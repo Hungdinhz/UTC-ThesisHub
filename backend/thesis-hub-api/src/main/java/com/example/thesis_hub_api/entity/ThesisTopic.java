@@ -34,6 +34,16 @@ public class ThesisTopic {
     @JoinColumn(name = "student_id")
     private User student;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "semester_id")
+    private Semester semester;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "council_id")
+    private Council council;
+
+    private Double supervisorScore;
+
     private String status; // PENDING, APPROVED, REJECTED, COMPLETED
 
     private LocalDateTime createdAt;
