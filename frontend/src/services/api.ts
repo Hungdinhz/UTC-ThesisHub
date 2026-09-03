@@ -34,8 +34,14 @@ import type {
   EvaluationSchedule,
   EvaluationScheduleCreate,
 } from '../types';
+import {
+  AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
+  GROUPS, SUPERVISOR_STUDENT, PROJECTS, DOCUMENTS,
+  EVALUATIONS, CHAT, TEMPLATES, NOTIFICATIONS,
+  AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT,
+} from './endpoints';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/app';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 
 class ApiService {
@@ -71,7 +77,7 @@ class ApiService {
           originalRequest._retry = true;
           try {
             // Send request to refresh token endpoint - HttpOnly cookie attached automatically via withCredentials
-            const response = await axios.post(`${API_BASE_URL}/token/refresh/`, {}, { withCredentials: true });
+            const response = await axios.post(`${API_BASE_URL}${AUTH.TOKEN_REFRESH}`, {}, { withCredentials: true });
             const { access } = response.data;
             localStorage.setItem('access_token', access);
             if (originalRequest.headers) {
@@ -90,7 +96,7 @@ class ApiService {
 
   // Auth
   async studentLogin(registrationNo: string, password: string): Promise<LoginResponse> {
-    const response = await this.api.post<LoginResponse>('/student/login/', {
+    const response = await this.api.post<LoginResponse>(AUTH.STUDENT_LOGIN, {
       registration_no: registrationNo,
       password,
     });
@@ -98,7 +104,7 @@ class ApiService {
   }
 
   async supervisorLogin(email: string, password: string): Promise<LoginResponse> {
-    const response = await this.api.post<LoginResponse>('/supervisor/login/', {
+    const response = await this.api.post<LoginResponse>(AUTH.SUPERVISOR_LOGIN, {
       email,
       password,
     });
@@ -106,7 +112,7 @@ class ApiService {
   }
 
   async committeeMemberLogin(email: string, password: string): Promise<LoginResponse> {
-    const response = await this.api.post<LoginResponse>('/committee_member/login/', {
+    const response = await this.api.post<LoginResponse>(AUTH.COMMITTEE_MEMBER_LOGIN, {
       email,
       password,
     });
@@ -114,7 +120,7 @@ class ApiService {
   }
 
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
-    await this.api.post('/change_password/', {
+    await this.api.post(AUTH.CHANGE_PASSWORD, {
       old_password: oldPassword,
       new_password: newPassword,
     });
@@ -122,36 +128,36 @@ class ApiService {
 
   // Student Profile
   async getStudentProfile(): Promise<Student> {
-    const response = await this.api.get<Student>('/student/profile/');
+    const response = await this.api.get<Student>(STUDENTS.PROFILE);
     return response.data;
   }
 
   // WebSocket Ticket
   async getWebSocketTicket(groupId: number): Promise<{ ticket: string; expires_in: number }> {
-    const response = await this.api.post<{ ticket: string; expires_in: number }>('/ws-ticket/', { group_id: groupId });
+    const response = await this.api.post<{ ticket: string; expires_in: number }>(AUTH.WS_TICKET, { group_id: groupId });
     return response.data;
   }
 
   // Supervisor Profile
   async getSupervisorProfile(): Promise<Supervisor> {
-    const response = await this.api.get<Supervisor>('/supervisor/profile/');
+    const response = await this.api.get<Supervisor>(SUPERVISORS.PROFILE);
     return response.data;
   }
 
   async updateSupervisorProfile(data: Partial<Supervisor>): Promise<Supervisor> {
-    const response = await this.api.patch<Supervisor>('/supervisor/profile/', data);
+    const response = await this.api.patch<Supervisor>(SUPERVISORS.PROFILE, data);
     return response.data;
   }
 
   // Committee Member Profile
   async getCommitteeMemberProfile(): Promise<CommitteeMember> {
-    const response = await this.api.get<CommitteeMember>('/committee_member/profile/');
+    const response = await this.api.get<CommitteeMember>(COMMITTEE_MEMBERS.PROFILE);
     return response.data;
   }
 
   // Committee Member Groups (for evaluation)
   async getCommitteeMemberGroups(): Promise<{ results: SupervisorOfStudentGroup[]; count: number }> {
-    const response = await this.api.get<{ results: SupervisorOfStudentGroup[]; count: number } | SupervisorOfStudentGroup[]>('/committee-member/groups/');
+    const response = await this.api.get<{ results: SupervisorOfStudentGroup[]; count: number } | SupervisorOfStudentGroup[]>(COMMITTEE_MEMBERS.GROUPS);
     // Handle paginated response
     if (Array.isArray(response.data)) {
       return { results: response.data, count: response.data.length };
@@ -164,13 +170,13 @@ class ApiService {
     const params: Record<string, string> = {};
     if (options?.forRequest) params.for_request = 'true';
     if (options?.search) params.search = options.search;
-    const response = await this.api.get<{ results: Student[]; count: number }>('/listofstudents/', { params });
+    const response = await this.api.get<{ results: Student[]; count: number }>(STUDENTS.LIST, { params });
     return response.data;
   }
 
   // Project Categories
   async getProjectCategories(): Promise<{ results: ProjectCategory[] }> {
-    const response = await this.api.get<{ results: ProjectCategory[] }>('/project/categories/');
+    const response = await this.api.get<{ results: ProjectCategory[] }>(PROJECTS.CATEGORIES);
     return response.data;
   }
 
@@ -180,7 +186,7 @@ class ApiService {
     if (options?.requested) params.requested = options.requested;
     if (options?.status) params.status = options.status;
     if (options?.search) params.search = options.search;
-    const response = await this.api.get<Group[] | { results: Group[] }>('/groupmate/request/', { params });
+    const response = await this.api.get<Group[] | { results: Group[] }>(GROUPS.REQUESTS, { params });
     // Handle paginated response
     if (Array.isArray(response.data)) {
       return response.data;
@@ -191,32 +197,32 @@ class ApiService {
   }
 
   async getGroupRequest(id: number): Promise<Group> {
-    const response = await this.api.get<Group>(`/groupmate/request/${id}/`);
+    const response = await this.api.get<Group>(GROUPS.request(id));
     return response.data;
   }
 
   async createGroupRequest(data: { student_2: number; project_category: number }): Promise<Group> {
-    const response = await this.api.post<Group>('/groupmate/request/', data);
+    const response = await this.api.post<Group>(GROUPS.REQUESTS, data);
     return response.data;
   }
 
   async updateGroupRequest(id: number, data: Partial<Group>): Promise<Group> {
-    const response = await this.api.patch<Group>(`/groupmate/request/?pk=${id}`, data);
+    const response = await this.api.patch<Group>(`${GROUPS.REQUESTS}/${id}`, data);
     return response.data;
   }
 
   async getGroup(id: number): Promise<Group> {
-    const response = await this.api.get<Group>(`/group/${id}/`);
+    const response = await this.api.get<Group>(GROUPS.detail(id));
     return response.data;
   }
 
   async getGroupComments(groupId: number): Promise<any[]> {
-    const response = await this.api.get(`/groupmate/${groupId}/comments/`);
+    const response = await this.api.get(GROUPS.comments(groupId));
     return response.data;
   }
 
   async createGroupComment(groupId: number, comment: string): Promise<any> {
-    const response = await this.api.post(`/groupmate/${groupId}/comments/`, { comment });
+    const response = await this.api.post(GROUPS.comments(groupId), { comment });
     return response.data;
   }
 
@@ -235,7 +241,7 @@ class ApiService {
     if (options?.search) params.search = options.search;
     if (options?.offered === true) params.offered = true;
     if (options?.mineOnly === true) params.mine_only = true;
-    const response = await this.api.get<Project[] | { results: Project[] }>('/projects/list/', { params });
+    const response = await this.api.get<Project[] | { results: Project[] }>(PROJECTS.LIST, { params });
     // Handle paginated response
     if (Array.isArray(response.data)) {
       return response.data;
@@ -246,17 +252,17 @@ class ApiService {
   }
 
   async createProject(data: Partial<Project>): Promise<Project> {
-    const response = await this.api.post<Project>('/projects/list/', data);
+    const response = await this.api.post<Project>(PROJECTS.LIST, data);
     return response.data;
   }
 
   async getProject(id: number): Promise<Project> {
-    const response = await this.api.get<Project>(`/project/${id}/`);
+    const response = await this.api.get<Project>(PROJECTS.detail(id));
     return response.data;
   }
 
   async deleteProject(id: number): Promise<void> {
-    await this.api.delete(`/projects/list/${id}/`);
+    await this.api.delete(PROJECTS.detail(id));
   }
 
   // Supervisors
@@ -264,34 +270,34 @@ class ApiService {
     const params: Record<string, string | number> = {};
     if (options?.categoryId) params.category = options.categoryId;
     if (options?.search) params.search = options.search;
-    const response = await this.api.get<{ results: Supervisor[] }>('/supervisor/list/', { params });
+    const response = await this.api.get<{ results: Supervisor[] }>(SUPERVISORS.LIST, { params });
     return response.data;
   }
 
   // Supervisor Requests
   async getSupervisorRequests(requested?: 'to' | 'from'): Promise<{ results: SupervisorOfStudentGroup[] }> {
     const params = requested ? { requested } : {};
-    const response = await this.api.get<{ results: SupervisorOfStudentGroup[] }>('/supervisor/student/request/', { params });
+    const response = await this.api.get<{ results: SupervisorOfStudentGroup[] }>(SUPERVISOR_STUDENT.REQUESTS, { params });
     return response.data;
   }
 
   async getSupervisorRequest(id: number): Promise<SupervisorOfStudentGroup> {
-    const response = await this.api.get<SupervisorOfStudentGroup>(`/supervisor-student/${id}/`);
+    const response = await this.api.get<SupervisorOfStudentGroup>(SUPERVISOR_STUDENT.request(id));
     return response.data;
   }
 
   async createSupervisorRequest(data: { supervisor: number; project: number | Partial<Project> }): Promise<SupervisorOfStudentGroup> {
-    const response = await this.api.post<SupervisorOfStudentGroup>('/supervisor/student/request/', data);
+    const response = await this.api.post<SupervisorOfStudentGroup>(SUPERVISOR_STUDENT.REQUESTS, data);
     return response.data;
   }
 
   async updateSupervisorRequest(id: number, data: Partial<SupervisorOfStudentGroup>): Promise<SupervisorOfStudentGroup> {
-    const response = await this.api.patch<SupervisorOfStudentGroup>(`/supervisor/student/request/?pk=${id}`, data);
+    const response = await this.api.patch<SupervisorOfStudentGroup>(`${SUPERVISOR_STUDENT.REQUESTS}/${id}`, data);
     return response.data;
   }
 
   async respondToSupervisorRequest(supervisorStudentId: number, status: 'accepted' | 'rejected'): Promise<SupervisorOfStudentGroup> {
-    const response = await this.api.post<SupervisorOfStudentGroup>('/supervisor/student/response/', {
+    const response = await this.api.post<SupervisorOfStudentGroup>(SUPERVISOR_STUDENT.RESPONSE, {
       supervisor_student_id: supervisorStudentId,
       status,
     });
@@ -303,7 +309,7 @@ class ApiService {
     const params: any = {};
     if (groupId) params.group = groupId;
     if (page) params.page = page;
-    const response = await this.api.get<{ results: any[]; count: number; next: string | null; previous: string | null } | any[]>('/supervisor/student/comments/', { params });
+    const response = await this.api.get<{ results: any[]; count: number; next: string | null; previous: string | null } | any[]>(SUPERVISOR_STUDENT.COMMENTS, { params });
     // Handle paginated response
     if (response.data && typeof response.data === 'object' && 'results' in response.data) {
       return response.data as { results: any[]; count: number; next: string | null; previous: string | null };
@@ -314,14 +320,14 @@ class ApiService {
   }
 
   async createSupervisorStudentComment(data: { group: number; comment: string }): Promise<any> {
-    const response = await this.api.post('/supervisor/student/comments/', data);
+    const response = await this.api.post(SUPERVISOR_STUDENT.COMMENTS, data);
     return response.data;
   }
 
   // Documents
   async getDocuments(documentType: string, groupId?: number): Promise<Document[]> {
     const params = groupId ? { group: groupId } : {};
-    const response = await this.api.get<{ count?: number; results?: Document[] } | Document[]>(`/proposal-document/${documentType}/`, { params });
+    const response = await this.api.get<{ count?: number; results?: Document[] } | Document[]>(DOCUMENTS.list(documentType), { params });
     // Handle both paginated and non-paginated responses
     if (response.data && typeof response.data === 'object' && 'results' in response.data) {
       return response.data.results || [];
@@ -330,7 +336,7 @@ class ApiService {
   }
 
   async uploadDocument(documentType: string, data: FormData): Promise<Document> {
-    const response = await this.api.post<Document>(`/proposal-document/${documentType}/`, data, {
+    const response = await this.api.post<Document>(DOCUMENTS.list(documentType), data, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -339,13 +345,13 @@ class ApiService {
   }
 
   async updateDocumentStatus(documentType: string, documentId: number, status: string): Promise<Document> {
-    const response = await this.api.patch<Document>(`/proposal-document/${documentType}/?pk=${documentId}`, { status });
+    const response = await this.api.patch<Document>(DOCUMENTS.detail(documentType, documentId), { status });
     return response.data;
   }
 
   /** Submit an accepted document to committee (before deadline). Committee sees only submitted documents. */
   async submitDocumentToCommittee(documentType: string, documentId: number): Promise<Document> {
-    const response = await this.api.post<Document>(`/document-submit-to-committee/${documentType}/${documentId}/`);
+    const response = await this.api.post<Document>(DOCUMENTS.submitToCommittee(documentType, documentId));
     return response.data;
   }
 
@@ -384,7 +390,7 @@ class ApiService {
   }
 
   async deleteDocument(documentType: string, documentId: number): Promise<void> {
-    await this.api.delete(`/proposal-document/${documentType}/${documentId}/`);
+    await this.api.delete(DOCUMENTS.detail(documentType, documentId));
   }
 
   // Document requirements (committee-defined deadlines; students see and submit against these)
@@ -392,7 +398,7 @@ class ApiService {
     const params: Record<string, string | number> = { page_size: 200 };
     if (semester) params.semester = semester;
     const response = await this.api.get<DocumentRequirement[] | { results: DocumentRequirement[] }>(
-      '/document-requirements/',
+      DOCUMENTS.REQUIREMENTS,
       { params }
     );
     if (Array.isArray(response.data)) return response.data;
@@ -406,12 +412,12 @@ class ApiService {
     deadline: string;
     semester?: string | null;
   }): Promise<DocumentRequirement> {
-    const response = await this.api.post<DocumentRequirement>('/document-requirements/', data);
+    const response = await this.api.post<DocumentRequirement>(DOCUMENTS.REQUIREMENTS, data);
     return response.data;
   }
 
   async getDocumentRequirement(id: number): Promise<DocumentRequirement> {
-    const response = await this.api.get<DocumentRequirement>(`/document-requirements/${id}/`);
+    const response = await this.api.get<DocumentRequirement>(DOCUMENTS.requirement(id));
     return response.data;
   }
 
@@ -419,12 +425,12 @@ class ApiService {
     id: number,
     data: Partial<Pick<DocumentRequirement, 'title' | 'deadline' | 'semester'>>
   ): Promise<DocumentRequirement> {
-    const response = await this.api.patch<DocumentRequirement>(`/document-requirements/${id}/`, data);
+    const response = await this.api.patch<DocumentRequirement>(DOCUMENTS.requirement(id), data);
     return response.data;
   }
 
   async deleteDocumentRequirement(id: number): Promise<void> {
-    await this.api.delete(`/document-requirements/${id}/`);
+    await this.api.delete(DOCUMENTS.requirement(id));
   }
 
   // Supervisor Documents
@@ -433,7 +439,7 @@ class ApiService {
     status?: string;
     group?: number;
   }): Promise<{ results: Document[]; count: number; next: string | null; previous: string | null }> {
-    const response = await this.api.get<{ results: Document[]; count: number; next: string | null; previous: string | null } | Document[]>('/supervisor/documents/', { params });
+    const response = await this.api.get<{ results: Document[]; count: number; next: string | null; previous: string | null } | Document[]>(SUPERVISORS.DOCUMENTS, { params });
     // Handle paginated response
     if (response.data && typeof response.data === 'object' && 'results' in response.data) {
       return response.data as { results: Document[]; count: number; next: string | null; previous: string | null };
@@ -445,95 +451,95 @@ class ApiService {
 
   // Evaluations
   async getScopeDocumentEvaluation(groupId: number): Promise<any> {
-    const response = await this.api.get(`/scope_document_evaluation_criteria/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.scopeDocument(groupId));
     return response.data;
   }
 
   async updateScopeDocumentEvaluation(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/scope_document_evaluation_criteria/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.scopeDocument(groupId), data);
     return response.data;
   }
 
   async getSRSEvaluationSupervisor(groupId: number): Promise<any> {
-    const response = await this.api.get(`/srs-evaluation-supervisor/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.srsSupervisor(groupId));
     return response.data;
   }
 
   async updateSRSEvaluationSupervisor(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/srs-evaluation-supervisor/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.srsSupervisor(groupId), data);
     return response.data;
   }
 
   async getSRSEvaluationCommitteeMember(groupId: number): Promise<any> {
-    const response = await this.api.get(`/srs-evaluation-committee-member/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.srsCommittee(groupId));
     return response.data;
   }
 
   async updateSRSEvaluationCommitteeMember(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/srs-evaluation-committee-member/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.srsCommittee(groupId), data);
     return response.data;
   }
 
   // SDD Evaluations
   async getSDDEvaluationSupervisor(groupId: number): Promise<any> {
-    const response = await this.api.get(`/sdd-evaluation-supervisor/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.sddSupervisor(groupId));
     return response.data;
   }
 
   async updateSDDEvaluationSupervisor(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/sdd-evaluation-supervisor/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.sddSupervisor(groupId), data);
     return response.data;
   }
 
   async getSDDEvaluationCommitteeMember(groupId: number): Promise<any> {
-    const response = await this.api.get(`/sdd-evaluation-committee-member/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.sddCommittee(groupId));
     return response.data;
   }
 
   async updateSDDEvaluationCommitteeMember(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/sdd-evaluation-committee-member/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.sddCommittee(groupId), data);
     return response.data;
   }
 
   // Evaluation 3
   async getEvaluation3Supervisor(groupId: number): Promise<any> {
-    const response = await this.api.get(`/evaluation3-supervisor/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.eval3Supervisor(groupId));
     return response.data;
   }
 
   async updateEvaluation3Supervisor(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/evaluation3-supervisor/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.eval3Supervisor(groupId), data);
     return response.data;
   }
 
   async getEvaluation3CommitteeMember(groupId: number): Promise<any> {
-    const response = await this.api.get(`/evaluation3-committee-member/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.eval3Committee(groupId));
     return response.data;
   }
 
   async updateEvaluation3CommitteeMember(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/evaluation3-committee-member/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.eval3Committee(groupId), data);
     return response.data;
   }
 
   // Evaluation 4
   async getEvaluation4Supervisor(groupId: number): Promise<any> {
-    const response = await this.api.get(`/evaluation4-supervisor/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.eval4Supervisor(groupId));
     return response.data;
   }
 
   async updateEvaluation4Supervisor(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/evaluation4-supervisor/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.eval4Supervisor(groupId), data);
     return response.data;
   }
 
   async getEvaluation4CommitteeMember(groupId: number): Promise<any> {
-    const response = await this.api.get(`/evaluation4-committee-member/${groupId}/`);
+    const response = await this.api.get(EVALUATIONS.eval4Committee(groupId));
     return response.data;
   }
 
   async updateEvaluation4CommitteeMember(groupId: number, data: any): Promise<any> {
-    const response = await this.api.patch(`/evaluation4-committee-member/${groupId}/`, data);
+    const response = await this.api.patch(EVALUATIONS.eval4Committee(groupId), data);
     return response.data;
   }
 
@@ -541,7 +547,7 @@ class ApiService {
   async getChatMessages(groupId: number, page?: number): Promise<{ results: ChatMessage[]; count: number; next: string | null; previous: string | null }> {
     const params: any = { group: groupId };
     if (page) params.page = page;
-    const response = await this.api.get<{ results: ChatMessage[]; count: number; next: string | null; previous: string | null } | ChatMessage[]>('/chatroom/', { params });
+    const response = await this.api.get<{ results: ChatMessage[]; count: number; next: string | null; previous: string | null } | ChatMessage[]>(CHAT.MESSAGES, { params });
     // Handle paginated response
     if (response.data && typeof response.data === 'object' && 'results' in response.data) {
       return response.data as { results: ChatMessage[]; count: number; next: string | null; previous: string | null };
@@ -552,18 +558,18 @@ class ApiService {
   }
 
   async sendChatMessage(data: { group: number; message: string }): Promise<ChatMessage> {
-    const response = await this.api.post<ChatMessage>('/chatroom/', data);
+    const response = await this.api.post<ChatMessage>(CHAT.MESSAGES, data);
     return response.data;
   }
 
   async deleteChatMessage(messageId: number): Promise<void> {
-    await this.api.delete(`/chatroom/${messageId}/`);
+    await this.api.delete(CHAT.message(messageId));
   }
 
   // Templates
   async getTemplates(templateType: string, semester?: string): Promise<any[]> {
     const params = semester ? { semester } : {};
-    const response = await this.api.get<any[] | { results: any[] }>(`/srs_template/${templateType}/`, { params });
+    const response = await this.api.get<any[] | { results: any[] }>(TEMPLATES.list(templateType), { params });
     // Handle paginated response
     if (Array.isArray(response.data)) {
       return response.data;
@@ -574,7 +580,7 @@ class ApiService {
   }
 
   async uploadTemplate(templateType: string, data: FormData): Promise<any> {
-    const response = await this.api.post(`/srs_template/${templateType}/`, data, {
+    const response = await this.api.post(TEMPLATES.list(templateType), data, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -584,7 +590,7 @@ class ApiService {
 
   // Export
   async exportReport(): Promise<Blob> {
-    const response = await this.api.get('/export/report/', {
+    const response = await this.api.get(EXPORT.REPORT, {
       responseType: 'blob',
     });
     return response.data;
@@ -597,56 +603,56 @@ class ApiService {
     is_read?: boolean;
     type?: string;
   }): Promise<PaginatedResponse<Notification>> {
-    const response = await this.api.get<PaginatedResponse<Notification>>('/notifications/', { params });
+    const response = await this.api.get<PaginatedResponse<Notification>>(NOTIFICATIONS.LIST, { params });
     return response.data;
   }
 
   async getUnreadNotificationCount(): Promise<NotificationUnreadCount> {
-    const response = await this.api.get<NotificationUnreadCount>('/notifications/unread-count/');
+    const response = await this.api.get<NotificationUnreadCount>(NOTIFICATIONS.UNREAD_COUNT);
     return response.data;
   }
 
   async markNotificationsAsRead(notificationIds?: number[]): Promise<{ message: string; updated_count: number }> {
     const response = await this.api.post<{ message: string; updated_count: number }>(
-      '/notifications/mark-read/',
+      NOTIFICATIONS.MARK_READ,
       notificationIds ? { notification_ids: notificationIds } : {}
     );
     return response.data;
   }
 
   async getNotification(id: number): Promise<Notification> {
-    const response = await this.api.get<Notification>(`/notifications/${id}/`);
+    const response = await this.api.get<Notification>(NOTIFICATIONS.detail(id));
     return response.data;
   }
 
   async deleteNotification(id: number): Promise<void> {
-    await this.api.delete(`/notifications/${id}/`);
+    await this.api.delete(NOTIFICATIONS.detail(id));
   }
 
   async deleteAllNotifications(): Promise<{ message: string; deleted_count: number }> {
-    const response = await this.api.delete<{ message: string; deleted_count: number }>('/notifications/delete-all/');
+    const response = await this.api.delete<{ message: string; deleted_count: number }>(NOTIFICATIONS.DELETE_ALL);
     return response.data;
   }
 
   async getNotificationPreferences(): Promise<NotificationPreference> {
-    const response = await this.api.get<NotificationPreference>('/notifications/preferences/');
+    const response = await this.api.get<NotificationPreference>(NOTIFICATIONS.PREFERENCES);
     return response.data;
   }
 
   async updateNotificationPreferences(preferences: Partial<NotificationPreference>): Promise<NotificationPreference> {
-    const response = await this.api.patch<NotificationPreference>('/notifications/preferences/', preferences);
+    const response = await this.api.patch<NotificationPreference>(NOTIFICATIONS.PREFERENCES, preferences);
     return response.data;
   }
 
   // ==================== Analytics ====================
 
   async getSupervisorAnalytics(): Promise<SupervisorAnalytics> {
-    const response = await this.api.get<SupervisorAnalytics>('/supervisor/analytics/');
+    const response = await this.api.get<SupervisorAnalytics>(SUPERVISORS.ANALYTICS);
     return response.data;
   }
 
   async getCommitteeMemberAnalytics(): Promise<CommitteeMemberAnalytics> {
-    const response = await this.api.get<CommitteeMemberAnalytics>('/committee-member/analytics/');
+    const response = await this.api.get<CommitteeMemberAnalytics>(COMMITTEE_MEMBERS.ANALYTICS);
     return response.data;
   }
 
@@ -661,19 +667,19 @@ class ApiService {
     from_date?: string;
     to_date?: string;
   }): Promise<PaginatedResponse<AuditLog>> {
-    const response = await this.api.get<PaginatedResponse<AuditLog>>('/audit-logs/', { params });
+    const response = await this.api.get<PaginatedResponse<AuditLog>>(AUDIT_LOGS.LIST, { params });
     return response.data;
   }
 
   async getAuditLogsByGroup(groupId: number, page = 1): Promise<PaginatedResponse<AuditLog>> {
-    const response = await this.api.get<PaginatedResponse<AuditLog>>(`/audit-logs/group/${groupId}/`, {
+    const response = await this.api.get<PaginatedResponse<AuditLog>>(AUDIT_LOGS.byGroup(groupId), {
       params: { page }
     });
     return response.data;
   }
 
   async getAuditLogStats(): Promise<AuditLogStats> {
-    const response = await this.api.get<AuditLogStats>('/audit-logs/stats/');
+    const response = await this.api.get<AuditLogStats>(AUDIT_LOGS.STATS);
     return response.data;
   }
 
@@ -681,7 +687,7 @@ class ApiService {
 
   // External Login
   async externalExaminerLogin(email: string, password: string): Promise<LoginResponse> {
-    const response = await this.api.post<LoginResponse>('/external/login/', {
+    const response = await this.api.post<LoginResponse>(AUTH.EXTERNAL_LOGIN, {
       email,
       password,
     });
@@ -690,18 +696,18 @@ class ApiService {
 
   // External Profile
   async getExternalProfile(): Promise<ExternalExaminer> {
-    const response = await this.api.get<ExternalExaminer>('/external/profile/');
+    const response = await this.api.get<ExternalExaminer>(EXTERNAL.PROFILE);
     return response.data;
   }
 
   async updateExternalProfile(data: Partial<ExternalExaminer>): Promise<ExternalExaminer> {
-    const response = await this.api.patch<ExternalExaminer>('/external/profile/', data);
+    const response = await this.api.patch<ExternalExaminer>(EXTERNAL.PROFILE, data);
     return response.data;
   }
 
   // External Dashboard
   async getExternalDashboard(): Promise<ExternalDashboardData> {
-    const response = await this.api.get<ExternalDashboardData>('/external/dashboard/');
+    const response = await this.api.get<ExternalDashboardData>(EXTERNAL.DASHBOARD);
     return response.data;
   }
 
@@ -711,7 +717,7 @@ class ApiService {
     designation?: string;
     is_active?: boolean;
   }): Promise<PaginatedResponse<ExternalExaminerListItem>> {
-    const response = await this.api.get<PaginatedResponse<ExternalExaminerListItem>>('/external/examiners/', { params });
+    const response = await this.api.get<PaginatedResponse<ExternalExaminerListItem>>(EXTERNAL.EXAMINERS, { params });
     return response.data;
   }
 
@@ -721,33 +727,33 @@ class ApiService {
     status?: string;
     external_examiner?: number;
   }): Promise<PaginatedResponse<ExternalGroup>> {
-    const response = await this.api.get<PaginatedResponse<ExternalGroup>>('/external/groups/', { params });
+    const response = await this.api.get<PaginatedResponse<ExternalGroup>>(EXTERNAL.GROUPS, { params });
     return response.data;
   }
 
   async getExternalGroup(id: number): Promise<ExternalGroupDetail> {
-    const response = await this.api.get<ExternalGroupDetail>(`/external/groups/${id}/`);
+    const response = await this.api.get<ExternalGroupDetail>(EXTERNAL.group(id));
     return response.data;
   }
 
   async createExternalGroup(data: ExternalGroupCreate): Promise<ExternalGroup> {
-    const response = await this.api.post<ExternalGroup>('/external/groups/', data);
+    const response = await this.api.post<ExternalGroup>(EXTERNAL.GROUPS, data);
     return response.data;
   }
 
   async updateExternalGroup(id: number, data: Partial<ExternalGroupCreate>): Promise<ExternalGroup> {
-    const response = await this.api.patch<ExternalGroup>(`/external/groups/${id}/`, data);
+    const response = await this.api.patch<ExternalGroup>(EXTERNAL.group(id), data);
     return response.data;
   }
 
   async deleteExternalGroup(id: number): Promise<void> {
-    await this.api.delete(`/external/groups/${id}/`);
+    await this.api.delete(EXTERNAL.group(id));
   }
 
   // External Group Assignments
   async getExternalGroupStudents(groupId: number): Promise<ExternalGroupAssignment[]> {
     const response = await this.api.get<ExternalGroupAssignment[]>(
-      `/external/groups/${groupId}/students/`
+      EXTERNAL.groupStudents(groupId)
     );
     return response.data;
   }
@@ -757,7 +763,7 @@ class ApiService {
     completed_internal?: string;
   }): Promise<PaginatedResponse<SupervisorOfStudentGroup>> {
     const response = await this.api.get<PaginatedResponse<SupervisorOfStudentGroup>>(
-      '/external/available-groups/',
+      EXTERNAL.AVAILABLE_GROUPS,
       { params }
     );
     return response.data;
@@ -770,30 +776,30 @@ class ApiService {
     slot_time?: string;
   }): Promise<ExternalGroupAssignment> {
     const response = await this.api.post<ExternalGroupAssignment>(
-      '/external/assignments/',
+      EXTERNAL.ASSIGNMENTS,
       data
     );
     return response.data;
   }
 
   async deleteExternalAssignment(id: number): Promise<void> {
-    await this.api.delete(`/external/assignments/${id}/`);
+    await this.api.delete(EXTERNAL.assignment(id));
   }
 
   // External Evaluations
   async getExternalEvaluations(): Promise<ExternalEvaluation[]> {
-    const response = await this.api.get<ExternalEvaluation[]>('/external/evaluations/');
+    const response = await this.api.get<ExternalEvaluation[]>(EXTERNAL.EVALUATIONS);
     return response.data;
   }
 
   async getExternalEvaluation(id: number): Promise<ExternalEvaluation> {
-    const response = await this.api.get<ExternalEvaluation>(`/external/evaluations/${id}/`);
+    const response = await this.api.get<ExternalEvaluation>(EXTERNAL.evaluation(id));
     return response.data;
   }
 
   async createExternalEvaluation(data: ExternalEvaluationCreate): Promise<ExternalEvaluation> {
     const response = await this.api.post<ExternalEvaluation>(
-      '/external/evaluations/create/',
+      EXTERNAL.EVALUATIONS_CREATE,
       data
     );
     return response.data;
@@ -804,7 +810,7 @@ class ApiService {
     data: Partial<ExternalEvaluationCreate>
   ): Promise<ExternalEvaluation> {
     const response = await this.api.patch<ExternalEvaluation>(
-      `/external/evaluations/${id}/`,
+      EXTERNAL.evaluation(id),
       data
     );
     return response.data;
@@ -813,7 +819,7 @@ class ApiService {
   // Student External Evaluation View
   async getStudentExternalEvaluation(): Promise<ExternalEvaluation | null> {
     try {
-      const response = await this.api.get<ExternalEvaluation>('/student/external-evaluation/');
+      const response = await this.api.get<ExternalEvaluation>(STUDENTS.EXTERNAL_EVALUATION);
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -830,32 +836,32 @@ class ApiService {
     status?: string;
     upcoming?: string;
   }): Promise<PaginatedResponse<EvaluationSchedule>> {
-    const response = await this.api.get<PaginatedResponse<EvaluationSchedule>>('/schedules/', { params });
+    const response = await this.api.get<PaginatedResponse<EvaluationSchedule>>(SCHEDULES.LIST, { params });
     return response.data;
   }
 
   async getEvaluationSchedule(id: number): Promise<EvaluationSchedule> {
-    const response = await this.api.get<EvaluationSchedule>(`/schedules/${id}/`);
+    const response = await this.api.get<EvaluationSchedule>(SCHEDULES.detail(id));
     return response.data;
   }
 
   async createEvaluationSchedule(data: EvaluationScheduleCreate): Promise<EvaluationSchedule> {
-    const response = await this.api.post<EvaluationSchedule>('/schedules/', data);
+    const response = await this.api.post<EvaluationSchedule>(SCHEDULES.LIST, data);
     return response.data;
   }
 
   async updateEvaluationSchedule(id: number, data: Partial<EvaluationScheduleCreate>): Promise<EvaluationSchedule> {
-    const response = await this.api.patch<EvaluationSchedule>(`/schedules/${id}/`, data);
+    const response = await this.api.patch<EvaluationSchedule>(SCHEDULES.detail(id), data);
     return response.data;
   }
 
   async deleteEvaluationSchedule(id: number): Promise<void> {
-    await this.api.delete(`/schedules/${id}/`);
+    await this.api.delete(SCHEDULES.detail(id));
   }
 
   // Consolidated Report Export
   async downloadConsolidatedReport(): Promise<void> {
-    const response = await this.api.get('/export/consolidated-report/', {
+    const response = await this.api.get(EXPORT.CONSOLIDATED_REPORT, {
       responseType: 'blob',
     });
     const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -870,7 +876,7 @@ class ApiService {
   // Utility
   async logout(): Promise<void> {
     try {
-      await axios.post(`${API_BASE_URL}/token/logout/`, {}, { withCredentials: true });
+      await axios.post(`${API_BASE_URL}${AUTH.LOGOUT}`, {}, { withCredentials: true });
     } catch (e) {
       // Ignore network errors during logout cleanup
     } finally {
