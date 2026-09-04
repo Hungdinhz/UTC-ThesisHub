@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { useTranslation } from 'react-i18next';
 import './LoginPage.css';
-import utcLogo from '../asset/images/utc_logo.webp';
+import utcLogo from '../assets/images/utc_logo.webp';
 
 const LoginPage: React.FC = () => {
   const { t, i18n } = useTranslation();

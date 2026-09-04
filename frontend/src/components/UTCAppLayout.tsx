@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import utcLogo from '../asset/images/utc_logo.webp';
+import utcLogo from '../assets/images/utc_logo.webp';
 import type { Student, Supervisor, CommitteeMember } from '../types';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
