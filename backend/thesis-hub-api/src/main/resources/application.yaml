@@ -1,3 +1,63 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
-    name: thesis-hub-api
+    name: ${APP_NAME:thesis-hub-api}
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:20MB}
+      max-request-size: ${MAX_FILE_SIZE:20MB}
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  docker:
+    compose:
+      enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.chat.memory.repository.redis.autoconfigure.RedisChatMemoryRepositoryAutoConfiguration
+      - org.springframework.ai.vectorstore.redis.autoconfigure.RedisVectorStoreAutoConfiguration
+
+server:
+  port: ${APP_PORT:8080}
+
+app:
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
+  backend-url: ${APP_BACKEND_URL:http://localhost:8080}
+
+  jwt:
+    secret: ${JWT_SECRET:CHANGE_THIS_SECRET}
+    expiration: ${JWT_EXPIRATION:86400000}
+
+  file:
+    storage-path: ${FILE_STORAGE_PATH:./uploads}
+
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
