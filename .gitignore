@@ -1,12 +1,345 @@
+# =========================================================
+# THESISHUB - ROOT GITIGNORE
+# =========================================================
+
+
+# =========================================================
+# 1. Java / Maven - Backend
+# =========================================================
+
+# Maven build output
+backend/target/
+**/target/
+
+# Compiled Java
+*.class
+
+# Maven reports / generated files
+backend/target/
+**/surefire-reports/
+**/failsafe-reports/
+
+# Spring Boot generated files
+**/*.log
+
+
+# =========================================================
+# 2. Node.js / React / Vite - Frontend
+# =========================================================
+
+# Dependencies
+frontend/node_modules/
+**/node_modules/
+
+# Production build
+frontend/dist/
+**/dist/
+
+# Vite cache
+**/.vite/
+
+# TypeScript incremental build
+*.tsbuildinfo
+
+# Coverage
+frontend/coverage/
+**/coverage/
+
+# npm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Package manager debug files
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+
+# =========================================================
+# 3. Environment Variables / Secrets
+# =========================================================
+
+# Environment files
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-target/
-node_modules/
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# Keep example environment files
+!.env.example
+!**/.env.example
+
+
+# =========================================================
+# 4. Spring Boot Local Configuration / Secrets
+# =========================================================
+
+# Local-only Spring configuration
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+
+# Local secrets
+**/secrets.yml
+**/secrets.yaml
+**/secrets.properties
+
+
+# =========================================================
+# 5. IntelliJ IDEA
+# =========================================================
 
 .idea/
+**/.idea/
+
+*.iml
+*.iws
+*.ipr
+
+out/
+**/out/
+
+# IntelliJ generated
+.idea/workspace.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+
+# Keep shared code style if the team decides to commit it
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+
+
+# =========================================================
+# 6. Visual Studio Code
+# =========================================================
+
 .vscode/
 
-*.log
+# Keep shared VS Code settings only if needed
+# Uncomment these if your team wants to commit them:
+# !.vscode/settings.json
+# !.vscode/extensions.json
+# !.vscode/launch.json
+# !.vscode/tasks.json
 
+
+# =========================================================
+# 7. Eclipse
+# =========================================================
+
+.classpath
+.project
+.settings/
+.factorypath
+
+
+# =========================================================
+# 8. NetBeans
+# =========================================================
+
+/nbproject/private/
+/nbbuild/
+/dist/
+/.nb-gradle/
+
+
+# =========================================================
+# 9. OS Generated Files
+# =========================================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+desktop.ini
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# macOS folder attributes
+._*
+
+# Linux
+*~
+.directory
+
+
+# =========================================================
+# 10. Logs
+# =========================================================
+
+*.log
+logs/
+**/logs/
+
+
+# =========================================================
+# 11. Temporary / Backup Files
+# =========================================================
+
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+*.orig
+*.rej
+
+# Editor temporary files
+*~
+.#*
+\#*\#
+
+
+# =========================================================
+# 12. Test / Coverage / Reports
+# =========================================================
+
+**/test-results/
+**/reports/
+**/surefire-reports/
+**/failsafe-reports/
+
+# JaCoCo
+**/jacoco/
+**/jacoco.exec
+
+# Generic coverage
+**/.nyc_output/
+**/coverage/
+
+
+# =========================================================
+# 13. Build / Generated Files
+# =========================================================
+
+build/
+**/build/
+
+generated/
+**/generated/
+
+tmp/
+**/tmp/
+
+
+# =========================================================
+# 14. Docker Local Files
+# =========================================================
+
+# Local Docker environment files
+docker-compose.override.yml
+
+# Docker local secrets
+**/docker-secrets/
+**/.docker/
+
+
+# =========================================================
+# 15. Database Local Files
+# =========================================================
+
+# Local database dumps
+*.sql.gz
+*.dump
+*.bak
+
+# SQLite local database files, if ever used
+*.sqlite
+*.sqlite3
+*.db
+
+
+# =========================================================
+# 16. Uploaded / Runtime Files
+# =========================================================
+
+# Local runtime uploads
+uploads/
+**/uploads/
+
+# Local generated files
+storage/
+**/storage/
+
+# IMPORTANT:
+# Keep application source/documentation files tracked.
+# Do not ignore docs/ itself.
+
+
+# =========================================================
+# 17. Generated API / Tool Files
+# =========================================================
+
+# OpenAPI generated output
+openapi-generated/
+swagger-generated/
+
+# Generated API clients
+generated-api/
+**/generated-api/
+
+
+# =========================================================
+# 18. Local IDE / Tool State
+# =========================================================
+
+.history/
+.project/
+.settings/
+
+# Cursor
+.cursor/
+
+# Claude / AI local files
+.claude/
+
+# Local MCP / tool state
+.mcp/
+
+
+# =========================================================
+# 19. Frontend Framework Specific
+# =========================================================
+
+# Vite
+**/.vite/
+
+# React / Next.js caches if ever introduced
+.next/
+**/.next/
+
+# Parcel
+.cache/
+**/.cache/
+
+# Turbo
+.turbo/
+
+
+# =========================================================
+# 20. Miscellaneous Generated Files
+# =========================================================
+
+*.pid
+*.pid.lock
+*.seed
+
+# OS crash dumps
+*.stackdump
