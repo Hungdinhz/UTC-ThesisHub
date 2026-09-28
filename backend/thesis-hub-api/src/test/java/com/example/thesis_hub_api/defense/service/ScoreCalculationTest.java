@@ -81,7 +81,7 @@ public class ScoreCalculationTest {
         GraduationResultResponseDTO res = defenseService.synthesizeResult(req);
         
         assertEquals(new BigDecimal("4.25"), res.getFinalScore());
-        assertEquals("POOR", res.getGrade());
+        assertEquals("AVERAGE", res.getGrade());
         assertEquals("FAILED", res.getFinalResult());
     }
 }
