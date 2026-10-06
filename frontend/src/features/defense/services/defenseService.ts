@@ -15,7 +15,8 @@ import type {
   SynthesizeResultRequest,
 } from '../types';
 
-const API_BASE = '/api/v1/defense';
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
+const API_BASE = `${BASE_URL}/defense`;
 
 export const mockLecturers: LecturerOption[] = [
   { lecturerId: 501, fullName: 'PGS. TS. Trần Văn Minh', degree: 'Phó Giáo sư', canBePresident: true, canBeSecretary: true, canBeMember: true, currentLoad: 2 },
