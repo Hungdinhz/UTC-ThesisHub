@@ -10,7 +10,8 @@ import type {
   FinalDefenseEligibilityResponse,
 } from '../types';
 
-const API_BASE = '/api/v1/eligibility';
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
+const API_BASE = `${BASE_URL}/eligibility`;
 
 // Mock initial data for UI preview / offline testing
 let mockStudents: EligibilityCheckResponse[] = [
