@@ -22,11 +22,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {
         log.warn("AppException occurred: code={}, message={}", ex.getErrorCode().getCode(), ex.getMessage());
-        ApiResponse<Object> response = ApiResponse.builder()
-                .code(ex.getErrorCode().getCode())
-                .message(ex.getMessage())
-                .success(false)
-                .build();
+        ApiResponse<Object> response = ApiResponse.error(ex.getErrorCode().getCode(), ex.getMessage());
         return ResponseEntity.status(ex.getErrorCode().getHttpStatus()).body(response);
     }
 
@@ -53,44 +49,28 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Object>> handleAccessDeniedException(AccessDeniedException ex) {
         log.warn("Access denied: {}", ex.getMessage());
-        ApiResponse<Object> response = ApiResponse.builder()
-                .code(ErrorCode.UNAUTHORIZED.getCode())
-                .message(ErrorCode.UNAUTHORIZED.getMessage())
-                .success(false)
-                .build();
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<Object>> handleAuthenticationException(AuthenticationException ex) {
         log.warn("Authentication failed: {}", ex.getMessage());
-        ApiResponse<Object> response = ApiResponse.builder()
-                .code(ErrorCode.UNAUTHENTICATED.getCode())
-                .message(ErrorCode.UNAUTHENTICATED.getMessage())
-                .success(false)
-                .build();
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.UNAUTHENTICATED.getCode(), ErrorCode.UNAUTHENTICATED.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Object>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
         log.warn("File upload exceeded max size: {}", ex.getMessage());
-        ApiResponse<Object> response = ApiResponse.builder()
-                .code(ErrorCode.FILE_STORAGE_ERROR.getCode())
-                .message("Kích thước tập tin vượt quá giới hạn tối đa cho phép (20MB)")
-                .success(false)
-                .build();
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.FILE_STORAGE_ERROR.getCode(), "Kích thước tập tin vượt quá giới hạn tối đa cho phép (20MB)");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
         log.error("Unhandled exception caught in GlobalExceptionHandler: ", ex);
-        ApiResponse<Object> response = ApiResponse.builder()
-                .code(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode())
-                .message("Đã xảy ra lỗi hệ thống. Vui lòng liên hệ quản trị viên.")
-                .success(false)
-                .build();
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode(), "Đã xảy ra lỗi hệ thống. Vui lòng liên hệ quản trị viên.");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }
