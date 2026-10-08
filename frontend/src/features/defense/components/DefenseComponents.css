@@ -1,0 +1,432 @@
+/* Council Member Card */
+.council-member-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.council-member-card:hover {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.council-member-card.conflict-warning {
+  border: 2px solid #ef4444;
+  background-color: #fef2f2;
+}
+
+.member-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.member-role-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.role-president {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.role-secretary {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+
+.role-member {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.conflict-badge {
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.member-select-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #666666);
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.member-select {
+  font-size: 0.8125rem;
+}
+
+/* CSP Info Box */
+.csp-info-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.8125rem;
+}
+
+.csp-info-box h4 {
+  margin: 0 0 6px 0;
+  color: #166534;
+}
+
+.csp-info-box ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #15803d;
+}
+
+/* Schedule Calendar Views */
+.schedule-empty-view {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px dashed var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-secondary, #666666);
+}
+
+.schedule-room-grid,
+.schedule-session-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.schedule-room-column,
+.schedule-session-column {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.room-column-header,
+.session-column-header {
+  background: var(--bg-tertiary, #f8f9fa);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.room-column-header h3,
+.session-column-header h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary, #333333);
+}
+
+.room-count,
+.session-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary-color, #007bff);
+  background: var(--primary-light, #e3f2fd);
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
+.room-schedules-list,
+.session-schedules-list {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule-item-card {
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.schedule-time-badge,
+.schedule-room-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary-color, #007bff);
+  margin-bottom: 6px;
+}
+
+.schedule-council-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary, #333333);
+  margin-bottom: 4px;
+}
+
+.schedule-capacity,
+.schedule-time-row {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #666666);
+  margin-bottom: 6px;
+}
+
+.schedule-notes {
+  font-size: 0.75rem;
+  color: var(--text-muted, #999999);
+  margin-bottom: 8px;
+}
+
+.schedule-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Timeline View */
+.schedule-timeline-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.timeline-row {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.timeline-time-col {
+  width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--primary-color, #007bff);
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.time-divider {
+  color: var(--text-muted, #999999);
+  line-height: 1;
+}
+
+.timeline-content-card {
+  flex: 1;
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.timeline-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.council-title {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--text-primary, #333333);
+}
+
+.header-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-tag,
+.session-tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.room-tag {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.session-tag {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.timeline-card-details {
+  display: flex;
+  gap: 20px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #666666);
+}
+
+/* Score Entry Card */
+.score-entry-card {
+  background: var(--bg-secondary, #ffffff);
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  margin-bottom: 24px;
+}
+
+.score-entry-header h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary, #333333);
+}
+
+.score-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.criteria-scoring-table {
+  background: var(--bg-tertiary, #f8f9fa);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.criteria-scoring-table h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.9375rem;
+  color: var(--text-primary, #333333);
+}
+
+.criterion-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light, #f0f0f0);
+}
+
+.criterion-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.criterion-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary, #333333);
+}
+
+.criterion-sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #666666);
+}
+
+.criterion-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-score {
+  width: 80px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.score-max {
+  font-size: 0.875rem;
+  color: var(--text-muted, #999999);
+}
+
+.total-score-banner {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.total-label {
+  font-weight: 700;
+  color: #1e40af;
+  font-size: 0.9375rem;
+}
+
+.total-val {
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: var(--primary-color, #007bff);
+}
+
+.form-actions-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.form-success-msg {
+  color: var(--success-text, #155724);
+  background-color: var(--success-bg, #d4edda);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.synthesis-formula-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.synthesis-formula-info h4 {
+  margin: 0 0 6px 0;
+  font-size: 0.875rem;
+  color: var(--text-primary, #333333);
+}
+
+.weight-check-box {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-tertiary, #f8f9fa);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
