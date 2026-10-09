@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { thesisApi } from '../services/thesisApi';
-import { Thesis } from '../types/thesis.types';
+import type {  Thesis  } from '../types/thesis.types';
 import { ThesisStatusBadge } from '../components/ThesisStatusBadge';
 
 export const ThesisListPage: React.FC = () => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Comment } from '../types/progress.types';
+import type {  Comment  } from '../types/progress.types';
 
 interface Props {
   comments: Comment[];

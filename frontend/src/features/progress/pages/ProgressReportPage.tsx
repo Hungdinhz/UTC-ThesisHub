@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { progressApi } from '../services/progressApi';
-import { ProgressReport } from '../types/progress.types';
+import type {  ProgressReport  } from '../types/progress.types';
 import { ProgressTimeline } from '../components/ProgressTimeline';
 
 export const ProgressReportPage: React.FC<{ thesisId: number }> = ({ thesisId }) => {

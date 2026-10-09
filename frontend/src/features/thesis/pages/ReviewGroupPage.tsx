@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { thesisApi } from '../services/thesisApi';
-import { ReviewGroup } from '../types/thesis.types';
+import type {  ReviewGroup  } from '../types/thesis.types';
 
 export const ReviewGroupPage: React.FC = () => {
   const [groups, setGroups] = useState<ReviewGroup[]>([]);

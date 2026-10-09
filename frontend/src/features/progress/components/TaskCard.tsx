@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task } from '../types/progress.types';
+import type {  Task  } from '../types/progress.types';
 
 interface Props {
   task: Task;

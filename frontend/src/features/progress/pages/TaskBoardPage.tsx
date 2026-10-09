@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { progressApi } from '../services/progressApi';
-import { Task } from '../types/progress.types';
+import type {  Task  } from '../types/progress.types';
 import { TaskCard } from '../components/TaskCard';
 
 export const TaskBoardPage: React.FC<{ thesisId: number }> = ({ thesisId }) => {

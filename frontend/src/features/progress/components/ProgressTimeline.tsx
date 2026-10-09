@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProgressFeedback } from '../types/progress.types';
+import type {  ProgressFeedback  } from '../types/progress.types';
 
 interface Props {
   feedbacks: ProgressFeedback[];

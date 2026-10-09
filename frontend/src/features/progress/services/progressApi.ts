@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Task, Submission, Comment, ProgressReport, ProgressFeedback } from '../types/progress.types';
+import type {  Task, Submission, Comment, ProgressReport, ProgressFeedback  } from '../types/progress.types';
 
 const API_BASE_URL = '/api';
 

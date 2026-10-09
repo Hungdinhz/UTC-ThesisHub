@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ReviewGroup, Proposal, Thesis, Document } from '../types/thesis.types';
+import type {  ReviewGroup, Proposal, Thesis, Document  } from '../types/thesis.types';
 
 const API_BASE_URL = '/api';
 

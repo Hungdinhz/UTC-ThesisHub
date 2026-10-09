@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { thesisApi } from '../services/thesisApi';
-import { Proposal } from '../types/thesis.types';
+import type {  Proposal  } from '../types/thesis.types';
 import { ThesisStatusBadge } from '../components/ThesisStatusBadge';
 import { ProposalReviewForm } from '../components/ProposalReviewForm';
 
