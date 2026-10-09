@@ -15,7 +15,7 @@ interface Props {
   showMajor?: boolean;
   showProgram?: boolean;
   showDirection?: boolean;
-  showLecturer?: boolean;
+  // showLecturer?: boolean;
   showStatus?: boolean;
 }
 
@@ -25,7 +25,7 @@ export const AssignmentFilterBar: React.FC<Props> = ({
   showMajor = true,
   showProgram = true,
   showDirection = true,
-  showLecturer = false,
+  // showLecturer = false,
   showStatus = true,
 }) => {
   const handleChange = (key: keyof FilterOptions, value: any) => {

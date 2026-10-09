@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { assignmentApi } from '../services/assignmentApi';
-import { LecturerCapacityResponse } from '../types/assignment.types';
+import type { LecturerCapacityResponse } from '../types/assignment.types';
 
 interface DashboardStats {
   totalStudentsRegistered: number;

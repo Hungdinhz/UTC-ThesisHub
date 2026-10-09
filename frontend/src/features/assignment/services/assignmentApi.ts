@@ -1,4 +1,4 @@
-import { ProjectDirection, Lecturer, PreferenceSubmitRequest, RegistrationResponse, LecturerCapacityRequest, LecturerCapacityResponse, SupervisorAssignment } from '../types/assignment.types';
+import type { ProjectDirection, Lecturer, PreferenceSubmitRequest, RegistrationResponse, LecturerCapacityRequest, LecturerCapacityResponse, SupervisorAssignment } from '../types/assignment.types';
 
 // Mocking API base URL and fetch wrapper for demonstration
 const API_BASE_URL = '/api/v1/assignments';

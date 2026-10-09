@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lecturer, PreferenceItem } from '../types/assignment.types';
+import type { Lecturer, PreferenceItem } from '../types/assignment.types';
 
 interface Props {
   lecturers: Lecturer[];
@@ -20,7 +20,7 @@ export const LecturerPreferenceForm: React.FC<Props> = ({
 
   useEffect(() => {
     if (initialPreferences && initialPreferences.length === 3) {
-      const newPrefs = ['', '', ''];
+      const newPrefs: (number | '')[] = ['', '', ''];
       initialPreferences.forEach(p => {
         if (p.priorityOrder >= 1 && p.priorityOrder <= 3) {
           newPrefs[p.priorityOrder - 1] = p.lecturerId;

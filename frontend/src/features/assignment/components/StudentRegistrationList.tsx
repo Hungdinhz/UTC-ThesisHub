@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { RegistrationResponse } from '../types/assignment.types';
-import { assignmentApi } from '../services/assignmentApi';
+import type { RegistrationResponse } from '../types/assignment.types';
+// import { assignmentApi } from '../services/assignmentApi';
 import { AssignmentFilterBar } from './AssignmentFilterBar';
 
 interface Props {
@@ -57,7 +57,6 @@ export const StudentRegistrationList: React.FC<Props> = ({ projectRoundId }) => 
       <AssignmentFilterBar 
         filters={filters} 
         onFilterChange={handleFilterChange} 
-        showLecturer={false}
       />
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">

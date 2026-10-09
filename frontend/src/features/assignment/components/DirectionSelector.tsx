@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProjectDirection } from '../types/assignment.types';
+import type { ProjectDirection } from '../types/assignment.types';
 
 interface Props {
   directions: ProjectDirection[];

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SupervisorAssignment } from '../types/assignment.types';
+import type { SupervisorAssignment } from '../types/assignment.types';
 import { OverrideModal } from './OverrideModal';
 
 interface Props {

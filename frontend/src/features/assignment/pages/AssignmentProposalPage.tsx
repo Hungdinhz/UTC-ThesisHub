@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SupervisorAssignment } from '../types/assignment.types';
+import type { SupervisorAssignment } from '../types/assignment.types';
 import { assignmentApi } from '../services/assignmentApi';
 import { AssignmentProposalList } from '../components/AssignmentProposalList';
 

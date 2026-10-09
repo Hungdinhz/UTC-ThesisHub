@@ -17,7 +17,6 @@ export const PreferencePage: React.FC = () => {
         <AssignmentFilterBar 
           filters={filters} 
           onFilterChange={setFilters} 
-          showLecturer={true}
         />
 
         <PreferenceList projectRoundId={projectRoundId} />

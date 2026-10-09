@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { RegistrationResponse } from '../types/assignment.types';
-import { assignmentApi } from '../services/assignmentApi';
+import type { RegistrationResponse } from '../types/assignment.types';
+// import { assignmentApi } from '../services/assignmentApi';
 
 interface Props {
   projectRoundId: number;

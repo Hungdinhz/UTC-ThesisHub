@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { assignmentApi } from '../services/assignmentApi';
-import { ProjectDirection, Lecturer, RegistrationResponse, PreferenceItem } from '../types/assignment.types';
+import type { ProjectDirection, Lecturer, RegistrationResponse, PreferenceItem } from '../types/assignment.types';
 import { DirectionSelector } from '../components/DirectionSelector';
 import { LecturerPreferenceForm } from '../components/LecturerPreferenceForm';
 

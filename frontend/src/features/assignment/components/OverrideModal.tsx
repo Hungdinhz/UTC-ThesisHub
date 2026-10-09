@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SupervisorAssignment } from '../types/assignment.types';
+import type { SupervisorAssignment } from '../types/assignment.types';
 import { assignmentApi } from '../services/assignmentApi';
 
 interface Props {
