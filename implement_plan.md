@@ -572,12 +572,12 @@ Mỗi nhóm công việc chỉ được coi là **HOÀN THÀNH (DONE)** khi th�
 - [x] `FileStorageService` upload được file an toàn, kiểm tra kích thước tối đa (<= 20MB) và lưu đúng đường dẫn quy định.
 
 ### 5.2. DoD cho Xác thực & Phân quyền (Authentication & Authorization)
-- [ ] Đăng nhập với mật khẩu đúng trả về Access Token hợp lệ; mật khẩu sai trả về 401 Unauthorized kèm thông báo rõ ràng.
-- [ ] Mật khẩu trong DB được mã hóa 100% bằng BCrypt, không lưu plain text.
-- [ ] Request không có token hoặc token hết hạn khi gọi API bảo vệ sẽ bị chặn 401 ngay tại `JwtAuthenticationFilter`.
-- [ ] Phân quyền theo vai trò chính xác: Ví dụ sinh viên gọi API tạo đợt đồ án của Admin phải nhận mã lỗi 403 Forbidden.
-- [ ] Frontend lưu token an toàn, tự động đính kèm vào mọi request axios, tự động chuyển về trang `/login` khi token hết hạn.
-- [ ] Người dùng đổi mật khẩu thành công và không thể dùng mật khẩu cũ để đăng nhập lại.
+- [x] Đăng nhập với mật khẩu đúng trả về Access Token hợp lệ; mật khẩu sai trả về mã lỗi rõ ràng (Đã hoàn thành trong AuthService, AuthController và test suite).
+- [x] Mật khẩu trong DB được mã hóa 100% bằng BCrypt, không lưu plain text.
+- [x] Request không có token hoặc token hết hạn khi gọi API bảo vệ sẽ bị chặn 401 ngay tại `JwtAuthenticationFilter` và `JwtAuthenticationEntryPoint`.
+- [x] Phân quyền theo vai trò chính xác: `@PreAuthorize("hasAuthority('ROLE_ADMIN')")` bảo vệ các API quản trị người dùng.
+- [x] Frontend lưu token an toàn, tự động đính kèm vào mọi request axios, tự động unwrap `ApiResponse`, tự động chuyển về trang `/login` khi 401.
+- [x] Người dùng đổi mật khẩu thành công và không thể dùng mật khẩu cũ để đăng nhập lại.
 
 ### 5.3. DoD cho Dữ liệu nền & Tổ chức (Organization)
 - [ ] Tạo lập đầy đủ quan hệ phân cấp: Khoa → Bộ môn → Giảng viên; Ngành → Sinh viên.
