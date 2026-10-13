@@ -68,22 +68,41 @@ class ApiService {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor to handle token refresh via HttpOnly Cookie
+    // Response interceptor to handle ApiResponse unwrapping and token refresh
     this.api.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        if (
+          response.data &&
+          typeof response.data === 'object' &&
+          'code' in response.data &&
+          'data' in response.data &&
+          'success' in response.data
+        ) {
+          if (response.data.data !== null && response.data.data !== undefined) {
+            return {
+              ...response,
+              data: response.data.data,
+            };
+          }
+        }
+        return response;
+      },
       async (error) => {
         const originalRequest = error.config;
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
           try {
-            // Send request to refresh token endpoint - HttpOnly cookie attached automatically via withCredentials
+            // Send request to refresh token endpoint
             const response = await axios.post(`${API_BASE_URL}${AUTH.TOKEN_REFRESH}`, {}, { withCredentials: true });
-            const { access } = response.data;
-            localStorage.setItem('access_token', access);
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${access}`;
+            const rawData = response.data?.data || response.data;
+            const access = rawData?.access || rawData?.token;
+            if (access) {
+              localStorage.setItem('access_token', access);
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${access}`;
+              }
+              return this.api(originalRequest);
             }
-            return this.api(originalRequest);
           } catch (refreshError) {
             this.logout();
             window.location.href = '/login';
