@@ -110,7 +110,9 @@ const LoginPage: React.FC = () => {
         response = await apiService.externalExaminerLogin(email.trim(), password);
       }
 
-      login(response.access, response.refresh, userType);
+      const accessToken = response?.access || (response as any)?.token || (response as any)?.data?.access || (response as any)?.data?.token;
+      const refreshToken = response?.refresh || (response as any)?.refreshToken || '';
+      login(accessToken, refreshToken, userType);
       navigate(`/${userType}/dashboard`);
     } catch (err: any) {
       if (err.response?.status === 429) {
