@@ -9,6 +9,7 @@ import SupervisorDashboard from './pages/SupervisorDashboard';
 import CommitteeMemberDashboard from './pages/CommitteeMemberDashboard';
 import ExternalDashboard from './pages/ExternalDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import './App.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedTypes: string[] }> = ({
@@ -80,6 +81,14 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedTypes={['admin']}>
             <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/organization"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <OrganizationManagementPage />
           </ProtectedRoute>
         }
       />

@@ -580,11 +580,11 @@ Mỗi nhóm công việc chỉ được coi là **HOÀN THÀNH (DONE)** khi th�
 - [x] Người dùng đổi mật khẩu thành công và không thể dùng mật khẩu cũ để đăng nhập lại.
 
 ### 5.3. DoD cho Dữ liệu nền & Tổ chức (Organization)
-- [ ] Tạo lập đầy đủ quan hệ phân cấp: Khoa → Bộ môn → Giảng viên; Ngành → Sinh viên.
-- [ ] Giảng viên lưu được đầy đủ thông tin: Mã CB (UNIQUE), Học vị (`THAC_SI`, `TIEN_SI`, `PGS`, `GS`), Hướng nghiên cứu, Bộ môn trực thuộc.
-- [ ] Sinh viên liên kết đúng 1-1 với tài khoản `users`, có đầy đủ Mã SV, Lớp, Ngành và Bậc đào tạo.
-- [ ] Cung cấp API lọc giảng viên theo học vị và bộ môn với tốc độ phản hồi < 200ms.
-- [ ] Giao diện Admin quản lý tổ chức cho phép xem, tìm kiếm và chỉnh sửa dữ liệu thuận tiện.
+- [x] Tạo lập đầy đủ quan hệ phân cấp: Khoa → Bộ môn → Giảng viên; Ngành → Sinh viên.
+- [x] Giảng viên lưu được đầy đủ thông tin: Mã CB (UNIQUE), Học vị (`THAC_SI`, `TIEN_SI`, `PGS`, `GS`), Hướng nghiên cứu, Bộ môn trực thuộc.
+- [x] Sinh viên liên kết đúng 1-1 với tài khoản `users`, có đầy đủ Mã SV, Lớp, Ngành và Bậc đào tạo.
+- [x] Cung cấp API lọc giảng viên theo học vị và bộ môn với tốc độ phản hồi < 200ms (Contract 1: GET /api/v1/lecturers).
+- [x] Giao diện Admin quản lý tổ chức cho phép xem, tìm kiếm và chỉnh sửa dữ liệu thuận tiện (/admin/organization).
 
 ### 5.4. DoD cho Đợt đồ án & Import Dữ liệu (Project Round & Ingestion)
 - [ ] Tạo được đợt đồ án, gắn đúng chương trình đào tạo (Cử nhân hoặc Kỹ sư), không cho phép tạo 2 đợt trùng mã code.

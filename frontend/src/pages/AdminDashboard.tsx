@@ -1,8 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import utcLogo from '../assets/images/utc_logo.webp';
 
 const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
 
   return (
@@ -94,6 +96,24 @@ const AdminDashboard: React.FC = () => {
         <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <h3 style={{ margin: '0 0 16px 0', color: '#1e293b' }}>Liên kết & Thao tác Quản trị</h3>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => navigate('/admin/organization')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#0a3273',
+                color: '#fff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer'
+              }}
+            >
+              🏛️ Quản lý Tổ chức & Đào tạo (Task 3)
+            </button>
             <a
               href="http://localhost:8081/swagger-ui/index.html"
               target="_blank"
