@@ -33,12 +33,19 @@ import type {
   ExternalEvaluationCreate,
   EvaluationSchedule,
   EvaluationScheduleCreate,
+  Faculty,
+  Department,
+  Major,
+  TrainingProgram,
+  LecturerItem,
+  StudentItem,
+  OrganizationPageResponse,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
   GROUPS, SUPERVISOR_STUDENT, PROJECTS, DOCUMENTS,
   EVALUATIONS, CHAT, TEMPLATES, NOTIFICATIONS,
-  AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT,
+  AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT, ORGANIZATION,
 } from './endpoints';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -111,6 +118,20 @@ class ApiService {
         return Promise.reject(error);
       }
     );
+  }
+
+  // General Auth (Admin & Unified)
+  async login(username: string, password: string): Promise<LoginResponse> {
+    const response = await this.api.post<LoginResponse>(AUTH.LOGIN, {
+      username,
+      password,
+    });
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<any> {
+    const response = await this.api.get('/users/me');
+    return response.data;
   }
 
   // Auth
@@ -890,6 +911,48 @@ class ApiService {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  }
+
+  // ─── Organization & Academic Master Data (UTC ThesisHub) ──────────
+  async getFaculties(): Promise<Faculty[]> {
+    const response = await this.api.get<Faculty[]>(ORGANIZATION.FACULTIES);
+    return response.data;
+  }
+
+  async getDepartments(facultyId?: number): Promise<Department[]> {
+    const response = await this.api.get<Department[]>(ORGANIZATION.DEPARTMENTS, {
+      params: facultyId ? { facultyId } : undefined,
+    });
+    return response.data;
+  }
+
+  async getMajors(facultyId?: number, departmentId?: number): Promise<Major[]> {
+    const response = await this.api.get<Major[]>(ORGANIZATION.MAJORS, {
+      params: { facultyId, departmentId },
+    });
+    return response.data;
+  }
+
+  async getTrainingPrograms(): Promise<TrainingProgram[]> {
+    const response = await this.api.get<TrainingProgram[]>(ORGANIZATION.TRAINING_PROGRAMS);
+    return response.data;
+  }
+
+  async getLecturers(params?: { departmentId?: number; degree?: string; search?: string }): Promise<LecturerItem[]> {
+    const response = await this.api.get<LecturerItem[]>(ORGANIZATION.LECTURERS, { params });
+    return response.data;
+  }
+
+  async getOrganizationStudents(params?: {
+    majorId?: number;
+    programId?: number;
+    className?: string;
+    search?: string;
+    page?: number;
+    size?: number;
+  }): Promise<OrganizationPageResponse<StudentItem>> {
+    const response = await this.api.get<OrganizationPageResponse<StudentItem>>(ORGANIZATION.STUDENTS, { params });
+    return response.data;
   }
 
   // Utility

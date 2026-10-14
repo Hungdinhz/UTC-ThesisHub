@@ -617,3 +617,97 @@ export interface EvaluationScheduleCreate {
   status?: EvaluationScheduleStatus;
   notes?: string;
 }
+
+// ─── Organization & Academic Types (UTC ThesisHub) ────────────────
+export interface Faculty {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  departmentCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Department {
+  id: number;
+  facultyId?: number;
+  facultyName?: string;
+  code: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Major {
+  id: number;
+  facultyId?: number;
+  facultyName?: string;
+  departmentId?: number;
+  departmentName?: string;
+  code: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TrainingProgram {
+  id: number;
+  code: string;
+  name: string;
+  durationYears: number;
+  totalCredits?: number;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LecturerItem {
+  lecturerId: number;
+  userId?: number;
+  lecturerCode: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  academicDegree?: string;
+  departmentId?: number;
+  departmentName?: string;
+  facultyId?: number;
+  facultyName?: string;
+  researchInterests?: string;
+  maxThesisQuota?: number;
+  isActive: boolean;
+}
+
+export interface StudentItem {
+  studentId: number;
+  userId?: number;
+  studentCode: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  className?: string;
+  majorId?: number;
+  majorName?: string;
+  trainingProgramId?: number;
+  trainingProgramName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  debtCredits?: number;
+  isActive: boolean;
+}
+
+export interface OrganizationPageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  first: boolean;
+}
+
