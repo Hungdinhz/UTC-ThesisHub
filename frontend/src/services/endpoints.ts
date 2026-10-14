@@ -167,3 +167,15 @@ export const ORGANIZATION = {
   student:          (id: number) => `/students/${id}` as const,
 } as const;
 
+// ─── Project Rounds & Timelines (Contract 2) ──────────────────────
+export const PROJECT_ROUNDS = {
+  LIST:                    '/project-rounds',
+  ACTIVE:                  '/project-rounds/active',
+  detail:           (id: number) => `/project-rounds/${id}` as const,
+  status:           (id: number) => `/project-rounds/${id}/status` as const,
+  currentMilestone: (id: number) => `/project-rounds/${id}/current-milestone` as const,
+  milestones:       (roundId: number) => `/project-rounds/${roundId}/milestones` as const,
+  milestoneDetail:  (milestoneId: number) => `/timeline-milestones/${milestoneId}` as const,
+} as const;
+
+
