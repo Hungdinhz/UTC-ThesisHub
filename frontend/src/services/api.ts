@@ -40,12 +40,17 @@ import type {
   LecturerItem,
   StudentItem,
   OrganizationPageResponse,
+  MilestoneItem,
+  ProjectRoundItem,
+  CreateProjectRoundPayload,
+  CreateMilestonePayload,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
   GROUPS, SUPERVISOR_STUDENT, PROJECTS, DOCUMENTS,
   EVALUATIONS, CHAT, TEMPLATES, NOTIFICATIONS,
   AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT, ORGANIZATION,
+  PROJECT_ROUNDS,
 } from './endpoints';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -953,6 +958,46 @@ class ApiService {
   }): Promise<OrganizationPageResponse<StudentItem>> {
     const response = await this.api.get<OrganizationPageResponse<StudentItem>>(ORGANIZATION.STUDENTS, { params });
     return response.data;
+  }
+
+  // ─── Project Rounds & Timelines (Contract 2) ──────────────────────
+  async getActiveProjectRound(): Promise<ProjectRoundItem> {
+    const response = await this.api.get<ProjectRoundItem>(PROJECT_ROUNDS.ACTIVE);
+    return response.data;
+  }
+
+  async getProjectRounds(params?: { status?: string; academicYear?: string }): Promise<ProjectRoundItem[]> {
+    const response = await this.api.get<ProjectRoundItem[]>(PROJECT_ROUNDS.LIST, { params });
+    return response.data;
+  }
+
+  async getProjectRoundById(id: number): Promise<ProjectRoundItem> {
+    const response = await this.api.get<ProjectRoundItem>(PROJECT_ROUNDS.detail(id));
+    return response.data;
+  }
+
+  async createProjectRound(payload: CreateProjectRoundPayload): Promise<ProjectRoundItem> {
+    const response = await this.api.post<ProjectRoundItem>(PROJECT_ROUNDS.LIST, payload);
+    return response.data;
+  }
+
+  async updateProjectRoundStatus(id: number, status: string): Promise<ProjectRoundItem> {
+    const response = await this.api.patch<ProjectRoundItem>(PROJECT_ROUNDS.status(id), { status });
+    return response.data;
+  }
+
+  async getRoundMilestones(roundId: number): Promise<MilestoneItem[]> {
+    const response = await this.api.get<MilestoneItem[]>(PROJECT_ROUNDS.milestones(roundId));
+    return response.data;
+  }
+
+  async addRoundMilestone(roundId: number, payload: CreateMilestonePayload): Promise<MilestoneItem> {
+    const response = await this.api.post<MilestoneItem>(PROJECT_ROUNDS.milestones(roundId), payload);
+    return response.data;
+  }
+
+  async deleteMilestone(milestoneId: number): Promise<void> {
+    await this.api.delete(PROJECT_ROUNDS.milestoneDetail(milestoneId));
   }
 
   // Utility

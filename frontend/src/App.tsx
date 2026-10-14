@@ -10,6 +10,7 @@ import CommitteeMemberDashboard from './pages/CommitteeMemberDashboard';
 import ExternalDashboard from './pages/ExternalDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import OrganizationManagementPage from './pages/OrganizationManagementPage';
+import ProjectRoundManagementPage from './pages/ProjectRoundManagementPage';
 import './App.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedTypes: string[] }> = ({
@@ -89,6 +90,14 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedTypes={['admin']}>
             <OrganizationManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/project-rounds"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <ProjectRoundManagementPage />
           </ProtectedRoute>
         }
       />

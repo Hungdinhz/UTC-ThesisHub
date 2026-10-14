@@ -587,9 +587,9 @@ Mỗi nhóm công việc chỉ được coi là **HOÀN THÀNH (DONE)** khi th�
 - [x] Giao diện Admin quản lý tổ chức cho phép xem, tìm kiếm và chỉnh sửa dữ liệu thuận tiện (/admin/organization).
 
 ### 5.4. DoD cho Đợt đồ án & Import Dữ liệu (Project Round & Ingestion)
-- [ ] Tạo được đợt đồ án, gắn đúng chương trình đào tạo (Cử nhân hoặc Kỹ sư), không cho phép tạo 2 đợt trùng mã code.
-- [ ] Cấu hình được các mốc thời gian (Timeline) và validate ngày kết thúc phải sau ngày bắt đầu.
-- [ ] Chức năng Mở / Đóng đợt hoạt động chính xác; API `/project-rounds/active` trả về đợt đồ án đang mở.
+- [x] Tạo được đợt đồ án, gắn đúng chương trình đào tạo (Cử nhân hoặc Kỹ sư), không cho phép tạo 2 đợt trùng mã code.
+- [x] Cấu hình được các mốc thời gian (Timeline) và validate ngày kết thúc phải sau ngày bắt đầu.
+- [x] Chức năng Mở / Đóng đợt hoạt động chính xác; API `/project-rounds/active` trả về đợt đồ án đang mở (Contract 2).
 - [ ] **Import Sinh viên (Phase 1)**:
   - [ ] Đọc thành công file Excel mẫu (.xlsx).
   - [ ] Hiển thị danh sách lỗi rõ ràng theo dòng nếu file có dữ liệu không hợp lệ.
