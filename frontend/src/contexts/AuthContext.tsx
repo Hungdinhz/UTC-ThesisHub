@@ -3,7 +3,7 @@ import { apiService } from '../services/api';
 import type { UserType, Student, Supervisor, CommitteeMember, ExternalExaminer } from '../types';
 
 interface AuthContextType {
-  user: Student | Supervisor | CommitteeMember | ExternalExaminer | null;
+  user: Student | Supervisor | CommitteeMember | ExternalExaminer | any | null;
   userType: UserType | null;
   loading: boolean;
   login: (token: string, refreshToken: string, userType: UserType) => void;
@@ -14,7 +14,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<Student | Supervisor | CommitteeMember | ExternalExaminer | null>(null);
+  const [user, setUser] = useState<Student | Supervisor | CommitteeMember | ExternalExaminer | any | null>(null);
   const [userType, setUserType] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +42,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       setUserType(type);
-      let userData: Student | Supervisor | CommitteeMember | ExternalExaminer;
+      let userData: any;
 
       switch (type) {
         case 'student':
@@ -56,6 +56,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           break;
         case 'external_examiner':
           userData = await apiService.getExternalProfile();
+          break;
+        case 'admin':
+          userData = await apiService.getCurrentUser();
           break;
         default:
           throw new Error('Invalid user type');

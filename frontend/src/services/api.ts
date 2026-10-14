@@ -113,6 +113,20 @@ class ApiService {
     );
   }
 
+  // General Auth (Admin & Unified)
+  async login(username: string, password: string): Promise<LoginResponse> {
+    const response = await this.api.post<LoginResponse>(AUTH.LOGIN, {
+      username,
+      password,
+    });
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<any> {
+    const response = await this.api.get('/users/me');
+    return response.data;
+  }
+
   // Auth
   async studentLogin(registrationNo: string, password: string): Promise<LoginResponse> {
     const response = await this.api.post<LoginResponse>(AUTH.STUDENT_LOGIN, {
