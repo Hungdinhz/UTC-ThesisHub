@@ -823,5 +823,58 @@ export interface StudentProjectRoundItem {
   enrolledAt?: string;
 }
 
+// ─── Academic Records Types (Phase 4 Ingestion & Contract 4) ─────
+export interface AcademicRecordImportRow {
+  rowIndex: number;
+  stt?: number;
+  studentCode: string;
+  fullName?: string;
+  completedCredits: number;
+  gpa: number;
+  tuitionDebt: boolean;
+  underDisciplinaryAction: boolean;
+  missingPrerequisiteCount: number;
+  note?: string;
+  isValid: boolean;
+  errors: string[];
+}
 
+export interface AcademicRecordImportPreviewResponse {
+  roundId: number;
+  roundCode: string;
+  roundName: string;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  rows: AcademicRecordImportRow[];
+}
 
+export interface AcademicRecordImportCommitPayload {
+  rows: AcademicRecordImportRow[];
+}
+
+export interface AcademicRecordImportResultResponse {
+  totalProcessed: number;
+  recordsCreated: number;
+  recordsUpdated: number;
+  skipped: number;
+  messages: string[];
+}
+
+export interface AcademicRecordItem {
+  id: number;
+  studentId: number;
+  studentCode: string;
+  fullName: string;
+  className?: string;
+  majorName?: string;
+  projectRoundId: number;
+  roundCode?: string;
+  completedCredits: number;
+  gpa: number;
+  tuitionDebt: boolean;
+  underDisciplinaryAction: boolean;
+  missingPrerequisiteCount: number;
+  note?: string;
+  importedAt: string;
+}

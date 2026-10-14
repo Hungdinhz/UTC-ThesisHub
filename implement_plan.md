@@ -595,10 +595,19 @@ Mỗi nhóm công việc chỉ được coi là **HOÀN THÀNH (DONE)** khi th�
   - [x] Hiển thị danh sách lỗi rõ ràng theo dòng nếu file có dữ liệu không hợp lệ.
   - [x] Khi commit import: Tự động tạo bản ghi `students`, tạo tài khoản `users` với mật khẩu mặc định, gán vào bảng `student_project_rounds`.
   - [x] Sinh viên đăng nhập được ngay lập tức bằng tài khoản vừa được tạo từ file Excel.
-- [ ] **Import Dữ liệu Học vụ (Phase 4)**:
-  - [ ] Đọc và lưu chính xác các chỉ số: Số tín chỉ tích lũy, GPA, Nợ học phí, Kỷ luật, Môn tiên quyết vào bảng `academic_records`.
-  - [ ] Không can thiệp vào logic duyệt hay loại sinh viên (nhường trọn vẹn cho module của Khoa).
-  - [ ] API trả về thông tin học vụ theo `studentId` và `roundId` hoạt động chính xác để module Eligibility gọi sang.
+- [x] **Import Dữ liệu Học vụ (Phase 4)**:
+  - [x] Đọc và lưu chính xác các chỉ số: Số tín chỉ tích lũy, GPA, Nợ học phí, Kỷ luật, Môn tiên quyết vào bảng `academic_records`.
+  - [x] Không can thiệp vào logic duyệt hay loại sinh viên (nhường trọn vẹn cho module của Khoa).
+  - [x] API trả về thông tin học vụ theo `studentId` và `roundId` hoạt động chính xác để module Eligibility gọi sang.
+
+### 5.5. DoD cho Hạ tầng Frontend dùng chung & Tích hợp Toàn hệ thống (Task 7)
+- [x] Layout chuẩn `UTCAppLayout` bọc đồng bộ toàn bộ các màn hình chính và màn hình con (Admin Dashboard, Quản lý Tổ chức, Quản lý Đợt đồ án, Sinh viên, Giảng viên, Hội đồng).
+- [x] Header hiển thị động avatar, họ tên người dùng, role tag chuẩn UTC (`Quản trị viên`, `Sinh viên`, `Giảng viên`, `Hội đồng chấm thi`).
+- [x] Sidebar hiển thị chính xác danh mục chức năng phân quyền theo vai trò của người dùng đang đăng nhập.
+- [x] Modal Đổi mật khẩu (`ChangePasswordModal`) tích hợp trực tiếp trên Header, gọi API `POST /api/v1/auth/change-password`, kiểm tra khớp mật khẩu mới và cập nhật tức thì.
+- [x] Hệ thống thông báo (`NotificationDropdown`) tích hợp chuông trên Header, tự động đếm số thông báo chưa đọc và đánh dấu đã đọc.
+- [x] Route Guards & Alias (`/admin`, `/student`, `/supervisor`, `/committee`) bảo vệ route an toàn, tự động chuyển hướng khi chưa đăng nhập hoặc đăng nhập sai quyền.
+- [x] TypeScript compiler (`npx tsc --noEmit`) 0 lỗi; Toàn bộ 123/123 unit tests Backend PASS 100%.
 
 ---
 

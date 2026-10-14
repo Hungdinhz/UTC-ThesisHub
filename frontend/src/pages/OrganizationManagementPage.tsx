@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import type { Faculty, Department, Major, TrainingProgram, LecturerItem, StudentItem } from '../types';
-import utcLogo from '../assets/images/utc_logo.webp';
+import UTCAppLayout from '../components/UTCAppLayout';
 
 type TabType = 'faculties' | 'majors' | 'lecturers' | 'students';
 
 const OrganizationManagementPage: React.FC = () => {
-  const navigate = useNavigate();
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('faculties');
   const [loading, setLoading] = useState(false);
@@ -135,60 +133,8 @@ const OrganizationManagementPage: React.FC = () => {
   }, [activeTab, selectedFacultyId]);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f4f7fc', fontFamily: 'Inter, system-ui, sans-serif' }}>
-      {/* Header */}
-      <header style={{
-        backgroundColor: '#0a3273',
-        color: '#fff',
-        padding: '16px 32px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <img src={utcLogo} alt="UTC Logo" style={{ height: '44px', backgroundColor: '#fff', borderRadius: '8px', padding: '4px', cursor: 'pointer' }} onClick={() => navigate('/admin/dashboard')} />
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>QUẢN LÝ DỮ LIỆU TỔ CHỨC & ĐÀO TẠO</h1>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: '#cbd5e1' }}>Khoa • Bộ môn • Ngành • Chương trình đào tạo • Giảng viên • Sinh viên</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            style={{
-              backgroundColor: '#1e40af',
-              color: '#fff',
-              border: 'none',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.85rem'
-            }}
-          >
-            ← Bảng điều khiển
-          </button>
-          <button
-            onClick={logout}
-            style={{
-              backgroundColor: '#ef4444',
-              color: '#fff',
-              border: 'none',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.85rem'
-            }}
-          >
-            Đăng xuất
-          </button>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main style={{ maxWidth: '1280px', margin: '24px auto', padding: '0 24px' }}>
+    <UTCAppLayout activeTab="organization" hideHeroBanner pageTitle="Quản lý Dữ liệu Tổ chức & Đào tạo" onLogout={logout}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
         {/* Navigation Tabs */}
         <div style={{
           display: 'flex',
@@ -593,8 +539,8 @@ const OrganizationManagementPage: React.FC = () => {
             </table>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </UTCAppLayout>
   );
 };
 
