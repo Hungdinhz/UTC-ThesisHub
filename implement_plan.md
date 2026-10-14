@@ -600,6 +600,15 @@ Mỗi nhóm công việc chỉ được coi là **HOÀN THÀNH (DONE)** khi th�
   - [x] Không can thiệp vào logic duyệt hay loại sinh viên (nhường trọn vẹn cho module của Khoa).
   - [x] API trả về thông tin học vụ theo `studentId` và `roundId` hoạt động chính xác để module Eligibility gọi sang.
 
+### 5.5. DoD cho Hạ tầng Frontend dùng chung & Tích hợp Toàn hệ thống (Task 7)
+- [x] Layout chuẩn `UTCAppLayout` bọc đồng bộ toàn bộ các màn hình chính và màn hình con (Admin Dashboard, Quản lý Tổ chức, Quản lý Đợt đồ án, Sinh viên, Giảng viên, Hội đồng).
+- [x] Header hiển thị động avatar, họ tên người dùng, role tag chuẩn UTC (`Quản trị viên`, `Sinh viên`, `Giảng viên`, `Hội đồng chấm thi`).
+- [x] Sidebar hiển thị chính xác danh mục chức năng phân quyền theo vai trò của người dùng đang đăng nhập.
+- [x] Modal Đổi mật khẩu (`ChangePasswordModal`) tích hợp trực tiếp trên Header, gọi API `POST /api/v1/auth/change-password`, kiểm tra khớp mật khẩu mới và cập nhật tức thì.
+- [x] Hệ thống thông báo (`NotificationDropdown`) tích hợp chuông trên Header, tự động đếm số thông báo chưa đọc và đánh dấu đã đọc.
+- [x] Route Guards & Alias (`/admin`, `/student`, `/supervisor`, `/committee`) bảo vệ route an toàn, tự động chuyển hướng khi chưa đăng nhập hoặc đăng nhập sai quyền.
+- [x] TypeScript compiler (`npx tsc --noEmit`) 0 lỗi; Toàn bộ 123/123 unit tests Backend PASS 100%.
+
 ---
 
 ## 6. DANH MỤC CÂU HỎI CẦN LÀM RÕ (OPEN QUESTIONS & CLARIFICATIONS)

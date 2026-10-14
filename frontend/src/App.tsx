@@ -101,6 +101,11 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/student" element={<Navigate to="/student/dashboard" replace />} />
+      <Route path="/supervisor" element={<Navigate to="/supervisor/dashboard" replace />} />
+      <Route path="/committee" element={<Navigate to="/committee_member/dashboard" replace />} />
+      <Route path="/committee_member" element={<Navigate to="/committee_member/dashboard" replace />} />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
