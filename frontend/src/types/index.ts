@@ -711,3 +711,58 @@ export interface OrganizationPageResponse<T> {
   first: boolean;
 }
 
+// ─── Project Round & Milestone Types (Contract 2) ─────────────────
+export interface MilestoneItem {
+  milestoneId: number;
+  roundId?: number;
+  name: string;
+  phaseType: string;
+  startDate: string;
+  endDate: string;
+  description?: string;
+  orderIndex: number;
+  isActive: boolean;
+}
+
+export type RoundStatus = 'DRAFT' | 'OPEN' | 'IN_PROGRESS' | 'CLOSED' | 'ARCHIVED';
+
+export interface ProjectRoundItem {
+  roundId: number;
+  roundCode: string;
+  name: string;
+  academicYear: string;
+  semester: string;
+  trainingProgramId?: number;
+  trainingProgram?: string; // e.g. "CU_NHAN", "KY_SU"
+  trainingProgramName?: string;
+  status: RoundStatus;
+  startDate?: string;
+  endDate?: string;
+  description?: string;
+  milestones?: MilestoneItem[];
+  currentMilestone?: MilestoneItem;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectRoundPayload {
+  roundCode: string;
+  name: string;
+  academicYear: string;
+  semester: string;
+  trainingProgramId: number;
+  startDate?: string;
+  endDate?: string;
+  description?: string;
+}
+
+export interface CreateMilestonePayload {
+  name: string;
+  phaseType: string;
+  startDate: string;
+  endDate: string;
+  description?: string;
+  orderIndex?: number;
+}
+
+

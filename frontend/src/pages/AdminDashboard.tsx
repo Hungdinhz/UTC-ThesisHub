@@ -114,6 +114,24 @@ const AdminDashboard: React.FC = () => {
             >
               🏛️ Quản lý Tổ chức & Đào tạo (Task 3)
             </button>
+            <button
+              onClick={() => navigate('/admin/project-rounds')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#16a34a',
+                color: '#fff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                cursor: 'pointer'
+              }}
+            >
+              🚀 Quản lý Đợt đồ án & Timeline (Task 4)
+            </button>
             <a
               href="http://localhost:8081/swagger-ui/index.html"
               target="_blank"
