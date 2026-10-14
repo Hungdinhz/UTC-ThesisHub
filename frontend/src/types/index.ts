@@ -765,4 +765,63 @@ export interface CreateMilestonePayload {
   orderIndex?: number;
 }
 
+// ─── Student Ingestion & Contract 3 Types ─────────────────────────
+export interface StudentImportRow {
+  rowIndex: number;
+  stt?: number;
+  studentCode: string;
+  lastName: string;
+  firstName: string;
+  fullName: string;
+  majorCode: string;
+  className: string;
+  phone?: string;
+  email?: string;
+  isValid: boolean;
+  errors: string[];
+}
+
+export interface StudentImportPreviewResponse {
+  roundId: number;
+  roundCode: string;
+  roundName: string;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  rows: StudentImportRow[];
+}
+
+export interface StudentImportCommitPayload {
+  rows: StudentImportRow[];
+}
+
+export interface StudentImportResultResponse {
+  totalProcessed: number;
+  newUsersCreated: number;
+  newStudentsCreated: number;
+  enrolledInRound: number;
+  skipped: number;
+  messages: string[];
+}
+
+export interface StudentProjectRoundItem {
+  studentRoundId: number;
+  studentId: number;
+  studentCode: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  className: string;
+  majorId: number;
+  majorCode: string;
+  majorName: string;
+  trainingProgramId?: number;
+  trainingProgram?: string;
+  status: string;
+  debtCredits: number;
+  note?: string;
+  enrolledAt?: string;
+}
+
+
 
