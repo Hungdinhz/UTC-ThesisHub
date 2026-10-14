@@ -48,13 +48,17 @@ import type {
   StudentImportCommitPayload,
   StudentImportResultResponse,
   StudentProjectRoundItem,
+  AcademicRecordImportPreviewResponse,
+  AcademicRecordImportCommitPayload,
+  AcademicRecordImportResultResponse,
+  AcademicRecordItem,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
   GROUPS, SUPERVISOR_STUDENT, PROJECTS, DOCUMENTS,
   EVALUATIONS, CHAT, TEMPLATES, NOTIFICATIONS,
   AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT, ORGANIZATION,
-  PROJECT_ROUNDS,
+  PROJECT_ROUNDS, ACADEMIC_RECORDS,
 } from './endpoints';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -1067,6 +1071,61 @@ class ApiService {
 
   async removeStudentFromRound(roundId: number, studentId: number): Promise<void> {
     await this.api.delete(PROJECT_ROUNDS.studentDetail(roundId, studentId));
+  }
+
+  // ─── Academic Records APIs (Phase 4 Ingestion & Contract 4) ─────
+  async downloadAcademicTemplate(): Promise<Blob> {
+    const response = await this.api.get(ACADEMIC_RECORDS.TEMPLATE, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async previewImportAcademicRecords(roundId: number, file: File): Promise<AcademicRecordImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<AcademicRecordImportPreviewResponse>(
+      ACADEMIC_RECORDS.importPreview(roundId),
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  }
+
+  async commitImportAcademicRecords(roundId: number, payload: AcademicRecordImportCommitPayload): Promise<AcademicRecordImportResultResponse> {
+    const response = await this.api.post<AcademicRecordImportResultResponse>(
+      ACADEMIC_RECORDS.importCommit(roundId),
+      payload
+    );
+    return response.data;
+  }
+
+  async getAcademicRecords(
+    roundId: number,
+    params?: {
+      tuitionDebt?: boolean;
+      underDisciplinaryAction?: boolean;
+      search?: string;
+      page?: number;
+      size?: number;
+    }
+  ): Promise<OrganizationPageResponse<AcademicRecordItem>> {
+    const response = await this.api.get<OrganizationPageResponse<AcademicRecordItem>>(
+      ACADEMIC_RECORDS.roundRecords(roundId),
+      { params }
+    );
+    return response.data;
+  }
+
+  async getStudentAcademicRecord(roundId: number, studentId: number): Promise<AcademicRecordItem> {
+    const response = await this.api.get<AcademicRecordItem>(
+      ACADEMIC_RECORDS.studentInRound(roundId, studentId)
+    );
+    return response.data;
   }
 
   // Utility

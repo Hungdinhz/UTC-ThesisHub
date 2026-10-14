@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import type { ProjectRoundItem, TrainingProgram, CreateProjectRoundPayload, CreateMilestonePayload } from '../types';
 import { RoundStudentsTab } from '../features/project-round/components/RoundStudentsTab';
+import { RoundAcademicRecordsTab } from '../features/project-round/components/RoundAcademicRecordsTab';
 import utcLogo from '../assets/images/utc_logo.webp';
 
 const ProjectRoundManagementPage: React.FC = () => {
@@ -17,8 +18,8 @@ const ProjectRoundManagementPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Tab: 'timeline' | 'students'
-  const [roundActiveTab, setRoundActiveTab] = useState<'timeline' | 'students'>('students');
+  // Tab: 'timeline' | 'students' | 'academic'
+  const [roundActiveTab, setRoundActiveTab] = useState<'timeline' | 'students' | 'academic'>('students');
 
   // Filter
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -479,6 +480,24 @@ const ProjectRoundManagementPage: React.FC = () => {
                     👥 Danh sách sinh viên & Import Excel (Contract 3)
                   </button>
                   <button
+                    onClick={() => setRoundActiveTab('academic')}
+                    style={{
+                      padding: '10px 18px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: roundActiveTab === 'academic' ? '3px solid #0a3273' : '3px solid transparent',
+                      color: roundActiveTab === 'academic' ? '#0a3273' : '#64748b',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    📊 Kết quả học vụ xét điều kiện (Contract 4)
+                  </button>
+                  <button
                     onClick={() => setRoundActiveTab('timeline')}
                     style={{
                       padding: '10px 18px',
@@ -500,6 +519,12 @@ const ProjectRoundManagementPage: React.FC = () => {
 
                 {roundActiveTab === 'students' ? (
                   <RoundStudentsTab
+                    roundId={selectedRound.roundId}
+                    roundName={selectedRound.name}
+                    roundCode={selectedRound.roundCode}
+                  />
+                ) : roundActiveTab === 'academic' ? (
+                  <RoundAcademicRecordsTab
                     roundId={selectedRound.roundId}
                     roundName={selectedRound.name}
                     roundCode={selectedRound.roundCode}
