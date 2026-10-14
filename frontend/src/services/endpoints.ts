@@ -16,6 +16,7 @@
 
 // ─── Authentication ───────────────────────────────────────────────
 export const AUTH = {
+  LOGIN:                   '/auth/login',
   STUDENT_LOGIN:           '/auth/students/login',
   SUPERVISOR_LOGIN:        '/auth/supervisors/login',
   COMMITTEE_MEMBER_LOGIN:  '/auth/committee-members/login',
@@ -148,3 +149,21 @@ export const EXPORT = {
   REPORT:                  '/export/report',
   CONSOLIDATED_REPORT:     '/export/consolidated-report',
 } as const;
+
+// ─── Organization & Academic Master Data ──────────────────────────
+export const ORGANIZATION = {
+  FACULTIES:               '/faculties',
+  faculty:          (id: number) => `/faculties/${id}` as const,
+  facultyDepartments: (id: number) => `/faculties/${id}/departments` as const,
+  DEPARTMENTS:             '/departments',
+  department:       (id: number) => `/departments/${id}` as const,
+  MAJORS:                  '/majors',
+  major:            (id: number) => `/majors/${id}` as const,
+  TRAINING_PROGRAMS:       '/training-programs',
+  trainingProgram:  (id: number) => `/training-programs/${id}` as const,
+  LECTURERS:               '/lecturers',
+  lecturer:         (id: number) => `/lecturers/${id}` as const,
+  STUDENTS:                '/students',
+  student:          (id: number) => `/students/${id}` as const,
+} as const;
+
