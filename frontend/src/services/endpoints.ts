@@ -184,5 +184,12 @@ export const PROJECT_ROUNDS = {
   studentImportCommit:  (roundId: number) => `/project-rounds/${roundId}/students/import-commit` as const,
 } as const;
 
-
-
+// ─── Academic Records (Contract 4) ────────────────────────────────
+export const ACADEMIC_RECORDS = {
+  TEMPLATE:                '/project-rounds/academic-records/template',
+  roundRecords:     (roundId: number) => `/project-rounds/${roundId}/academic-records` as const,
+  studentInRound:   (roundId: number, studentId: number) => `/project-rounds/${roundId}/academic-records/${studentId}` as const,
+  importPreview:    (roundId: number) => `/project-rounds/${roundId}/academic-records/import-preview` as const,
+  importCommit:     (roundId: number) => `/project-rounds/${roundId}/academic-records/import-commit` as const,
+  studentLatest:    (studentId: number) => `/academic-records/student/${studentId}` as const,
+} as const;
