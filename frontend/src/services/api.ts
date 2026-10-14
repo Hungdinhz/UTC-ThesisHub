@@ -44,6 +44,10 @@ import type {
   ProjectRoundItem,
   CreateProjectRoundPayload,
   CreateMilestonePayload,
+  StudentImportPreviewResponse,
+  StudentImportCommitPayload,
+  StudentImportResultResponse,
+  StudentProjectRoundItem,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
@@ -998,6 +1002,71 @@ class ApiService {
 
   async deleteMilestone(milestoneId: number): Promise<void> {
     await this.api.delete(PROJECT_ROUNDS.milestoneDetail(milestoneId));
+  }
+
+  // ─── Student Project Round & Ingestion APIs (Contract 3) ────────
+  async downloadStudentTemplate(): Promise<Blob> {
+    const response = await this.api.get(PROJECT_ROUNDS.STUDENT_TEMPLATE, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async previewImportStudents(roundId: number, file: File): Promise<StudentImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<StudentImportPreviewResponse>(
+      PROJECT_ROUNDS.studentImportPreview(roundId),
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  }
+
+  async commitImportStudents(roundId: number, payload: StudentImportCommitPayload): Promise<StudentImportResultResponse> {
+    const response = await this.api.post<StudentImportResultResponse>(
+      PROJECT_ROUNDS.studentImportCommit(roundId),
+      payload
+    );
+    return response.data;
+  }
+
+  async getStudentsInRound(
+    roundId: number,
+    params?: {
+      majorId?: number;
+      status?: string;
+      search?: string;
+      page?: number;
+      size?: number;
+    }
+  ): Promise<OrganizationPageResponse<StudentProjectRoundItem>> {
+    const response = await this.api.get<OrganizationPageResponse<StudentProjectRoundItem>>(
+      PROJECT_ROUNDS.students(roundId),
+      { params }
+    );
+    return response.data;
+  }
+
+  async updateStudentRoundStatus(
+    roundId: number,
+    studentId: number,
+    status: string,
+    note?: string
+  ): Promise<StudentProjectRoundItem> {
+    const response = await this.api.patch<StudentProjectRoundItem>(
+      PROJECT_ROUNDS.studentStatus(roundId, studentId),
+      { status, note }
+    );
+    return response.data;
+  }
+
+  async removeStudentFromRound(roundId: number, studentId: number): Promise<void> {
+    await this.api.delete(PROJECT_ROUNDS.studentDetail(roundId, studentId));
   }
 
   // Utility

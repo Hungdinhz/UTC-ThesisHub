@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import type { ProjectRoundItem, TrainingProgram, CreateProjectRoundPayload, CreateMilestonePayload } from '../types';
+import { RoundStudentsTab } from '../features/project-round/components/RoundStudentsTab';
 import utcLogo from '../assets/images/utc_logo.webp';
 
 const ProjectRoundManagementPage: React.FC = () => {
@@ -15,6 +16,9 @@ const ProjectRoundManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Tab: 'timeline' | 'students'
+  const [roundActiveTab, setRoundActiveTab] = useState<'timeline' | 'students'>('students');
 
   // Filter
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -454,115 +458,165 @@ const ProjectRoundManagementPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Timeline Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div>
-                    <h3 style={{ margin: 0, color: '#1e293b' }}>Các mốc thời gian / Timeline nghiệp vụ</h3>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-                      Cung cấp API cho hệ thống tự động kiểm tra thời hạn đăng ký, nộp đề cương và bảo vệ
-                    </p>
-                  </div>
+                {/* Tab Switcher: Students (Contract 3) vs Timeline */}
+                <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #e2e8f0', marginBottom: '20px' }}>
                   <button
-                    onClick={() => setShowAddMilestoneModal(true)}
+                    onClick={() => setRoundActiveTab('students')}
                     style={{
-                      backgroundColor: '#0a3273',
-                      color: '#fff',
+                      padding: '10px 18px',
+                      background: 'none',
                       border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '6px',
-                      fontWeight: 600,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
+                      borderBottom: roundActiveTab === 'students' ? '3px solid #0a3273' : '3px solid transparent',
+                      color: roundActiveTab === 'students' ? '#0a3273' : '#64748b',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}
                   >
-                    ➕ Thêm mốc Timeline
+                    👥 Danh sách sinh viên & Import Excel (Contract 3)
+                  </button>
+                  <button
+                    onClick={() => setRoundActiveTab('timeline')}
+                    style={{
+                      padding: '10px 18px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: roundActiveTab === 'timeline' ? '3px solid #0a3273' : '3px solid transparent',
+                      color: roundActiveTab === 'timeline' ? '#0a3273' : '#64748b',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    🗓️ Mốc thời gian (Timeline) ({selectedRound.milestones?.length || 0})
                   </button>
                 </div>
 
-                {/* Milestones Stepper / Table */}
-                {selectedRound.milestones && selectedRound.milestones.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {selectedRound.milestones.map((m, idx) => (
-                      <div
-                        key={m.milestoneId}
+                {roundActiveTab === 'students' ? (
+                  <RoundStudentsTab
+                    roundId={selectedRound.roundId}
+                    roundName={selectedRound.name}
+                    roundCode={selectedRound.roundCode}
+                  />
+                ) : (
+                  <div>
+                    {/* Timeline Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <div>
+                        <h3 style={{ margin: 0, color: '#1e293b' }}>Các mốc thời gian / Timeline nghiệp vụ</h3>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                          Cung cấp API cho hệ thống tự động kiểm tra thời hạn đăng ký, nộp đề cương và bảo vệ
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowAddMilestoneModal(true)}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '14px 18px',
-                          borderRadius: '8px',
-                          border: m.isActive ? '2px solid #16a34a' : '1px solid #e2e8f0',
-                          backgroundColor: m.isActive ? '#f0fdf4' : '#fff'
+                          backgroundColor: '#0a3273',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          fontWeight: 600,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                          <span style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            backgroundColor: m.isActive ? '#16a34a' : '#0a3273',
-                            color: '#fff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            fontSize: '0.85rem'
-                          }}>
-                            {idx + 1}
-                          </span>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontWeight: 700, color: '#1e293b' }}>{m.name}</span>
-                              <span style={{
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                backgroundColor: '#f1f5f9',
-                                color: '#475569'
-                              }}>
-                                {m.phaseType}
-                              </span>
-                              {m.isActive && (
-                                <span style={{
-                                  padding: '2px 8px',
-                                  borderRadius: '12px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  backgroundColor: '#dcfce7',
-                                  color: '#15803d'
-                                }}>
-                                  ● Đang diễn ra
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-                              🗓️ {new Date(m.startDate).toLocaleDateString('vi-VN')} → {new Date(m.endDate).toLocaleDateString('vi-VN')}
-                            </div>
-                          </div>
-                        </div>
+                        ➕ Thêm mốc Timeline
+                      </button>
+                    </div>
 
-                        <button
-                          onClick={() => handleDeleteMilestone(m.milestoneId)}
-                          style={{
-                            backgroundColor: '#fee2e2',
-                            color: '#dc2626',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            fontSize: '0.8rem'
-                          }}
-                        >
-                          Xóa
-                        </button>
+                    {/* Milestones Stepper / Table */}
+                    {selectedRound.milestones && selectedRound.milestones.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {selectedRound.milestones.map((m, idx) => (
+                          <div
+                            key={m.milestoneId}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 18px',
+                              borderRadius: '8px',
+                              border: m.isActive ? '2px solid #16a34a' : '1px solid #e2e8f0',
+                              backgroundColor: m.isActive ? '#f0fdf4' : '#fff'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              <span style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: m.isActive ? '#16a34a' : '#0a3273',
+                                color: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 700,
+                                fontSize: '0.85rem'
+                              }}>
+                                {idx + 1}
+                              </span>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontWeight: 700, color: '#1e293b' }}>{m.name}</span>
+                                  <span style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#475569'
+                                  }}>
+                                    {m.phaseType}
+                                  </span>
+                                  {m.isActive && (
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '12px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700,
+                                      backgroundColor: '#dcfce7',
+                                      color: '#15803d'
+                                    }}>
+                                      ● Đang diễn ra
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                                  🗓️ {new Date(m.startDate).toLocaleDateString('vi-VN')} → {new Date(m.endDate).toLocaleDateString('vi-VN')}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => handleDeleteMilestone(m.milestoneId)}
+                              style={{
+                                backgroundColor: '#fee2e2',
+                                color: '#dc2626',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                fontSize: '0.8rem'
+                              }}
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
-                    Chưa có mốc thời gian nào được thiết lập. Hãy bấm nút "Thêm mốc Timeline" ở trên.
+                    ) : (
+                      <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+                        Chưa có mốc thời gian nào được thiết lập. Hãy bấm nút "Thêm mốc Timeline" ở trên.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
