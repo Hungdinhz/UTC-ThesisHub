@@ -33,12 +33,32 @@ import type {
   ExternalEvaluationCreate,
   EvaluationSchedule,
   EvaluationScheduleCreate,
+  Faculty,
+  Department,
+  Major,
+  TrainingProgram,
+  LecturerItem,
+  StudentItem,
+  OrganizationPageResponse,
+  MilestoneItem,
+  ProjectRoundItem,
+  CreateProjectRoundPayload,
+  CreateMilestonePayload,
+  StudentImportPreviewResponse,
+  StudentImportCommitPayload,
+  StudentImportResultResponse,
+  StudentProjectRoundItem,
+  AcademicRecordImportPreviewResponse,
+  AcademicRecordImportCommitPayload,
+  AcademicRecordImportResultResponse,
+  AcademicRecordItem,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
   GROUPS, SUPERVISOR_STUDENT, PROJECTS, DOCUMENTS,
   EVALUATIONS, CHAT, TEMPLATES, NOTIFICATIONS,
-  AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT,
+  AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT, ORGANIZATION,
+  PROJECT_ROUNDS, ACADEMIC_RECORDS,
 } from './endpoints';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -68,22 +88,41 @@ class ApiService {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor to handle token refresh via HttpOnly Cookie
+    // Response interceptor to handle ApiResponse unwrapping and token refresh
     this.api.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        if (
+          response.data &&
+          typeof response.data === 'object' &&
+          'code' in response.data &&
+          'data' in response.data &&
+          'success' in response.data
+        ) {
+          if (response.data.data !== null && response.data.data !== undefined) {
+            return {
+              ...response,
+              data: response.data.data,
+            };
+          }
+        }
+        return response;
+      },
       async (error) => {
         const originalRequest = error.config;
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
           try {
-            // Send request to refresh token endpoint - HttpOnly cookie attached automatically via withCredentials
+            // Send request to refresh token endpoint
             const response = await axios.post(`${API_BASE_URL}${AUTH.TOKEN_REFRESH}`, {}, { withCredentials: true });
-            const { access } = response.data;
-            localStorage.setItem('access_token', access);
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${access}`;
+            const rawData = response.data?.data || response.data;
+            const access = rawData?.access || rawData?.token;
+            if (access) {
+              localStorage.setItem('access_token', access);
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${access}`;
+              }
+              return this.api(originalRequest);
             }
-            return this.api(originalRequest);
           } catch (refreshError) {
             this.logout();
             window.location.href = '/login';
@@ -92,6 +131,20 @@ class ApiService {
         return Promise.reject(error);
       }
     );
+  }
+
+  // General Auth (Admin & Unified)
+  async login(username: string, password: string): Promise<LoginResponse> {
+    const response = await this.api.post<LoginResponse>(AUTH.LOGIN, {
+      username,
+      password,
+    });
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<any> {
+    const response = await this.api.get('/users/me');
+    return response.data;
   }
 
   // Auth
@@ -871,6 +924,208 @@ class ApiService {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  }
+
+  // ─── Organization & Academic Master Data (UTC ThesisHub) ──────────
+  async getFaculties(): Promise<Faculty[]> {
+    const response = await this.api.get<Faculty[]>(ORGANIZATION.FACULTIES);
+    return response.data;
+  }
+
+  async getDepartments(facultyId?: number): Promise<Department[]> {
+    const response = await this.api.get<Department[]>(ORGANIZATION.DEPARTMENTS, {
+      params: facultyId ? { facultyId } : undefined,
+    });
+    return response.data;
+  }
+
+  async getMajors(facultyId?: number, departmentId?: number): Promise<Major[]> {
+    const response = await this.api.get<Major[]>(ORGANIZATION.MAJORS, {
+      params: { facultyId, departmentId },
+    });
+    return response.data;
+  }
+
+  async getTrainingPrograms(): Promise<TrainingProgram[]> {
+    const response = await this.api.get<TrainingProgram[]>(ORGANIZATION.TRAINING_PROGRAMS);
+    return response.data;
+  }
+
+  async getLecturers(params?: { departmentId?: number; degree?: string; search?: string }): Promise<LecturerItem[]> {
+    const response = await this.api.get<LecturerItem[]>(ORGANIZATION.LECTURERS, { params });
+    return response.data;
+  }
+
+  async getOrganizationStudents(params?: {
+    majorId?: number;
+    programId?: number;
+    className?: string;
+    search?: string;
+    page?: number;
+    size?: number;
+  }): Promise<OrganizationPageResponse<StudentItem>> {
+    const response = await this.api.get<OrganizationPageResponse<StudentItem>>(ORGANIZATION.STUDENTS, { params });
+    return response.data;
+  }
+
+  // ─── Project Rounds & Timelines (Contract 2) ──────────────────────
+  async getActiveProjectRound(): Promise<ProjectRoundItem> {
+    const response = await this.api.get<ProjectRoundItem>(PROJECT_ROUNDS.ACTIVE);
+    return response.data;
+  }
+
+  async getProjectRounds(params?: { status?: string; academicYear?: string }): Promise<ProjectRoundItem[]> {
+    const response = await this.api.get<ProjectRoundItem[]>(PROJECT_ROUNDS.LIST, { params });
+    return response.data;
+  }
+
+  async getProjectRoundById(id: number): Promise<ProjectRoundItem> {
+    const response = await this.api.get<ProjectRoundItem>(PROJECT_ROUNDS.detail(id));
+    return response.data;
+  }
+
+  async createProjectRound(payload: CreateProjectRoundPayload): Promise<ProjectRoundItem> {
+    const response = await this.api.post<ProjectRoundItem>(PROJECT_ROUNDS.LIST, payload);
+    return response.data;
+  }
+
+  async updateProjectRoundStatus(id: number, status: string): Promise<ProjectRoundItem> {
+    const response = await this.api.patch<ProjectRoundItem>(PROJECT_ROUNDS.status(id), { status });
+    return response.data;
+  }
+
+  async getRoundMilestones(roundId: number): Promise<MilestoneItem[]> {
+    const response = await this.api.get<MilestoneItem[]>(PROJECT_ROUNDS.milestones(roundId));
+    return response.data;
+  }
+
+  async addRoundMilestone(roundId: number, payload: CreateMilestonePayload): Promise<MilestoneItem> {
+    const response = await this.api.post<MilestoneItem>(PROJECT_ROUNDS.milestones(roundId), payload);
+    return response.data;
+  }
+
+  async deleteMilestone(milestoneId: number): Promise<void> {
+    await this.api.delete(PROJECT_ROUNDS.milestoneDetail(milestoneId));
+  }
+
+  // ─── Student Project Round & Ingestion APIs (Contract 3) ────────
+  async downloadStudentTemplate(): Promise<Blob> {
+    const response = await this.api.get(PROJECT_ROUNDS.STUDENT_TEMPLATE, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async previewImportStudents(roundId: number, file: File): Promise<StudentImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<StudentImportPreviewResponse>(
+      PROJECT_ROUNDS.studentImportPreview(roundId),
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  }
+
+  async commitImportStudents(roundId: number, payload: StudentImportCommitPayload): Promise<StudentImportResultResponse> {
+    const response = await this.api.post<StudentImportResultResponse>(
+      PROJECT_ROUNDS.studentImportCommit(roundId),
+      payload
+    );
+    return response.data;
+  }
+
+  async getStudentsInRound(
+    roundId: number,
+    params?: {
+      majorId?: number;
+      status?: string;
+      search?: string;
+      page?: number;
+      size?: number;
+    }
+  ): Promise<OrganizationPageResponse<StudentProjectRoundItem>> {
+    const response = await this.api.get<OrganizationPageResponse<StudentProjectRoundItem>>(
+      PROJECT_ROUNDS.students(roundId),
+      { params }
+    );
+    return response.data;
+  }
+
+  async updateStudentRoundStatus(
+    roundId: number,
+    studentId: number,
+    status: string,
+    note?: string
+  ): Promise<StudentProjectRoundItem> {
+    const response = await this.api.patch<StudentProjectRoundItem>(
+      PROJECT_ROUNDS.studentStatus(roundId, studentId),
+      { status, note }
+    );
+    return response.data;
+  }
+
+  async removeStudentFromRound(roundId: number, studentId: number): Promise<void> {
+    await this.api.delete(PROJECT_ROUNDS.studentDetail(roundId, studentId));
+  }
+
+  // ─── Academic Records APIs (Phase 4 Ingestion & Contract 4) ─────
+  async downloadAcademicTemplate(): Promise<Blob> {
+    const response = await this.api.get(ACADEMIC_RECORDS.TEMPLATE, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async previewImportAcademicRecords(roundId: number, file: File): Promise<AcademicRecordImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.api.post<AcademicRecordImportPreviewResponse>(
+      ACADEMIC_RECORDS.importPreview(roundId),
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  }
+
+  async commitImportAcademicRecords(roundId: number, payload: AcademicRecordImportCommitPayload): Promise<AcademicRecordImportResultResponse> {
+    const response = await this.api.post<AcademicRecordImportResultResponse>(
+      ACADEMIC_RECORDS.importCommit(roundId),
+      payload
+    );
+    return response.data;
+  }
+
+  async getAcademicRecords(
+    roundId: number,
+    params?: {
+      tuitionDebt?: boolean;
+      underDisciplinaryAction?: boolean;
+      search?: string;
+      page?: number;
+      size?: number;
+    }
+  ): Promise<OrganizationPageResponse<AcademicRecordItem>> {
+    const response = await this.api.get<OrganizationPageResponse<AcademicRecordItem>>(
+      ACADEMIC_RECORDS.roundRecords(roundId),
+      { params }
+    );
+    return response.data;
+  }
+
+  async getStudentAcademicRecord(roundId: number, studentId: number): Promise<AcademicRecordItem> {
+    const response = await this.api.get<AcademicRecordItem>(
+      ACADEMIC_RECORDS.studentInRound(roundId, studentId)
+    );
+    return response.data;
   }
 
   // Utility

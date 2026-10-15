@@ -604,3 +604,80 @@
     flex-wrap: wrap;
   }
 }
+
+/* Demo Accounts Quick-Fill Box */
+.utc-demo-accounts-box {
+  background: #f8fafc;
+  border: 1px dashed #94a3b8;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 18px;
+}
+
+.utc-demo-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.utc-demo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.utc-demo-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+}
+
+.utc-demo-btn:hover {
+  border-color: #0a3273;
+  background-color: #eff6ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(10, 50, 115, 0.1);
+}
+
+.utc-demo-btn .demo-role {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.utc-demo-btn .demo-cred {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-top: 2px;
+  font-family: monospace;
+}
+
+.utc-demo-btn.admin:hover {
+  border-color: #d97706;
+  background-color: #fffbeb;
+}
+
+.utc-demo-btn.student:hover {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+}
+
+.utc-demo-btn.supervisor:hover {
+  border-color: #0d9488;
+  background-color: #f0fdfa;
+}
+
+.utc-demo-btn.committee:hover {
+  border-color: #7c3aed;
+  background-color: #f5f3ff;
+}

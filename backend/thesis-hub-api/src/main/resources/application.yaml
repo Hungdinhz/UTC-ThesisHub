@@ -3,25 +3,6 @@ spring:
     import: optional:file:.env[.properties]
 
   application:
-<<<<<<< HEAD
-    name: thesis-hub-api
-  datasource:
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        format_sql: true
-    show-sql: true
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-
-jwt:
-  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-  expiration: 86400000 # 1 day
-=======
     name: ${APP_NAME:thesis-hub-api}
 
   profiles:
@@ -31,6 +12,12 @@ jwt:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+  flyway:
+    enabled: true
+    out-of-order: true
+    validate-on-migrate: false
+    ignore-migration-patterns: "*:missing,*:future,*:ignored"
 
   jpa:
     hibernate:
@@ -68,8 +55,8 @@ server:
   port: ${APP_PORT:8080}
 
 app:
-  frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
-  backend-url: ${APP_BACKEND_URL:http://localhost:8080}
+  frontend-url: ${APP_FRONTEND_URL:https://utc-thesishub.vercel.app}
+  backend-url: ${APP_BACKEND_URL:https://utc-thesishub.onrender.com}
 
   jwt:
     secret: ${JWT_SECRET:CHANGE_THIS_SECRET}
@@ -79,5 +66,5 @@ app:
     storage-path: ${FILE_STORAGE_PATH:./uploads}
 
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
->>>>>>> 951d93743d9978e0a91e1cfb14458b8e88b9196c
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://utc-thesishub.vercel.app,https://utc-thesishub.onrender.com,https://utc-thesishub-develop.onrender.com,http://localhost:3000,http://localhost:5173}
+

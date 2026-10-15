@@ -617,3 +617,264 @@ export interface EvaluationScheduleCreate {
   status?: EvaluationScheduleStatus;
   notes?: string;
 }
+
+// ─── Organization & Academic Types (UTC ThesisHub) ────────────────
+export interface Faculty {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  departmentCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Department {
+  id: number;
+  facultyId?: number;
+  facultyName?: string;
+  code: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Major {
+  id: number;
+  facultyId?: number;
+  facultyName?: string;
+  departmentId?: number;
+  departmentName?: string;
+  code: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TrainingProgram {
+  id: number;
+  code: string;
+  name: string;
+  durationYears: number;
+  totalCredits?: number;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LecturerItem {
+  lecturerId: number;
+  userId?: number;
+  lecturerCode: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  academicDegree?: string;
+  departmentId?: number;
+  departmentName?: string;
+  facultyId?: number;
+  facultyName?: string;
+  researchInterests?: string;
+  maxThesisQuota?: number;
+  isActive: boolean;
+}
+
+export interface StudentItem {
+  studentId: number;
+  userId?: number;
+  studentCode: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  className?: string;
+  majorId?: number;
+  majorName?: string;
+  trainingProgramId?: number;
+  trainingProgramName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  debtCredits?: number;
+  isActive: boolean;
+}
+
+export interface OrganizationPageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  first: boolean;
+}
+
+// ─── Project Round & Milestone Types (Contract 2) ─────────────────
+export interface MilestoneItem {
+  milestoneId: number;
+  roundId?: number;
+  name: string;
+  phaseType: string;
+  startDate: string;
+  endDate: string;
+  description?: string;
+  orderIndex: number;
+  isActive: boolean;
+}
+
+export type RoundStatus = 'DRAFT' | 'OPEN' | 'IN_PROGRESS' | 'CLOSED' | 'ARCHIVED';
+
+export interface ProjectRoundItem {
+  roundId: number;
+  roundCode: string;
+  name: string;
+  academicYear: string;
+  semester: string;
+  trainingProgramId?: number;
+  trainingProgram?: string; // e.g. "CU_NHAN", "KY_SU"
+  trainingProgramName?: string;
+  status: RoundStatus;
+  startDate?: string;
+  endDate?: string;
+  description?: string;
+  milestones?: MilestoneItem[];
+  currentMilestone?: MilestoneItem;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectRoundPayload {
+  roundCode: string;
+  name: string;
+  academicYear: string;
+  semester: string;
+  trainingProgramId: number;
+  startDate?: string;
+  endDate?: string;
+  description?: string;
+}
+
+export interface CreateMilestonePayload {
+  name: string;
+  phaseType: string;
+  startDate: string;
+  endDate: string;
+  description?: string;
+  orderIndex?: number;
+}
+
+// ─── Student Ingestion & Contract 3 Types ─────────────────────────
+export interface StudentImportRow {
+  rowIndex: number;
+  stt?: number;
+  studentCode: string;
+  lastName: string;
+  firstName: string;
+  fullName: string;
+  majorCode: string;
+  className: string;
+  phone?: string;
+  email?: string;
+  isValid: boolean;
+  errors: string[];
+}
+
+export interface StudentImportPreviewResponse {
+  roundId: number;
+  roundCode: string;
+  roundName: string;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  rows: StudentImportRow[];
+}
+
+export interface StudentImportCommitPayload {
+  rows: StudentImportRow[];
+}
+
+export interface StudentImportResultResponse {
+  totalProcessed: number;
+  newUsersCreated: number;
+  newStudentsCreated: number;
+  enrolledInRound: number;
+  skipped: number;
+  messages: string[];
+}
+
+export interface StudentProjectRoundItem {
+  studentRoundId: number;
+  studentId: number;
+  studentCode: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  className: string;
+  majorId: number;
+  majorCode: string;
+  majorName: string;
+  trainingProgramId?: number;
+  trainingProgram?: string;
+  status: string;
+  debtCredits: number;
+  note?: string;
+  enrolledAt?: string;
+}
+
+// ─── Academic Records Types (Phase 4 Ingestion & Contract 4) ─────
+export interface AcademicRecordImportRow {
+  rowIndex: number;
+  stt?: number;
+  studentCode: string;
+  fullName?: string;
+  completedCredits: number;
+  gpa: number;
+  tuitionDebt: boolean;
+  underDisciplinaryAction: boolean;
+  missingPrerequisiteCount: number;
+  note?: string;
+  isValid: boolean;
+  errors: string[];
+}
+
+export interface AcademicRecordImportPreviewResponse {
+  roundId: number;
+  roundCode: string;
+  roundName: string;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  rows: AcademicRecordImportRow[];
+}
+
+export interface AcademicRecordImportCommitPayload {
+  rows: AcademicRecordImportRow[];
+}
+
+export interface AcademicRecordImportResultResponse {
+  totalProcessed: number;
+  recordsCreated: number;
+  recordsUpdated: number;
+  skipped: number;
+  messages: string[];
+}
+
+export interface AcademicRecordItem {
+  id: number;
+  studentId: number;
+  studentCode: string;
+  fullName: string;
+  className?: string;
+  majorName?: string;
+  projectRoundId: number;
+  roundCode?: string;
+  completedCredits: number;
+  gpa: number;
+  tuitionDebt: boolean;
+  underDisciplinaryAction: boolean;
+  missingPrerequisiteCount: number;
+  note?: string;
+  importedAt: string;
+}
