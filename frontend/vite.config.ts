@@ -10,7 +10,14 @@ export default defineConfig(({ mode }) => {
   //
   // Proxy target cần:
   // http://localhost:8080
-  const apiBaseUrl = new URL(env.VITE_API_BASE_URL).origin
+  let apiBaseUrl = 'http://localhost:8080'
+  if (env.VITE_API_BASE_URL) {
+    try {
+      apiBaseUrl = new URL(env.VITE_API_BASE_URL).origin
+    } catch {
+      apiBaseUrl = 'http://localhost:8080'
+    }
+  }
 
   return {
     plugins: [react()],

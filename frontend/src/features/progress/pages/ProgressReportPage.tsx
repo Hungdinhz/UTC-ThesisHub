@@ -454,6 +454,19 @@ export const ProgressReportPage: React.FC = () => {
                 />
               </div>
 
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                  Đường dẫn file báo cáo đính kèm (PDF)
+                </label>
+                <input
+                  type="text"
+                  placeholder="/files/reports/bao_cao_tuan.pdf"
+                  value={fileUrl}
+                  onChange={e => setFileUrl(e.target.value)}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                />
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button
                   type="button"

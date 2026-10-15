@@ -264,6 +264,12 @@ export const TaskBoardPage: React.FC = () => {
         </button>
       </div>
 
+      {loading && (
+        <div style={{ marginBottom: '16px', color: '#2563eb', fontWeight: '500' }}>
+          Đang tải danh sách công việc...
+        </div>
+      )}
+
       {/* Kanban Board Columns */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', minHeight: '650px' }}>
         {columns.map(col => {
