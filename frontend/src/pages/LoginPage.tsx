@@ -8,7 +8,7 @@ import utcLogo from '../assets/images/utc_logo.webp';
 
 const LoginPage: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const [userType, setUserType] = useState<'student' | 'supervisor' | 'committee_member' | 'external_examiner'>('student');
+  const [userType, setUserType] = useState<'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin'>('student');
   const [registrationNo, setRegistrationNo] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,12 +46,12 @@ const LoginPage: React.FC = () => {
     } else {
       if (!emailVal.trim()) {
         errors.email = i18n.language.startsWith('vi')
-          ? 'Vui lòng nhập Email cán bộ/giảng viên UTC'
-          : 'Please enter UTC Staff/Supervisor Email';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal.trim())) {
+          ? 'Vui lòng nhập Email hoặc Tên đăng nhập UTC'
+          : 'Please enter UTC Staff Email or Username';
+      } else if (emailVal.trim().length < 3) {
         errors.email = i18n.language.startsWith('vi')
-          ? 'Định dạng Email không hợp lệ (Ví dụ: gvdemo@utc.edu.vn)'
-          : 'Invalid Email format (e.g. gvdemo@utc.edu.vn)';
+          ? 'Tên đăng nhập hoặc Email phải có ít nhất 3 ký tự'
+          : 'Email or Username must be at least 3 characters';
       }
     }
 
@@ -74,8 +74,27 @@ const LoginPage: React.FC = () => {
     setFieldErrors(errors);
   };
 
-  const handleUserTypeChange = (newRole: 'student' | 'supervisor' | 'committee_member' | 'external_examiner') => {
+  const handleUserTypeChange = (newRole: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin') => {
     setUserType(newRole);
+    setError('');
+    setFieldErrors({});
+    setTouched({});
+  };
+
+  const handleQuickFill = (
+    role: 'student' | 'supervisor' | 'committee_member' | 'admin',
+    account: string,
+    pass: string
+  ) => {
+    setUserType(role);
+    if (role === 'student') {
+      setRegistrationNo(account);
+      setEmail('');
+    } else {
+      setEmail(account);
+      setRegistrationNo(account);
+    }
+    setPassword(pass);
     setError('');
     setFieldErrors({});
     setTouched({});
@@ -106,11 +125,15 @@ const LoginPage: React.FC = () => {
         response = await apiService.supervisorLogin(email.trim(), password);
       } else if (userType === 'committee_member') {
         response = await apiService.committeeMemberLogin(email.trim(), password);
+      } else if (userType === 'admin') {
+        response = await apiService.login(email.trim() || registrationNo.trim(), password);
       } else {
         response = await apiService.externalExaminerLogin(email.trim(), password);
       }
 
-      login(response.access, response.refresh, userType);
+      const accessToken = response?.access || (response as any)?.token || (response as any)?.data?.access || (response as any)?.data?.token;
+      const refreshToken = response?.refresh || (response as any)?.refreshToken || '';
+      login(accessToken, refreshToken, userType);
       navigate(`/${userType}/dashboard`);
     } catch (err: any) {
       if (err.response?.status === 429) {
@@ -237,6 +260,58 @@ const LoginPage: React.FC = () => {
             >
               {t('roles.committee_member', 'Hội đồng')}
             </button>
+            <button
+              type="button"
+              className={`utc-role-tab ${userType === 'admin' ? 'active' : ''}`}
+              onClick={() => handleUserTypeChange('admin')}
+            >
+              👑 Quản trị viên
+            </button>
+          </div>
+
+          {/* Demo Accounts Quick-Fill Box */}
+          <div className="utc-demo-accounts-box">
+            <div className="utc-demo-title">
+              <span>⚡</span> <span>Tài khoản mẫu để test (Click điền nhanh):</span>
+            </div>
+            <div className="utc-demo-grid">
+              <button
+                type="button"
+                className="utc-demo-btn admin"
+                onClick={() => handleQuickFill('admin', 'admin', 'Admin@123')}
+                title="Click để điền tài khoản Quản trị viên"
+              >
+                <span className="demo-role">👑 Quản trị viên</span>
+                <span className="demo-cred">admin | Admin@123</span>
+              </button>
+              <button
+                type="button"
+                className="utc-demo-btn student"
+                onClick={() => handleQuickFill('student', 'sinhvien', 'Password@123')}
+                title="Click để điền tài khoản Sinh viên"
+              >
+                <span className="demo-role">🎓 Sinh viên</span>
+                <span className="demo-cred">sinhvien | Password@123</span>
+              </button>
+              <button
+                type="button"
+                className="utc-demo-btn supervisor"
+                onClick={() => handleQuickFill('supervisor', 'giangvien@utc.edu.vn', 'Password@123')}
+                title="Click để điền tài khoản Giảng viên hướng dẫn"
+              >
+                <span className="demo-role">👨‍🏫 Giảng viên HD</span>
+                <span className="demo-cred">giangvien | Password@123</span>
+              </button>
+              <button
+                type="button"
+                className="utc-demo-btn committee"
+                onClick={() => handleQuickFill('committee_member', 'hoidong@utc.edu.vn', 'Password@123')}
+                title="Click để điền tài khoản Hội đồng chấm thi"
+              >
+                <span className="demo-role">⚖️ Hội đồng</span>
+                <span className="demo-cred">hoidong | Password@123</span>
+              </button>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="utc-login-form" noValidate>

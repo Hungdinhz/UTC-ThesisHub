@@ -8,6 +8,9 @@ import StudentDashboard from './pages/StudentDashboard';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import CommitteeMemberDashboard from './pages/CommitteeMemberDashboard';
 import ExternalDashboard from './pages/ExternalDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import OrganizationManagementPage from './pages/OrganizationManagementPage';
+import ProjectRoundManagementPage from './pages/ProjectRoundManagementPage';
 import './App.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedTypes: string[] }> = ({
@@ -73,6 +76,36 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+      {/* Admin Route */}
+      <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/organization"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <OrganizationManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/project-rounds"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <ProjectRoundManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/student" element={<Navigate to="/student/dashboard" replace />} />
+      <Route path="/supervisor" element={<Navigate to="/supervisor/dashboard" replace />} />
+      <Route path="/committee" element={<Navigate to="/committee_member/dashboard" replace />} />
+      <Route path="/committee_member" element={<Navigate to="/committee_member/dashboard" replace />} />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

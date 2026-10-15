@@ -16,6 +16,7 @@
 
 // ─── Authentication ───────────────────────────────────────────────
 export const AUTH = {
+  LOGIN:                   '/auth/login',
   STUDENT_LOGIN:           '/auth/students/login',
   SUPERVISOR_LOGIN:        '/auth/supervisors/login',
   COMMITTEE_MEMBER_LOGIN:  '/auth/committee-members/login',
@@ -147,4 +148,48 @@ export const SCHEDULES = {
 export const EXPORT = {
   REPORT:                  '/export/report',
   CONSOLIDATED_REPORT:     '/export/consolidated-report',
+} as const;
+
+// ─── Organization & Academic Master Data ──────────────────────────
+export const ORGANIZATION = {
+  FACULTIES:               '/faculties',
+  faculty:          (id: number) => `/faculties/${id}` as const,
+  facultyDepartments: (id: number) => `/faculties/${id}/departments` as const,
+  DEPARTMENTS:             '/departments',
+  department:       (id: number) => `/departments/${id}` as const,
+  MAJORS:                  '/majors',
+  major:            (id: number) => `/majors/${id}` as const,
+  TRAINING_PROGRAMS:       '/training-programs',
+  trainingProgram:  (id: number) => `/training-programs/${id}` as const,
+  LECTURERS:               '/lecturers',
+  lecturer:         (id: number) => `/lecturers/${id}` as const,
+  STUDENTS:                '/students',
+  student:          (id: number) => `/students/${id}` as const,
+} as const;
+
+// ─── Project Rounds & Timelines (Contract 2 & Contract 3) ─────────
+export const PROJECT_ROUNDS = {
+  LIST:                    '/project-rounds',
+  ACTIVE:                  '/project-rounds/active',
+  STUDENT_TEMPLATE:        '/project-rounds/students/template',
+  detail:           (id: number) => `/project-rounds/${id}` as const,
+  status:           (id: number) => `/project-rounds/${id}/status` as const,
+  currentMilestone: (id: number) => `/project-rounds/${id}/current-milestone` as const,
+  milestones:       (roundId: number) => `/project-rounds/${roundId}/milestones` as const,
+  milestoneDetail:  (milestoneId: number) => `/timeline-milestones/${milestoneId}` as const,
+  students:         (roundId: number) => `/project-rounds/${roundId}/students` as const,
+  studentDetail:    (roundId: number, studentId: number) => `/project-rounds/${roundId}/students/${studentId}` as const,
+  studentStatus:    (roundId: number, studentId: number) => `/project-rounds/${roundId}/students/${studentId}/status` as const,
+  studentImportPreview: (roundId: number) => `/project-rounds/${roundId}/students/import-preview` as const,
+  studentImportCommit:  (roundId: number) => `/project-rounds/${roundId}/students/import-commit` as const,
+} as const;
+
+// ─── Academic Records (Contract 4) ────────────────────────────────
+export const ACADEMIC_RECORDS = {
+  TEMPLATE:                '/project-rounds/academic-records/template',
+  roundRecords:     (roundId: number) => `/project-rounds/${roundId}/academic-records` as const,
+  studentInRound:   (roundId: number, studentId: number) => `/project-rounds/${roundId}/academic-records/${studentId}` as const,
+  importPreview:    (roundId: number) => `/project-rounds/${roundId}/academic-records/import-preview` as const,
+  importCommit:     (roundId: number) => `/project-rounds/${roundId}/academic-records/import-commit` as const,
+  studentLatest:    (studentId: number) => `/academic-records/student/${studentId}` as const,
 } as const;
