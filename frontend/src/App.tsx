@@ -11,6 +11,10 @@ import ExternalDashboard from './pages/ExternalDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import ProjectRoundManagementPage from './pages/ProjectRoundManagementPage';
+import { ProposalManagementPage } from './features/thesis/pages/ProposalManagementPage';
+import { ThesisDetailPage } from './features/thesis/pages/ThesisDetailPage';
+import { TaskBoardPage } from './features/progress/pages/TaskBoardPage';
+import { ProgressReportPage } from './features/progress/pages/ProgressReportPage';
 import './App.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedTypes: string[] }> = ({
@@ -98,6 +102,39 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedTypes={['admin']}>
             <ProjectRoundManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Module 3: Thesis & Execution Routes (Owner: Ngo Minh Quyet) */}
+      <Route
+        path="/thesis/proposals"
+        element={
+          <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor', 'committee_member']}>
+            <ProposalManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/thesis/detail"
+        element={
+          <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor', 'committee_member']}>
+            <ThesisDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/progress/tasks"
+        element={
+          <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor', 'committee_member']}>
+            <TaskBoardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/progress/reports"
+        element={
+          <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor', 'committee_member']}>
+            <ProgressReportPage />
           </ProtectedRoute>
         }
       />
