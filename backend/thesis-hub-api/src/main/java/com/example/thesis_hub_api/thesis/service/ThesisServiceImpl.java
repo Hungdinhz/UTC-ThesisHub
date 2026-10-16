@@ -90,7 +90,10 @@ public class ThesisServiceImpl implements ThesisService {
     @Override
     @Transactional(readOnly = true)
     public Page<ThesisResponse> searchTheses(Long roundId, Long lecturerId, String status, Boolean defenseEligible, String search, Pageable pageable) {
-        return thesisRepository.searchTheses(roundId, lecturerId, status, defenseEligible, search, pageable)
+        String searchPattern = (search != null && !search.trim().isEmpty())
+                ? "%" + search.trim().toLowerCase() + "%"
+                : null;
+        return thesisRepository.searchTheses(roundId, lecturerId, status, defenseEligible, searchPattern, pageable)
                 .map(this::mapToResponse);
     }
 
