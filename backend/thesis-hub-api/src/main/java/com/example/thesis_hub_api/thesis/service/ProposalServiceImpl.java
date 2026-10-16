@@ -89,7 +89,7 @@ public class ProposalServiceImpl implements ProposalService {
                 .orElseThrow(() -> new ResourceNotFoundException("Proposal", id));
 
         if (!"DRAFT".equals(proposal.getStatus()) && !"REVISE_REQUIRED".equals(proposal.getStatus())) {
-            throw new AppException(ErrorCode.BAD_REQUEST, "Chỉ có thể chỉnh sửa đề cương ở trạng thái DRAFT hoặc REVISE_REQUIRED");
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Chỉ có thể chỉnh sửa đề cương ở trạng thái DRAFT hoặc REVISE_REQUIRED");
         }
 
         if (request.getTitleVn() != null) proposal.setTitleVn(request.getTitleVn());
@@ -237,7 +237,10 @@ public class ProposalServiceImpl implements ProposalService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, String status, String search, Pageable pageable) {
-        return proposalRepository.searchProposals(roundId, lecturerId, status, search, pageable)
+        String searchPattern = (search != null && !search.trim().isEmpty())
+                ? "%" + search.trim().toLowerCase() + "%"
+                : null;
+        return proposalRepository.searchProposals(roundId, lecturerId, status, searchPattern, pageable)
                 .map(this::mapToResponse);
     }
 

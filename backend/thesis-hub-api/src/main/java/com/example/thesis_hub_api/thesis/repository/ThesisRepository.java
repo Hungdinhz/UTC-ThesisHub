@@ -35,9 +35,10 @@ public interface ThesisRepository extends JpaRepository<Thesis, Long> {
            "(:lecturerId IS NULL OR t.lecturer.id = :lecturerId) AND " +
            "(:status IS NULL OR t.status = :status) AND " +
            "(:defenseEligible IS NULL OR t.defenseEligible = :defenseEligible) AND " +
-           "(:search IS NULL OR LOWER(t.titleVn) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "LOWER(t.thesisCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "LOWER(t.student.studentCode) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "(:search IS NULL OR " +
+           "LOWER(t.titleVn) LIKE :search OR " +
+           "LOWER(t.thesisCode) LIKE :search OR " +
+           "LOWER(t.student.studentCode) LIKE :search)")
     Page<Thesis> searchTheses(
             @Param("roundId") Long roundId,
             @Param("lecturerId") Long lecturerId,
