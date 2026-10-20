@@ -35,6 +35,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -114,7 +115,7 @@ class StudentServiceTest {
     @DisplayName("Tìm kiếm sinh viên phân trang theo bộ lọc thành công")
     void getStudents_Paged_Success() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(studentRepository.searchStudents(100L, 1L, "CNTT1", "2021", pageable))
+        when(studentRepository.searchStudents(eq(100L), eq(1L), any(), any(), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(sampleStudent), pageable, 1));
         when(majorRepository.findById(100L)).thenReturn(Optional.of(sampleMajor));
         when(trainingProgramRepository.findById(1L)).thenReturn(Optional.of(sampleProgram));

@@ -1,7 +1,7 @@
 # ==============================================================================
-# Stage 1: Build the application using JDK 25 and Maven Wrapper
+# Stage 1: Build the application using JDK 21 and Maven Wrapper
 # ==============================================================================
-FROM eclipse-temurin:25-jdk AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /build
 
@@ -20,9 +20,9 @@ COPY src ./src
 RUN ./mvnw clean package -DskipTests -B
 
 # ==============================================================================
-# Stage 2: Lightweight runtime environment using JRE 25
+# Stage 2: Lightweight runtime environment using JRE 21
 # ==============================================================================
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 

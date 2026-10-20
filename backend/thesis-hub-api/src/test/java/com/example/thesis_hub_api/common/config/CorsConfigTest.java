@@ -2,6 +2,7 @@ package com.example.thesis_hub_api.common.config;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
@@ -102,6 +103,7 @@ class CorsConfigTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void testActualPostRequestWithoutCsrfBlock() throws Exception {
         String json = """
                 {

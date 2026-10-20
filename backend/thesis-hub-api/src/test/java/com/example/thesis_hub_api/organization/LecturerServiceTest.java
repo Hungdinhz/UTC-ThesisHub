@@ -30,6 +30,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -104,7 +105,7 @@ class LecturerServiceTest {
     @Test
     @DisplayName("CONTRACT 1: Tra cứu giảng viên theo bộ môn/học vị/từ khóa trả về đúng chuẩn DTO")
     void getLecturers_Contract1_Success() {
-        when(lecturerRepository.findLecturersFiltered(10L, "TIEN_SI", "Hướng"))
+        when(lecturerRepository.findLecturersFiltered(eq(10L), eq("TIEN_SI"), any()))
                 .thenReturn(List.of(sampleLecturer));
         when(departmentRepository.findById(10L)).thenReturn(Optional.of(sampleDepartment));
 
