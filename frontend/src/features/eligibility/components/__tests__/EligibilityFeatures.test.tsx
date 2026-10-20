@@ -6,6 +6,15 @@ import { FinalDefenseEligibilityPage } from '../../pages/FinalDefenseEligibility
 import { EligibilitySummaryCard } from '../EligibilitySummaryCard';
 import { ForceApproveModal } from '../ForceApproveModal';
 
+vi.mock('../../../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 1, username: 'admin', fullName: 'Admin' },
+    userType: 'admin',
+    logout: vi.fn(),
+  }),
+  AuthProvider: ({ children }: any) => children,
+}));
+
 describe('Eligibility Feature Component & Page Tests', () => {
   it('renders EligibilitySummaryCard with correct values', () => {
     render(

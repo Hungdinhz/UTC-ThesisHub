@@ -5,6 +5,7 @@ import type {
   StudentProjectRoundItem,
   StudentImportPreviewResponse,
   StudentImportRow,
+  CreateRoundStudentManualPayload,
 } from '../../../types';
 
 interface RoundStudentsTabProps {
@@ -39,6 +40,20 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   const [importLoading, setImportLoading] = useState(false);
   const [previewData, setPreviewData] = useState<StudentImportPreviewResponse | null>(null);
   const [importResultMsg, setImportResultMsg] = useState<string | null>(null);
+
+  // Modal Add Student Manually states
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualForm, setManualForm] = useState<CreateRoundStudentManualPayload>({
+    studentCode: '',
+    fullName: '',
+    email: '',
+    className: '',
+    majorId: 0,
+    phone: '',
+    status: 'ELIGIBLE',
+    note: '',
+  });
 
   // Modal Update Status states
   const [editingStudent, setEditingStudent] = useState<StudentProjectRoundItem | null>(null);
@@ -135,6 +150,47 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setError(err instanceof Error ? err.message : 'Lỗi khi phân tích dữ liệu file Excel');
     } finally {
       setImportLoading(false);
+    }
+  };
+
+  // Manual student submit
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualForm.studentCode.trim() || !manualForm.fullName.trim() || !manualForm.majorId) {
+      setError('Vui lòng điền đầy đủ Mã SV, Họ tên và chọn Ngành đào tạo');
+      return;
+    }
+
+    try {
+      setManualLoading(true);
+      setError(null);
+      const code = manualForm.studentCode.trim();
+      const emailVal = manualForm.email?.trim() || `${code.toLowerCase()}@lms.utc.edu.vn`;
+      await apiService.addStudentToRoundManually(roundId, {
+        ...manualForm,
+        studentCode: code,
+        fullName: manualForm.fullName.trim(),
+        email: emailVal,
+      });
+
+      setSuccessMsg(`Thêm sinh viên ${code} thành công. Tài khoản hệ thống đã được cấp: Tên đăng nhập = ${code}, Mật khẩu = ${code}.`);
+      setShowManualModal(false);
+      setManualForm({
+        studentCode: '',
+        fullName: '',
+        email: '',
+        className: '',
+        majorId: majors[0]?.id || 0,
+        phone: '',
+        status: 'ELIGIBLE',
+        note: '',
+      });
+      loadStudents();
+      setTimeout(() => setSuccessMsg(null), 5000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Lỗi khi thêm sinh viên thủ công vào đợt');
+    } finally {
+      setManualLoading(false);
     }
   };
 
@@ -659,6 +715,138 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   style={{ backgroundColor: '#0a3273', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
                 >
                   Lưu thay đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Add Student Manually */}
+      {showManualModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px 32px', width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ margin: '0 0 12px 0', color: '#0a3273' }}>
+              ➕ Thêm Sinh viên thủ công vào đợt đồ án
+            </h3>
+            
+            <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '0.85rem', color: '#1e40af' }}>
+              🔐 <strong>Cấp tài khoản đăng nhập tự động:</strong> Khi lưu, hệ thống tự động tạo tài khoản Sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu khởi tạo = Mã SV</strong>.
+            </div>
+
+            <form onSubmit={handleManualSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Mã sinh viên (MSSV) *</label>
+                  <input
+                    type="text"
+                    value={manualForm.studentCode}
+                    onChange={(e) => setManualForm({ ...manualForm, studentCode: e.target.value })}
+                    placeholder="VD: 201200101"
+                    required
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Họ và tên sinh viên *</label>
+                  <input
+                    type="text"
+                    value={manualForm.fullName}
+                    onChange={(e) => setManualForm({ ...manualForm, fullName: e.target.value })}
+                    placeholder="VD: Nguyễn Văn An"
+                    required
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Lớp sinh hoạt</label>
+                  <input
+                    type="text"
+                    value={manualForm.className || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, className: e.target.value })}
+                    placeholder="VD: CNTT1 - K64"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Ngành đào tạo *</label>
+                  <select
+                    value={manualForm.majorId}
+                    onChange={(e) => setManualForm({ ...manualForm, majorId: Number(e.target.value) })}
+                    required
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  >
+                    {majors.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name} ({m.code})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Email sinh viên</label>
+                  <input
+                    type="email"
+                    value={manualForm.email || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })}
+                    placeholder="Tự động: mssv@lms.utc.edu.vn"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Số điện thoại</label>
+                  <input
+                    type="text"
+                    value={manualForm.phone || ''}
+                    onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
+                    placeholder="VD: 0912345678"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Trạng thái ban đầu trong đợt</label>
+                <select
+                  value={manualForm.status}
+                  onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                >
+                  <option value="ELIGIBLE">Đủ điều kiện tham gia (ELIGIBLE)</option>
+                  <option value="REGISTERED">Đã có đề tài (REGISTERED)</option>
+                  <option value="ASSIGNED">Đã gán GVHD (ASSIGNED)</option>
+                  <option value="IN_PROGRESS">Đang làm đồ án (IN_PROGRESS)</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Ghi chú</label>
+                <textarea
+                  value={manualForm.note || ''}
+                  onChange={(e) => setManualForm({ ...manualForm, note: e.target.value })}
+                  placeholder="Ghi chú thêm về sinh viên (nếu có)..."
+                  rows={2}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowManualModal(false)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={manualLoading}
+                  style={{ backgroundColor: '#0a3273', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {manualLoading ? 'Đang lưu...' : '💾 Lưu thông tin Sinh viên'}
                 </button>
               </div>
             </form>
