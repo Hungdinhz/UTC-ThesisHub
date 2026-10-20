@@ -8,7 +8,14 @@ import com.example.thesis_hub_api.eligibility.entity.ReservationRequest;
 import com.example.thesis_hub_api.eligibility.repository.ReservationRequestRepository;
 import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockService;
 import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockService.StudentAcademicRecord;
+import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
+import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
+import com.example.thesis_hub_api.projectround.repository.AcademicRecordRepository;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import com.example.thesis_hub_api.thesis.entity.Thesis;
+import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +34,15 @@ public class EligibilityService {
     private final ScoreRepository scoreRepository;
     private final ReviewerAssignmentRepository reviewerAssignmentRepository;
 
+    @Autowired(required = false)
+    private AcademicRecordRepository academicRecordRepository;
+
+    @Autowired(required = false)
+    private StudentProjectRoundRepository studentProjectRoundRepository;
+
+    @Autowired(required = false)
+    private ThesisRepository thesisRepository;
+
     // Track overrides in-memory for testing and decoupling
     private final Map<String, String> statusOverrides = new ConcurrentHashMap<>();
     private final Map<String, String> overrideReasons = new ConcurrentHashMap<>();
@@ -35,11 +51,78 @@ public class EligibilityService {
         return studentId + "_" + (projectRoundId != null ? projectRoundId : 0L);
     }
 
+    private StudentAcademicRecord resolveAcademicRecord(Long studentId, Long projectRoundId) {
+        if (academicRecordRepository != null && studentId != null) {
+            Optional<AcademicRecord> dbRecordOpt = Optional.empty();
+            if (projectRoundId != null) {
+                dbRecordOpt = academicRecordRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
+            }
+            if (dbRecordOpt.isEmpty()) {
+                dbRecordOpt = academicRecordRepository.findFirstByStudentIdOrderByImportedAtDesc(studentId);
+            }
+            if (dbRecordOpt.isPresent()) {
+                AcademicRecord ar = dbRecordOpt.get();
+                String code = ar.getStudent() != null ? ar.getStudent().getStudentCode() : ("SV" + studentId);
+                String name = (ar.getStudent() != null && ar.getStudent().getUser() != null)
+                        ? ar.getStudent().getUser().getFullName()
+                        : ("Sinh viên #" + studentId);
+                return StudentAcademicRecord.builder()
+                        .studentId(studentId)
+                        .studentCode(code)
+                        .fullName(name)
+                        .completedCredits(ar.getCompletedCredits() != null ? ar.getCompletedCredits() : 0)
+                        .gpa(ar.getGpa() != null ? ar.getGpa() : 0.0)
+                        .tuitionDebt(Boolean.TRUE.equals(ar.getTuitionDebt()))
+                        .underDisciplinaryAction(Boolean.TRUE.equals(ar.getUnderDisciplinaryAction()))
+                        .missingPrerequisiteCount(ar.getMissingPrerequisiteCount() != null ? ar.getMissingPrerequisiteCount() : 0)
+                        .thesisProgressPercentage(100.0)
+                        .supervisorApprovedForDefense(true)
+                        .build();
+            }
+        }
+        return academicMockService.getRecord(studentId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EligibilityCheckResponseDTO> getAllStudentsEligibility(Long projectRoundId) {
+        Set<Long> studentIds = new LinkedHashSet<>();
+        if (studentProjectRoundRepository != null) {
+            List<StudentProjectRound> sprList = (projectRoundId != null)
+                    ? studentProjectRoundRepository.findByProjectRoundId(projectRoundId)
+                    : studentProjectRoundRepository.findAll();
+            for (StudentProjectRound spr : sprList) {
+                if (spr.getStudent() != null) {
+                    studentIds.add(spr.getStudent().getId());
+                }
+            }
+        }
+        if (academicRecordRepository != null) {
+            List<AcademicRecord> arList = (projectRoundId != null)
+                    ? academicRecordRepository.findByProjectRoundId(projectRoundId)
+                    : academicRecordRepository.findAll();
+            for (AcademicRecord ar : arList) {
+                if (ar.getStudent() != null) {
+                    studentIds.add(ar.getStudent().getId());
+                }
+            }
+        }
+        if (studentIds.isEmpty()) {
+            studentIds.addAll(List.of(101L, 102L, 103L, 104L, 105L));
+        }
+
+        List<EligibilityCheckResponseDTO> results = new ArrayList<>();
+        for (Long sid : studentIds) {
+            results.add(checkThesisEligibility(sid, projectRoundId));
+        }
+        return results;
+    }
+
     /**
      * Check if a student meets initial eligibility criteria for starting a thesis project.
      */
+    @Transactional(readOnly = true)
     public EligibilityCheckResponseDTO checkThesisEligibility(Long studentId, Long projectRoundId) {
-        StudentAcademicRecord record = academicMockService.getRecord(studentId);
+        StudentAcademicRecord record = resolveAcademicRecord(studentId, projectRoundId);
         String overrideKey = getOverrideKey(studentId, projectRoundId);
 
         List<String> reasons = new ArrayList<>();
@@ -97,20 +180,40 @@ public class EligibilityService {
     /**
      * Force approve a student into the project round (Admin/Dean privilege).
      */
+    @Transactional
     public EligibilityCheckResponseDTO forceApprove(ForceApproveRequestDTO request) {
         String key = getOverrideKey(request.getStudentId(), request.getProjectRoundId());
         statusOverrides.put(key, "FORCE_APPROVED");
         overrideReasons.put(key, "Được duyệt đặc cách bởi cán bộ ID: " + request.getApprovedBy() + " - Lý do: " + request.getReason());
+
+        if (studentProjectRoundRepository != null && request.getStudentId() != null && request.getProjectRoundId() != null) {
+            studentProjectRoundRepository.findByStudentIdAndProjectRoundId(request.getStudentId(), request.getProjectRoundId())
+                    .ifPresent(spr -> {
+                        spr.setStatus("ELIGIBLE");
+                        spr.setNote("Force Approved: " + request.getReason());
+                        studentProjectRoundRepository.save(spr);
+                    });
+        }
         return checkThesisEligibility(request.getStudentId(), request.getProjectRoundId());
     }
 
     /**
      * Disqualify a student from the project round.
      */
+    @Transactional
     public EligibilityCheckResponseDTO disqualify(DisqualifyRequestDTO request) {
         String key = getOverrideKey(request.getStudentId(), request.getProjectRoundId());
         statusOverrides.put(key, "DISQUALIFIED");
         overrideReasons.put(key, "Loại khỏi đợt bởi cán bộ ID: " + request.getDisqualifiedBy() + " - Lý do: " + request.getReason());
+
+        if (studentProjectRoundRepository != null && request.getStudentId() != null && request.getProjectRoundId() != null) {
+            studentProjectRoundRepository.findByStudentIdAndProjectRoundId(request.getStudentId(), request.getProjectRoundId())
+                    .ifPresent(spr -> {
+                        spr.setStatus("DROPPED");
+                        spr.setNote("Disqualified: " + request.getReason());
+                        studentProjectRoundRepository.save(spr);
+                    });
+        }
         return checkThesisEligibility(request.getStudentId(), request.getProjectRoundId());
     }
 
@@ -159,6 +262,20 @@ public class EligibilityService {
             entity.setNote(request.getNote());
         }
 
+        if (studentProjectRoundRepository != null && entity.getStudentId() != null && entity.getProjectRoundId() != null) {
+            studentProjectRoundRepository.findByStudentIdAndProjectRoundId(entity.getStudentId(), entity.getProjectRoundId())
+                    .ifPresent(spr -> {
+                        if ("APPROVED".equalsIgnoreCase(targetStatus)) {
+                            spr.setStatus("RESERVED");
+                            spr.setNote("Bảo lưu đã được duyệt");
+                        } else if ("REJECTED".equalsIgnoreCase(targetStatus)) {
+                            spr.setStatus("DROPPED");
+                            spr.setNote("Từ chối bảo lưu: " + (request.getRejectionReason() != null ? request.getRejectionReason() : ""));
+                        }
+                        studentProjectRoundRepository.save(spr);
+                    });
+        }
+
         ReservationRequest updated = reservationRepository.save(entity);
         return mapToReservationResponse(updated);
     }
@@ -189,17 +306,37 @@ public class EligibilityService {
     /**
      * Check if student / thesis is eligible for final defense council evaluation.
      */
+    @Transactional(readOnly = true)
     public FinalDefenseEligibilityResponseDTO checkFinalDefenseEligibility(Long thesisId, Long studentId) {
-        StudentAcademicRecord record = academicMockService.getRecord(studentId != null ? studentId : 101L);
+        double progressPercentage;
+        boolean supervisorApproved;
+
+        Optional<Thesis> dbThesisOpt = (thesisRepository != null && thesisId != null)
+                ? thesisRepository.findById(thesisId)
+                : Optional.empty();
+
+        if (dbThesisOpt.isPresent()) {
+            Thesis t = dbThesisOpt.get();
+            progressPercentage = t.getCompletionRate() != null ? t.getCompletionRate().doubleValue() : 0.0;
+            supervisorApproved = Boolean.TRUE.equals(t.getDefenseEligible());
+            if (studentId == null && t.getStudent() != null) {
+                studentId = t.getStudent().getId();
+            }
+        } else {
+            StudentAcademicRecord record = academicMockService.getRecord(studentId != null ? studentId : 101L);
+            progressPercentage = record.getThesisProgressPercentage();
+            supervisorApproved = record.isSupervisorApprovedForDefense();
+        }
+
         List<String> reasons = new ArrayList<>();
         boolean eligible = true;
 
-        if (record.getThesisProgressPercentage() < 100.0) {
+        if (progressPercentage < 100.0) {
             eligible = false;
-            reasons.add("Tiến độ thực hiện đồ án chưa hoàn tất (Hiện tại: " + record.getThesisProgressPercentage() + "%)");
+            reasons.add("Tiến độ thực hiện đồ án chưa hoàn tất (Hiện tại: " + progressPercentage + "%)");
         }
 
-        if (!record.isSupervisorApprovedForDefense()) {
+        if (!supervisorApproved) {
             eligible = false;
             reasons.add("Giảng viên hướng dẫn chưa đồng ý cho sinh viên bảo vệ");
         }
@@ -243,8 +380,8 @@ public class EligibilityService {
                 .studentId(studentId)
                 .thesisId(thesisId)
                 .eligibleForDefense(eligible)
-                .thesisProgressPercentage(record.getThesisProgressPercentage())
-                .supervisorApproved(record.isSupervisorApprovedForDefense())
+                .thesisProgressPercentage(progressPercentage)
+                .supervisorApproved(supervisorApproved)
                 .supervisorScore(supervisorScore)
                 .reviewerAssigned(reviewerAssigned)
                 .reviewerScore(reviewerScore)

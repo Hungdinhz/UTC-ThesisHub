@@ -20,12 +20,12 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     @Query("SELECT s FROM Student s JOIN s.user u WHERE " +
            "(:majorId IS NULL OR s.majorId = :majorId) AND " +
            "(:trainingProgramId IS NULL OR s.trainingProgramId = :trainingProgramId) AND " +
-           "(:className IS NULL OR LOWER(s.className) LIKE LOWER(CONCAT('%', :className, '%'))) AND " +
+           "(:className IS NULL OR LOWER(s.className) LIKE :className) AND " +
            "(:search IS NULL OR " +
-           " LOWER(s.studentCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(s.className) LIKE LOWER(CONCAT('%', :search, '%')))")
+           " LOWER(s.studentCode) LIKE :search OR " +
+           " LOWER(u.fullName) LIKE :search OR " +
+           " LOWER(u.email) LIKE :search OR " +
+           " LOWER(s.className) LIKE :search)")
     Page<Student> searchStudents(
             @Param("majorId") Long majorId,
             @Param("trainingProgramId") Long trainingProgramId,

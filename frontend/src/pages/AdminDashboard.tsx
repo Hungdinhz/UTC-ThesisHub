@@ -7,146 +7,164 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  const lifecycleStages = [
+    {
+      stage: 'Giai đoạn 1',
+      title: 'Khởi tạo Đợt Đồ án & Thiết lập Dữ liệu',
+      icon: '🗓️',
+      color: '#16a34a',
+      description:
+        'Khoa tạo đợt đồ án, chọn CTĐT (Cử nhân / Kỹ sư), Import danh sách SV từ Excel, tạo tài khoản GV/SV thủ công, cập nhật hướng nghiên cứu và học vị GV.',
+      actions: [
+        { label: 'Tạo đợt & Import SV', route: '/admin/project-rounds' },
+        { label: 'Tạo GV / SV & Học vị', route: '/admin/organization' },
+      ],
+    },
+    {
+      stage: 'Giai đoạn 2',
+      title: 'Chọn Hướng, Nguyện vọng NV1–NV3 & Phân công',
+      icon: '🎯',
+      color: '#0284c7',
+      description:
+        'SV chọn hướng đồ án, chọn NV1–NV3 (kiểm tra học vị tối thiểu cho CT Kỹ sư), hệ thống tính Capacity theo hệ số, tối ưu hóa ràng buộc cứng/mềm, Khoa review/override và chốt phân công.',
+      actions: [
+        { label: 'Khoa Phân công & Chốt', route: '/admin/assignments' },
+        { label: 'Form SV Chọn NV1–NV3', route: '/student/assignment' },
+      ],
+    },
+    {
+      stage: 'Giai đoạn 3',
+      title: 'Công bố, Xây dựng Đề tài & Sinh Đề cương PDF',
+      icon: '📑',
+      color: '#7c3aed',
+      description:
+        'Công bố kết quả phân công, GV & SV xác định đề tài (Draft), GV xác nhận, Khoa/Ban duyệt đề tài (Approved/Revise), sinh đề cương PDF, SV ký nộp & Khoa lưu hồ sơ.',
+      actions: [
+        { label: 'Duyệt Đề cương & PDF', route: '/thesis/proposals' },
+        { label: 'Chi tiết Đề tài', route: '/thesis/detail' },
+      ],
+    },
+    {
+      stage: 'Giai đoạn 4',
+      title: 'Xét Điều kiện Làm Đồ án & Duyệt Đặc cách',
+      icon: '✅',
+      color: '#f59e0b',
+      description:
+        'Import điểm/học vụ xét điều kiện (Tín chỉ >= 110, GPA >= 2.0, Không nợ HP/Kỷ luật). Nếu không đủ: nút quyết định Force Approve (vẫn cho làm ĐA) hoặc Loại khỏi đợt.',
+      actions: [
+        { label: 'Xét ĐK & Force Approve', route: '/admin/eligibility' },
+        { label: 'Import Học vụ (Tab 3)', route: '/admin/project-rounds' },
+      ],
+    },
+    {
+      stage: 'Giai đoạn 5',
+      title: 'Thực hiện Đồ án (Task, Submit, Review)',
+      icon: '📋',
+      color: '#0891b2',
+      description:
+        'Tạo task, deadline, comment. SV nhận task và submit kết quả. GV review kết quả: Không đạt -> Yêu cầu sửa task làm lại; Đạt -> Hoàn thành project và chuyển sang Giai đoạn 6.',
+      actions: [
+        { label: 'Bảng Task & Review', route: '/progress/tasks' },
+        { label: 'Báo cáo Tiến độ', route: '/progress/reports' },
+      ],
+    },
+    {
+      stage: 'Giai đoạn 6',
+      title: 'Xét Bảo vệ, Hội đồng (1CT-2TK-2UV), Bảo lưu & Kết thúc',
+      icon: '🏆',
+      color: '#dc2626',
+      description:
+        'GV xác nhận đủ khả năng BV -> Kiểm tra ĐK học vụ cuối -> Lập hội đồng 1CT-2TK-2UV & gán phản biện -> Xếp lịch -> Chấm điểm -> Tổng hợp -> Xuất Biên bản PDF & Dữ liệu cuối kỳ (ký). Nhánh phụ: Đơn Bảo lưu.',
+      actions: [
+        { label: 'Xét ĐK Bảo vệ Cuối', route: '/admin/final-eligibility' },
+        { label: 'Lập HĐ (1CT-2TK-2UV)', route: '/admin/councils' },
+        { label: 'Xếp lịch Bảo vệ', route: '/admin/defense-schedules' },
+        { label: 'Chấm điểm & Biên bản PDF', route: '/admin/defense-scoring' },
+        { label: 'Duyệt Đơn Bảo lưu', route: '/admin/reservations' },
+      ],
+    },
+  ];
+
   return (
     <UTCAppLayout activeTab="overview" onLogout={logout} user={user}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Welcome Card */}
-        <div style={{
-          backgroundColor: '#fff',
-          borderRadius: '12px',
-          padding: '24px 32px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          borderLeft: '5px solid #0a3273'
-        }}>
+        <div
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            padding: '24px 32px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            borderLeft: '5px solid #0a3273',
+          }}
+        >
           <h2 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>
-            Chào mừng trở lại, {user?.fullName || user?.username || 'Quản trị viên'} 👋
+            Chào mừng trở lại, {user?.fullName || user?.username || 'Quản trị viên Khoa CNTT'} 👋
           </h2>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
-            Hệ thống quản lý đồ án tốt nghiệp TheSisHub UTC. Bạn có toàn quyền thiết lập dữ liệu nền, khởi tạo đợt đồ án, import sinh viên và quản lý kết quả học vụ xét điều kiện.
+            Trung tâm điều hành toàn trình <strong>6 Giai đoạn Đồ án Tốt nghiệp UTC</strong>. Bạn có thể chuyển nhanh tới bất kỳ giai đoạn nào bên dưới để kiểm thử và vận hành.
           </p>
         </div>
 
-        {/* 4 Cards Quick Modules */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
-          <div
-            onClick={() => navigate('/admin/project-rounds')}
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: '12px',
-              padding: '24px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              borderTop: '4px solid #16a34a',
-              cursor: 'pointer',
-              transition: 'transform 0.2s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-3px)')}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-          >
-            <div style={{ fontSize: '1.75rem', marginBottom: '12px' }}>🗓️</div>
-            <h3 style={{ margin: '0 0 8px 0', color: '#1e293b', fontSize: '1.1rem' }}>Đợt Đồ Án & Timeline</h3>
-            <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
-              Khởi tạo đợt đồ án (Cử nhân/Kỹ sư), cấu hình các mốc thời gian đăng ký, bảo vệ (Contract 2).
-            </p>
-            <div style={{ marginTop: '16px', color: '#16a34a', fontWeight: 600, fontSize: '0.85rem' }}>
-              Quản lý đợt đồ án →
+        {/* 6-Stage Lifecycle Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+          {lifecycleStages.map((item) => (
+            <div
+              key={item.stage}
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '12px',
+                padding: '22px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                borderTop: `4px solid ${item.color}`,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span
+                    style={{
+                      backgroundColor: '#f1f5f9',
+                      color: item.color,
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                    }}
+                  >
+                    {item.stage}
+                  </span>
+                  <span style={{ fontSize: '1.5rem' }}>{item.icon}</span>
+                </div>
+                <h3 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '1.05rem' }}>{item.title}</h3>
+                <p style={{ margin: '0 0 16px 0', color: '#475569', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                  {item.description}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {item.actions.map((act) => (
+                  <button
+                    key={act.route + act.label}
+                    onClick={() => navigate(act.route)}
+                    style={{
+                      backgroundColor: '#eff6ff',
+                      color: '#0a3273',
+                      border: '1px solid #bfdbfe',
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '0.82rem',
+                    }}
+                  >
+                    {act.label} →
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-
-          <div
-            onClick={() => navigate('/admin/project-rounds')}
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: '12px',
-              padding: '24px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              borderTop: '4px solid #0284c7',
-              cursor: 'pointer',
-              transition: 'transform 0.2s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-3px)')}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-          >
-            <div style={{ fontSize: '1.75rem', marginBottom: '12px' }}>📤</div>
-            <h3 style={{ margin: '0 0 8px 0', color: '#1e293b', fontSize: '1.1rem' }}>Import Sinh Viên (Excel)</h3>
-            <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
-              Nạp danh sách SV theo mẫu 8 cột UTC, tự động tạo tài khoản User và ghi danh vào đợt (Contract 3).
-            </p>
-            <div style={{ marginTop: '16px', color: '#0284c7', fontWeight: 600, fontSize: '0.85rem' }}>
-              Xem danh sách & Import →
-            </div>
-          </div>
-
-          <div
-            onClick={() => navigate('/admin/project-rounds')}
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: '12px',
-              padding: '24px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              borderTop: '4px solid #f59e0b',
-              cursor: 'pointer',
-              transition: 'transform 0.2s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-3px)')}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-          >
-            <div style={{ fontSize: '1.75rem', marginBottom: '12px' }}>📊</div>
-            <h3 style={{ margin: '0 0 8px 0', color: '#1e293b', fontSize: '1.1rem' }}>Dữ Liệu Học Vụ (Phase 4)</h3>
-            <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
-              Import kết quả học vụ (Tín chỉ, GPA, Nợ HP, Kỷ luật) cung cấp cho Module xét duyệt (Contract 4).
-            </p>
-            <div style={{ marginTop: '16px', color: '#f59e0b', fontWeight: 600, fontSize: '0.85rem' }}>
-              Tra cứu & Nạp điểm →
-            </div>
-          </div>
-
-          <div
-            onClick={() => navigate('/admin/organization')}
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: '12px',
-              padding: '24px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              borderTop: '4px solid #0a3273',
-              cursor: 'pointer',
-              transition: 'transform 0.2s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-3px)')}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-          >
-            <div style={{ fontSize: '1.75rem', marginBottom: '12px' }}>🏛️</div>
-            <h3 style={{ margin: '0 0 8px 0', color: '#1e293b', fontSize: '1.1rem' }}>Tổ Chức & Danh Mục</h3>
-            <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
-              Quản lý Khoa, Bộ môn, Ngành, Chương trình đào tạo, Giảng viên và Sinh viên (Contract 1).
-            </p>
-            <div style={{ marginTop: '16px', color: '#0a3273', fontWeight: 600, fontSize: '0.85rem' }}>
-              Quản lý danh mục →
-            </div>
-          </div>
-        </div>
-
-        {/* System Overview Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
-          <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>TÀI KHOẢN MẪU TEST</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0a3273', margin: '6px 0' }}>4 Vai Trò</div>
-            <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>ADMIN, Sinh viên, Giảng viên, Hội đồng</div>
-          </div>
-          <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>KHOA & BỘ MÔN</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0a3273', margin: '6px 0' }}>1 Khoa / 4 Bộ môn</div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>CNTT, HTTT, KTPM, MMT</div>
-          </div>
-          <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>CHƯƠNG TRÌNH & NGÀNH</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0a3273', margin: '6px 0' }}>2 CT / 3 Ngành</div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Cử nhân & Kỹ sư (CNTT, KHMT, KTPM)</div>
-          </div>
-          <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>API BACKEND & CSDL</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#16a34a', margin: '6px 0' }}>Online</div>
-            <div style={{ fontSize: '0.8rem', color: '#16a34a' }}>Postgres Neon / 4 Contracts Ready</div>
-          </div>
+          ))}
         </div>
       </div>
     </UTCAppLayout>

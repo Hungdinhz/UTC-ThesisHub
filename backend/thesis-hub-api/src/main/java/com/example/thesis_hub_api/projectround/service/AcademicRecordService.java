@@ -126,7 +126,9 @@ public class AcademicRecordService {
         for (AcademicRecordImportRowDTO row : requestDTO.getRows()) {
             totalProcessed++;
 
-            if (!row.isValid()) {
+            boolean hasNoErrors = row.getErrors() == null || row.getErrors().isEmpty();
+            boolean hasStudentCode = StringUtils.hasText(row.getStudentCode());
+            if (!row.isValid() && !(hasNoErrors && hasStudentCode)) {
                 skipped++;
                 continue;
             }
@@ -193,7 +195,7 @@ public class AcademicRecordService {
             String search,
             Pageable pageable) {
 
-        String normalizedSearch = StringUtils.hasText(search) ? search.trim() : null;
+        String normalizedSearch = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
 
         Page<AcademicRecord> recordPage = academicRecordRepository.searchAcademicRecords(
                 roundId,

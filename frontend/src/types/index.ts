@@ -878,3 +878,54 @@ export interface AcademicRecordItem {
   note?: string;
   importedAt: string;
 }
+
+
+export interface CreateLecturerPayload {
+  username: string;
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+  lecturerCode: string;
+  departmentId?: number;
+  academicDegree: string;
+  researchInterests?: string;
+  maxThesisQuota?: number;
+}
+
+export interface UpdateLecturerPayload {
+  fullName?: string;
+  phone?: string;
+  departmentId?: number;
+  academicDegree?: string;
+  researchInterests?: string;
+  maxThesisQuota?: number;
+  isActive?: boolean;
+}
+
+export interface CreateStudentPayload {
+  username: string;
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+  studentCode: string;
+  className?: string;
+  majorId?: number;
+  trainingProgramId?: number;
+  dateOfBirth?: string;
+  gender?: string;
+  debtCredits?: number;
+}
+
+export interface UpdateStudentPayload {
+  fullName?: string;
+  phone?: string;
+  className?: string;
+  majorId?: number;
+  trainingProgramId?: number;
+  dateOfBirth?: string;
+  gender?: string;
+  debtCredits?: number;
+  isActive?: boolean;
+}

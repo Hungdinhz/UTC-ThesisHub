@@ -90,9 +90,10 @@ public class StudentProjectRoundService {
 
             // Kiểm tra mã ngành có hợp lệ trong CSDL không
             if (StringUtils.hasText(row.getMajorCode())) {
-                String normalizedMajor = row.getMajorCode().toUpperCase().trim();
-                if (!majorMap.containsKey(normalizedMajor)) {
-                    errors.add("Không tìm thấy mã ngành '" + row.getMajorCode() + "' trong hệ thống");
+                String normalizedMajor = studentExcelParser.normalizeMajorCode(row.getMajorCode()); if (!StringUtils.hasText(normalizedMajor)) { normalizedMajor = row.getMajorCode().trim().toUpperCase(); }
+                row.setMajorCode(normalizedMajor);
+                if (!majorMap.containsKey(normalizedMajor) && !majorMap.isEmpty()) {
+                    errors.add("Không tìm thấy mã ngành '" + row.getMajorCode() + "' trong hệ thống (Hỗ trợ: " + String.join(", ", majorMap.keySet()) + ")");
                 }
             }
 
@@ -156,12 +157,20 @@ public class StudentProjectRoundService {
         for (StudentImportRowDTO row : requestDTO.getRows()) {
             totalProcessed++;
 
-            if (!row.isValid()) {
+            boolean hasNoErrors = row.getErrors() == null || row.getErrors().isEmpty();
+            boolean hasStudentCode = StringUtils.hasText(row.getStudentCode());
+            if (!row.isValid() && !(hasNoErrors && hasStudentCode)) {
                 skipped++;
                 continue;
             }
 
             String studentCode = row.getStudentCode().trim();
+            String fullName = StringUtils.hasText(row.getFullName())
+                    ? row.getFullName().trim()
+                    : ((row.getLastName() != null ? row.getLastName() : "") + " " + (row.getFirstName() != null ? row.getFirstName() : "")).trim();
+            if (fullName.isEmpty()) {
+                fullName = "Sinh viên " + studentCode;
+            }
             String email = StringUtils.hasText(row.getEmail())
                     ? row.getEmail().trim()
                     : studentCode.toLowerCase() + "@lms.utc.edu.vn";
@@ -174,7 +183,7 @@ public class StudentProjectRoundService {
             if (user == null) {
                 user = User.builder()
                         .username(studentCode)
-                        .fullName(row.getFullName())
+                        .fullName(fullName)
                         .email(email)
                         .phone(row.getPhone())
                         .password(defaultEncodedPassword)
@@ -184,8 +193,8 @@ public class StudentProjectRoundService {
                 user = userRepository.save(user);
                 newUsersCreated++;
             } else {
-                if (StringUtils.hasText(row.getFullName())) {
-                    user.setFullName(row.getFullName());
+                if (StringUtils.hasText(fullName)) {
+                    user.setFullName(fullName);
                 }
                 if (StringUtils.hasText(row.getPhone())) {
                     user.setPhone(row.getPhone());
@@ -195,7 +204,11 @@ public class StudentProjectRoundService {
 
             // 2. Tìm hoặc tạo Student
             Student student = studentRepository.findByStudentCode(studentCode).orElse(null);
-            Major major = majorMap.get(row.getMajorCode().toUpperCase().trim());
+            String normalizedMajorCode = studentExcelParser.normalizeMajorCode(row.getMajorCode());
+            Major major = majorMap.get(normalizedMajorCode);
+            if (major == null && !majorMap.isEmpty()) {
+                major = majorMap.getOrDefault("CNTT", majorMap.values().iterator().next());
+            }
 
             Long roundTrainingProgramId = round.getTrainingProgram() != null ? round.getTrainingProgram().getId() : null;
 
@@ -271,7 +284,7 @@ public class StudentProjectRoundService {
             throw new AppException(ErrorCode.RESOURCE_NOT_FOUND);
         }
 
-        String normalizedSearch = StringUtils.hasText(search) ? search.trim() : null;
+        String normalizedSearch = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
         String normalizedStatus = StringUtils.hasText(status) ? status.trim().toUpperCase() : null;
 
         Page<StudentProjectRound> sprPage = studentProjectRoundRepository.searchStudentsInRound(

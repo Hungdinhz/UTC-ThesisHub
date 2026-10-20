@@ -6,16 +6,16 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   // VITE_API_BASE_URL:
-  // http://localhost:8080/api/v1
+  // http://localhost:8081/api/v1
   //
   // Proxy target cần:
-  // http://localhost:8080
-  let apiBaseUrl = 'http://localhost:8080'
+  // http://localhost:8081
+  let apiBaseUrl = 'http://localhost:8081'
   if (env.VITE_API_BASE_URL) {
     try {
       apiBaseUrl = new URL(env.VITE_API_BASE_URL).origin
     } catch {
-      apiBaseUrl = 'http://localhost:8080'
+      apiBaseUrl = 'http://localhost:8081'
     }
   }
 
