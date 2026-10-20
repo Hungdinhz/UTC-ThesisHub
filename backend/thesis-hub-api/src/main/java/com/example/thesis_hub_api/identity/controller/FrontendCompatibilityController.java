@@ -121,4 +121,27 @@ public class FrontendCompatibilityController {
         data.put("count", 0);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
+
+    @GetMapping("/external/dashboard")
+    @Operation(summary = "Dữ liệu bảng điều khiển dành cho Chuyên gia ngoài / Phản biện ngoài")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getExternalDashboard() {
+        Map<String, Object> stats = Map.of(
+                "total_groups", 0,
+                "total_students", 0,
+                "pending_evaluations", 0,
+                "completed_evaluations", 0
+        );
+        Map<String, Object> profile = Map.of(
+                "id", 1,
+                "institution", "Trường Đại học GTVT",
+                "designation", "Chuyên gia phản biện độc lập",
+                "is_active", true
+        );
+        Map<String, Object> data = new HashMap<>();
+        data.put("profile", profile);
+        data.put("statistics", stats);
+        data.put("upcoming_evaluations", Collections.emptyList());
+        data.put("recent_evaluations", Collections.emptyList());
+        return ResponseEntity.ok(ApiResponse.success(data));
+    }
 }

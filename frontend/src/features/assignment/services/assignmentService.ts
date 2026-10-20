@@ -15,7 +15,7 @@ const API_BASE = `${BASE_URL}/assignments`;
 
 // Helper for JWT auth header
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

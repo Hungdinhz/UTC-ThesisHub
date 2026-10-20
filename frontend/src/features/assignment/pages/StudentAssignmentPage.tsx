@@ -41,15 +41,17 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         assignmentService.getRegistrations(projectRoundId),
       ]);
 
-      setDirections(dirsData);
-      setCapacities(capsData);
+      setDirections(dirsData || []);
+      setCapacities(capsData || []);
 
       // Check current registration and assignment for this student
-      const myReg = regsData.find((r) => r.studentId === effectiveStudentId);
+      const myReg = regsData?.find((r) => r.studentId === effectiveStudentId);
       if (myReg) setCurrentRegistration(myReg);
 
-      const assigned = propsData.find((p) => p.studentId === effectiveStudentId);
+      const assigned = propsData?.find((p) => p.studentId === effectiveStudentId);
       if (assigned) setMyAssignment(assigned);
+    } catch (err) {
+      console.error('Failed to load assignment data:', err);
     } finally {
       setLoading(false);
     }
