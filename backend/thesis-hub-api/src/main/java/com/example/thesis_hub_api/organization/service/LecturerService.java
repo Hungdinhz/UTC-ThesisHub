@@ -43,7 +43,7 @@ public class LecturerService {
      */
     @Transactional(readOnly = true)
     public List<LecturerResponseDTO> getLecturers(Long departmentId, String degree, String search) {
-        String cleanSearch = StringUtils.hasText(search) ? search.trim() : null;
+        String cleanSearch = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
         String cleanDegree = StringUtils.hasText(degree) ? degree.trim() : null;
 
         List<Lecturer> lecturers = lecturerRepository.findLecturersFiltered(departmentId, cleanDegree, cleanSearch);
@@ -52,7 +52,7 @@ public class LecturerService {
 
     @Transactional(readOnly = true)
     public PageResponse<LecturerResponseDTO> getLecturersPaged(Long departmentId, String degree, String search, Pageable pageable) {
-        String cleanSearch = StringUtils.hasText(search) ? search.trim() : null;
+        String cleanSearch = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
         String cleanDegree = StringUtils.hasText(degree) ? degree.trim() : null;
 
         Page<Lecturer> page = lecturerRepository.searchLecturers(departmentId, cleanDegree, cleanSearch, pageable);

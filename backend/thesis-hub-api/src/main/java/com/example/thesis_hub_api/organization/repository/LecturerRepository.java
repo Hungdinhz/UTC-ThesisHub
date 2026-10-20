@@ -23,10 +23,10 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
            "(:departmentId IS NULL OR l.departmentId = :departmentId) AND " +
            "(:degree IS NULL OR l.academicDegree = :degree) AND " +
            "(:search IS NULL OR " +
-           " LOWER(l.lecturerCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(l.researchInterests) LIKE LOWER(CONCAT('%', :search, '%')))")
+           " LOWER(l.lecturerCode) LIKE :search OR " +
+           " LOWER(u.fullName) LIKE :search OR " +
+           " LOWER(u.email) LIKE :search OR " +
+           " LOWER(l.researchInterests) LIKE :search)")
     List<Lecturer> findLecturersFiltered(
             @Param("departmentId") Long departmentId,
             @Param("degree") String degree,
@@ -36,10 +36,10 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
            "(:departmentId IS NULL OR l.departmentId = :departmentId) AND " +
            "(:degree IS NULL OR l.academicDegree = :degree) AND " +
            "(:search IS NULL OR " +
-           " LOWER(l.lecturerCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(l.researchInterests) LIKE LOWER(CONCAT('%', :search, '%')))")
+           " LOWER(l.lecturerCode) LIKE :search OR " +
+           " LOWER(u.fullName) LIKE :search OR " +
+           " LOWER(u.email) LIKE :search OR " +
+           " LOWER(l.researchInterests) LIKE :search)")
     Page<Lecturer> searchLecturers(
             @Param("departmentId") Long departmentId,
             @Param("degree") String degree,

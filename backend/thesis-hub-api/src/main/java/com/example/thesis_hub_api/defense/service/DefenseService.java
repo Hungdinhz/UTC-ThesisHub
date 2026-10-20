@@ -7,7 +7,12 @@ import com.example.thesis_hub_api.defense.repository.*;
 import com.example.thesis_hub_api.defense.service.mock.ExternalThesisMockService;
 import com.example.thesis_hub_api.defense.service.mock.ExternalThesisMockService.MockLecturer;
 import com.example.thesis_hub_api.defense.service.mock.ExternalThesisMockService.MockThesis;
+import com.example.thesis_hub_api.organization.entity.Lecturer;
+import com.example.thesis_hub_api.organization.repository.LecturerRepository;
+import com.example.thesis_hub_api.thesis.entity.Thesis;
+import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +38,24 @@ public class DefenseService {
     private final DefenseCouncilScheduler councilScheduler;
     private final ExternalThesisMockService thesisMockService;
 
+    @Autowired(required = false)
+    private ThesisRepository thesisRepository;
+
+    @Autowired(required = false)
+    private LecturerRepository lecturerRepository;
+
+    private String resolveLecturerName(Long lecturerId) {
+        if (lecturerRepository != null && lecturerId != null) {
+            Optional<Lecturer> dbLec = lecturerRepository.findById(lecturerId);
+            if (dbLec.isPresent() && dbLec.get().getUser() != null) {
+                return dbLec.get().getUser().getFullName();
+            }
+        }
+        return thesisMockService.getLecturer(lecturerId)
+                .map(MockLecturer::getFullName)
+                .orElse("Giảng viên " + lecturerId);
+    }
+
     /**
      * 1. API Chạy thuật toán CSP (Backtracking + Greedy) tạo Hội đồng & gán sinh viên
      */
@@ -45,13 +68,26 @@ public class DefenseService {
         if (request.getOverrideStudents() != null && !request.getOverrideStudents().isEmpty()) {
             students.addAll(request.getOverrideStudents());
         } else {
-            List<MockThesis> thesesInRound = thesisMockService.getThesesByProjectRound(roundId);
-            for (MockThesis mt : thesesInRound) {
-                CouncilSchedulingRequestDTO.StudentInfo si = new CouncilSchedulingRequestDTO.StudentInfo();
-                si.setStudentId(String.valueOf(mt.getStudentId()));
-                si.setThesisId(String.valueOf(mt.getThesisId()));
-                si.setAdvisorId(String.valueOf(mt.getAdvisorId()));
-                students.add(si);
+            List<Thesis> dbTheses = thesisRepository != null
+                    ? thesisRepository.findByProjectRoundId(roundId)
+                    : Collections.emptyList();
+            if (!dbTheses.isEmpty()) {
+                for (Thesis t : dbTheses) {
+                    CouncilSchedulingRequestDTO.StudentInfo si = new CouncilSchedulingRequestDTO.StudentInfo();
+                    si.setStudentId(String.valueOf(t.getStudent().getId()));
+                    si.setThesisId(String.valueOf(t.getId()));
+                    si.setAdvisorId(String.valueOf(t.getLecturer().getId()));
+                    students.add(si);
+                }
+            } else {
+                List<MockThesis> thesesInRound = thesisMockService.getThesesByProjectRound(roundId);
+                for (MockThesis mt : thesesInRound) {
+                    CouncilSchedulingRequestDTO.StudentInfo si = new CouncilSchedulingRequestDTO.StudentInfo();
+                    si.setStudentId(String.valueOf(mt.getStudentId()));
+                    si.setThesisId(String.valueOf(mt.getThesisId()));
+                    si.setAdvisorId(String.valueOf(mt.getAdvisorId()));
+                    students.add(si);
+                }
             }
         }
 
@@ -60,15 +96,32 @@ public class DefenseService {
         if (request.getOverrideLecturers() != null && !request.getOverrideLecturers().isEmpty()) {
             lecturers.addAll(request.getOverrideLecturers());
         } else {
-            List<MockLecturer> allLecs = thesisMockService.getAllLecturers();
-            for (MockLecturer ml : allLecs) {
-                CouncilSchedulingRequestDTO.LecturerInfo li = new CouncilSchedulingRequestDTO.LecturerInfo();
-                li.setLecturerId(String.valueOf(ml.getLecturerId()));
-                li.setPresidentEligible(ml.isCanBePresident());
-                li.setSecretaryEligible(ml.isCanBeSecretary());
-                li.setMemberEligible(ml.isCanBeMember());
-                li.setCurrentLoad(ml.getCurrentLoad());
-                lecturers.add(li);
+            List<Lecturer> dbLecturers = lecturerRepository != null
+                    ? lecturerRepository.findAll()
+                    : Collections.emptyList();
+            if (dbLecturers.size() >= 5) {
+                for (Lecturer l : dbLecturers) {
+                    CouncilSchedulingRequestDTO.LecturerInfo li = new CouncilSchedulingRequestDTO.LecturerInfo();
+                    li.setLecturerId(String.valueOf(l.getId()));
+                    String degree = l.getAcademicDegree() != null ? l.getAcademicDegree().toUpperCase() : "";
+                    boolean canBePres = degree.contains("TIEN_SI") || degree.contains("PGS") || degree.contains("GS");
+                    li.setPresidentEligible(canBePres);
+                    li.setSecretaryEligible(true);
+                    li.setMemberEligible(true);
+                    li.setCurrentLoad(0);
+                    lecturers.add(li);
+                }
+            } else {
+                List<MockLecturer> allLecs = thesisMockService.getAllLecturers();
+                for (MockLecturer ml : allLecs) {
+                    CouncilSchedulingRequestDTO.LecturerInfo li = new CouncilSchedulingRequestDTO.LecturerInfo();
+                    li.setLecturerId(String.valueOf(ml.getLecturerId()));
+                    li.setPresidentEligible(ml.isCanBePresident());
+                    li.setSecretaryEligible(ml.isCanBeSecretary());
+                    li.setMemberEligible(ml.isCanBeMember());
+                    li.setCurrentLoad(ml.getCurrentLoad());
+                    lecturers.add(li);
+                }
             }
         }
 
@@ -133,9 +186,7 @@ public class DefenseService {
                 .build();
         CouncilMember saved = memberRepository.save(member);
 
-        String lecName = thesisMockService.getLecturer(lecturerId)
-                .map(MockLecturer::getFullName)
-                .orElse("Giảng viên " + lecturerId);
+        String lecName = resolveLecturerName(lecturerId);
 
         return CouncilMemberDTO.builder()
                 .id(saved.getId())
@@ -160,9 +211,7 @@ public class DefenseService {
     private CouncilResponseDTO mapToCouncilResponse(DefenseCouncil council) {
         List<CouncilMember> members = memberRepository.findByCouncilId(council.getId());
         List<CouncilMemberDTO> memberDTOs = members.stream().map(m -> {
-            String name = thesisMockService.getLecturer(m.getLecturerId())
-                    .map(MockLecturer::getFullName)
-                    .orElse("Giảng viên " + m.getLecturerId());
+            String name = resolveLecturerName(m.getLecturerId());
             return CouncilMemberDTO.builder()
                     .id(m.getId())
                     .lecturerId(m.getLecturerId())
@@ -190,12 +239,21 @@ public class DefenseService {
      */
     @Transactional
     public ReviewerAssignmentResponseDTO assignReviewer(ReviewerAssignRequestDTO request) {
-        Optional<MockThesis> thesisOpt = thesisMockService.getThesis(request.getThesisId());
-        if (thesisOpt.isPresent()) {
-            Long advisorId = thesisOpt.get().getAdvisorId();
-            if (Objects.equals(advisorId, request.getReviewerId())) {
-                throw new IllegalArgumentException("Ràng buộc cứng vi phạm: Giảng viên phản biện (GVPB) KHÔNG ĐƯỢC TRÙNG với Giảng viên hướng dẫn (GVHD - ID: " + advisorId + ")");
+        Long advisorId = null;
+        if (thesisRepository != null && request.getThesisId() != null) {
+            Optional<Thesis> dbThesis = thesisRepository.findById(request.getThesisId());
+            if (dbThesis.isPresent() && dbThesis.get().getLecturer() != null) {
+                advisorId = dbThesis.get().getLecturer().getId();
             }
+        }
+        if (advisorId == null) {
+            Optional<MockThesis> thesisOpt = thesisMockService.getThesis(request.getThesisId());
+            if (thesisOpt.isPresent()) {
+                advisorId = thesisOpt.get().getAdvisorId();
+            }
+        }
+        if (advisorId != null && Objects.equals(advisorId, request.getReviewerId())) {
+            throw new IllegalArgumentException("Ràng buộc cứng vi phạm: Giảng viên phản biện (GVPB) KHÔNG ĐƯỢC TRÙNG với Giảng viên hướng dẫn (GVHD - ID: " + advisorId + ")");
         }
 
         ReviewerAssignment assignment = reviewerAssignmentRepository.findByThesisId(request.getThesisId())
@@ -228,9 +286,7 @@ public class DefenseService {
     }
 
     private ReviewerAssignmentResponseDTO mapToReviewerResponse(ReviewerAssignment assignment) {
-        String reviewerName = thesisMockService.getLecturer(assignment.getReviewerId())
-                .map(MockLecturer::getFullName)
-                .orElse("Giảng viên " + assignment.getReviewerId());
+        String reviewerName = resolveLecturerName(assignment.getReviewerId());
 
         return ReviewerAssignmentResponseDTO.builder()
                 .id(assignment.getId())
@@ -495,8 +551,10 @@ public class DefenseService {
     }
 
     public GraduationResultResponseDTO getGraduationResultByThesis(Long thesisId) {
-        GraduationResult entity = graduationResultRepository.findByThesisId(thesisId)
-                .orElseThrow(() -> new NoSuchElementException("Chưa có kết quả tốt nghiệp cho đề tài ID: " + thesisId));
+        GraduationResult entity = graduationResultRepository.findByThesisId(thesisId).orElse(null);
+        if (entity == null) {
+            return null;
+        }
 
         return GraduationResultResponseDTO.builder()
                 .id(entity.getId())

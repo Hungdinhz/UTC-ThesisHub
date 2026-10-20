@@ -71,6 +71,7 @@ class ApiService {
     this.api = axios.create({
       baseURL: API_BASE_URL,
       withCredentials: true,
+      timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -949,6 +950,34 @@ class ApiService {
   async getTrainingPrograms(): Promise<TrainingProgram[]> {
     const response = await this.api.get<TrainingProgram[]>(ORGANIZATION.TRAINING_PROGRAMS);
     return response.data;
+  }
+
+  async createLecturer(payload: Record<string, any>): Promise<LecturerItem> {
+    const response = await this.api.post<LecturerItem>(ORGANIZATION.LECTURERS, payload);
+    return response.data;
+  }
+
+  async updateLecturer(id: number, payload: Record<string, any>): Promise<LecturerItem> {
+    const response = await this.api.put<LecturerItem>(ORGANIZATION.lecturer(id), payload);
+    return response.data;
+  }
+
+  async deleteLecturer(id: number): Promise<void> {
+    await this.api.delete(ORGANIZATION.lecturer(id));
+  }
+
+  async createStudent(payload: Record<string, any>): Promise<StudentItem> {
+    const response = await this.api.post<StudentItem>(ORGANIZATION.STUDENTS, payload);
+    return response.data;
+  }
+
+  async updateStudent(id: number, payload: Record<string, any>): Promise<StudentItem> {
+    const response = await this.api.put<StudentItem>(ORGANIZATION.student(id), payload);
+    return response.data;
+  }
+
+  async deleteStudent(id: number): Promise<void> {
+    await this.api.delete(ORGANIZATION.student(id));
   }
 
   async getLecturers(params?: { departmentId?: number; degree?: string; search?: string }): Promise<LecturerItem[]> {

@@ -17,6 +17,15 @@ import type {
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
 const API_BASE = `${BASE_URL}/defense`;
+const IS_TEST_ENV = import.meta.env.MODE === 'test';
+
+function authHeaders(): Record<string, string> {
+  if (IS_TEST_ENV) {
+    throw new Error('Skip live network in unit tests');
+  }
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('access_token') : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export const mockLecturers: LecturerOption[] = [
   { lecturerId: 501, fullName: 'PGS. TS. Trần Văn Minh', degree: 'Phó Giáo sư', canBePresident: true, canBeSecretary: true, canBeMember: true, currentLoad: 2 },
@@ -122,13 +131,39 @@ let mockResults: GraduationResult[] = [
 
 class DefenseService {
   async getLecturers(): Promise<LecturerOption[]> {
+    try {
+      const res = await axios.get(`${BASE_URL}/lecturers`, { headers: authHeaders() });
+      const list = res.data?.data || res.data;
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((l: any) => {
+          const deg = String(l.academicDegree || '').toUpperCase();
+          const canBePres = deg.includes('TIEN_SI') || deg.includes('PGS') || deg.includes('GS');
+          return {
+            lecturerId: l.lecturerId,
+            fullName: l.fullName,
+            degree: l.academicDegree || 'Giảng viên',
+            canBePresident: canBePres,
+            canBeSecretary: true,
+            canBeMember: true,
+            currentLoad: 1,
+          };
+        });
+      }
+    } catch {
+      // Fallback
+    }
     return mockLecturers;
   }
 
   async getCouncils(projectRoundId: number = 10): Promise<DefenseCouncil[]> {
     try {
-      const res = await axios.get(`${API_BASE}/councils`, { params: { projectRoundId } });
-      if (res.data?.data) return res.data.data;
+      const res = await axios.get(`${API_BASE}/councils`, {
+        params: { projectRoundId },
+        headers: authHeaders(),
+      });
+      if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+        return res.data.data;
+      }
     } catch {
       // Fallback
     }
@@ -137,7 +172,7 @@ class DefenseService {
 
   async getCouncilById(id: number): Promise<DefenseCouncil> {
     try {
-      const res = await axios.get(`${API_BASE}/councils/${id}`);
+      const res = await axios.get(`${API_BASE}/councils/${id}`, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch {
       // Fallback
@@ -149,12 +184,11 @@ class DefenseService {
 
   async generateCouncils(request: CouncilGenerationRequest): Promise<DefenseCouncil[]> {
     try {
-      const res = await axios.post(`${API_BASE}/councils/generate`, request);
+      const res = await axios.post(`${API_BASE}/councils/generate`, request, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch {
       // Fallback simulation of CSP algorithm
     }
-    // Simulate auto-generation with 1CT - 2TK - 2UV and greedy load
     const newCouncil: DefenseCouncil = {
       id: mockCouncils.length + 1,
       projectRoundId: request.projectRoundId || 10,
@@ -194,7 +228,7 @@ class DefenseService {
 
   async assignReviewer(request: ReviewerAssignRequest): Promise<ReviewerAssignment> {
     try {
-      const res = await axios.post(`${API_BASE}/reviewers/assign`, request);
+      const res = await axios.post(`${API_BASE}/reviewers/assign`, request, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch {
       // Fallback
@@ -216,8 +250,8 @@ class DefenseService {
   async getSchedules(date?: string): Promise<DefenseSchedule[]> {
     try {
       const d = date || new Date().toISOString().split('T')[0];
-      const res = await axios.get(`${API_BASE}/schedules`, { params: { date: d } });
-      if (res.data?.data) return res.data.data;
+      const res = await axios.get(`${API_BASE}/schedules`, { params: { date: d }, headers: authHeaders() });
+      if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) return res.data.data;
     } catch {
       // Fallback
     }
@@ -226,7 +260,7 @@ class DefenseService {
 
   async autoGenerateSchedules(request: AutoScheduleRequest): Promise<DefenseSchedule[]> {
     try {
-      const res = await axios.post(`${API_BASE}/schedules/auto-generate`, request);
+      const res = await axios.post(`${API_BASE}/schedules/auto-generate`, request, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch {
       // Fallback
@@ -236,7 +270,7 @@ class DefenseService {
 
   async configureSchedule(config: ScheduleConfig): Promise<DefenseSchedule> {
     try {
-      const res = await axios.post(`${API_BASE}/schedules/configure`, config);
+      const res = await axios.post(`${API_BASE}/schedules/configure`, config, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch {
       // Fallback
@@ -260,8 +294,8 @@ class DefenseService {
 
   async getScores(thesisId: number): Promise<ScoreItem[]> {
     try {
-      const res = await axios.get(`${API_BASE}/scores`, { params: { thesisId } });
-      if (res.data?.data) return res.data.data;
+      const res = await axios.get(`${API_BASE}/scores`, { params: { thesisId }, headers: authHeaders() });
+      if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) return res.data.data;
     } catch {
       // Fallback
     }
@@ -270,7 +304,7 @@ class DefenseService {
 
   async submitScore(request: ScoreSubmitRequest): Promise<ScoreItem> {
     try {
-      const res = await axios.post(`${API_BASE}/scores`, request);
+      const res = await axios.post(`${API_BASE}/scores`, request, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch {
       // Fallback
@@ -292,7 +326,7 @@ class DefenseService {
 
   async synthesizeResult(request: SynthesizeResultRequest): Promise<GraduationResult> {
     try {
-      const res = await axios.post(`${API_BASE}/results/synthesize`, request);
+      const res = await axios.post(`${API_BASE}/results/synthesize`, request, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch {
       // Fallback
@@ -346,7 +380,7 @@ class DefenseService {
 
   async getGraduationResult(thesisId: number): Promise<GraduationResult> {
     try {
-      const res = await axios.get(`${API_BASE}/results/${thesisId}`);
+      const res = await axios.get(`${API_BASE}/results/${thesisId}`, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch {
       // Fallback
