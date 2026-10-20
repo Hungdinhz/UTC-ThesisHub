@@ -6,6 +6,15 @@ import { DefenseScoringPage } from '../../pages/DefenseScoringPage';
 import { CouncilMemberCard } from '../CouncilMemberCard';
 import { ScoreEntryForm } from '../ScoreEntryForm';
 
+vi.mock('../../../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 1, username: 'admin', fullName: 'Admin' },
+    userType: 'admin',
+    logout: vi.fn(),
+  }),
+  AuthProvider: ({ children }: any) => children,
+}));
+
 describe('Defense Feature Component & Page Tests', () => {
   it('renders CouncilMemberCard with 1CT - 2TK - 2UV role badges', () => {
     const mockMember = {
