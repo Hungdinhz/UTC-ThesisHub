@@ -256,7 +256,7 @@ const StudentDashboard: React.FC = () => {
       <div className="container">
         <div className="dashboard-header">
           <h1>{t('dashboard.studentTitle', 'Bảng Điều Khiển Sinh Viên UTC')}</h1>
-          <p>{t('dashboard.welcome', 'Xin chào')}, {student?.user?.username}</p>
+          <p>{t('dashboard.welcome', 'Xin chào')}, {student?.user?.username || profile?.user?.username || (student as any)?.username || (user as any)?.username || 'Sinh viên'}</p>
         </div>
 
         <div className="tabs">

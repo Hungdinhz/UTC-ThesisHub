@@ -49,7 +49,11 @@ const CommitteeMemberAnalytics: React.FC = () => {
     return null;
   }
 
-  const { panel, groups, evaluations, average_marks, completion } = analytics;
+  const panel = analytics.panel || { id: 1, name: 'Hội đồng chấm bảo vệ UTC', total_members: 0, members: [] };
+  const groups = analytics.groups || { total: 0, groups_per_member: 0 };
+  const evaluations = analytics.evaluations || {};
+  const average_marks = analytics.average_marks || {};
+  const completion = analytics.completion || { percentage: 0, completed_evaluations: 0, total_evaluations: 0 };
 
   const getProgressClass = (percent: number): string => {
     if (percent >= 75) return 'cm-progress-fill cm-progress-fill-high';
@@ -134,9 +138,11 @@ const CommitteeMemberAnalytics: React.FC = () => {
       <div className="cm-card">
         <h4 className="cm-card-title">Evaluation Breakdown</h4>
         <div className="cm-evaluation-list">
-          {Object.entries(evaluations).map(([key, stat]) => {
-            const total = stat.completed + stat.pending;
-            const percent = total > 0 ? Math.round((stat.completed / total) * 100) : 0;
+          {Object.entries(evaluations).map(([key, stat]: [string, any]) => {
+            const completed = stat?.completed || stat?.evaluated || 0;
+            const pending = stat?.pending || 0;
+            const total = completed + pending;
+            const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
             return (
               <div key={key} className="cm-evaluation-row">
                 <div className="cm-evaluation-header">
@@ -144,7 +150,7 @@ const CommitteeMemberAnalytics: React.FC = () => {
                     {key.replace(/_/g, ' ').replace('committee', '').trim()}
                   </span>
                   <span className="cm-evaluation-count">
-                    {stat.completed}/{total}
+                    {completed}/{total}
                   </span>
                 </div>
                 <div className="cm-progress-bar">
