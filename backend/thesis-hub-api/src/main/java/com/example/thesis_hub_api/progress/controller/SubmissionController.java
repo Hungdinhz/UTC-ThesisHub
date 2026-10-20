@@ -7,6 +7,7 @@ import com.example.thesis_hub_api.progress.dto.SubmissionResponse;
 import com.example.thesis_hub_api.progress.service.SubmissionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class SubmissionController {
     private final SubmissionService submissionService;
 
     @PostMapping("/by-task/{taskId}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public ApiResponse<SubmissionResponse> submitTask(
             @PathVariable Long taskId,
             @Valid @RequestBody CreateSubmissionRequest request) {
@@ -27,6 +29,7 @@ public class SubmissionController {
     }
 
     @PostMapping("/{id}/review")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
     public ApiResponse<SubmissionResponse> reviewSubmission(
             @PathVariable Long id,
             @Valid @RequestBody ReviewSubmissionRequest request) {

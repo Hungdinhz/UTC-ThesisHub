@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { thesisService } from '../services/thesisService';
 import type { Thesis, ThesisDocument } from '../types';
 
 export const ThesisDetailPage: React.FC = () => {
+  const { userType, user } = useAuth();
+  const isStudent = userType === 'student';
+  const isLecturerOrAdmin = userType === 'supervisor' || userType === 'admin';
+
   const [thesis, setThesis] = useState<Thesis | null>(null);
   const [documents, setDocuments] = useState<ThesisDocument[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -80,8 +85,9 @@ export const ThesisDetailPage: React.FC = () => {
 
   const handleUploadDocument = async (e: React.FormEvent) => {
     e.preventDefault();
+    const effectiveUploaderId = (user as unknown as { student_id?: number })?.student_id || user?.id || 1;
     try {
-      const doc = await thesisService.uploadDocument(1, 1, {
+      const doc = await thesisService.uploadDocument(1, effectiveUploaderId, {
         name: docName,
         documentType: docType,
         fileUrl: docUrl || '/files/theses/DT_2026_CNTT_001/tailieu_demo.pdf',
@@ -96,6 +102,24 @@ export const ThesisDetailPage: React.FC = () => {
     setDocName('');
     setDocUrl('');
     setDocDesc('');
+  };
+
+  const handleToggleDefenseEligible = async () => {
+    if (!thesis) return;
+    const newStatus = !thesis.defenseEligible;
+    const confirmMsg = newStatus
+      ? 'Xác nhận sinh viên ĐỦ điều kiện bảo vệ đồ án tốt nghiệp?'
+      : 'Hủy xác nhận đủ điều kiện bảo vệ đồ án?';
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const updated = await thesisService.setDefenseEligible(thesis.id, newStatus);
+      setThesis(updated);
+      alert('Đã cập nhật trạng thái đủ điều kiện bảo vệ thành công!');
+    } catch {
+      setThesis(prev => prev ? { ...prev, defenseEligible: newStatus } : null);
+      alert('Đã cập nhật trạng thái đủ điều kiện bảo vệ!');
+    }
   };
 
   if (loading) {
@@ -185,7 +209,7 @@ export const ThesisDetailPage: React.FC = () => {
             </div>
           </div>
 
-          <div>
+          <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
               <span>Tiến độ hoàn thành:</span>
               <span style={{ fontWeight: 'bold' }}>{thesis.completionRate}%</span>
@@ -193,6 +217,61 @@ export const ThesisDetailPage: React.FC = () => {
             <div style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
               <div style={{ background: '#2563eb', width: `${thesis.completionRate}%`, height: '100%' }} />
             </div>
+          </div>
+
+          <div style={{ paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>Điều kiện bảo vệ:</div>
+            {thesis.defenseEligible ? (
+              <div style={{
+                background: '#dcfce7',
+                color: '#15803d',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '600',
+                display: 'inline-block'
+              }}>
+                ✓ ĐỦ ĐIỀU KIỆN BẢO VỆ
+              </div>
+            ) : (
+              <div style={{
+                background: '#fef3c7',
+                color: '#b45309',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '600',
+                display: 'inline-block'
+              }}>
+                ⏳ CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ
+              </div>
+            )}
+
+            {isLecturerOrAdmin && (
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  onClick={handleToggleDefenseEligible}
+                  style={{
+                    background: thesis.defenseEligible ? '#dc2626' : '#16a34a',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {thesis.defenseEligible ? '✕ Hủy Xác Nhận Đủ ĐK' : '✓ Xác Nhận Đủ Điều Kiện Bảo Vệ'}
+                </button>
+              </div>
+            )}
+
+            {isStudent && (
+              <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>
+                * Quyền xác nhận đủ điều kiện bảo vệ thuộc về Giảng viên hướng dẫn.
+              </p>
+            )}
           </div>
         </div>
       </div>

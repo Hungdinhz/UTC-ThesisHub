@@ -5,6 +5,7 @@ import com.example.thesis_hub_api.eligibility.dto.*;
 import com.example.thesis_hub_api.eligibility.service.EligibilityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +21,7 @@ public class EligibilityController {
      * API lấy danh sách kiểm tra điều kiện làm đồ án của toàn bộ sinh viên trong đợt
      */
     @GetMapping("/students")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LECTURER', 'FACULTY_ADMIN')")
     public ResponseEntity<ApiResponse<List<EligibilityCheckResponseDTO>>> getAllStudentsEligibility(
             @RequestParam(required = false) Long projectRoundId) {
         List<EligibilityCheckResponseDTO> result = eligibilityService.getAllStudentsEligibility(projectRoundId);
@@ -41,6 +43,7 @@ public class EligibilityController {
      * API duyệt đặc cách (Force Approve) sinh viên vào đợt làm đồ án
      */
     @PostMapping("/force-approve")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<EligibilityCheckResponseDTO>> forceApprove(
             @RequestBody ForceApproveRequestDTO request) {
         EligibilityCheckResponseDTO result = eligibilityService.forceApprove(request);
@@ -51,6 +54,7 @@ public class EligibilityController {
      * API loại sinh viên khỏi đợt làm đồ án
      */
     @PostMapping("/disqualify")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<EligibilityCheckResponseDTO>> disqualify(
             @RequestBody DisqualifyRequestDTO request) {
         EligibilityCheckResponseDTO result = eligibilityService.disqualify(request);
@@ -61,6 +65,7 @@ public class EligibilityController {
      * API gửi đơn bảo lưu (Sinh viên)
      */
     @PostMapping("/reservations")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public ResponseEntity<ApiResponse<ReservationResponseDTO>> submitReservation(
             @RequestBody ReservationSubmitRequestDTO request) {
         ReservationResponseDTO result = eligibilityService.submitReservation(request);
@@ -71,6 +76,7 @@ public class EligibilityController {
      * API Khoa phê duyệt hoặc từ chối đơn bảo lưu
      */
     @PutMapping("/reservations/{id}/review")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
     public ResponseEntity<ApiResponse<ReservationResponseDTO>> reviewReservation(
             @PathVariable Long id,
             @RequestBody ReservationReviewRequestDTO request) {

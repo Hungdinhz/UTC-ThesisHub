@@ -50,7 +50,7 @@ public class FrontendCompatibilityController {
     @Operation(summary = "Thống kê tổng quan dành cho Giảng viên hướng dẫn")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getSupervisorAnalytics() {
         Map<String, Object> groups = Map.of("total", 0, "pending", 0, "accepted", 0, "rejected", 0);
-        Map<String, Object> evalStat = Map.of("submitted", 0, "evaluated", 0);
+        Map<String, Object> evalStat = Map.of("completed", 0, "pending", 0, "submitted", 0, "evaluated", 0);
         Map<String, Object> evaluations = Map.of(
                 "scope_document", evalStat,
                 "srs_supervisor", evalStat,
@@ -64,11 +64,14 @@ public class FrontendCompatibilityController {
                 "evaluation3_supervisor", 0.0,
                 "evaluation4_supervisor", 0.0
         );
+        Map<String, Object> documents = Map.of("total", 0, "pending", 0, "approved", 0);
 
         Map<String, Object> data = new HashMap<>();
         data.put("groups", groups);
         data.put("evaluations", evaluations);
         data.put("average_marks", avgMarks);
+        data.put("documents", documents);
+        data.put("recent_documents", Collections.emptyList());
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
@@ -82,18 +85,31 @@ public class FrontendCompatibilityController {
                 "members", Collections.emptyList()
         );
         Map<String, Object> groups = Map.of("total", 0, "groups_per_member", 0);
-        Map<String, Object> evalStat = Map.of("submitted", 0, "evaluated", 0);
+        Map<String, Object> evalStat = Map.of("completed", 0, "pending", 0, "submitted", 0, "evaluated", 0);
         Map<String, Object> evaluations = Map.of(
                 "srs_committee", evalStat,
                 "sdd_committee", evalStat,
                 "evaluation3_committee", evalStat,
                 "evaluation4_committee", evalStat
         );
+        Map<String, Object> avgMarks = Map.of(
+                "srs_committee", 0.0,
+                "sdd_committee", 0.0,
+                "evaluation3_committee", 0.0,
+                "evaluation4_committee", 0.0
+        );
+        Map<String, Object> completion = Map.of(
+                "percentage", 0,
+                "completed_evaluations", 0,
+                "total_evaluations", 0
+        );
 
         Map<String, Object> data = new HashMap<>();
         data.put("panel", panel);
         data.put("groups", groups);
         data.put("evaluations", evaluations);
+        data.put("average_marks", avgMarks);
+        data.put("completion", completion);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
@@ -103,6 +119,29 @@ public class FrontendCompatibilityController {
         Map<String, Object> data = new HashMap<>();
         data.put("results", Collections.emptyList());
         data.put("count", 0);
+        return ResponseEntity.ok(ApiResponse.success(data));
+    }
+
+    @GetMapping("/external/dashboard")
+    @Operation(summary = "Dữ liệu bảng điều khiển dành cho Chuyên gia ngoài / Phản biện ngoài")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getExternalDashboard() {
+        Map<String, Object> stats = Map.of(
+                "total_groups", 0,
+                "total_students", 0,
+                "pending_evaluations", 0,
+                "completed_evaluations", 0
+        );
+        Map<String, Object> profile = Map.of(
+                "id", 1,
+                "institution", "Trường Đại học GTVT",
+                "designation", "Chuyên gia phản biện độc lập",
+                "is_active", true
+        );
+        Map<String, Object> data = new HashMap<>();
+        data.put("profile", profile);
+        data.put("statistics", stats);
+        data.put("upcoming_evaluations", Collections.emptyList());
+        data.put("recent_evaluations", Collections.emptyList());
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 }

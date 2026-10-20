@@ -1,12 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { thesisService } from '../services/thesisService';
 import type { Proposal } from '../types';
 
 export const ProposalManagementPage: React.FC = () => {
+  const { user, userType } = useAuth();
+  const isStudent = userType === 'student';
+  const isSupervisor = userType === 'supervisor';
+  const isAdmin = userType === 'admin';
+  const isCommittee = userType === 'committee_member';
+
+  const canSupervisorApprove = isSupervisor || isAdmin;
+  const canReview = isCommittee || isAdmin || isSupervisor;
+
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [onlyMyProposal, setOnlyMyProposal] = useState<boolean>(isStudent);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [reviewModal, setReviewModal] = useState<boolean>(false);
@@ -190,6 +201,16 @@ export const ProposalManagementPage: React.FC = () => {
   };
 
   const filtered = proposals.filter((p) => {
+    if (onlyMyProposal) {
+      const userCode = user?.student_id || user?.studentCode || user?.username || user?.user?.username;
+      const userName = user?.fullName || user?.user?.fullName;
+      const matchUser =
+        (userCode && (p.studentCode === userCode || String(p.studentId) === String(user?.id))) ||
+        (userName && p.studentFullName && p.studentFullName.toLowerCase().includes(userName.toLowerCase()));
+      if (!matchUser && proposals.length > 1) {
+        return false;
+      }
+    }
     const matchStatus = filterStatus === 'ALL' || p.status === filterStatus;
     const matchKeyword =
       !searchKeyword ||
@@ -304,6 +325,16 @@ export const ProposalManagementPage: React.FC = () => {
           <option value="APPROVED">Đã phê duyệt (APPROVED)</option>
           <option value="REVISE_REQUIRED">Yêu cầu sửa đổi (REVISE)</option>
         </select>
+        {isStudent && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#1e293b', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={onlyMyProposal}
+              onChange={(e) => setOnlyMyProposal(e.target.checked)}
+            />
+            Chỉ hiển thị đề cương của tôi
+          </label>
+        )}
       </div>
 
       {/* Table */}
@@ -356,7 +387,7 @@ export const ProposalManagementPage: React.FC = () => {
                   <td style={{ padding: '12px 16px' }}>{getStatusBadge(p.status)}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {!p.supervisorApproved && (
+                      {canSupervisorApprove && !p.supervisorApproved && (
                         <button
                           onClick={() => handleSupervisorConfirm(p)}
                           style={{
@@ -373,24 +404,43 @@ export const ProposalManagementPage: React.FC = () => {
                           ✓ GV Xác nhận
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          setSelectedProposal(p);
-                          setReviewModal(true);
-                        }}
-                        style={{
-                          background: '#f1f5f9',
-                          color: '#334155',
-                          border: '1px solid #cbd5e1',
-                          padding: '6px 10px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        Đánh Giá
-                      </button>
+                      {canReview && (
+                        <button
+                          onClick={() => {
+                            setSelectedProposal(p);
+                            setReviewModal(true);
+                          }}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#334155',
+                            border: '1px solid #cbd5e1',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Đánh Giá
+                        </button>
+                      )}
+                      {isStudent && p.status === 'APPROVED' && !signedProposalIds[p.id] && (
+                        <button
+                          onClick={() => handleSignAndArchive(p)}
+                          style={{
+                            background: '#ecfdf5',
+                            color: '#047857',
+                            border: '1px solid #a7f3d0',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✍️ Ký Nộp Đề Cương
+                        </button>
+                      )}
                       <button
                         onClick={() => setPdfPreviewProposal(p)}
                         style={{
@@ -416,7 +466,7 @@ export const ProposalManagementPage: React.FC = () => {
       </div>
 
       {/* Review Modal */}
-      {reviewModal && selectedProposal && (
+      {canReview && reviewModal && selectedProposal && (
         <div
           style={{
             position: 'fixed',

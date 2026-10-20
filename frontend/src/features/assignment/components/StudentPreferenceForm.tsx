@@ -44,16 +44,20 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   const currentDirection = directions.find((d) => d.id === selectedDirectionId);
 
   // Filter eligible lecturers based on direction and training program degree constraint
-  const eligibleLecturers = capacities.filter((c) => {
-    // If direction has directionNames, check if direction matches
+  const matchingLecturers = capacities.filter((c) => {
     if (currentDirection && c.directionNames && c.directionNames.length > 0) {
-      return (
-        c.directionNames.includes(currentDirection.code) ||
-        c.directionNames.includes(currentDirection.name)
+      return c.directionNames.some(
+        (nameOrCode) =>
+          nameOrCode.toLowerCase() === currentDirection.code.toLowerCase() ||
+          nameOrCode.toLowerCase() === currentDirection.name.toLowerCase()
       );
     }
-    return true; // Fallback to all if not specifically mapped
+    return false;
   });
+
+  // If matching lecturers found for this direction, show them. Otherwise fallback to all capacities in round
+  const eligibleLecturers = matchingLecturers.length > 0 ? matchingLecturers : capacities;
+  const isFallback = matchingLecturers.length === 0 && capacities.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,9 +179,79 @@ export const StudentPreferenceForm: React.FC<Props> = ({
 
         {/* Step 2: Choose 3 Preferences */}
         <div className="form-section">
-          <h4 className="section-title">
-            <span className="step-num">2</span> Chọn Nguyện vọng Giảng viên hướng dẫn (NV1 → NV3)
-          </h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+            <h4 className="section-title" style={{ margin: 0 }}>
+              <span className="step-num">2</span> Chọn Nguyện vọng Giảng viên hướng dẫn (NV1 → NV3)
+            </h4>
+            {eligibleLecturers.length > 0 && (
+              <span style={{ fontSize: '0.85rem', color: '#166534', backgroundColor: '#dcfce7', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+                {matchingLecturers.length > 0
+                  ? `✓ Có ${matchingLecturers.length} GV chuyên trách hướng đã chọn`
+                  : `ℹ️ Hiển thị ${eligibleLecturers.length} GV trong đợt`}
+              </span>
+            )}
+          </div>
+
+          {capacities.length === 0 && (
+            <div className="alert-box alert-warning" style={{ marginBottom: '16px' }}>
+              ⚠️ Hiện tại chưa có dữ liệu chỉ tiêu giảng viên nào trong đợt đồ án này. Vui lòng liên hệ quản trị viên khoa hoặc chọn đợt đồ án khác!
+            </div>
+          )}
+
+          {isFallback && capacities.length > 0 && (
+            <div className="alert-box alert-info" style={{ marginBottom: '14px', fontSize: '0.88rem' }}>
+              ℹ️ Hướng <strong>{currentDirection?.name}</strong> hiện chưa có giảng viên đăng ký chuyên trách riêng. Hệ thống hiển thị tất cả {capacities.length} giảng viên trong đợt để bạn tự do lựa chọn.
+            </div>
+          )}
+
+          {eligibleLecturers.length > 0 && (
+            <div
+              style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+              }}
+            >
+              <div style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600, marginBottom: '8px' }}>
+                👨‍🏫 Danh sách Giảng viên khả dụng theo hướng đồ án:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {eligibleLecturers.map((l) => (
+                  <div
+                    key={l.lecturerId}
+                    style={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      fontSize: '0.84rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <strong>{l.fullName}</strong>
+                    <span style={{ color: '#0284c7', fontWeight: 600 }}>({l.academicDegree})</span>
+                    <span style={{ color: '#64748b' }}>• {l.departmentName}</span>
+                    <span
+                      style={{
+                        backgroundColor: l.remainingCapacity > 0 ? '#ecfdf5' : '#fef2f2',
+                        color: l.remainingCapacity > 0 ? '#059669' : '#dc2626',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      Còn {l.remainingCapacity}/{l.maxQuota}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="preferences-form-grid">
             <div className="pref-input-block">

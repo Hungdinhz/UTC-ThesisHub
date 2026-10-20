@@ -184,7 +184,7 @@ const SupervisorDashboard: React.FC = () => {
         <div className="dashboard-header">
           <div>
             <h1>{t('dashboard.supervisorTitle', 'Bảng Điều Khiển Giảng Viên Hướng Dẫn')}</h1>
-            <p>{t('dashboard.welcome', 'Xin chào')}, {supervisor?.user?.username}</p>
+            <p>{t('dashboard.welcome', 'Xin chào')}, {supervisor?.user?.username || profile?.user?.username || (supervisor as any)?.username || (user as any)?.username || 'Thầy/Cô'}</p>
           </div>
           <button
             className="btn btn-primary"

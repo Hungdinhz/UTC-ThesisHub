@@ -487,7 +487,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                     .filter(ld -> ld.getLecturerId().equals(cap.getLecturerId()))
                     .map(ld -> directionMap.get(ld.getDirectionId()))
                     .filter(Objects::nonNull)
-                    .map(ProjectDirection::getName)
+                    .flatMap(d -> java.util.stream.Stream.of(d.getCode(), d.getName()))
                     .collect(Collectors.toList());
 
             return mapper.toCapacityResponse(cap, lCode, lName, email, phone, degree, deptId, deptName, dNames);

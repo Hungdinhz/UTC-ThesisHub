@@ -6,6 +6,7 @@ import com.example.thesis_hub_api.defense.service.DefenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ public class DefenseController {
      * 1. API Chạy thuật toán CSP (Backtracking + Greedy) tạo Hội đồng & gán sinh viên
      */
     @PostMapping("/councils/generate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<CouncilResponseDTO>>> generateCouncils(
             @RequestBody(required = false) CouncilGenerationRequestDTO request) {
         CouncilGenerationRequestDTO req = request != null ? request : new CouncilGenerationRequestDTO();
@@ -52,6 +54,7 @@ public class DefenseController {
      * 2. API Phân công Giảng viên phản biện (Kiểm tra ràng buộc GVPB ≠ GVHD)
      */
     @PostMapping("/reviewers/assign")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ReviewerAssignmentResponseDTO>> assignReviewer(
             @RequestBody ReviewerAssignRequestDTO request) {
         ReviewerAssignmentResponseDTO result = defenseService.assignReviewer(request);
@@ -73,6 +76,7 @@ public class DefenseController {
      * 3. API Tự động sinh lịch bảo vệ (Auto Schedule)
      */
     @PostMapping("/schedules/auto-generate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<DefenseScheduleResponseDTO>>> autoGenerateSchedules(
             @RequestBody AutoScheduleRequestDTO request) {
         List<DefenseScheduleResponseDTO> result = defenseService.autoGenerateSchedules(request);
@@ -83,6 +87,7 @@ public class DefenseController {
      * Cấu hình tham số lịch bảo vệ thủ công
      */
     @PostMapping("/schedules/configure")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<DefenseScheduleResponseDTO>> configureSchedule(
             @RequestBody ScheduleConfigDTO config) {
         DefenseScheduleResponseDTO result = defenseService.configureSchedule(config);
@@ -103,6 +108,7 @@ public class DefenseController {
      * 4. API Chấm điểm và nhập nhận xét của Hội đồng / GVHD / GVPB
      */
     @PostMapping("/scores")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ResponseEntity<ApiResponse<ScoreResponseDTO>> submitScore(
             @RequestBody ScoreSubmitRequestDTO request) {
         ScoreResponseDTO result = defenseService.submitScore(request);
@@ -123,6 +129,7 @@ public class DefenseController {
      * 5. API Tổng hợp điểm, xuất kết quả tốt nghiệp cuối kỳ
      */
     @PostMapping("/results/synthesize")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<GraduationResultResponseDTO>> synthesizeResult(
             @RequestBody SynthesizeResultRequestDTO request) {
         GraduationResultResponseDTO result = defenseService.synthesizeResult(request);

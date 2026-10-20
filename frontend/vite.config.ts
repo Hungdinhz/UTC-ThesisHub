@@ -8,14 +8,13 @@ export default defineConfig(({ mode }) => {
   // VITE_API_BASE_URL:
   // http://localhost:8081/api/v1
   //
-  // Proxy target cần:
-  // http://localhost:8081
-  let apiBaseUrl = 'http://localhost:8081'
+  // Proxy target: Spring Boot runs on 8080
+  let apiBaseUrl = 'http://localhost:8080'
   if (env.VITE_API_BASE_URL) {
     try {
       apiBaseUrl = new URL(env.VITE_API_BASE_URL).origin
     } catch {
-      apiBaseUrl = 'http://localhost:8081'
+      apiBaseUrl = 'http://localhost:8080'
     }
   }
 
