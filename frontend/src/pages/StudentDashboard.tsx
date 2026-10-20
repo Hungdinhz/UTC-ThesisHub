@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
@@ -29,6 +30,7 @@ import '../components/StudentTemplatesView.css';
 import '../components/CommitteeOfferedProjects.css';
 
 const StudentDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const student = user as Student;
@@ -332,6 +334,70 @@ const StudentDashboard: React.FC = () => {
             <>
               {/* UTC FYP Progress Timeline */}
               <UTCFypTimeline currentStep={profile?.groupmate_id ? 3 : 1} />
+
+              {/* Callout Card: Giai đoạn 2 - Chọn Hướng đồ án & Nguyện vọng Giảng viên */}
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, #003366 0%, #0a4d8c 100%)',
+                  color: '#fff',
+                  borderRadius: '12px',
+                  padding: '20px 24px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  boxShadow: '0 4px 14px rgba(0, 51, 102, 0.18)',
+                  flexWrap: 'wrap',
+                  gap: '16px',
+                }}
+              >
+                <div style={{ maxWidth: '680px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '1.4rem' }}>🎯</span>
+                    <h3 style={{ margin: 0, color: '#fff', fontSize: '1.15rem' }}>
+                      Giai đoạn 2: Chọn Hướng Đồ Án & Đăng Ký Nguyện Vọng GVHD (NV1–NV3)
+                    </h3>
+                    <span
+                      style={{
+                        backgroundColor: '#22c55e',
+                        color: '#fff',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                      }}
+                    >
+                      ĐANG MỞ
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, color: '#e0f2fe', fontSize: '0.9rem', lineHeight: '1.4' }}>
+                    Sinh viên đăng ký hướng nghiên cứu chuyên môn (AI, Phần mềm, Web/Cloud, ATTT, IoT, Big Data) và lựa chọn tối đa 3 nguyện vọng giảng viên hướng dẫn theo quy định Khoa CNTT.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/student/assignment')}
+                  style={{
+                    backgroundColor: '#f59e0b',
+                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '11px 22px',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#d97706')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f59e0b')}
+                >
+                  🚀 Đăng ký Hướng & GVHD ngay
+                </button>
+              </div>
 
               <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

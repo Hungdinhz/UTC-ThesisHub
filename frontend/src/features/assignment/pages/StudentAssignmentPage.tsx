@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { apiService } from '../../../services/api';
+import type { ProjectRoundItem } from '../../../types';
 import type {
   ProjectDirection,
   LecturerCapacity,
@@ -17,13 +19,15 @@ interface Props {
 }
 
 export const StudentAssignmentPage: React.FC<Props> = ({
-  projectRoundId = 10,
+  projectRoundId: propRoundId,
   studentId = 201,
   studentProgram: initialProgram = 'CU_NHAN',
 }) => {
   const { user } = useAuth();
   const effectiveStudentId = user?.id || user?.student_id || studentId;
 
+  const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
+  const [selectedRoundId, setSelectedRoundId] = useState<number | null>(propRoundId || null);
   const [directions, setDirections] = useState<ProjectDirection[]>([]);
   const [capacities, setCapacities] = useState<LecturerCapacity[]>([]);
   const [currentRegistration, setCurrentRegistration] = useState<DirectionRegistration | null>(null);
@@ -31,14 +35,44 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [activeProgram, setActiveProgram] = useState<'CU_NHAN' | 'KY_SU'>(initialProgram);
 
-  const loadData = async () => {
+  // 1. Load project rounds
+  useEffect(() => {
+    const fetchRounds = async () => {
+      try {
+        const roundList = await apiService.getProjectRounds();
+        setRounds(roundList || []);
+
+        if (!propRoundId && roundList && roundList.length > 0) {
+          // Find active/in-progress round first
+          const activeRound = roundList.find((r) => r.status === 'IN_PROGRESS') ||
+            roundList.find((r) => r.currentMilestone?.phaseType === 'REGISTRATION') ||
+            roundList[0];
+          setSelectedRoundId(activeRound.roundId);
+          if (activeRound.trainingProgram === 'KY_SU' || activeRound.trainingProgram === 'CU_NHAN') {
+            setActiveProgram(activeRound.trainingProgram);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load project rounds:', err);
+        // Fallback default round ID
+        if (!selectedRoundId) setSelectedRoundId(1);
+      }
+    };
+    fetchRounds();
+  }, [propRoundId]);
+
+  const effectiveRoundId = selectedRoundId || propRoundId || 1;
+  const currentRound = rounds.find((r) => r.roundId === effectiveRoundId);
+
+  // 2. Load directions, capacities, registrations, assignments for effective round
+  const loadData = async (roundId: number) => {
     try {
       setLoading(true);
       const [dirsData, capsData, propsData, regsData] = await Promise.all([
         assignmentService.getDirections(true),
-        assignmentService.getCapacities(projectRoundId),
-        assignmentService.getProposals(projectRoundId),
-        assignmentService.getRegistrations(projectRoundId),
+        assignmentService.getCapacities(roundId),
+        assignmentService.getProposals(roundId),
+        assignmentService.getRegistrations(roundId),
       ]);
 
       setDirections(dirsData || []);
@@ -46,10 +80,10 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
       // Check current registration and assignment for this student
       const myReg = regsData?.find((r) => r.studentId === effectiveStudentId);
-      if (myReg) setCurrentRegistration(myReg);
+      setCurrentRegistration(myReg || null);
 
       const assigned = propsData?.find((p) => p.studentId === effectiveStudentId);
-      if (assigned) setMyAssignment(assigned);
+      setMyAssignment(assigned || null);
     } catch (err) {
       console.error('Failed to load assignment data:', err);
     } finally {
@@ -58,8 +92,10 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   };
 
   useEffect(() => {
-    loadData();
-  }, [projectRoundId, effectiveStudentId]);
+    if (effectiveRoundId) {
+      loadData(effectiveRoundId);
+    }
+  }, [effectiveRoundId, effectiveStudentId]);
 
   const handleSubmit = async (data: {
     directionId: number;
@@ -71,7 +107,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   }) => {
     // 1. Register direction
     await assignmentService.registerDirection({
-      projectRoundId,
+      projectRoundId: effectiveRoundId,
       directionId: data.directionId,
       studentId: effectiveStudentId,
     });
@@ -84,70 +120,129 @@ export const StudentAssignmentPage: React.FC<Props> = ({
     ];
 
     await assignmentService.submitPreferences({
-      projectRoundId,
+      projectRoundId: effectiveRoundId,
       studentId: effectiveStudentId,
       gpa: data.gpa,
       prioritizationCriteria: data.prioritizationCriteria,
       preferences: prefs,
     });
 
-    // Reload
-    await loadData();
+    // Reload data for this round
+    await loadData(effectiveRoundId);
   };
 
   return (
     <div className="assignment-container">
-      {/* Program Selector Bar for Phase 2 Decision Node Testing */}
+      {/* Round Selector Bar */}
       <div
         style={{
           backgroundColor: '#fff',
           border: '1px solid #cbd5e1',
           borderRadius: '10px',
-          padding: '14px 20px',
+          padding: '16px 20px',
           marginBottom: '20px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '12px',
+          gap: '16px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
         }}
       >
         <div>
-          <strong style={{ color: '#0a3273' }}>🎓 Chương trình đào tạo của Sinh viên (Bước 12 - Nút quyết định):</strong>
-          <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
-            Nếu thuộc <strong>CT Kỹ sư (KY_SU)</strong>, hệ thống kiểm tra học vị tối thiểu của GVHD (yêu cầu từ Tiến sĩ/PGS/GS trở lên; nếu chọn Thạc sĩ sẽ yêu cầu chọn lại NV1–NV3).
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '1.2rem' }}>🎓</span>
+            <strong style={{ color: '#0a3273', fontSize: '1rem' }}>
+              Đợt Đồ án Tốt nghiệp & Khóa sinh viên:
+            </strong>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {rounds.length > 0 ? (
+              <select
+                value={effectiveRoundId}
+                onChange={(e) => {
+                  const rId = Number(e.target.value);
+                  setSelectedRoundId(rId);
+                  const selected = rounds.find((r) => r.roundId === rId);
+                  if (selected?.trainingProgram === 'KY_SU' || selected?.trainingProgram === 'CU_NHAN') {
+                    setActiveProgram(selected.trainingProgram);
+                  }
+                }}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #003366',
+                  fontWeight: 600,
+                  color: '#003366',
+                  backgroundColor: '#f8fafc',
+                  cursor: 'pointer',
+                  minWidth: '280px',
+                }}
+              >
+                {rounds.map((r) => (
+                  <option key={r.roundId} value={r.roundId}>
+                    [{r.roundCode}] {r.name} ({r.academicYear || '2026-2027'})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span style={{ color: '#64748b' }}>Đang tải danh sách đợt đồ án...</span>
+            )}
+
+            {currentRound?.currentMilestone && (
+              <span
+                style={{
+                  backgroundColor: '#dcfce7',
+                  color: '#15803d',
+                  padding: '4px 10px',
+                  borderRadius: '14px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  border: '1px solid #bbf7d0',
+                }}
+              >
+                🎯 {currentRound.currentMilestone.name || 'Giai đoạn đăng ký nguyện vọng'}
+              </span>
+            )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+
+        {/* Program Toggle (Cử nhân / Kỹ sư) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>
+            Hệ đào tạo:
+          </span>
           <button
             type="button"
             onClick={() => setActiveProgram('CU_NHAN')}
             style={{
-              padding: '7px 14px',
+              padding: '6px 12px',
               borderRadius: '6px',
               border: activeProgram === 'CU_NHAN' ? '2px solid #0a3273' : '1px solid #cbd5e1',
               backgroundColor: activeProgram === 'CU_NHAN' ? '#0a3273' : '#fff',
               color: activeProgram === 'CU_NHAN' ? '#fff' : '#334155',
               fontWeight: 600,
+              fontSize: '0.85rem',
               cursor: 'pointer',
             }}
           >
-            Hệ Cử nhân (CU_NHAN)
+            Hệ Cử nhân
           </button>
           <button
             type="button"
             onClick={() => setActiveProgram('KY_SU')}
             style={{
-              padding: '7px 14px',
+              padding: '6px 12px',
               borderRadius: '6px',
               border: activeProgram === 'KY_SU' ? '2px solid #b45309' : '1px solid #cbd5e1',
               backgroundColor: activeProgram === 'KY_SU' ? '#d97706' : '#fff',
               color: activeProgram === 'KY_SU' ? '#fff' : '#334155',
               fontWeight: 600,
+              fontSize: '0.85rem',
               cursor: 'pointer',
             }}
           >
-            Hệ Kỹ sư chuyên sâu (KY_SU)
+            Hệ Kỹ sư (Yêu cầu TS+)
           </button>
         </div>
       </div>
@@ -157,7 +252,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         <div className="alert-box alert-info" style={{ marginBottom: '20px' }}>
           <strong>Hướng đồ án hiện tại đã đăng ký:</strong> {currentRegistration.directionName} ({currentRegistration.directionCode})
           <span style={{ marginLeft: '12px', fontSize: '0.85rem', color: '#0369a1' }}>
-            Thời gian: {new Date(currentRegistration.registeredAt).toLocaleString('vi-VN')}
+            Thời gian nộp: {new Date(currentRegistration.registeredAt).toLocaleString('vi-VN')}
           </span>
         </div>
       )}
