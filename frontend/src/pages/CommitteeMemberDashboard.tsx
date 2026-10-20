@@ -98,7 +98,7 @@ const CommitteeMemberDashboard: React.FC = () => {
       <div className="container">
         <div className="dashboard-header">
           <h1>{t('dashboard.committeeTitle', 'Bảng Điều Khiển Hội Đồng Đánh Giá UTC')}</h1>
-          <p>{t('dashboard.welcome', 'Xin chào')}, {committeeMember?.user?.username}</p>
+          <p>{t('dashboard.welcome', 'Xin chào')}, {committeeMember?.user?.username || profile?.user?.username || (committeeMember as any)?.username || (user as any)?.username || 'Thầy/Cô Hội đồng'}</p>
         </div>
 
         <div className="tabs">

@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +21,7 @@ public class ReviewGroupController {
     private final ReviewGroupService reviewGroupService;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<ReviewGroupResponse> createReviewGroup(@Valid @RequestBody CreateReviewGroupRequest request) {
         return ApiResponse.success("Tạo nhóm xét duyệt thành công", reviewGroupService.createReviewGroup(request));
     }
@@ -35,6 +37,7 @@ public class ReviewGroupController {
     }
 
     @PostMapping("/{id}/members")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<ReviewGroupResponse> addMember(
             @PathVariable Long id,
             @RequestParam Long lecturerId,
@@ -44,6 +47,7 @@ public class ReviewGroupController {
     }
 
     @DeleteMapping("/{id}/members/{lecturerId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> removeMember(
             @PathVariable Long id,
             @PathVariable Long lecturerId) {

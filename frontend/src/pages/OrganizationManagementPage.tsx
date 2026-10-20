@@ -67,7 +67,7 @@ const OrganizationManagementPage: React.FC = () => {
   const [studentForm, setStudentForm] = useState<CreateStudentPayload>({
     username: '',
     email: '',
-    password: 'password123',
+    password: '',
     fullName: '',
     phone: '',
     studentCode: '',
@@ -947,7 +947,7 @@ const OrganizationManagementPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mật khẩu khởi tạo *</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mật khẩu khởi tạo (Mặc định: Mã SV)</label>
                     <input
                       type="text"
                       required
@@ -1099,7 +1099,7 @@ const OrganizationManagementPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mật khẩu khởi tạo *</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mật khẩu khởi tạo (Mặc định: Mã SV)</label>
                     <input
                       type="text"
                       required

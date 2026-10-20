@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/ui';
 import { ScheduleCalendarView } from '../components/ScheduleCalendarView';
 import { ScheduleConfigModal } from '../components/ScheduleConfigModal';
@@ -7,6 +8,10 @@ import type { DefenseSchedule, DefenseCouncil, ScheduleConfig } from '../types';
 import './DefensePages.css';
 
 export const DefenseSchedulePage: React.FC = () => {
+  const { userType } = useAuth();
+  const isStudent = userType === 'student';
+  const canManageSchedule = userType === 'admin' || userType === 'committee_member';
+
   const [schedules, setSchedules] = useState<DefenseSchedule[]>([]);
   const [councils, setCouncils] = useState<DefenseCouncil[]>([]);
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -70,19 +75,25 @@ export const DefenseSchedulePage: React.FC = () => {
     <div className="feature-page-container">
       <div className="feature-page-header">
         <div>
-          <h1 className="feature-page-title">Xếp lịch và Điều hành Bảo vệ Luận văn</h1>
+          <h1 className="feature-page-title">
+            {isStudent ? 'Tra Cứu Lịch Bảo Vệ Đồ Án Tốt Nghiệp' : 'Xếp lịch và Điều hành Bảo vệ Luận văn'}
+          </h1>
           <p className="feature-page-subtitle">
-            Hệ thống xếp lịch tự động theo Timeline, Phòng bảo vệ và Ca sáng/chiều tránh trùng lắp khung giờ.
+            {isStudent
+              ? 'Xem thông tin phòng bảo vệ, hội đồng và khung thời gian bảo vệ đồ án tốt nghiệp.'
+              : 'Hệ thống xếp lịch tự động theo Timeline, Phòng bảo vệ và Ca sáng/chiều tránh trùng lắp khung giờ.'}
           </p>
         </div>
-        <div className="header-actions">
-          <Button variant="primary" onClick={handleAutoGenerate} loading={loading}>
-            ⚡ Tự động sinh lịch bảo vệ
-          </Button>
-          <Button variant="outline" onClick={() => setIsConfigModalOpen(true)}>
-            + Thêm / Cấu hình lịch
-          </Button>
-        </div>
+        {canManageSchedule && (
+          <div className="header-actions">
+            <Button variant="primary" onClick={handleAutoGenerate} loading={loading}>
+              ⚡ Tự động sinh lịch bảo vệ
+            </Button>
+            <Button variant="outline" onClick={() => setIsConfigModalOpen(true)}>
+              + Thêm / Cấu hình lịch
+            </Button>
+          </div>
+        )}
       </div>
 
       {notification && (
@@ -133,13 +144,15 @@ export const DefenseSchedulePage: React.FC = () => {
       </div>
 
       {/* Config Modal */}
-      <ScheduleConfigModal
-        isOpen={isConfigModalOpen}
-        onClose={() => setIsConfigModalOpen(false)}
-        councils={councils}
-        defaultDate={currentDate}
-        onSave={handleSaveSchedule}
-      />
+      {canManageSchedule && (
+        <ScheduleConfigModal
+          isOpen={isConfigModalOpen}
+          onClose={() => setIsConfigModalOpen(false)}
+          councils={councils}
+          defaultDate={currentDate}
+          onSave={handleSaveSchedule}
+        />
+      )}
     </div>
   );
 };

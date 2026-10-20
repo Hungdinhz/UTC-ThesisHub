@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -37,6 +38,7 @@ public class ThesisController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
     public ApiResponse<ThesisResponse> updateThesis(
             @PathVariable Long id,
             @Valid @RequestBody UpdateThesisRequest request) {
@@ -44,6 +46,7 @@ public class ThesisController {
     }
 
     @PatchMapping("/{id}/completion-rate")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
     public ApiResponse<ThesisResponse> updateCompletionRate(
             @PathVariable Long id,
             @RequestParam BigDecimal rate) {
@@ -52,6 +55,7 @@ public class ThesisController {
     }
 
     @PatchMapping("/{id}/defense-eligible")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
     public ApiResponse<ThesisResponse> setDefenseEligible(
             @PathVariable Long id,
             @RequestParam boolean eligible) {

@@ -48,6 +48,7 @@ import type {
   StudentImportCommitPayload,
   StudentImportResultResponse,
   StudentProjectRoundItem,
+  CreateRoundStudentManualPayload,
   AcademicRecordImportPreviewResponse,
   AcademicRecordImportCommitPayload,
   AcademicRecordImportResultResponse,
@@ -1100,6 +1101,17 @@ class ApiService {
 
   async removeStudentFromRound(roundId: number, studentId: number): Promise<void> {
     await this.api.delete(PROJECT_ROUNDS.studentDetail(roundId, studentId));
+  }
+
+  async addStudentToRoundManually(
+    roundId: number,
+    payload: CreateRoundStudentManualPayload
+  ): Promise<StudentProjectRoundItem> {
+    const response = await this.api.post<StudentProjectRoundItem>(
+      PROJECT_ROUNDS.studentManual(roundId),
+      payload
+    );
+    return response.data;
   }
 
   // ─── Academic Records APIs (Phase 4 Ingestion & Contract 4) ─────

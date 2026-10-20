@@ -341,7 +341,7 @@ const LoginPage: React.FC = () => {
               <div className={`utc-input-group ${touched.email && fieldErrors.email ? 'has-error' : ''} ${touched.email && !fieldErrors.email && email ? 'is-valid' : ''}`}>
                 <span className="utc-input-icon">✉️</span>
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -350,7 +350,7 @@ const LoginPage: React.FC = () => {
                     }
                   }}
                   onBlur={() => handleBlur('email')}
-                  placeholder={t('login.emailPlaceholder', 'Nhập email UTC (Ví dụ: gvdemo@utc.edu.vn)')}
+                  placeholder={t('login.emailPlaceholder', 'Nhập Tên đăng nhập hoặc Email UTC (Ví dụ: giangvien hoặc giangvien@utc.edu.vn)')}
                 />
                 {touched.email && !fieldErrors.email && email && (
                   <span className="utc-valid-icon">✓</span>

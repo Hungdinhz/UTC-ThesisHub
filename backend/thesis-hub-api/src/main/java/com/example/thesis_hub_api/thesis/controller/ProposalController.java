@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,11 +18,13 @@ public class ProposalController {
     private final ProposalService proposalService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public ApiResponse<ProposalResponse> createProposal(@Valid @RequestBody CreateProposalRequest request) {
         return ApiResponse.success("Tạo đề cương thành công", proposalService.createProposal(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public ApiResponse<ProposalResponse> updateProposal(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProposalRequest request) {
@@ -29,11 +32,13 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public ApiResponse<ProposalResponse> submitProposal(@PathVariable Long id) {
         return ApiResponse.success("Nộp đề cương thành công", proposalService.submitProposal(id));
     }
 
     @PostMapping("/{id}/supervisor-approve")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
     public ApiResponse<ProposalResponse> supervisorApprove(
             @PathVariable Long id,
             @RequestParam boolean approved,
@@ -43,6 +48,7 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/assign-review-group")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<ProposalResponse> assignToReviewGroup(
             @PathVariable Long id,
             @RequestParam Long reviewGroupId,
@@ -52,6 +58,7 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/reviews")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ProposalResponse> reviewProposal(
             @PathVariable Long id,
             @Valid @RequestBody ReviewProposalRequest request) {

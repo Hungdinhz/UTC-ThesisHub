@@ -2,6 +2,7 @@ package com.example.thesis_hub_api.projectround.controller;
 
 import com.example.thesis_hub_api.common.pagination.PageResponse;
 import com.example.thesis_hub_api.common.response.ApiResponse;
+import com.example.thesis_hub_api.projectround.dto.request.CreateRoundStudentManualDTO;
 import com.example.thesis_hub_api.projectround.dto.request.StudentImportCommitRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.request.UpdateStudentRoundStatusRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreviewResponseDTO;
@@ -68,6 +69,17 @@ public class StudentProjectRoundController {
 
         StudentImportResultResponseDTO result = studentProjectRoundService.commitImportStudents(roundId, requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(result));
+    }
+
+    @PostMapping("/{roundId}/students/manual")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Thêm sinh viên thủ công vào đợt đồ án (Tự động cấp tài khoản MSSV/MSSV)")
+    public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> addStudentManually(
+            @PathVariable Long roundId,
+            @Valid @RequestBody CreateRoundStudentManualDTO dto) {
+
+        StudentProjectRoundResponseDTO response = studentProjectRoundService.addStudentManually(roundId, dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Thêm sinh viên vào đợt thành công", response));
     }
 
     /**

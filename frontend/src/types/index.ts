@@ -929,3 +929,15 @@ export interface UpdateStudentPayload {
   debtCredits?: number;
   isActive?: boolean;
 }
+
+
+export interface CreateRoundStudentManualPayload {
+  studentCode: string;
+  fullName: string;
+  email?: string;
+  className?: string;
+  majorId: number;
+  phone?: string;
+  status?: string;
+  note?: string;
+}

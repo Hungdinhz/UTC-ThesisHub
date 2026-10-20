@@ -51,15 +51,19 @@ const SupervisorAnalytics: React.FC = () => {
     return null;
   }
 
-  const { groups, evaluations, average_marks, documents, recent_documents } = analytics;
+  const groups = analytics.groups || { total: 0, pending: 0, accepted: 0, rejected: 0 };
+  const evaluations = analytics.evaluations || {};
+  const average_marks = analytics.average_marks || {};
+  const documents = analytics.documents || { total: 0, pending: 0, approved: 0 };
+  const recent_documents = analytics.recent_documents || [];
 
   // Calculate evaluation completion percentage
   const totalEvaluations = Object.values(evaluations).reduce(
-    (sum, stat) => sum + stat.completed + stat.pending,
+    (sum, stat) => sum + ((stat?.completed || 0) + (stat?.pending || 0)),
     0
   );
   const completedEvaluations = Object.values(evaluations).reduce(
-    (sum, stat) => sum + stat.completed,
+    (sum, stat) => sum + (stat?.completed || 0),
     0
   );
   const completionPercentage = totalEvaluations > 0 

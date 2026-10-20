@@ -13,6 +13,7 @@ import com.example.thesis_hub_api.organization.entity.TrainingProgram;
 import com.example.thesis_hub_api.organization.repository.MajorRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.organization.repository.TrainingProgramRepository;
+import com.example.thesis_hub_api.projectround.dto.request.CreateRoundStudentManualDTO;
 import com.example.thesis_hub_api.projectround.dto.request.StudentImportCommitRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.request.UpdateStudentRoundStatusRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreviewResponseDTO;
@@ -186,7 +187,7 @@ public class StudentProjectRoundService {
                         .fullName(fullName)
                         .email(email)
                         .phone(row.getPhone())
-                        .password(defaultEncodedPassword)
+                        .password(passwordEncoder.encode(studentCode))
                         .role(studentRole)
                         .isActive(true)
                         .build();
@@ -266,6 +267,102 @@ public class StudentProjectRoundService {
                 .skipped(skipped)
                 .messages(messages)
                 .build();
+    }
+
+    @Transactional
+    public StudentProjectRoundResponseDTO addStudentManually(Long roundId, CreateRoundStudentManualDTO dto) {
+        ProjectRound round = projectRoundRepository.findById(roundId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        String studentCode = dto.getStudentCode().trim();
+        String fullName = dto.getFullName().trim();
+        String email = StringUtils.hasText(dto.getEmail())
+                ? dto.getEmail().trim()
+                : studentCode.toLowerCase() + "@lms.utc.edu.vn";
+
+        Role studentRole = roleRepository.findByName("ROLE_STUDENT")
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+
+        // 1. User: username = studentCode, password = studentCode
+        User user = userRepository.findByUsername(studentCode)
+                .or(() -> userRepository.findByEmail(email))
+                .orElse(null);
+
+        if (user == null) {
+            user = User.builder()
+                    .username(studentCode)
+                    .fullName(fullName)
+                    .email(email)
+                    .phone(dto.getPhone() != null ? dto.getPhone().trim() : null)
+                    .password(passwordEncoder.encode(studentCode))
+                    .role(studentRole)
+                    .isActive(true)
+                    .build();
+            user = userRepository.save(user);
+        } else {
+            user.setFullName(fullName);
+            if (StringUtils.hasText(dto.getPhone())) {
+                user.setPhone(dto.getPhone().trim());
+            }
+            user.setPassword(passwordEncoder.encode(studentCode));
+            user = userRepository.save(user);
+        }
+
+        // 2. Student
+        Long roundTrainingProgramId = round.getTrainingProgram() != null ? round.getTrainingProgram().getId() : null;
+        Student student = studentRepository.findByStudentCode(studentCode).orElse(null);
+        if (student == null) {
+            student = Student.builder()
+                    .user(user)
+                    .studentCode(studentCode)
+                    .className(dto.getClassName() != null ? dto.getClassName().trim() : null)
+                    .majorId(dto.getMajorId())
+                    .trainingProgramId(roundTrainingProgramId)
+                    .debtCredits(0)
+                    .build();
+            student = studentRepository.save(student);
+        } else {
+            if (dto.getClassName() != null) {
+                student.setClassName(dto.getClassName().trim());
+            }
+            if (dto.getMajorId() != null) {
+                student.setMajorId(dto.getMajorId());
+            }
+            if (student.getTrainingProgramId() == null) {
+                student.setTrainingProgramId(roundTrainingProgramId);
+            }
+            student = studentRepository.save(student);
+        }
+
+        // 3. StudentProjectRound
+        StudentProjectRound spr = studentProjectRoundRepository
+                .findByStudentIdAndProjectRoundId(student.getId(), roundId)
+                .orElse(null);
+
+        String initialStatus = StringUtils.hasText(dto.getStatus()) ? dto.getStatus().trim().toUpperCase() : "ELIGIBLE";
+
+        if (spr == null) {
+            spr = StudentProjectRound.builder()
+                    .student(student)
+                    .projectRound(round)
+                    .status(initialStatus)
+                    .note(dto.getNote() != null ? dto.getNote().trim() : "Thêm thủ công")
+                    .build();
+        } else {
+            spr.setStatus(initialStatus);
+            if (dto.getNote() != null) {
+                spr.setNote(dto.getNote().trim());
+            }
+        }
+        spr = studentProjectRoundRepository.save(spr);
+
+        Map<Long, Major> majorMap = majorRepository.findAll().stream()
+                .collect(Collectors.toMap(Major::getId, m -> m, (a, b) -> a));
+
+        Map<Long, TrainingProgram> tpMap = trainingProgramRepository.findAll().stream()
+                .collect(Collectors.toMap(TrainingProgram::getId, tp -> tp, (a, b) -> a));
+
+        return toStudentProjectRoundResponseDTO(spr, majorMap, tpMap);
     }
 
     /**
