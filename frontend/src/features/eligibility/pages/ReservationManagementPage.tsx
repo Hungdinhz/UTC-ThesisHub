@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Button, Table, StatusBadge } from '../../../components/ui';
 import type { Column } from '../../../components/ui';
 import { ReservationReviewModal } from '../components/ReservationReviewModal';
@@ -8,6 +9,10 @@ import type { ReservationRequestItem } from '../types';
 import './EligibilityPages.css';
 
 export const ReservationManagementPage: React.FC = () => {
+  const { user, userType } = useAuth();
+  const isStudent = userType === 'student';
+  const canReview = userType === 'admin' || userType === 'supervisor';
+
   const [reservations, setReservations] = useState<ReservationRequestItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -22,11 +27,19 @@ export const ReservationManagementPage: React.FC = () => {
   const loadReservations = async () => {
     try {
       setLoading(true);
+      const studentId = user?.id || user?.student_id;
       const data = await eligibilityService.getReservations({
         projectRoundId: 10,
+        studentId: isStudent && studentId ? studentId : undefined,
         status: statusFilter !== 'ALL' ? statusFilter : undefined,
       });
-      setReservations(data);
+      if (isStudent && Array.isArray(data)) {
+        const studentCode = user?.student_id || user?.studentCode || user?.username;
+        const myItems = data.filter(r => (studentId && r.studentId === studentId) || (studentCode && r.studentCode === studentCode));
+        setReservations(myItems.length > 0 ? myItems : (data.length <= 1 ? data : []));
+      } else {
+        setReservations(data);
+      }
     } catch (error: any) {
       setNotification({ type: 'error', message: error.message || 'Không thể tải danh sách đơn bảo lưu' });
     } finally {
@@ -130,30 +143,38 @@ export const ReservationManagementPage: React.FC = () => {
           <span className="text-muted">—</span>
         ),
     },
-    {
-      key: 'actions',
-      title: 'Thao tác',
-      align: 'center',
-      width: '140px',
-      render: (_, record) => (
-        <Button
-          size="sm"
-          variant={record.status === 'PENDING' ? 'primary' : 'outline'}
-          onClick={() => setSelectedForReview(record)}
-        >
-          {record.status === 'PENDING' ? 'Xét duyệt' : 'Xem / Sửa'}
-        </Button>
-      ),
-    },
+    ...(canReview
+      ? [
+          {
+            key: 'actions',
+            title: 'Thao tác',
+            align: 'center' as const,
+            width: '140px',
+            render: (_: any, record: ReservationRequestItem) => (
+              <Button
+                size="sm"
+                variant={record.status === 'PENDING' ? 'primary' : 'outline'}
+                onClick={() => setSelectedForReview(record)}
+              >
+                {record.status === 'PENDING' ? 'Xét duyệt' : 'Xem / Sửa'}
+              </Button>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
     <div className="feature-page-container">
       <div className="feature-page-header">
         <div>
-          <h1 className="feature-page-title">Quản lý và Phê duyệt Đơn bảo lưu</h1>
+          <h1 className="feature-page-title">
+            {isStudent ? 'Đơn Xin Bảo Lưu Đồ Án Tốt Nghiệp' : 'Quản lý và Phê duyệt Đơn bảo lưu'}
+          </h1>
           <p className="feature-page-subtitle">
-            Tiếp nhận, thẩm tra hồ sơ minh chứng và xử lý đơn xin bảo lưu đồ án tốt nghiệp của sinh viên.
+            {isStudent
+              ? 'Nộp đơn và hồ sơ minh chứng xin bảo lưu kết quả đồ án tốt nghiệp đến Ban chủ nhiệm Khoa.'
+              : 'Tiếp nhận, thẩm tra hồ sơ minh chứng và xử lý đơn xin bảo lưu đồ án tốt nghiệp của sinh viên.'}
           </p>
         </div>
         <div className="header-actions">
@@ -201,12 +222,14 @@ export const ReservationManagementPage: React.FC = () => {
       </div>
 
       {/* Modals */}
-      <ReservationReviewModal
-        isOpen={Boolean(selectedForReview)}
-        onClose={() => setSelectedForReview(null)}
-        reservation={selectedForReview}
-        onConfirm={handleReview}
-      />
+      {canReview && (
+        <ReservationReviewModal
+          isOpen={Boolean(selectedForReview)}
+          onClose={() => setSelectedForReview(null)}
+          reservation={selectedForReview}
+          onConfirm={handleReview}
+        />
+      )}
 
       <ReservationSubmitModal
         isOpen={isSubmitModalOpen}

@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,11 +22,13 @@ public class TaskController {
     private final TaskService taskService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
     public ApiResponse<TaskResponse> createTask(@Valid @RequestBody CreateTaskRequest request) {
         return ApiResponse.success("Tạo công việc thành công", taskService.createTask(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('LECTURER', 'STUDENT', 'ADMIN')")
     public ApiResponse<TaskResponse> updateTask(
             @PathVariable Long id,
             @Valid @RequestBody UpdateTaskRequest request) {
@@ -53,6 +56,7 @@ public class TaskController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
     public ApiResponse<Void> deleteTask(@PathVariable Long id) {
         taskService.deleteTask(id);
         return ApiResponse.success("Xóa công việc thành công", null);

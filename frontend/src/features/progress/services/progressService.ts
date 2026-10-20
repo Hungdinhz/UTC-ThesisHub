@@ -10,35 +10,50 @@ import type {
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
 
+const apiClient = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const progressService = {
   // Task APIs
   async createTask(payload: CreateTaskPayload): Promise<Task> {
-    const res = await axios.post(`${API_BASE}/tasks`, payload);
+    const res = await apiClient.post('/tasks', payload);
     return res.data.data;
   },
 
   async updateTask(id: number, payload: Partial<Task>): Promise<Task> {
-    const res = await axios.put(`${API_BASE}/tasks/${id}`, payload);
+    const res = await apiClient.put(`/tasks/${id}`, payload);
     return res.data.data;
   },
 
   async getTasksByThesis(thesisId: number): Promise<Task[]> {
-    const res = await axios.get(`${API_BASE}/tasks/by-thesis/${thesisId}`);
+    const res = await apiClient.get(`/tasks/by-thesis/${thesisId}`);
     return res.data.data;
   },
 
   async getTaskById(id: number): Promise<Task> {
-    const res = await axios.get(`${API_BASE}/tasks/${id}`);
+    const res = await apiClient.get(`/tasks/${id}`);
     return res.data.data;
   },
 
   async deleteTask(id: number): Promise<void> {
-    await axios.delete(`${API_BASE}/tasks/${id}`);
+    await apiClient.delete(`/tasks/${id}`);
   },
 
   // Submission APIs
   async submitTask(taskId: number, studentId: number, content: string, fileUrl?: string): Promise<Submission> {
-    const res = await axios.post(`${API_BASE}/submissions/by-task/${taskId}`, {
+    const res = await apiClient.post(`/submissions/by-task/${taskId}`, {
       studentId,
       submissionContent: content,
       fileUrl
@@ -47,7 +62,7 @@ export const progressService = {
   },
 
   async reviewSubmission(submissionId: number, status: 'ACCEPTED' | 'REVISE_REQUIRED' | 'REJECTED', reviewFeedback?: string): Promise<Submission> {
-    const res = await axios.post(`${API_BASE}/submissions/${submissionId}/review`, {
+    const res = await apiClient.post(`/submissions/${submissionId}/review`, {
       status,
       reviewFeedback
     });
@@ -55,13 +70,13 @@ export const progressService = {
   },
 
   async getSubmissionsByTask(taskId: number): Promise<Submission[]> {
-    const res = await axios.get(`${API_BASE}/submissions/by-task/${taskId}`);
+    const res = await apiClient.get(`/submissions/by-task/${taskId}`);
     return res.data.data;
   },
 
   // Comment APIs
   async addComment(taskId: number, userId: number, content: string, parentId?: number, attachmentUrl?: string): Promise<Comment> {
-    const res = await axios.post(`${API_BASE}/comments/by-task/${taskId}`, {
+    const res = await apiClient.post(`/comments/by-task/${taskId}`, {
       userId,
       parentId,
       content,
@@ -71,7 +86,7 @@ export const progressService = {
   },
 
   async getCommentsByTask(taskId: number): Promise<Comment[]> {
-    const res = await axios.get(`${API_BASE}/comments/by-task/${taskId}`);
+    const res = await apiClient.get(`/comments/by-task/${taskId}`);
     return res.data.data;
   },
 
@@ -86,7 +101,7 @@ export const progressService = {
     progressPercent: number;
     fileUrl?: string;
   }): Promise<ProgressReport> {
-    const res = await axios.post(`${API_BASE}/progress-reports/by-thesis/${thesisId}`, payload);
+    const res = await apiClient.post(`/progress-reports/by-thesis/${thesisId}`, payload);
     return res.data.data;
   },
 
@@ -96,18 +111,18 @@ export const progressService = {
     assessment: string;
     confirmedCompletionRate?: number;
   }): Promise<ProgressReport> {
-    const res = await axios.post(`${API_BASE}/progress-reports/${reportId}/feedback`, payload);
+    const res = await apiClient.post(`/progress-reports/${reportId}/feedback`, payload);
     return res.data.data;
   },
 
   async getReportsByThesis(thesisId: number): Promise<ProgressReport[]> {
-    const res = await axios.get(`${API_BASE}/progress-reports/by-thesis/${thesisId}`);
+    const res = await apiClient.get(`/progress-reports/by-thesis/${thesisId}`);
     return res.data.data;
   },
 
   // Summary API for Module 4 integration
   async getThesisProgressSummary(thesisId: number): Promise<ThesisProgressSummary> {
-    const res = await axios.get(`${API_BASE}/progress-reports/by-thesis/${thesisId}/summary`);
+    const res = await apiClient.get(`/progress-reports/by-thesis/${thesisId}/summary`);
     return res.data.data;
   }
 };

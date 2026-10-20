@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { progressService } from '../services/progressService';
 import type { Task, Comment, Submission } from '../types';
 
 export const TaskBoardPage: React.FC = () => {
+  const { userType } = useAuth();
+  const isStudent = userType === 'student';
+  const isSupervisor = userType === 'supervisor';
+  const isAdmin = userType === 'admin';
+  const canCreateTask = isSupervisor || isAdmin;
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -248,20 +255,22 @@ export const TaskBoardPage: React.FC = () => {
             Theo dõi phân công, hạn nộp, nộp sản phẩm và trao đổi giữa Giảng viên hướng dẫn & Sinh viên.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          style={{
-            background: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            padding: '10px 18px',
-            borderRadius: '6px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          + Giao Việc Mới
-        </button>
+        {canCreateTask && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              padding: '10px 18px',
+              borderRadius: '6px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            + Giao Việc Mới
+          </button>
+        )}
       </div>
 
       {loading && (
@@ -372,7 +381,7 @@ export const TaskBoardPage: React.FC = () => {
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
               <span style={{ fontSize: '13px', color: '#475569' }}>Trạng thái:</span>
               <select
                 value={selectedTask.status}
@@ -382,8 +391,17 @@ export const TaskBoardPage: React.FC = () => {
                 <option value="TODO">Cần làm (TODO)</option>
                 <option value="IN_PROGRESS">Đang làm (IN_PROGRESS)</option>
                 <option value="SUBMITTED">Đã nộp bài (SUBMITTED)</option>
-                <option value="COMPLETED">Hoàn thành (COMPLETED)</option>
+                {canCreateTask ? (
+                  <option value="COMPLETED">Hoàn thành (COMPLETED)</option>
+                ) : (
+                  <option value="COMPLETED" disabled>Hoàn thành (Chỉ GVHD nghiệm thu)</option>
+                )}
               </select>
+              {isStudent && (
+                <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
+                  (Sinh viên nộp sản phẩm để chuyển trạng thái, GVHD sẽ nghiệm thu hoàn thành)
+                </span>
+              )}
             </div>
 
             <p style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', fontSize: '14px', color: '#334155' }}>
@@ -399,9 +417,27 @@ export const TaskBoardPage: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                   {submissions.map(s => (
                     <div key={s.id} style={{ background: '#f1f5f9', padding: '10px', borderRadius: '4px', fontSize: '13px' }}>
-                      <div style={{ fontWeight: '600' }}>{s.title || 'Bài nộp'} - Trạng thái: {s.status}</div>
-                      <div>{s.submissionContent}</div>
-                      {s.fileUrl && <a href={s.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>Tải file đính kèm</a>}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: '600' }}>{s.title || 'Bài nộp'} - Trạng thái: {s.status}</span>
+                        {canCreateTask && s.status !== 'ACCEPTED' && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await progressService.reviewSubmission(s.id, 'ACCEPTED', 'GVHD nghiệm thu đạt yêu cầu.');
+                              } catch {}
+                              setSubmissions(prev => prev.map(item => item.id === s.id ? { ...item, status: 'ACCEPTED' } : item));
+                              handleStatusChange(selectedTask.id, 'COMPLETED');
+                              alert('Đã nghiệm thu bài nộp và chuyển Task sang HOÀN THÀNH!');
+                            }}
+                            style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            ✓ Nghiệm thu Đạt
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ marginTop: '4px' }}>{s.submissionContent}</div>
+                      {s.fileUrl && <a href={s.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#2563eb', display: 'inline-block', marginTop: '4px' }}>Tải file đính kèm</a>}
                     </div>
                   ))}
                 </div>
@@ -470,7 +506,7 @@ export const TaskBoardPage: React.FC = () => {
       )}
 
       {/* Create Task Modal */}
-      {showCreateModal && (
+      {canCreateTask && showCreateModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000

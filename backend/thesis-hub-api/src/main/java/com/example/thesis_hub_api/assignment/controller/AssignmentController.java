@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,6 +44,7 @@ public class AssignmentController {
     }
 
     @PostMapping("/directions")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Tạo mới một hướng đồ án")
     public ResponseEntity<ApiResponse<ProjectDirectionResponseDTO>> createDirection(
             @Valid @RequestBody ProjectDirectionRequestDTO request) {
@@ -52,6 +54,7 @@ public class AssignmentController {
     }
 
     @PutMapping("/directions/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Cập nhật thông tin hướng đồ án")
     public ResponseEntity<ApiResponse<ProjectDirectionResponseDTO>> updateDirection(
             @PathVariable Long id,
@@ -74,6 +77,7 @@ public class AssignmentController {
     }
 
     @PostMapping("/lecturer-directions")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Gán giảng viên vào hướng đồ án")
     public ResponseEntity<ApiResponse<LecturerDirectionResponseDTO>> assignLecturerDirection(
             @Valid @RequestBody LecturerDirectionRequestDTO request) {
@@ -83,6 +87,7 @@ public class AssignmentController {
     }
 
     @DeleteMapping("/lecturer-directions/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Xóa phân công hướng của giảng viên")
     public ResponseEntity<ApiResponse<Void>> removeLecturerDirection(@PathVariable Long id) {
         assignmentService.removeLecturerDirection(id);
@@ -94,6 +99,7 @@ public class AssignmentController {
     // ==========================================
 
     @PostMapping("/register-direction")
+    @PreAuthorize("hasAnyAuthority('ROLE_STUDENT', 'ROLE_ADMIN')")
     @Operation(summary = "Sinh viên đăng ký hướng đồ án", description = "Đăng ký hướng đề tài cho đợt đồ án")
     public ResponseEntity<ApiResponse<DirectionRegistrationResponseDTO>> registerDirection(
             @Valid @RequestBody DirectionRegistrationRequestDTO request,
@@ -128,6 +134,7 @@ public class AssignmentController {
     }
 
     @PostMapping("/preferences")
+    @PreAuthorize("hasAnyAuthority('ROLE_STUDENT', 'ROLE_ADMIN')")
     @Operation(summary = "Sinh viên gửi 3 nguyện vọng GVHD và tiêu chí phụ (Step A & E)")
     public ResponseEntity<ApiResponse<List<PreferenceResponseDTO>>> submitPreferences(
             @Valid @RequestBody PreferenceSubmitRequestDTO request,
@@ -150,6 +157,7 @@ public class AssignmentController {
     }
 
     @PutMapping("/capacities/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Cập nhật chỉ tiêu / hệ số capacity của giảng viên")
     public ResponseEntity<ApiResponse<LecturerCapacityResponseDTO>> updateCapacity(
             @PathVariable Long id,
@@ -159,6 +167,7 @@ public class AssignmentController {
     }
 
     @PostMapping("/capacities/init")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Khởi tạo bảng chỉ tiêu cho toàn bộ giảng viên trong đợt")
     public ResponseEntity<ApiResponse<Void>> initCapacities(
             @RequestParam Long projectRoundId,
@@ -172,6 +181,7 @@ public class AssignmentController {
     // ==========================================
 
     @PostMapping("/generate")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Chạy thuật toán phân công đề xuất (Step C & E: POST /assignments/generate)")
     public ResponseEntity<ApiResponse<List<SupervisorAssignmentResponseDTO>>> generateAssignments(
             @Valid @RequestBody AssignmentGenerateRequestDTO request) {
@@ -189,6 +199,7 @@ public class AssignmentController {
     }
 
     @PutMapping("/{id}/override")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Khoa điều chỉnh (override) thủ công kết quả (Step C & E: PUT /assignments/{id}/override)")
     public ResponseEntity<ApiResponse<SupervisorAssignmentResponseDTO>> overrideAssignment(
             @PathVariable Long id,
@@ -200,6 +211,7 @@ public class AssignmentController {
     }
 
     @PostMapping("/finalize")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "Khoa chốt kết quả phân công cuối cùng (Step C & E: POST /assignments/finalize)")
     public ResponseEntity<ApiResponse<AssignmentStatsResponseDTO>> finalizeAssignments(
             @Valid @RequestBody AssignmentFinalizeRequestDTO request,

@@ -6,6 +6,7 @@ import com.example.thesis_hub_api.thesis.dto.DocumentResponse;
 import com.example.thesis_hub_api.thesis.service.DocumentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ public class DocumentController {
     private final DocumentService documentService;
 
     @PostMapping("/{thesisId}/documents")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
     public ApiResponse<DocumentResponse> addDocument(
             @PathVariable Long thesisId,
             @RequestParam Long uploaderId,
@@ -37,6 +39,7 @@ public class DocumentController {
     }
 
     @DeleteMapping("/documents/{id}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
     public ApiResponse<Void> deleteDocument(@PathVariable Long id) {
         documentService.deleteDocument(id);
         return ApiResponse.success("Xóa tài liệu thành công", null);

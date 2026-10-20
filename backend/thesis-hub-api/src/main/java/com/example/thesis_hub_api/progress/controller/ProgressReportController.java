@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class ProgressReportController {
     private final ProgressReportService progressReportService;
 
     @PostMapping("/by-thesis/{thesisId}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
     public ApiResponse<ProgressReportResponse> createReport(
             @PathVariable Long thesisId,
             @Valid @RequestBody CreateProgressReportRequest request) {
@@ -27,6 +29,7 @@ public class ProgressReportController {
     }
 
     @PostMapping("/{id}/feedback")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
     public ApiResponse<ProgressReportResponse> feedbackReport(
             @PathVariable Long id,
             @Valid @RequestBody CreateProgressFeedbackRequest request) {

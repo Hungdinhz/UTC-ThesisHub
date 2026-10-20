@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { progressService } from '../services/progressService';
 import type { ProgressReport, ThesisProgressSummary } from '../types';
 
 export const ProgressReportPage: React.FC = () => {
+  const { userType } = useAuth();
+  const isStudent = userType === 'student';
+  const isSupervisor = userType === 'supervisor';
+  const isAdmin = userType === 'admin';
+  const canFeedback = isSupervisor || isAdmin;
+  const canSubmitReport = isStudent || isAdmin;
+
   const [reports, setReports] = useState<ProgressReport[]>([]);
   const [summary, setSummary] = useState<ThesisProgressSummary | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -156,20 +164,22 @@ export const ProgressReportPage: React.FC = () => {
             Sinh viên nộp báo cáo theo giai đoạn; Giảng viên hướng dẫn phản hồi và xác nhận tỷ lệ hoàn thành.
           </p>
         </div>
-        <button
-          onClick={() => setShowSubmitModal(true)}
-          style={{
-            background: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            padding: '10px 18px',
-            borderRadius: '6px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          + Nộp Báo Cáo Đợt Mới
-        </button>
+        {canSubmitReport && (
+          <button
+            onClick={() => setShowSubmitModal(true)}
+            style={{
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              padding: '10px 18px',
+              borderRadius: '6px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            + Nộp Báo Cáo Đợt Mới
+          </button>
+        )}
       </div>
 
       {/* Progress Summary Card (Integration with Module 4) */}
@@ -300,16 +310,20 @@ export const ProgressReportPage: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f1f5f9', padding: '10px 16px', borderRadius: '6px' }}>
-                  <span style={{ fontSize: '13px', color: '#64748b' }}>Chưa có nhận xét từ giảng viên hướng dẫn.</span>
-                  <button
-                    onClick={() => {
-                      setSelectedReport(r);
-                      setConfirmedRate(r.progressPercent);
-                    }}
-                    style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
-                  >
-                    Viết Nhận Xét (GVHD)
-                  </button>
+                  <span style={{ fontSize: '13px', color: '#64748b' }}>
+                    {isStudent ? '⏳ Đang chờ Giảng viên hướng dẫn nhận xét & đánh giá tiến độ...' : 'Chưa có nhận xét từ giảng viên hướng dẫn.'}
+                  </span>
+                  {canFeedback && (
+                    <button
+                      onClick={() => {
+                        setSelectedReport(r);
+                        setConfirmedRate(r.progressPercent);
+                      }}
+                      style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      Viết Nhận Xét (GVHD)
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -318,7 +332,7 @@ export const ProgressReportPage: React.FC = () => {
       </div>
 
       {/* Feedback Modal for Lecturer */}
-      {selectedReport && (
+      {canFeedback && selectedReport && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000

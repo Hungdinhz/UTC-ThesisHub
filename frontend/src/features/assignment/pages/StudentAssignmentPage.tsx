@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import type {
   ProjectDirection,
   LecturerCapacity,
@@ -20,6 +21,9 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   studentId = 201,
   studentProgram: initialProgram = 'CU_NHAN',
 }) => {
+  const { user } = useAuth();
+  const effectiveStudentId = user?.id || user?.student_id || studentId;
+
   const [directions, setDirections] = useState<ProjectDirection[]>([]);
   const [capacities, setCapacities] = useState<LecturerCapacity[]>([]);
   const [currentRegistration, setCurrentRegistration] = useState<DirectionRegistration | null>(null);
@@ -41,10 +45,10 @@ export const StudentAssignmentPage: React.FC<Props> = ({
       setCapacities(capsData);
 
       // Check current registration and assignment for this student
-      const myReg = regsData.find((r) => r.studentId === studentId);
+      const myReg = regsData.find((r) => r.studentId === effectiveStudentId);
       if (myReg) setCurrentRegistration(myReg);
 
-      const assigned = propsData.find((p) => p.studentId === studentId);
+      const assigned = propsData.find((p) => p.studentId === effectiveStudentId);
       if (assigned) setMyAssignment(assigned);
     } finally {
       setLoading(false);
@@ -53,7 +57,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
   useEffect(() => {
     loadData();
-  }, [projectRoundId, studentId]);
+  }, [projectRoundId, effectiveStudentId]);
 
   const handleSubmit = async (data: {
     directionId: number;
@@ -67,7 +71,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
     await assignmentService.registerDirection({
       projectRoundId,
       directionId: data.directionId,
-      studentId,
+      studentId: effectiveStudentId,
     });
 
     // 2. Submit preferences
@@ -79,7 +83,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
     await assignmentService.submitPreferences({
       projectRoundId,
-      studentId,
+      studentId: effectiveStudentId,
       gpa: data.gpa,
       prioritizationCriteria: data.prioritizationCriteria,
       preferences: prefs,
