@@ -89,7 +89,8 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public PageResponse<UserProfileResponseDTO> getUsers(String search, Long roleId, Boolean isActive, Pageable pageable) {
-        Page<User> userPage = userRepository.searchUsers(roleId, isActive, search, pageable);
+        String cleanSearch = org.springframework.util.StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
+        Page<User> userPage = userRepository.searchUsers(roleId, isActive, cleanSearch, pageable);
         List<UserProfileResponseDTO> content = userPage.getContent().stream()
                 .map(this::toUserProfileResponse)
                 .toList();

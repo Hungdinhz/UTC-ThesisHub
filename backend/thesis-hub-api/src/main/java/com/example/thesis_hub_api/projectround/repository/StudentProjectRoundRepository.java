@@ -29,10 +29,10 @@ public interface StudentProjectRoundRepository extends JpaRepository<StudentProj
            "AND (:majorId IS NULL OR s.majorId = :majorId) " +
            "AND (:status IS NULL OR spr.status = :status) " +
            "AND (:search IS NULL OR " +
-           "     LOWER(s.studentCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(s.className) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "     LOWER(s.studentCode) LIKE :search OR " +
+           "     LOWER(u.fullName) LIKE :search OR " +
+           "     LOWER(u.email) LIKE :search OR " +
+           "     LOWER(s.className) LIKE :search)")
     Page<StudentProjectRound> searchStudentsInRound(
             @Param("roundId") Long roundId,
             @Param("majorId") Long majorId,

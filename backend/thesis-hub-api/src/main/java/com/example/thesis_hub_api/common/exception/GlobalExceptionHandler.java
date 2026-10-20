@@ -7,13 +7,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 @Slf4j
 @RestControllerAdvice
@@ -67,10 +70,31 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<ApiResponse<Object>> handleNoSuchElementException(NoSuchElementException ex) {
+        log.warn("Resource not found: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.RESOURCE_NOT_FOUND.getCode(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleNoResourceFoundException(NoResourceFoundException ex) {
+        log.warn("Endpoint or static resource not found: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(404, "Endpoint không tồn tại: " + ex.getResourcePath());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        log.warn("Method not supported: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(405, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
         log.error("Unhandled exception caught in GlobalExceptionHandler: ", ex);
-        ApiResponse<Object> response = ApiResponse.error(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode(), "Đã xảy ra lỗi hệ thống. Vui lòng liên hệ quản trị viên.");
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode(), "Lỗi hệ thống: " + ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

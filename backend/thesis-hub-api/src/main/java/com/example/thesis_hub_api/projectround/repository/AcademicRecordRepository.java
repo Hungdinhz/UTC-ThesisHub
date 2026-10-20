@@ -29,10 +29,10 @@ public interface AcademicRecordRepository extends JpaRepository<AcademicRecord, 
            "AND (:tuitionDebt IS NULL OR ar.tuitionDebt = :tuitionDebt) " +
            "AND (:underDisciplinaryAction IS NULL OR ar.underDisciplinaryAction = :underDisciplinaryAction) " +
            "AND (:search IS NULL OR " +
-           "     LOWER(s.studentCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(s.className) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "     LOWER(s.studentCode) LIKE :search OR " +
+           "     LOWER(u.fullName) LIKE :search OR " +
+           "     LOWER(u.email) LIKE :search OR " +
+           "     LOWER(s.className) LIKE :search)")
     Page<AcademicRecord> searchAcademicRecords(
             @Param("roundId") Long roundId,
             @Param("tuitionDebt") Boolean tuitionDebt,

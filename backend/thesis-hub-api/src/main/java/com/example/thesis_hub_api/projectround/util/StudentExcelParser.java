@@ -32,13 +32,16 @@ public class StudentExcelParser {
             }
 
             int lastRowNum = sheet.getLastRowNum();
-            for (int r = 1; r <= lastRowNum; r++) { // Bắt đầu từ dòng 1 (bỏ qua header ở dòng 0)
+            int headerRowIdx = detectHeaderRowIndex(sheet, Math.min(lastRowNum, 6));
+            boolean combinedFullNameMode = isCombinedFullNameHeader(sheet.getRow(headerRowIdx));
+
+            for (int r = headerRowIdx + 1; r <= lastRowNum; r++) {
                 Row row = sheet.getRow(r);
                 if (row == null || isRowEmpty(row)) {
                     continue;
                 }
 
-                StudentImportRowDTO rowDto = parseRow(row, r);
+                StudentImportRowDTO rowDto = parseRow(row, r, combinedFullNameMode);
                 rows.add(rowDto);
             }
         }
@@ -46,7 +49,52 @@ public class StudentExcelParser {
         return rows;
     }
 
-    private StudentImportRowDTO parseRow(Row row, int rowIndex) {
+    private int detectHeaderRowIndex(Sheet sheet, int maxScanRow) {
+        for (int r = 0; r <= maxScanRow; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            for (int c = 0; c < row.getLastCellNum(); c++) {
+                String val = getCellValue(row.getCell(c)).toLowerCase();
+                if (val.contains("mssv") || val.contains("mã sinh viên") || val.contains("ma sinh vien") || val.contains("mã sv") || val.contains("student code")) {
+                    return r;
+                }
+            }
+        }
+        return 0;
+    }
+
+    private boolean isCombinedFullNameHeader(Row headerRow) {
+        if (headerRow == null) return false;
+        String col2 = getCellValue(headerRow.getCell(2)).toLowerCase();
+        String col3 = getCellValue(headerRow.getCell(3)).toLowerCase();
+        // If column C is "Họ và tên" / "Họ tên" and column D is "Ngành" / "Lớp" (not "Tên")
+        return (col2.contains("họ và tên") || col2.contains("họ tên") || col2.contains("full name"))
+                && !col3.equals("tên") && !col3.equals("tên *");
+    }
+
+    public String normalizeMajorCode(String rawMajor) {
+        if (rawMajor == null) return "";
+        String upper = rawMajor.trim().toUpperCase();
+        if (upper.isEmpty()) return "";
+        if (upper.equals("CNTT") || upper.contains("CÔNG NGHỆ THÔNG TIN") || upper.contains("CONG NGHE THONG TIN") || upper.equals("IT") || upper.equals("FIT")) {
+            return "CNTT";
+        }
+        if (upper.equals("KTPM") || upper.contains("KỸ THUẬT PHẦN MỀM") || upper.contains("KY THUAT PHAN MEM") || upper.contains("CÔNG NGHỆ PHẦN MỀM") || upper.equals("CNPM") || upper.equals("SE")) {
+            return "KTPM";
+        }
+        if (upper.equals("KHMT") || upper.contains("KHOA HỌC MÁY TÍNH") || upper.contains("KHOA HOC MAY TINH") || upper.equals("CS")) {
+            return "KHMT";
+        }
+        if (upper.equals("HTTT") || upper.contains("HỆ THỐNG THÔNG TIN") || upper.contains("HE THONG THONG TIN") || upper.equals("IS")) {
+            return "CNTT";
+        }
+        if (upper.equals("MMT") || upper.contains("MẠNG MÁY TÍNH") || upper.contains("AN TOÀN THÔNG TIN") || upper.equals("ATTT")) {
+            return "CNTT";
+        }
+        return upper;
+    }
+
+    private StudentImportRowDTO parseRow(Row row, int rowIndex, boolean combinedFullNameMode) {
         List<String> errors = new ArrayList<>();
 
         // Cột A (0): STT
@@ -65,40 +113,74 @@ public class StudentExcelParser {
             errors.add("Mã sinh viên không được để trống");
         }
 
-        // Cột C (2): Họ đệm *
-        String lastName = getCellValue(row.getCell(2));
-        if (lastName.isEmpty()) {
-            errors.add("Họ đệm không được để trống");
+        String lastName;
+        String firstName;
+        String fullName;
+        String rawMajor;
+        String className;
+        String phone;
+        String email;
+
+        if (combinedFullNameMode) {
+            fullName = getCellValue(row.getCell(2));
+            if (fullName.isEmpty()) {
+                errors.add("Họ và tên không được để trống");
+                lastName = "";
+                firstName = "";
+            } else {
+                int lastSpace = fullName.lastIndexOf(' ');
+                if (lastSpace > 0) {
+                    lastName = fullName.substring(0, lastSpace).trim();
+                    firstName = fullName.substring(lastSpace + 1).trim();
+                } else {
+                    lastName = fullName;
+                    firstName = fullName;
+                }
+            }
+            rawMajor = getCellValue(row.getCell(3));
+            className = getCellValue(row.getCell(4));
+            phone = getCellValue(row.getCell(5));
+            email = getCellValue(row.getCell(6));
+        } else {
+            // Cột C (2): Họ đệm *
+            lastName = getCellValue(row.getCell(2));
+            // Cột D (3): Tên *
+            firstName = getCellValue(row.getCell(3));
+
+            if (lastName.isEmpty() && firstName.isEmpty()) {
+                errors.add("Họ và tên sinh viên không được để trống");
+            } else if (firstName.isEmpty() && lastName.contains(" ")) {
+                // Trường hợp người dùng nhập cả họ và tên vào cột Họ đệm
+                int lastSpace = lastName.lastIndexOf(' ');
+                firstName = lastName.substring(lastSpace + 1).trim();
+                lastName = lastName.substring(0, lastSpace).trim();
+            }
+
+            fullName = (lastName + " " + firstName).trim();
+            rawMajor = getCellValue(row.getCell(4));
+            className = getCellValue(row.getCell(5));
+            phone = getCellValue(row.getCell(6));
+            email = getCellValue(row.getCell(7));
         }
 
-        // Cột D (3): Tên *
-        String firstName = getCellValue(row.getCell(3));
-        if (firstName.isEmpty()) {
-            errors.add("Tên không được để trống");
-        }
-
-        String fullName = (lastName + " " + firstName).trim();
-
-        // Cột E (4): Ngành (CNTT/KHMT) *
-        String majorCode = getCellValue(row.getCell(4)).toUpperCase();
+        String majorCode = normalizeMajorCode(rawMajor);
         if (majorCode.isEmpty()) {
-            errors.add("Mã ngành không được để trống");
+            majorCode = "CNTT"; // Mặc định ngành CNTT nếu để trống
         }
 
-        // Cột F (5): Lớp sinh hoạt *
-        String className = getCellValue(row.getCell(5));
         if (className.isEmpty()) {
-            errors.add("Lớp sinh hoạt không được để trống");
+            className = majorCode + " - K62";
         }
 
-        // Cột G (6): Số điện thoại
-        String phone = getCellValue(row.getCell(6));
-        if (!phone.isEmpty() && (phone.length() < 9 || phone.length() > 15 || !phone.matches("^[0-9+ ]+$"))) {
-            errors.add("Số điện thoại không hợp lệ");
+        if (!phone.isEmpty()) {
+            String cleanedPhone = phone.replaceAll("[\\s.-]", "");
+            if (cleanedPhone.length() < 8 || cleanedPhone.length() > 15) {
+                errors.add("Số điện thoại không hợp lệ");
+            } else {
+                phone = cleanedPhone;
+            }
         }
 
-        // Cột H (7): Email
-        String email = getCellValue(row.getCell(7));
         if (email.isEmpty()) {
             if (!studentCode.isEmpty()) {
                 email = studentCode.toLowerCase() + "@lms.utc.edu.vn";

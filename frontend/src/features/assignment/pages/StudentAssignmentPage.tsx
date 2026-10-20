@@ -18,13 +18,14 @@ interface Props {
 export const StudentAssignmentPage: React.FC<Props> = ({
   projectRoundId = 10,
   studentId = 201,
-  studentProgram = 'CU_NHAN',
+  studentProgram: initialProgram = 'CU_NHAN',
 }) => {
   const [directions, setDirections] = useState<ProjectDirection[]>([]);
   const [capacities, setCapacities] = useState<LecturerCapacity[]>([]);
   const [currentRegistration, setCurrentRegistration] = useState<DirectionRegistration | null>(null);
   const [myAssignment, setMyAssignment] = useState<SupervisorAssignment | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activeProgram, setActiveProgram] = useState<'CU_NHAN' | 'KY_SU'>(initialProgram);
 
   const loadData = async () => {
     try {
@@ -90,6 +91,61 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
   return (
     <div className="assignment-container">
+      {/* Program Selector Bar for Phase 2 Decision Node Testing */}
+      <div
+        style={{
+          backgroundColor: '#fff',
+          border: '1px solid #cbd5e1',
+          borderRadius: '10px',
+          padding: '14px 20px',
+          marginBottom: '20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
+        }}
+      >
+        <div>
+          <strong style={{ color: '#0a3273' }}>🎓 Chương trình đào tạo của Sinh viên (Bước 12 - Nút quyết định):</strong>
+          <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
+            Nếu thuộc <strong>CT Kỹ sư (KY_SU)</strong>, hệ thống kiểm tra học vị tối thiểu của GVHD (yêu cầu từ Tiến sĩ/PGS/GS trở lên; nếu chọn Thạc sĩ sẽ yêu cầu chọn lại NV1–NV3).
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setActiveProgram('CU_NHAN')}
+            style={{
+              padding: '7px 14px',
+              borderRadius: '6px',
+              border: activeProgram === 'CU_NHAN' ? '2px solid #0a3273' : '1px solid #cbd5e1',
+              backgroundColor: activeProgram === 'CU_NHAN' ? '#0a3273' : '#fff',
+              color: activeProgram === 'CU_NHAN' ? '#fff' : '#334155',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Hệ Cử nhân (CU_NHAN)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveProgram('KY_SU')}
+            style={{
+              padding: '7px 14px',
+              borderRadius: '6px',
+              border: activeProgram === 'KY_SU' ? '2px solid #b45309' : '1px solid #cbd5e1',
+              backgroundColor: activeProgram === 'KY_SU' ? '#d97706' : '#fff',
+              color: activeProgram === 'KY_SU' ? '#fff' : '#334155',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Hệ Kỹ sư chuyên sâu (KY_SU)
+          </button>
+        </div>
+      </div>
+
       {/* If direction is already registered */}
       {currentRegistration && !myAssignment && (
         <div className="alert-box alert-info" style={{ marginBottom: '20px' }}>
@@ -131,7 +187,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         directions={directions}
         capacities={capacities}
         onSubmit={handleSubmit}
-        studentProgram={studentProgram}
+        studentProgram={activeProgram}
         loading={loading}
       />
     </div>

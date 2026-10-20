@@ -17,6 +17,16 @@ public class EligibilityController {
     private final EligibilityService eligibilityService;
 
     /**
+     * API lấy danh sách kiểm tra điều kiện làm đồ án của toàn bộ sinh viên trong đợt
+     */
+    @GetMapping("/students")
+    public ResponseEntity<ApiResponse<List<EligibilityCheckResponseDTO>>> getAllStudentsEligibility(
+            @RequestParam(required = false) Long projectRoundId) {
+        List<EligibilityCheckResponseDTO> result = eligibilityService.getAllStudentsEligibility(projectRoundId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách xét điều kiện đồ án thành công", result));
+    }
+
+    /**
      * API kiểm tra điều kiện làm đồ án tốt nghiệp
      */
     @GetMapping("/check")

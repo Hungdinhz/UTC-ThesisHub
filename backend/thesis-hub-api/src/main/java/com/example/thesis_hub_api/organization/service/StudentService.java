@@ -41,8 +41,8 @@ public class StudentService {
 
     @Transactional(readOnly = true)
     public PageResponse<StudentResponseDTO> getStudents(Long majorId, Long trainingProgramId, String className, String search, Pageable pageable) {
-        String cleanSearch = StringUtils.hasText(search) ? search.trim() : null;
-        String cleanClass = StringUtils.hasText(className) ? className.trim() : null;
+        String cleanSearch = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
+        String cleanClass = StringUtils.hasText(className) ? "%" + className.trim().toLowerCase() + "%" : null;
 
         Page<Student> page = studentRepository.searchStudents(majorId, trainingProgramId, cleanClass, cleanSearch, pageable);
         List<StudentResponseDTO> content = page.getContent().stream().map(this::toResponseDTO).toList();
