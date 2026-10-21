@@ -17,6 +17,8 @@
 // ─── Authentication ───────────────────────────────────────────────
 export const AUTH = {
   LOGIN:                   '/auth/login',
+  ADMIN_REGISTER:          '/auth/admin/register',
+  ADMIN_LOGIN:             '/auth/admin/login',
   STUDENT_LOGIN:           '/auth/students/login',
   SUPERVISOR_LOGIN:        '/auth/supervisors/login',
   COMMITTEE_MEMBER_LOGIN:  '/auth/committee-members/login',

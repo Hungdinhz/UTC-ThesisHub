@@ -25,7 +25,9 @@ public enum ErrorCode {
     ROLE_NOT_FOUND(1017, "Không tìm thấy vai trò yêu cầu", HttpStatus.NOT_FOUND),
     STUDENT_NOT_FOUND(1018, "Không tìm thấy thông tin sinh viên", HttpStatus.NOT_FOUND),
     LECTURER_NOT_FOUND(1019, "Không tìm thấy thông tin giảng viên", HttpStatus.NOT_FOUND),
-    CONFIRM_PASSWORD_MISMATCH(1020, "Mật khẩu xác nhận không khớp", HttpStatus.BAD_REQUEST);
+    CONFIRM_PASSWORD_MISMATCH(1020, "Mật khẩu xác nhận không khớp", HttpStatus.BAD_REQUEST),
+    INVALID_ADMIN_SECRET_KEY(1021, "Mã bí mật xác nhận Quản trị viên (Admin API Key) không chính xác", HttpStatus.FORBIDDEN),
+    NOT_AN_ADMIN_ACCOUNT(1022, "Tài khoản không có quyền truy cập vào cổng Quản trị viên", HttpStatus.FORBIDDEN);
 
     private final int code;
     private final String message;

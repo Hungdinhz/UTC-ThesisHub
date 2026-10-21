@@ -3,6 +3,8 @@ package com.example.thesis_hub_api.identity.controller;
 import com.example.thesis_hub_api.common.exception.AppException;
 import com.example.thesis_hub_api.common.exception.ErrorCode;
 import com.example.thesis_hub_api.common.response.ApiResponse;
+import com.example.thesis_hub_api.identity.dto.request.AdminLoginRequestDTO;
+import com.example.thesis_hub_api.identity.dto.request.AdminRegisterRequestDTO;
 import com.example.thesis_hub_api.identity.dto.request.ChangePasswordRequestDTO;
 import com.example.thesis_hub_api.identity.dto.request.LoginRequestDTO;
 import com.example.thesis_hub_api.identity.dto.response.LoginResponseDTO;
@@ -29,6 +31,20 @@ public class AuthController {
     public ResponseEntity<ApiResponse<LoginResponseDTO>> login(@Valid @RequestBody LoginRequestDTO request) {
         LoginResponseDTO response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", response));
+    }
+
+    @PostMapping("/admin/register")
+    @Operation(summary = "Đăng ký tài khoản Quản trị viên", description = "Đăng ký tài khoản Quản trị viên với Admin API Key bí mật")
+    public ResponseEntity<ApiResponse<LoginResponseDTO>> registerAdmin(@Valid @RequestBody AdminRegisterRequestDTO request) {
+        LoginResponseDTO response = authService.registerAdmin(request);
+        return ResponseEntity.ok(ApiResponse.success("Đăng ký tài khoản Quản trị viên thành công", response));
+    }
+
+    @PostMapping("/admin/login")
+    @Operation(summary = "Đăng nhập dành cho Quản trị viên", description = "Đăng nhập và kiểm tra nghiêm ngặt quyền Quản trị viên (ROLE_ADMIN)")
+    public ResponseEntity<ApiResponse<LoginResponseDTO>> adminLogin(@Valid @RequestBody AdminLoginRequestDTO request) {
+        LoginResponseDTO response = authService.adminLogin(request);
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập Quản trị viên thành công", response));
     }
 
     @PostMapping("/students/login")
