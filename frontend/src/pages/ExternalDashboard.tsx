@@ -6,13 +6,13 @@ import type {
   ExternalGroup,
   ExternalGroupAssignment
 } from '../types';
-import Navbar from '../components/Navbar';
+import UTCAppLayout from '../components/UTCAppLayout';
 import { SkeletonProfile, SkeletonCardGrid } from '../components/SkeletonLoader';
 import './Dashboard.css';
 import './ExternalDashboard.css';
 
 const ExternalDashboard: React.FC = () => {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [dashboardData, setDashboardData] = useState<ExternalDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'groups' | 'evaluations' | 'schedule'>('overview');
@@ -76,51 +76,50 @@ const ExternalDashboard: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading && !dashboardData) {
     return (
-      <div className="dashboard">
-        <Navbar user={null} onLogout={logout} />
-        <div className="dashboard-content">
+      <UTCAppLayout user={user} onLogout={logout} activeTab="overview" onTabChange={() => {}}>
+        <div style={{ padding: '20px 0' }}>
+          <div className="dashboard-header" style={{ marginBottom: '20px' }}>
+            <div>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                Bảng Điều Khiển Cán Bộ Chấm Ngoài UTC
+              </h1>
+              <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
+                Đang tải dữ liệu tổng quan...
+              </p>
+            </div>
+          </div>
           <SkeletonProfile />
-          <SkeletonCardGrid count={3} />
+          <div style={{ marginTop: '20px' }}>
+            <SkeletonCardGrid count={3} />
+          </div>
         </div>
-      </div>
+      </UTCAppLayout>
     );
   }
 
   if (error || !dashboardData) {
     return (
-      <div className="dashboard">
-        <Navbar user={null} onLogout={logout} />
-        <div className="dashboard-content">
-          <div className="card error-card">
-            <h2>Error Loading Dashboard</h2>
-            <p>{error || 'Failed to load your profile. Please try again.'}</p>
+      <UTCAppLayout user={user} onLogout={logout} activeTab="overview" onTabChange={() => {}}>
+        <div style={{ padding: '20px 0' }}>
+          <div className="card error-card" style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '24px', border: '1px solid #fecaca' }}>
+            <h2 style={{ color: '#dc2626', margin: '0 0 12px 0' }}>Lỗi khi tải bảng điều khiển</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>{error || 'Không thể tải thông tin hồ sơ. Vui lòng thử lại.'}</p>
             <button className="btn btn-primary" onClick={loadDashboard}>
-              Retry
+              Thử lại
             </button>
           </div>
         </div>
-      </div>
+      </UTCAppLayout>
     );
   }
 
   const { profile, statistics, upcoming_evaluations, recent_evaluations } = dashboardData;
 
   return (
-    <div className="dashboard">
-      <Navbar 
-        user={{
-          id: profile.id,
-          user: profile.user,
-          external_id: profile.external_id,
-          institution: profile.institution,
-          designation: profile.designation
-        } as any} 
-        onLogout={logout} 
-      />
-      
-      <div className="dashboard-content">
+    <UTCAppLayout user={user} onLogout={logout} activeTab={activeTab} onTabChange={(tab: any) => setActiveTab(tab)}>
+      <div className="dashboard-content" style={{ padding: '16px 0' }}>
         {/* Profile Header */}
         <div className="card profile-card">
           <div className="profile-header">
@@ -498,7 +497,7 @@ const ExternalDashboard: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </UTCAppLayout>
   );
 };
 

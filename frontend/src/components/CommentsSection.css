@@ -19,8 +19,8 @@
 .comments-header h4 {
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 .btn-refresh {
@@ -30,13 +30,13 @@
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 4px;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
   transition: all 0.2s ease;
 }
 
 .btn-refresh:hover {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--text-primary, #0f172a);
 }
 
 .comments-loading {
@@ -45,7 +45,7 @@
   justify-content: center;
   gap: 10px;
   padding: 40px 20px;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
 }
 
 .comments-error {
@@ -66,7 +66,7 @@
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
 }
 
 .comments-empty span {
@@ -85,7 +85,7 @@
   display: flex;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
   transition: background-color 0.2s ease;
 }
 
@@ -94,15 +94,15 @@
 }
 
 .comment-item:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-tertiary, #f8fafc);
 }
 
 .comment-item.my-comment {
-  background: var(--primary-light);
+  background: var(--primary-light, #eff6ff);
 }
 
 .comment-item.my-comment:hover {
-  background: var(--primary-light);
+  background: var(--primary-light, #eff6ff);
 }
 
 .comment-avatar {
@@ -112,7 +112,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-tertiary);
+  background: var(--bg-tertiary, #f1f5f9);
   border-radius: 50%;
   font-size: 18px;
 }
@@ -131,24 +131,24 @@
 }
 
 .comment-author {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--text-primary, #0f172a);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .comment-author.supervisor {
-  color: var(--primary-color);
+  color: var(--primary-color, #003366);
 }
 
 .author-badge {
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   padding: 2px 6px;
-  background: var(--primary-light);
-  color: var(--primary-color);
+  background: var(--primary-light, #eff6ff);
+  color: var(--primary-color, #003366);
   border-radius: 4px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -156,12 +156,13 @@
 
 .comment-time {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-muted, #64748b);
+  font-weight: 500;
 }
 
 .comment-text {
   font-size: 14px;
-  color: var(--text-primary);
+  color: var(--text-primary, #1e293b);
   line-height: 1.5;
   word-wrap: break-word;
   white-space: pre-wrap;

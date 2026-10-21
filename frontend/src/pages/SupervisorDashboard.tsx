@@ -163,13 +163,25 @@ const SupervisorDashboard: React.FC = () => {
     }
   };
 
-  if (loading || !supervisor) {
+  if (loading && !profile) {
     return (
-      <UTCAppLayout user={supervisor} onLogout={logout} activeTab={activeTab} onTabChange={setActiveTab}>
-        <div className="container" style={{ paddingTop: '10px' }}>
-          <SkeletonProfile />
+      <UTCAppLayout user={supervisor || user} onLogout={logout} activeTab={activeTab} onTabChange={setActiveTab}>
+        <div className="container" style={{ padding: '20px 0' }}>
+          <div className="dashboard-header">
+            <div>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                {t('dashboard.supervisorTitle', 'Bảng Điều Khiển Giảng Viên Hướng Dẫn')}
+              </h1>
+              <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
+                {t('common.loading', 'Đang tải dữ liệu tổng quan hướng dẫn...')}
+              </p>
+            </div>
+          </div>
           <div style={{ marginTop: '20px' }}>
-            <SkeletonEvaluationGrid count={3} />
+            <SkeletonProfile />
+            <div style={{ marginTop: '20px' }}>
+              <SkeletonEvaluationGrid count={3} />
+            </div>
           </div>
         </div>
       </UTCAppLayout>

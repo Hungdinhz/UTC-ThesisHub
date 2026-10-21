@@ -138,7 +138,8 @@
 .external-evaluation-view .criteria-label {
   flex: 0 0 140px;
   font-size: 13px;
-  color: var(--text-secondary, #64748b);
+  color: #334155 !important;
+  font-weight: 600;
 }
 
 .external-evaluation-view .criteria-bar {
@@ -160,8 +161,8 @@
   flex: 0 0 50px;
   text-align: right;
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary, #1e293b);
+  font-weight: 700;
+  color: #0f172a !important;
 }
 
 /* Comments Section */
@@ -174,8 +175,9 @@
 
 .external-evaluation-view .evaluation-comments h3 {
   margin: 0 0 16px 0;
-  color: var(--text-primary, #1e293b);
+  color: #0f172a !important;
   font-size: 18px;
+  font-weight: 700;
 }
 
 .external-evaluation-view .comment-block {
@@ -192,7 +194,8 @@
 .external-evaluation-view .comment-block h4 {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: var(--text-secondary, #64748b);
+  color: #0f172a !important;
+  font-weight: 700;
 }
 
 .external-evaluation-view .comment-block p {

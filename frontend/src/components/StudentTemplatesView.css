@@ -1,5 +1,5 @@
 .student-templates-view .templates-description {
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
   margin: 0 0 1.25rem;
   font-size: 0.95rem;
 }
@@ -18,31 +18,31 @@
 .student-templates-view .templates-filters label {
   display: block;
   margin-bottom: 0.35rem;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 .student-templates-view .templates-filters select {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 6px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: #ffffff;
+  color: var(--text-primary, #0f172a);
   font-size: 0.95rem;
 }
 
 .student-templates-view .templates-error {
   padding: 1.5rem;
   text-align: center;
-  background: var(--bg-secondary);
+  background: var(--bg-secondary, #ffffff);
   border-radius: 8px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color, #cbd5e1);
 }
 
 .student-templates-view .templates-error p {
   margin: 0 0 1rem;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
 }
 
 .student-templates-view .templates-table-wrapper {

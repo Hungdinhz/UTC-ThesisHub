@@ -38,8 +38,8 @@
 .ui-modal-title {
   margin: 0;
   font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary, #333333);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 .ui-modal-close {
@@ -47,7 +47,7 @@
   border: none;
   font-size: 1.5rem;
   line-height: 1;
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary, #475569);
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 4px;
@@ -55,14 +55,14 @@
 }
 
 .ui-modal-close:hover {
-  color: var(--text-primary, #333333);
+  color: var(--text-primary, #0f172a);
   background: var(--bg-hover, #f0f0f0);
 }
 
 .ui-modal-body {
   padding: 20px;
   overflow-y: auto;
-  color: var(--text-primary, #333333);
+  color: var(--text-primary, #0f172a);
   font-size: 0.9375rem;
 }
 

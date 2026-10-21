@@ -39,6 +39,16 @@ export interface CreateProposalPayload {
   fileUrl?: string;
 }
 
+export interface UpdateProposalPayload {
+  titleVn?: string;
+  titleEn?: string;
+  description?: string;
+  objectives?: string;
+  expectedResults?: string;
+  researchContent?: string;
+  fileUrl?: string;
+}
+
 export interface ReviewGroupMember {
   id: number;
   lecturerId: number;

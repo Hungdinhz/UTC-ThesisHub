@@ -11,14 +11,14 @@
 .audit-title {
   margin: 0 0 20px 0;
   font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 .audit-loading {
   padding: 40px;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
 }
 
 .audit-error {
@@ -40,7 +40,8 @@
   flex: 1;
   min-width: 120px;
   padding: 16px;
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-tertiary, #f8fafc);
+  border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 8px;
   text-align: center;
   transition: background-color 0.3s ease;
@@ -48,13 +49,14 @@
 
 .audit-stat-value {
   font-size: 28px;
-  font-weight: bold;
-  color: var(--text-primary);
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
 }
 
 .audit-stat-label {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
+  font-weight: 600;
   margin-top: 4px;
 }
 
@@ -66,7 +68,8 @@
   flex-wrap: wrap;
   align-items: flex-end;
   padding: 16px;
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-tertiary, #f8fafc);
+  border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 8px;
   transition: background-color 0.3s ease;
 }
@@ -79,18 +82,18 @@
 
 .audit-filter-label {
   font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-secondary, #334155);
 }
 
 .audit-filter-select,
 .audit-filter-input {
   padding: 8px 12px;
   border-radius: 4px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color, #cbd5e1);
   font-size: 14px;
-  background-color: var(--input-bg);
-  color: var(--text-primary);
+  background-color: var(--input-bg, #ffffff);
+  color: var(--text-primary, #0f172a);
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 

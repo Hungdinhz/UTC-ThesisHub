@@ -75,15 +75,21 @@ const CommitteeMemberDashboard: React.FC = () => {
     }
   };
 
-  if (loading || !committeeMember) {
+  if (loading && !profile) {
     return (
-      <UTCAppLayout user={committeeMember} onLogout={logout} activeTab={activeTab} onTabChange={setActiveTab}>
-        <div className="container">
+      <UTCAppLayout user={committeeMember || user} onLogout={logout} activeTab={activeTab} onTabChange={setActiveTab}>
+        <div className="container" style={{ padding: '20px 0' }}>
           <div className="dashboard-header">
-            <h1>{t('dashboard.committeeTitle', 'Bảng Điều Khiển Hội Đồng Đánh Giá UTC')}</h1>
-            <p>Đang tải thông tin hội đồng...</p>
+            <div>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                {t('dashboard.committeeTitle', 'Bảng Điều Khiển Hội Đồng Đánh Giá UTC')}
+              </h1>
+              <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
+                {t('common.loading', 'Đang tải dữ liệu tổng quan hội đồng...')}
+              </p>
+            </div>
           </div>
-          <div className="card">
+          <div className="card" style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '24px', border: '1px solid var(--border-color)', marginTop: '20px' }}>
             <SkeletonProfile />
           </div>
         </div>
@@ -180,22 +186,22 @@ const CommitteeMemberDashboard: React.FC = () => {
                   
                   {profile.panel_info.members && profile.panel_info.members.length > 0 ? (
                     <div style={{ marginTop: '15px' }}>
-                      <h4 style={{ marginBottom: '10px', color: '#555' }}>Other Panel Members</h4>
+                      <h4 style={{ marginBottom: '10px', color: '#1e293b', fontWeight: 600 }}>Other Panel Members</h4>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                         {profile.panel_info.members.map(member => (
                           <div 
                             key={member.id} 
                             style={{ 
                               padding: '10px 15px', 
-                              backgroundColor: '#f0f4f8', 
+                              backgroundColor: '#f8fafc', 
                               borderRadius: '6px',
-                              border: '1px solid #e0e0e0'
+                              border: '1px solid #e2e8f0'
                             }}
                           >
-                            <span style={{ fontWeight: '500' }}>
+                            <span style={{ fontWeight: '600', color: '#0f172a' }}>
                               {member.user.first_name || member.user.username} {member.user.last_name || ''}
                             </span>
-                            <span style={{ color: '#666', fontSize: '0.9em', marginLeft: '8px' }}>
+                            <span style={{ color: '#475569', fontSize: '0.9em', marginLeft: '8px' }}>
                               ({member.committee_id})
                             </span>
                           </div>
@@ -203,15 +209,16 @@ const CommitteeMemberDashboard: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <p style={{ color: '#666', marginTop: '15px' }}>You are the only member in this panel.</p>
+                    <p style={{ color: '#475569', marginTop: '15px' }}>You are the only member in this panel.</p>
                   )}
                   
                   <div style={{ 
                     marginTop: '20px', 
                     padding: '12px', 
-                    backgroundColor: '#e8f4f8', 
-                    borderRadius: '4px',
-                    border: '1px solid #bee5eb'
+                    backgroundColor: '#eff6ff', 
+                    borderRadius: '6px',
+                    border: '1px solid #bfdbfe',
+                    color: '#1e40af'
                   }}>
                     <p style={{ margin: 0, fontSize: '0.9rem' }}>
                       <strong>Groups Assigned:</strong> {panelGroups.length} group(s) are assigned to your panel for evaluation.

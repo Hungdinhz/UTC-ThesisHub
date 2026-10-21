@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Proposal, CreateProposalPayload, ReviewGroup, Thesis, ThesisDocument } from '../types';
+import type { Proposal, CreateProposalPayload, UpdateProposalPayload, ReviewGroup, Thesis, ThesisDocument } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
 
@@ -22,6 +22,11 @@ export const thesisService = {
   // Proposal APIs
   async createProposal(payload: CreateProposalPayload): Promise<Proposal> {
     const res = await apiClient.post('/proposals', payload);
+    return res.data.data;
+  },
+
+  async updateProposal(id: number, payload: UpdateProposalPayload): Promise<Proposal> {
+    const res = await apiClient.put(`/proposals/${id}`, payload);
     return res.data.data;
   },
 

@@ -62,7 +62,8 @@
 .external-evaluation-form .assignment-info h3 {
   margin: 0 0 16px 0;
   font-size: 16px;
-  color: var(--text-secondary);
+  color: #0f172a !important;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -81,14 +82,16 @@
 
 .external-evaluation-form .info-item strong {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #475569 !important;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 
 .external-evaluation-form .info-item span {
   font-size: 15px;
-  color: var(--text-primary);
+  color: #0f172a !important;
+  font-weight: 600;
 }
 
 /* Evaluation Sections (Fieldsets) */
@@ -151,8 +154,8 @@
 
 .external-evaluation-form .rating-field .max-marks {
   font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 400;
+  color: #475569 !important;
+  font-weight: 500;
 }
 
 .external-evaluation-form .rating-field select {
@@ -228,7 +231,8 @@
 
 .external-evaluation-form .grade-label {
   font-size: 16px;
-  color: var(--text-secondary);
+  color: #334155 !important;
+  font-weight: 600;
 }
 
 .external-evaluation-form .grade-value {

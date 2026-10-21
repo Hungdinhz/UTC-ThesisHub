@@ -579,7 +579,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                         ))}
                       </div>
                     ) : (
-                      <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+                      <div style={{ padding: '32px', textAlign: 'center', color: '#475569', fontWeight: 500, border: '1px dashed #94a3b8', borderRadius: '8px' }}>
                         Chưa có mốc thời gian nào được thiết lập. Hãy bấm nút "Thêm mốc Timeline" ở trên.
                       </div>
                     )}
