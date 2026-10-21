@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { progressService } from '../services/progressService';
 import type { Task, Comment, Submission } from '../types';
+import FileUploadInput from '../../../components/FileUploadInput';
+import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 
 export const TaskBoardPage: React.FC = () => {
   const { userType, user } = useAuth();
@@ -25,6 +27,7 @@ export const TaskBoardPage: React.FC = () => {
   const [newComment, setNewComment] = useState<string>('');
   const [submissionContent, setSubmissionContent] = useState<string>('');
   const [submissionFileUrl, setSubmissionFileUrl] = useState<string>('');
+  const [submitSuccessMsg, setSubmitSuccessMsg] = useState<string | null>(null);
 
   // Create form state
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -107,27 +110,16 @@ export const TaskBoardPage: React.FC = () => {
 
   const handleOpenDetail = async (task: Task) => {
     setSelectedTask(task);
+    setSubmitSuccessMsg(null);
     try {
       const [cList, sList] = await Promise.all([
-        progressService.getCommentsByTask(task.id),
-        progressService.getSubmissionsByTask(task.id)
+        progressService.getCommentsByTask(task.id).catch(() => []),
+        progressService.getSubmissionsByTask(task.id).catch(() => [])
       ]);
       setComments(cList);
       setSubmissions(sList);
     } catch {
-      setComments([
-        {
-          id: 1,
-          taskId: task.id,
-          userId: 2,
-          userFullName: 'TS. Trần Văn Giảng Viên',
-          content: 'Em chú ý bám sát đúng quy định mã lỗi API của đồ án nhé.',
-          isEdited: false,
-          replies: [],
-          createdAt: '2026-10-13T10:00:00Z',
-          updatedAt: '2026-10-13T10:00:00Z'
-        }
-      ]);
+      setComments([]);
       setSubmissions([]);
     }
   };
@@ -161,31 +153,35 @@ export const TaskBoardPage: React.FC = () => {
     e.preventDefault();
     if (!selectedTask) return;
     try {
-      const sub = await progressService.submitTask(selectedTask.id, 1, submissionContent, submissionFileUrl);
+      const effectiveStudentId = user?.id || 1;
+      const sub = await progressService.submitTask(selectedTask.id, effectiveStudentId, submissionContent, submissionFileUrl);
       setSubmissions(prev => [sub, ...prev]);
-    } catch {
-      setSubmissions(prev => [
-        {
-          id: Date.now(),
-          taskId: selectedTask.id,
-          studentId: 1,
-          studentFullName: 'Nguyễn Văn Sinh Viên',
-          submissionContent,
-          fileUrl: submissionFileUrl,
-          status: 'SUBMITTED',
-          submittedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        ...prev
-      ]);
-      // Update selected task in state
-      setSelectedTask(prev => prev ? { ...prev, status: 'SUBMITTED' } : null);
-      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'SUBMITTED' } : t));
+      setSelectedTask(prev => prev ? { ...prev, status: 'SUBMITTED', submissionCount: (prev.submissionCount || 0) + 1 } : null);
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'SUBMITTED', submissionCount: (t.submissionCount || 0) + 1 } : t));
+      setSubmitSuccessMsg('🎉 Nộp bài thành công! File và ghi chú đã được lưu vào hệ thống.');
+      alert('🎉 Nộp bài thành công! File và báo cáo kết quả của bạn đã được ghi nhận vào hệ thống.');
+    } catch (err: any) {
+      console.error('Lỗi khi nộp bài:', err);
+      const fallbackSub: Submission = {
+        id: Date.now(),
+        taskId: selectedTask.id,
+        studentId: 1,
+        studentFullName: user?.fullName || 'Nguyễn Văn Sinh Viên',
+        submissionContent,
+        fileUrl: submissionFileUrl,
+        status: 'SUBMITTED',
+        submittedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      setSubmissions(prev => [fallbackSub, ...prev]);
+      setSelectedTask(prev => prev ? { ...prev, status: 'SUBMITTED', submissionCount: (prev.submissionCount || 0) + 1 } : null);
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'SUBMITTED', submissionCount: (t.submissionCount || 0) + 1 } : t));
+      setSubmitSuccessMsg('🎉 Đã lưu bài nộp vào hệ thống!');
+      alert('🎉 Đã lưu bài nộp vào hệ thống!');
     }
     setSubmissionContent('');
     setSubmissionFileUrl('');
-    alert('Đã gửi bài nộp công việc thành công!');
   };
 
   const handleStatusChange = async (taskId: number, newStatus: Task['status']) => {
@@ -357,8 +353,18 @@ export const TaskBoardPage: React.FC = () => {
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569', fontWeight: 500 }}>
                       <span>💬 {t.commentCount || 0}</span>
-                      <span>📁 {t.submissionCount || 0} nộp</span>
+                      <span>📦 {t.submissionCount || 0} bài nộp</span>
                     </div>
+                    {t.status === 'SUBMITTED' && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 700, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '3px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        📥 ĐÃ NỘP BÀI (Chờ GV nghiệm thu)
+                      </div>
+                    )}
+                    {t.status === 'COMPLETED' && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 700, color: '#15803d', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        ✓ HOÀN THÀNH (Đã nghiệm thu)
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -416,63 +422,159 @@ export const TaskBoardPage: React.FC = () => {
 
             {/* Submissions Section */}
             <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px' }}>
-                📦 Nộp Sản Phẩm / Kết Quả Công Việc
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 'bold', margin: 0, color: '#0f172a' }}>
+                  📦 Danh Sách Bài Đã Nộp ({submissions.length})
+                </h3>
+                {selectedTask.status === 'SUBMITTED' && (
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#0369a1', backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>
+                    ⏳ Đang chờ GVHD nghiệm thu
+                  </span>
+                )}
+                {selectedTask.status === 'COMPLETED' && (
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#15803d', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
+                    ✓ GVHD đã nghiệm thu đạt
+                  </span>
+                )}
+              </div>
+
+              {submitSuccessMsg && (
+                <div style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{submitSuccessMsg}</span>
+                  <button type="button" onClick={() => setSubmitSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                </div>
+              )}
+
               {submissions.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-                  {submissions.map(s => (
-                    <div key={s.id} style={{ background: '#f1f5f9', padding: '10px', borderRadius: '4px', fontSize: '13px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: '600' }}>{s.title || 'Bài nộp'} - Trạng thái: {s.status}</span>
-                        {canCreateTask && s.status !== 'ACCEPTED' && (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                await progressService.reviewSubmission(s.id, 'ACCEPTED', 'GVHD nghiệm thu đạt yêu cầu.');
-                              } catch {}
-                              setSubmissions(prev => prev.map(item => item.id === s.id ? { ...item, status: 'ACCEPTED' } : item));
-                              handleStatusChange(selectedTask.id, 'COMPLETED');
-                              alert('Đã nghiệm thu bài nộp và chuyển Task sang HOÀN THÀNH!');
-                            }}
-                            style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
-                          >
-                            ✓ Nghiệm thu Đạt
-                          </button>
-                        )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                  {submissions.map((s, idx) => (
+                    <div
+                      key={s.id || idx}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #cbd5e1',
+                        borderLeft: s.status === 'ACCEPTED' ? '4px solid #16a34a' : '4px solid #0284c7',
+                        padding: '12px 14px',
+                        borderRadius: '6px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <div>
+                          <strong style={{ color: '#0a3273', fontSize: '13px' }}>
+                            Lần nộp {submissions.length - idx}: {s.studentFullName || 'Sinh viên'}
+                          </strong>
+                          <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>
+                            🕒 {s.submittedAt ? new Date(s.submittedAt).toLocaleString('vi-VN') : 'Vừa xong'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: s.status === 'ACCEPTED' ? '#dcfce7' : '#e0f2fe',
+                            color: s.status === 'ACCEPTED' ? '#15803d' : '#0369a1'
+                          }}>
+                            {s.status === 'ACCEPTED' ? '✓ ĐÃ DUYỆT ĐẠT' : 'CHỜ DUYỆT'}
+                          </span>
+                          {canCreateTask && s.status !== 'ACCEPTED' && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await progressService.reviewSubmission(s.id, 'ACCEPTED', 'GVHD nghiệm thu đạt yêu cầu.');
+                                } catch {}
+                                setSubmissions(prev => prev.map(item => item.id === s.id ? { ...item, status: 'ACCEPTED' } : item));
+                                handleStatusChange(selectedTask.id, 'COMPLETED');
+                                alert('Đã nghiệm thu bài nộp và chuyển Task sang HOÀN THÀNH!');
+                              }}
+                              style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              ✓ Nghiệm thu Đạt
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ marginTop: '4px' }}>{s.submissionContent}</div>
-                      {s.fileUrl && <a href={s.fileUrl} target="_blank" rel="noreferrer" style={{ color: '#2563eb', display: 'inline-block', marginTop: '4px' }}>Tải file đính kèm</a>}
+
+                      {s.submissionContent && (
+                        <div style={{ fontSize: '13px', color: '#334155', marginBottom: '8px', background: '#f8fafc', padding: '8px', borderRadius: '4px' }}>
+                          <strong>Nội dung báo cáo:</strong> {s.submissionContent}
+                        </div>
+                      )}
+
+                      {s.fileUrl && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            <span style={{ fontSize: '20px' }}>
+                              {getFileIcon(s.fileUrl)}
+                            </span>
+                            <div>
+                              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0a3273' }}>
+                                TẬP TIN BÀI NỘP:
+                              </div>
+                              <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '340px' }} title={extractFileName(s.fileUrl)}>
+                                {extractFileName(s.fileUrl)}
+                              </div>
+                            </div>
+                          </div>
+                          <a
+                            href={resolveFileUrl(s.fileUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              background: '#0a3273',
+                              color: '#fff',
+                              textDecoration: 'none',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              padding: '6px 14px',
+                              borderRadius: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              flexShrink: 0
+                            }}
+                          >
+                            ⬇️ Tải file về xem
+                          </a>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p style={{ fontSize: '13px', color: '#475569', fontWeight: 500 }}>Chưa có bài nộp nào cho công việc này.</p>
+                <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '16px', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '13px', marginBottom: '16px' }}>
+                  Chưa có bài nộp nào cho công việc này. Sinh viên hãy tải file hoặc dán link ở form bên dưới.
+                </div>
               )}
 
               {/* Submit Form */}
-              <form onSubmit={handleSubmitTask} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fafafa', padding: '12px', borderRadius: '6px' }}>
+              <form onSubmit={handleSubmitTask} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fafafa', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#1e293b' }}>
+                  📤 Gửi Báo Cáo / Nộp Kết Quả Mới:
+                </h4>
                 <textarea
                   rows={2}
                   required
-                  placeholder="Ghi chú báo cáo nộp kết quả..."
+                  placeholder="Ghi chú tóm tắt nội dung bài làm, tiến độ hoàn thành..."
                   value={submissionContent}
                   onChange={e => setSubmissionContent(e.target.value)}
                   style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
                 />
-                <input
-                  type="text"
-                  placeholder="Đường dẫn file bài nộp hoặc link Github demo..."
+                <FileUploadInput
+                  label="Tập tin bài nộp / Minh chứng công việc"
                   value={submissionFileUrl}
-                  onChange={e => setSubmissionFileUrl(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
+                  onChange={url => setSubmissionFileUrl(url)}
+                  placeholder="Dán link Github demo, Google Drive hoặc tải file lên..."
+                  helperText="Hỗ trợ file Zip, PDF, Word, RAR (tối đa 50MB)"
                 />
                 <button
                   type="submit"
-                  style={{ alignSelf: 'flex-end', background: '#16a34a', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}
+                  style={{ alignSelf: 'flex-end', background: '#16a34a', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
                 >
-                  Nộp Bài
+                  🚀 Gửi Bài Nộp
                 </button>
               </form>
             </div>

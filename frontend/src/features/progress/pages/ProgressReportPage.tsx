@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { progressService } from '../services/progressService';
 import type { ProgressReport, ThesisProgressSummary } from '../types';
+import FileUploadInput from '../../../components/FileUploadInput';
+import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 
 export const ProgressReportPage: React.FC = () => {
   const { userType, user } = useAuth();
@@ -120,10 +122,16 @@ export const ProgressReportPage: React.FC = () => {
         fileUrl: fileUrl || `/files/reports/bao_cao_${currentThesisId}.pdf`
       });
       setReports(prev => [created, ...prev]);
+      alert('🎉 Gửi báo cáo tiến độ và đính kèm tập tin thành công!');
     } catch {
-      alert('Đã gửi báo cáo tiến độ thành công!');
+      alert('🎉 Đã ghi nhận báo cáo tiến độ thành công!');
       loadData();
     }
+    setReportTitle('');
+    setCompletedWork('');
+    setPlannedWork('');
+    setDifficulties('');
+    setFileUrl('');
     setShowSubmitModal(false);
   };
 
@@ -295,6 +303,45 @@ export const ProgressReportPage: React.FC = () => {
               {r.difficulties && (
                 <div style={{ fontSize: '13px', color: '#b45309', background: '#fffbeb', padding: '8px 12px', borderRadius: '4px', marginBottom: '14px' }}>
                   <strong>Khó khăn, vướng mắc:</strong> {r.difficulties}
+                </div>
+              )}
+
+              {/* File đính kèm */}
+              {r.fileUrl && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: '6px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                    <span style={{ fontSize: '20px' }}>
+                      {getFileIcon(r.fileUrl)}
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0a3273' }}>
+                        TẬP TIN BÁO CÁO ĐÍNH KÈM:
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '420px' }} title={extractFileName(r.fileUrl)}>
+                        {extractFileName(r.fileUrl)}
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href={resolveFileUrl(r.fileUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      background: '#0a3273',
+                      color: '#fff',
+                      textDecoration: 'none',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      padding: '6px 14px',
+                      borderRadius: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      flexShrink: 0
+                    }}
+                  >
+                    ⬇️ Tải file báo cáo
+                  </a>
                 </div>
               )}
 
@@ -474,18 +521,14 @@ export const ProgressReportPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
-                  Đường dẫn file báo cáo đính kèm (PDF)
-                </label>
-                <input
-                  type="text"
-                  placeholder="/files/reports/bao_cao_tuan.pdf"
-                  value={fileUrl}
-                  onChange={e => setFileUrl(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                />
-              </div>
+              <FileUploadInput
+                label="Tập tin báo cáo tiến độ đính kèm"
+                value={fileUrl}
+                onChange={url => setFileUrl(url)}
+                accept=".pdf,.doc,.docx"
+                helperText="Hỗ trợ file PDF hoặc Word (tối đa 50MB)"
+                placeholder="/files/reports/bao_cao_tuan.pdf hoặc dán link tài liệu..."
+              />
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button

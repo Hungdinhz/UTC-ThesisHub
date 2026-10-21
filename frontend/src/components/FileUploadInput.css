@@ -1,0 +1,208 @@
+.utc-file-upload-wrapper {
+  margin-bottom: 16px;
+  font-family: inherit;
+}
+
+.utc-file-upload-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.utc-file-upload-mode-toggle {
+  font-size: 12px;
+  color: #0a3273;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  font-weight: 500;
+}
+
+.utc-file-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 16px 20px;
+  text-align: center;
+  background-color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+}
+
+.utc-file-dropzone:hover {
+  border-color: #0a3273;
+  background-color: #f0f7ff;
+}
+
+.utc-file-dropzone.dragover {
+  border-color: #0284c7;
+  background-color: #e0f2fe;
+}
+
+.utc-file-dropzone.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.utc-dropzone-icon {
+  font-size: 28px;
+  margin-bottom: 2px;
+}
+
+.utc-dropzone-text {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 500;
+}
+
+.utc-dropzone-subtext {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.utc-file-selected-box {
+  border: 1px solid #bfdbfe;
+  background-color: #eff6ff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.utc-file-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.utc-file-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.utc-file-details {
+  min-width: 0;
+  flex: 1;
+}
+
+.utc-file-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a3273;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.utc-file-size {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.utc-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.utc-file-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.utc-file-btn-view {
+  background-color: #0a3273;
+  color: #ffffff;
+}
+
+.utc-file-btn-view:hover {
+  background-color: #082554;
+}
+
+.utc-file-btn-delete {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.utc-file-btn-delete:hover {
+  background-color: #fca5a5;
+}
+
+.utc-file-progress-container {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.utc-file-progress-bar-bg {
+  width: 100%;
+  height: 6px;
+  background-color: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.utc-file-progress-bar-fill {
+  height: 100%;
+  background-color: #0a3273;
+  transition: width 0.2s ease;
+}
+
+.utc-file-progress-text {
+  font-size: 11px;
+  color: #475569;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.utc-file-direct-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.utc-file-direct-input input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.utc-file-error {
+  font-size: 12px;
+  color: #dc2626;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
