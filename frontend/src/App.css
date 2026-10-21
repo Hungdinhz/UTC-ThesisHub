@@ -634,24 +634,33 @@ body {
 /* Tabs responsive */
 @media (max-width: 768px) {
   .tabs {
-    flex-wrap: wrap;
-    gap: 4px;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
     border-bottom: none;
     background: var(--bg-tertiary);
     border-radius: 8px;
-    padding: 8px;
+    padding: 6px;
+    scrollbar-width: none;
+  }
+  
+  .tabs::-webkit-scrollbar {
+    display: none;
   }
   
   .tab {
-    flex: 1 1 calc(33.33% - 4px);
-    min-width: 80px;
-    padding: 10px 8px;
+    flex: 0 0 auto;
+    min-width: max-content;
+    padding: 8px 14px;
     font-size: 13px;
     text-align: center;
-    border-radius: 4px;
+    border-radius: 6px;
     border-bottom: none;
     margin-bottom: 0;
     background: var(--bg-secondary);
+    white-space: nowrap;
   }
   
   .tab.active {
@@ -671,9 +680,8 @@ body {
 
 @media (max-width: 480px) {
   .tab {
-    flex: 1 1 calc(50% - 4px);
+    padding: 7px 12px;
     font-size: 12px;
-    padding: 8px 6px;
   }
 }
 

@@ -14,6 +14,7 @@ import type {
   UpdateStudentPayload,
 } from '../types';
 import UTCAppLayout from '../components/UTCAppLayout';
+import './OrganizationManagementPage.css';
 
 type TabType = 'faculties' | 'majors' | 'lecturers' | 'students';
 
@@ -332,75 +333,49 @@ const OrganizationManagementPage: React.FC = () => {
 
   return (
     <UTCAppLayout activeTab="organization" hideHeroBanner pageTitle="Quản lý Dữ liệu Tổ chức & Đào tạo" onLogout={logout}>
-      <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+      <div className="org-page-container">
         {/* Navigation Tabs */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            borderBottom: '2px solid #e2e8f0',
-            marginBottom: '24px',
-            backgroundColor: '#fff',
-            padding: '8px 16px',
-            borderRadius: '8px 8px 0 0',
-          }}
-        >
+        <div className="org-tabs-container">
           <button
             onClick={() => setActiveTab('faculties')}
+            className="org-tab-button"
             style={{
-              padding: '10px 18px',
-              border: 'none',
               borderBottom: activeTab === 'faculties' ? '3px solid #0a3273' : '3px solid transparent',
-              backgroundColor: 'transparent',
               color: activeTab === 'faculties' ? '#0a3273' : '#64748b',
               fontWeight: activeTab === 'faculties' ? 700 : 500,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
             }}
           >
             🏛️ Khoa & Bộ môn
           </button>
           <button
             onClick={() => setActiveTab('majors')}
+            className="org-tab-button"
             style={{
-              padding: '10px 18px',
-              border: 'none',
               borderBottom: activeTab === 'majors' ? '3px solid #0a3273' : '3px solid transparent',
-              backgroundColor: 'transparent',
               color: activeTab === 'majors' ? '#0a3273' : '#64748b',
               fontWeight: activeTab === 'majors' ? 700 : 500,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
             }}
           >
             🎓 Ngành & CTĐT
           </button>
           <button
             onClick={() => setActiveTab('lecturers')}
+            className="org-tab-button"
             style={{
-              padding: '10px 18px',
-              border: 'none',
               borderBottom: activeTab === 'lecturers' ? '3px solid #0a3273' : '3px solid transparent',
-              backgroundColor: 'transparent',
               color: activeTab === 'lecturers' ? '#0a3273' : '#64748b',
               fontWeight: activeTab === 'lecturers' ? 700 : 500,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
             }}
           >
             👨‍🏫 Danh sách Giảng viên (Contract 1)
           </button>
           <button
             onClick={() => setActiveTab('students')}
+            className="org-tab-button"
             style={{
-              padding: '10px 18px',
-              border: 'none',
               borderBottom: activeTab === 'students' ? '3px solid #0a3273' : '3px solid transparent',
-              backgroundColor: 'transparent',
               color: activeTab === 'students' ? '#0a3273' : '#64748b',
               fontWeight: activeTab === 'students' ? 700 : 500,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
             }}
           >
             👨‍🎓 Danh sách Sinh viên
@@ -453,7 +428,7 @@ const OrganizationManagementPage: React.FC = () => {
 
         {/* Tab 1: Khoa & Bộ môn */}
         {activeTab === 'faculties' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+          <div className="org-two-col-layout">
             {/* Faculties List */}
             <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <h3 style={{ margin: '0 0 16px 0', color: '#1e293b' }}>Danh mục Khoa ({faculties.length})</h3>
@@ -502,9 +477,19 @@ const OrganizationManagementPage: React.FC = () => {
                       <td style={{ padding: '12px 10px', color: '#64748b' }}>{d.facultyName || 'Khoa CNTT'}</td>
                       <td style={{ padding: '12px 10px', color: '#475569', fontSize: '0.85rem' }}>{d.description || '—'}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {departments.map((d) => (
+                      <tr key={d.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 10px', fontWeight: 600, color: '#0a3273' }}>{d.code}</td>
+                        <td style={{ padding: '12px 10px', fontWeight: 500 }}>{d.name}</td>
+                        <td style={{ padding: '12px 10px', color: '#64748b' }}>{d.facultyName || 'Khoa CNTT'}</td>
+                        <td style={{ padding: '12px 10px', color: '#94a3b8', fontSize: '0.85rem' }}>{d.description || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -536,26 +521,28 @@ const OrganizationManagementPage: React.FC = () => {
             {/* Majors */}
             <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <h3 style={{ margin: '0 0 16px 0', color: '#1e293b' }}>Danh mục Ngành đào tạo ({majors.length})</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
-                    <th style={{ padding: '10px' }}>Mã ngành</th>
-                    <th style={{ padding: '10px' }}>Tên ngành</th>
-                    <th style={{ padding: '10px' }}>Khoa quản lý</th>
-                    <th style={{ padding: '10px' }}>Bộ môn phụ trách</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {majors.map((m) => (
-                    <tr key={m.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px 10px', fontWeight: 600, color: '#0a3273' }}>{m.code}</td>
-                      <td style={{ padding: '12px 10px', fontWeight: 500 }}>{m.name}</td>
-                      <td style={{ padding: '12px 10px', color: '#475569' }}>{m.facultyName || 'Khoa CNTT'}</td>
-                      <td style={{ padding: '12px 10px', color: '#475569' }}>{m.departmentName || '—'}</td>
+              <div className="org-table-wrapper">
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
+                      <th style={{ padding: '10px' }}>Mã ngành</th>
+                      <th style={{ padding: '10px' }}>Tên ngành</th>
+                      <th style={{ padding: '10px' }}>Khoa quản lý</th>
+                      <th style={{ padding: '10px' }}>Bộ môn phụ trách</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {majors.map((m) => (
+                      <tr key={m.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 10px', fontWeight: 600, color: '#0a3273' }}>{m.code}</td>
+                        <td style={{ padding: '12px 10px', fontWeight: 500 }}>{m.name}</td>
+                        <td style={{ padding: '12px 10px', color: '#475569' }}>{m.facultyName || 'Khoa CNTT'}</td>
+                        <td style={{ padding: '12px 10px', color: '#475569' }}>{m.departmentName || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -592,7 +579,7 @@ const OrganizationManagementPage: React.FC = () => {
             </div>
 
             {/* Filter Bar */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <div className="org-filter-bar">
               <input
                 type="text"
                 placeholder="🔍 Tìm kiếm theo tên, hướng nghiên cứu hoặc mã CB..."
@@ -640,7 +627,8 @@ const OrganizationManagementPage: React.FC = () => {
             </div>
 
             {/* Lecturer Table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div className="org-table-wrapper">
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
                   <th style={{ padding: '10px' }}>Mã CB</th>
@@ -704,6 +692,7 @@ const OrganizationManagementPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
@@ -783,65 +772,67 @@ const OrganizationManagementPage: React.FC = () => {
             </div>
 
             {/* Student Table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
-                  <th style={{ padding: '10px' }}>Mã SV</th>
-                  <th style={{ padding: '10px' }}>Họ và tên</th>
-                  <th style={{ padding: '10px' }}>Email</th>
-                  <th style={{ padding: '10px' }}>Lớp</th>
-                  <th style={{ padding: '10px' }}>Ngành</th>
-                  <th style={{ padding: '10px' }}>CT Đào tạo</th>
-                  <th style={{ padding: '10px' }}>Nợ tín chỉ</th>
-                  <th style={{ padding: '10px', textAlign: 'right' }}>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((s) => (
-                  <tr key={s.studentId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px 10px', fontWeight: 600, color: '#0a3273' }}>{s.studentCode}</td>
-                    <td style={{ padding: '12px 10px', fontWeight: 600 }}>{s.fullName}</td>
-                    <td style={{ padding: '12px 10px', color: '#64748b' }}>{s.email}</td>
-                    <td style={{ padding: '12px 10px', fontWeight: 500 }}>{s.className || '—'}</td>
-                    <td style={{ padding: '12px 10px', color: '#475569' }}>{s.majorName || 'CNTT'}</td>
-                    <td style={{ padding: '12px 10px' }}>
-                      <span
-                        style={{
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          backgroundColor: '#e0f2fe',
-                          color: '#0369a1',
-                        }}
-                      >
-                        {s.trainingProgramName || 'Cử nhân'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 10px', color: (s.debtCredits || 0) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
-                      {s.debtCredits || 0} TC
-                    </td>
-                    <td style={{ padding: '12px 10px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => handleOpenEditStudent(s)}
-                        style={{
-                          backgroundColor: '#eff6ff',
-                          color: '#1d4ed8',
-                          border: '1px solid #bfdbfe',
-                          padding: '5px 10px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        ✏️ Sửa
-                      </button>
-                    </td>
+            <div className="org-table-wrapper">
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
+                    <th style={{ padding: '10px' }}>Mã SV</th>
+                    <th style={{ padding: '10px' }}>Họ và tên</th>
+                    <th style={{ padding: '10px' }}>Email</th>
+                    <th style={{ padding: '10px' }}>Lớp</th>
+                    <th style={{ padding: '10px' }}>Ngành</th>
+                    <th style={{ padding: '10px' }}>CT Đào tạo</th>
+                    <th style={{ padding: '10px' }}>Nợ tín chỉ</th>
+                    <th style={{ padding: '10px', textAlign: 'right' }}>Thao tác</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {students.map((s) => (
+                    <tr key={s.studentId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 10px', fontWeight: 600, color: '#0a3273' }}>{s.studentCode}</td>
+                      <td style={{ padding: '12px 10px', fontWeight: 600 }}>{s.fullName}</td>
+                      <td style={{ padding: '12px 10px', color: '#64748b' }}>{s.email}</td>
+                      <td style={{ padding: '12px 10px', fontWeight: 500 }}>{s.className || '—'}</td>
+                      <td style={{ padding: '12px 10px', color: '#475569' }}>{s.majorName || 'CNTT'}</td>
+                      <td style={{ padding: '12px 10px' }}>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            backgroundColor: '#e0f2fe',
+                            color: '#0369a1',
+                          }}
+                        >
+                          {s.trainingProgramName || 'Cử nhân'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 10px', color: (s.debtCredits || 0) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                        {s.debtCredits || 0} TC
+                      </td>
+                      <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleOpenEditStudent(s)}
+                          style={{
+                            backgroundColor: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✏️ Sửa
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

@@ -355,10 +355,12 @@
 /* Table styling */
 .table-responsive {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .assignment-table {
   width: 100%;
+  min-width: 680px;
   border-collapse: collapse;
   font-size: 0.9rem;
   text-align: left;

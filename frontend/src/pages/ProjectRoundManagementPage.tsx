@@ -5,6 +5,7 @@ import type { ProjectRoundItem, TrainingProgram, CreateProjectRoundPayload, Crea
 import { RoundStudentsTab } from '../features/project-round/components/RoundStudentsTab';
 import { RoundAcademicRecordsTab } from '../features/project-round/components/RoundAcademicRecordsTab';
 import { UTCAppLayout } from '../components/UTCAppLayout';
+import './ProjectRoundManagementPage.css';
 
 const ProjectRoundManagementPage: React.FC = () => {
   const { logout } = useAuth();
@@ -196,7 +197,7 @@ const ProjectRoundManagementPage: React.FC = () => {
       pageTitle="Quản lý Đợt đồ án & Mốc thời gian (Contract 2)"
       onLogout={logout}
     >
-      <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '16px 0' }}>
+      <div className="round-page-container">
         {/* Banner Alert Messages */}
         {loading && (
           <div style={{ padding: '10px 16px', backgroundColor: '#e0f2fe', color: '#0369a1', borderRadius: '8px', marginBottom: '16px', fontWeight: 600 }}>
@@ -215,19 +216,8 @@ const ProjectRoundManagementPage: React.FC = () => {
         )}
 
         {/* Top Action Bar */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: '#fff',
-          padding: '16px 20px',
-          borderRadius: '10px',
-          marginBottom: '20px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          flexWrap: 'wrap',
-          gap: '12px'
-        }}>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div className="round-action-bar">
+          <div className="round-filter-group">
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -283,7 +273,7 @@ const ProjectRoundManagementPage: React.FC = () => {
         </div>
 
         {/* Content Layout: Left = Rounds List, Right = Round Details & Timeline */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+        <div className="round-two-col-layout">
           {/* Left Column: Rounds List */}
           <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <h3 style={{ margin: '0 0 16px 0', color: '#1e293b' }}>
@@ -334,9 +324,9 @@ const ProjectRoundManagementPage: React.FC = () => {
             {selectedRound ? (
               <div>
                 {/* Round Header & Status Controls */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #f1f5f9', paddingBottom: '16px', marginBottom: '20px' }}>
+                <div className="round-detail-header">
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <h2 style={{ margin: 0, color: '#0a3273', fontSize: '1.35rem' }}>{selectedRound.name}</h2>
                       <span style={{
                         padding: '3px 10px',

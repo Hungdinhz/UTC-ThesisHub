@@ -107,7 +107,7 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* 6-Stage Lifecycle Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '20px' }}>
           {lifecycleStages.map((item) => (
             <div
               key={item.stage}
