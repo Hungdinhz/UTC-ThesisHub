@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { thesisService } from '../services/thesisService';
 import type { Proposal } from '../types';
+import FileUploadInput from '../../../components/FileUploadInput';
+import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 
 export const ProposalManagementPage: React.FC = () => {
   const { user, userType } = useAuth();
@@ -162,6 +164,7 @@ export const ProposalManagementPage: React.FC = () => {
           fileUrl: fileUrl || '/uploads/proposals/de_cuong_mau.pdf',
         });
         setBannerMsg('Đã tạo và lưu Đề cương đề tài thành công vào CSDL!');
+        alert('🎉 Đã tạo Đề cương thành công! Bạn có thể bấm nút "🚀 Nộp Đề Cương" trong danh sách để gửi GVHD phê duyệt.');
       }
       setShowModal(false);
       setEditingProposal(null);
@@ -190,6 +193,7 @@ export const ProposalManagementPage: React.FC = () => {
     try {
       await thesisService.submitProposal(proposal.id);
       setBannerMsg(`Đã nộp đề cương "${proposal.titleVn}" thành công! Trạng thái chuyển sang SUBMITTED (Chờ GVHD xác nhận).`);
+      alert(`🚀 Đã nộp đề cương "${proposal.titleVn}" lên GVHD thành công! Trạng thái chuyển sang SUBMITTED.`);
       await loadProposals();
     } catch (err: any) {
       alert('Lỗi nộp đề cương: ' + (err?.response?.data?.message || err?.message));
@@ -402,6 +406,36 @@ export const ProposalManagementPage: React.FC = () => {
                   <td style={{ padding: '12px 16px', maxWidth: '340px' }}>
                     <div style={{ fontWeight: '600', color: '#0f172a' }}>{p.titleVn}</div>
                     {p.titleEn && <div style={{ fontSize: '12px', color: '#64748b' }}>{p.titleEn}</div>}
+                    {p.fileUrl && (
+                      <div style={{ marginTop: '6px' }}>
+                        <a
+                          href={resolveFileUrl(p.fileUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontSize: '12px',
+                            color: '#0a3273',
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontWeight: 600,
+                            backgroundColor: '#eff6ff',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #bfdbfe',
+                            maxWidth: '100%'
+                          }}
+                          title={extractFileName(p.fileUrl)}
+                        >
+                          <span>{getFileIcon(p.fileUrl)}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                            {extractFileName(p.fileUrl)}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#2563eb' }}>⬇️ Mở</span>
+                        </a>
+                      </div>
+                    )}
                     {signedProposalIds[p.id] && (
                       <div style={{ marginTop: '4px', fontSize: '12px', color: '#15803d', fontWeight: 600 }}>
                         📌 Đã ký nộp & Khoa lưu hồ sơ
@@ -761,6 +795,30 @@ export const ProposalManagementPage: React.FC = () => {
                 </div>
               </div>
 
+              {pdfPreviewProposal.fileUrl && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 16px', borderRadius: '6px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '20px' }}>{getFileIcon(pdfPreviewProposal.fileUrl)}</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: '#0a3273' }}>
+                        Tập tin đề cương gốc đã tải lên:
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#475569' }}>
+                        {extractFileName(pdfPreviewProposal.fileUrl)}
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href={resolveFileUrl(pdfPreviewProposal.fileUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ background: '#0a3273', color: '#fff', textDecoration: 'none', padding: '6px 14px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}
+                  >
+                    ⬇️ Tải file đề cương
+                  </a>
+                </div>
+              )}
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', textAlign: 'center', marginTop: '28px', fontSize: '13px' }}>
                 <div>
                   <strong>SINH VIÊN THỰC HIỆN</strong>
@@ -968,16 +1026,14 @@ export const ProposalManagementPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Đường dẫn file đề cương (PDF)</label>
-                <input
-                  type="text"
-                  placeholder="/uploads/proposals/de_cuong.pdf"
-                  value={fileUrl}
-                  onChange={(e) => setFileUrl(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                />
-              </div>
+              <FileUploadInput
+                label="Tập tin đề cương đồ án"
+                value={fileUrl}
+                onChange={(url) => setFileUrl(url)}
+                accept=".pdf,.doc,.docx"
+                helperText="Hỗ trợ file PDF hoặc Word (tối đa 50MB)"
+                placeholder="/uploads/proposals/de_cuong.pdf hoặc dán link Google Drive/OneDrive..."
+              />
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button

@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { thesisService } from '../services/thesisService';
 import type { Thesis, ThesisDocument } from '../types';
+import FileUploadInput from '../../../components/FileUploadInput';
+import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 
 export const ThesisDetailPage: React.FC = () => {
   const { userType, user } = useAuth();
@@ -98,8 +100,9 @@ export const ThesisDetailPage: React.FC = () => {
         description: docDesc
       });
       setDocuments(prev => [doc, ...prev]);
+      alert('🎉 Đã tải lên tài liệu đồ án thành công!');
     } catch {
-      alert('Đã tải lên tài liệu thành công!');
+      alert('🎉 Đã tải lên tài liệu thành công!');
       loadThesisData();
     }
     setShowUploadModal(false);
@@ -318,27 +321,34 @@ export const ThesisDetailPage: React.FC = () => {
               }}
             >
               <div>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: '#0f172a' }}>{d.name}</div>
+                <div style={{ fontWeight: '600', fontSize: '14px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{getFileIcon(d.fileUrl || d.name)}</span>
+                  <span>{d.name}</span>
+                </div>
                 <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                   Loại: <strong>{d.documentType}</strong> — Phiên bản: v{d.version} — Người tải: {d.uploaderFullName}
+                  {d.fileUrl && <span style={{ marginLeft: '8px', color: '#94a3b8' }}>({extractFileName(d.fileUrl)})</span>}
                 </div>
               </div>
               <a
-                href={d.fileUrl}
+                href={resolveFileUrl(d.fileUrl)}
                 target="_blank"
                 rel="noreferrer"
                 style={{
-                  background: '#fff',
-                  border: '1px solid #cbd5e1',
+                  background: '#0a3273',
+                  color: '#fff',
+                  border: 'none',
                   padding: '6px 14px',
                   borderRadius: '4px',
-                  color: '#2563eb',
                   textDecoration: 'none',
                   fontSize: '13px',
-                  fontWeight: '600'
+                  fontWeight: '600',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
                 }}
               >
-                Tải Về File
+                ⬇️ Tải Về File
               </a>
             </div>
           ))}
@@ -381,17 +391,20 @@ export const ThesisDetailPage: React.FC = () => {
                 </select>
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Đường dẫn file *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="/uploads/theses/bao_cao_final.pdf"
-                  value={docUrl}
-                  onChange={e => setDocUrl(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                />
-              </div>
+              <FileUploadInput
+                label="Tập tin tài liệu đồ án"
+                value={docUrl}
+                required
+                onChange={(url, info) => {
+                  setDocUrl(url);
+                  if (info?.name && !docName) {
+                    setDocName(info.name);
+                  }
+                }}
+                accept=".pdf,.doc,.docx,.zip,.rar,.ppt,.pptx"
+                helperText="Hỗ trợ PDF, Word, Slide PPT, Mã nguồn ZIP (tối đa 50MB)"
+                placeholder="/uploads/theses/bao_cao_final.pdf hoặc dán link..."
+              />
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Mô tả ngắn</label>
