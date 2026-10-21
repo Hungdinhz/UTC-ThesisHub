@@ -73,3 +73,7 @@ app:
 
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:https://utc-thesishub.vercel.app,https://utc-thesishub.onrender.com,https://utc-thesishub-develop.onrender.com,http://localhost:3000,http://localhost:5173}
+
+  admin:
+    registration-key: ${ADMIN_REGISTRATION_KEY:thesishub_admin_secret_key_2026_fit_utc}
+    require-key-on-login: ${ADMIN_LOGIN_REQUIRE_KEY:false}

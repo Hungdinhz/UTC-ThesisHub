@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +22,21 @@ const LoginPage: React.FC = () => {
   const [isShaking, setIsShaking] = useState(false);
 
   const { login } = useAuth();
+
   const navigate = useNavigate();
+  const location = useLocation();
+
+  React.useEffect(() => {
+    const state = location.state as any;
+    if (state?.registeredRole === 'admin') {
+      setUserType('admin');
+      if (state.registeredUsername) {
+        setEmail(state.registeredUsername);
+        setRegistrationNo(state.registeredUsername);
+      }
+    }
+  }, [location.state]);
+
 
   const toggleLanguage = () => {
     const nextLng = i18n.language.startsWith('vi') ? 'en' : 'vi';
@@ -126,7 +140,7 @@ const LoginPage: React.FC = () => {
       } else if (userType === 'committee_member') {
         response = await apiService.committeeMemberLogin(email.trim(), password);
       } else if (userType === 'admin') {
-        response = await apiService.login(email.trim() || registrationNo.trim(), password);
+        response = await apiService.adminLogin(email.trim() || registrationNo.trim(), password);
       } else {
         response = await apiService.externalExaminerLogin(email.trim(), password);
       }
@@ -314,7 +328,45 @@ const LoginPage: React.FC = () => {
             </div>
           </div>
 
+          
+          {userType === 'admin' && (
+            <div className="utc-admin-register-prompt" style={{
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: '10px',
+              padding: '12px 16px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ fontSize: '0.85rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>🔑</span>
+                <span><strong>Chưa có tài khoản Quản trị viên?</strong><br/><span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Đăng ký tài khoản Admin mới với Admin API Key</span></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/register')}
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#0f172a',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '7px 14px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Đăng ký ngay →
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="utc-login-form" noValidate>
+
             {userType === 'student' ? (
               <div className={`utc-input-group ${touched.registrationNo && fieldErrors.registrationNo ? 'has-error' : ''} ${touched.registrationNo && !fieldErrors.registrationNo && registrationNo ? 'is-valid' : ''}`}>
                 <span className="utc-input-icon">👤</span>

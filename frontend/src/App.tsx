@@ -5,6 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import UTCAppLayout from './components/UTCAppLayout';
 import LoginPage from './pages/LoginPage';
+import AdminRegisterPage from './pages/AdminRegisterPage';
 import StudentDashboard from './pages/StudentDashboard';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import CommitteeMemberDashboard from './pages/CommitteeMemberDashboard';
@@ -65,6 +66,7 @@ const AppRoutes: React.FC = () => {
 
   return (
     <Routes>
+      <Route path="/admin/register" element={<AdminRegisterPage />} />
       <Route
         path="/login"
         element={userType ? <Navigate to={`/${userType}/dashboard`} replace /> : <LoginPage />}
