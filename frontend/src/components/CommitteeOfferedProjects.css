@@ -1,5 +1,5 @@
 .committee-offered-projects .committee-offered-description {
-  color: var(--text-secondary);
+  color: #475569 !important;
   margin: 0 0 1rem;
   font-size: 0.95rem;
 }
@@ -11,7 +11,8 @@
 .committee-offered-projects .form-group label {
   display: block;
   margin-bottom: 0.35rem;
-  font-weight: 500;
+  font-weight: 700;
+  color: #0f172a !important;
 }
 
 .committee-offered-projects .form-group select {
@@ -21,7 +22,7 @@
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--bg-primary);
-  color: var(--text-primary);
+  color: #0f172a !important;
 }
 
 .committee-offered-list {
@@ -50,13 +51,15 @@
 }
 
 .committee-offered-item-name {
-  font-weight: 600;
+  font-weight: 700;
+  color: #0f172a !important;
   flex: 1 1 100%;
 }
 
 .committee-offered-item-meta {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: #475569 !important;
+  font-weight: 500;
 }
 
 .committee-offered-item-actions {
@@ -70,6 +73,7 @@
   padding-top: 1rem;
   border-top: 1px solid var(--border-color);
   font-size: 0.9rem;
+  color: #334155 !important;
 }
 
 .committee-offered-item-detail p {

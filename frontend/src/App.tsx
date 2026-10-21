@@ -27,6 +27,35 @@ import { DefenseSchedulePage } from './features/defense/pages/DefenseSchedulePag
 import { DefenseScoringPage } from './features/defense/pages/DefenseScoringPage';
 import './App.css';
 
+const FullPageLoader: React.FC<{ message?: string }> = ({ message = 'Đang tải hệ thống UTC-ThesisHub...' }) => (
+  <div
+    style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100vh',
+      backgroundColor: '#f8fafc',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      color: '#003366',
+    }}
+  >
+    <div
+      style={{
+        width: '42px',
+        height: '42px',
+        border: '3.5px solid #e2e8f0',
+        borderTop: '3.5px solid #003366',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+        marginBottom: '16px',
+      }}
+    />
+    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>{message}</span>
+    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+  </div>
+);
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedTypes: string[] }> = ({
   children,
   allowedTypes,
@@ -34,7 +63,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedTypes: string
   const { userType, loading } = useAuth();
 
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return <FullPageLoader message="Đang xác thực phiên làm việc UTC..." />;
   }
 
   if (!userType || !allowedTypes.includes(userType)) {
@@ -61,7 +90,7 @@ const AppRoutes: React.FC = () => {
   const { userType, loading } = useAuth();
 
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return <FullPageLoader message="Đang khởi tạo hệ thống UTC-ThesisHub..." />;
   }
 
   return (

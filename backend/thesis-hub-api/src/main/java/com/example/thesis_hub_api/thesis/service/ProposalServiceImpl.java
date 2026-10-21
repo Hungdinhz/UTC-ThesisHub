@@ -48,8 +48,25 @@ public class ProposalServiceImpl implements ProposalService {
     @Override
     @Transactional
     public ProposalResponse createProposal(CreateProposalRequest request) {
-        if (proposalRepository.existsByStudentIdAndProjectRoundId(request.getStudentId(), request.getProjectRoundId())) {
-            throw new DuplicateResourceException("Sinh viên đã có đề cương trong đợt đồ án này");
+        java.util.Optional<Proposal> existingOpt = proposalRepository.findByStudentIdAndProjectRoundId(request.getStudentId(), request.getProjectRoundId());
+        if (existingOpt.isPresent()) {
+            Proposal existing = existingOpt.get();
+            if ("DRAFT".equals(existing.getStatus()) || "REVISE_REQUIRED".equals(existing.getStatus())) {
+                Lecturer lecturer = lecturerRepository.findById(request.getLecturerId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Lecturer", request.getLecturerId()));
+                existing.setLecturer(lecturer);
+                existing.setTitleVn(request.getTitleVn());
+                if (request.getTitleEn() != null) existing.setTitleEn(request.getTitleEn());
+                if (request.getDescription() != null) existing.setDescription(request.getDescription());
+                if (request.getObjectives() != null) existing.setObjectives(request.getObjectives());
+                if (request.getExpectedResults() != null) existing.setExpectedResults(request.getExpectedResults());
+                if (request.getResearchContent() != null) existing.setResearchContent(request.getResearchContent());
+                if (request.getFileUrl() != null) existing.setFileUrl(request.getFileUrl());
+                Proposal updated = proposalRepository.save(existing);
+                log.info("Updated existing proposal with ID: {} for student: {}", updated.getId(), updated.getStudent().getStudentCode());
+                return mapToResponse(updated);
+            }
+            throw new DuplicateResourceException("Sinh viên đã có đề cương trong đợt đồ án này (trạng thái: " + existing.getStatus() + ")");
         }
 
         ProjectRound round = projectRoundRepository.findById(request.getProjectRoundId())
@@ -173,7 +190,25 @@ public class ProposalServiceImpl implements ProposalService {
 
         ProposalReviewAssignment assignment = reviewAssignmentRepository
                 .findByProposalIdAndReviewGroupId(proposalId, request.getReviewGroupId())
-                .orElseThrow(() -> new ResourceNotFoundException("Phân công xét duyệt đề cương không tồn tại"));
+                .orElseGet(() -> {
+                    ReviewGroup rg = reviewGroupRepository.findById(request.getReviewGroupId())
+                            .orElse(null);
+                    if (rg == null) {
+                        java.util.List<ReviewGroup> groups = reviewGroupRepository.findByProjectRoundId(proposal.getProjectRound().getId());
+                        if (!groups.isEmpty()) {
+                            rg = groups.get(0);
+                        }
+                    }
+                    if (rg != null) {
+                        return reviewAssignmentRepository.save(ProposalReviewAssignment.builder()
+                                .proposal(proposal)
+                                .reviewGroup(rg)
+                                .assignedAt(Instant.now())
+                                .status("PENDING")
+                                .build());
+                    }
+                    throw new ResourceNotFoundException("Phân công xét duyệt đề cương không tồn tại");
+                });
 
         assignment.setStatus(request.getStatus());
         assignment.setEvaluationNotes(request.getEvaluationNotes());

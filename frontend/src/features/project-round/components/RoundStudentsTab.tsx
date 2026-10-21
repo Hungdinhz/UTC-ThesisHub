@@ -499,8 +499,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
           </div>
         </div>
       ) : (
-        <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
-          Đợt đồ án này chưa có sinh viên nào. Hãy bấm nút <strong>"Import SV từ Excel"</strong> để nạp danh sách.
+        <div style={{ padding: '36px', textAlign: 'center', color: '#475569', fontWeight: 500, border: '1px dashed #94a3b8', borderRadius: '8px' }}>
+          Đợt đồ án này chưa có sinh viên nào. Hãy bấm nút <strong style={{ color: '#0f172a' }}>"Import SV từ Excel"</strong> để nạp danh sách.
         </div>
       )}
 

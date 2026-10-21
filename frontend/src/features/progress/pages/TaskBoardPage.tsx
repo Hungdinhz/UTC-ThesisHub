@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { progressService } from '../services/progressService';
 import type { Task, Comment, Submission } from '../types';
 
 export const TaskBoardPage: React.FC = () => {
-  const { userType } = useAuth();
+  const { userType, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const currentThesisId = Number(searchParams.get('thesisId') || searchParams.get('id')) || 1;
+
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor';
   const isAdmin = userType === 'admin';
@@ -30,12 +34,12 @@ export const TaskBoardPage: React.FC = () => {
 
   useEffect(() => {
     loadTasks();
-  }, []);
+  }, [currentThesisId]);
 
   const loadTasks = async () => {
     setLoading(true);
     try {
-      const data = await progressService.getTasksByThesis(1);
+      const data = await progressService.getTasksByThesis(currentThesisId);
       setTasks(data);
     } catch {
       // Fallback sample tasks
@@ -198,11 +202,13 @@ export const TaskBoardPage: React.FC = () => {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    const effectiveCreatedById = user?.id || 2;
+    const effectiveAssignedToId = (tasks.length > 0 && tasks[0].assignedToId) ? tasks[0].assignedToId : 1;
     try {
       const created = await progressService.createTask({
-        thesisId: 1,
-        createdById: 2,
-        assignedToId: 1,
+        thesisId: currentThesisId,
+        createdById: effectiveCreatedById,
+        assignedToId: effectiveAssignedToId,
         title: newTaskTitle,
         description: newTaskDesc,
         priority: newTaskPriority,
@@ -338,7 +344,7 @@ export const TaskBoardPage: React.FC = () => {
                         {t.priority}
                       </span>
                       {t.dueDate && (
-                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                        <span style={{ fontSize: '11px', color: '#475569', fontWeight: 500 }}>
                           Hạn: {new Date(t.dueDate).toLocaleDateString('vi-VN')}
                         </span>
                       )}
@@ -346,10 +352,10 @@ export const TaskBoardPage: React.FC = () => {
                     <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
                       {t.title}
                     </h4>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#64748b', lineClamp: 2 }}>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#475569', lineClamp: 2 }}>
                       {t.description}
                     </p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94a3b8' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569', fontWeight: 500 }}>
                       <span>💬 {t.commentCount || 0}</span>
                       <span>📁 {t.submissionCount || 0} nộp</span>
                     </div>
@@ -375,7 +381,7 @@ export const TaskBoardPage: React.FC = () => {
               </div>
               <button
                 onClick={() => setSelectedTask(null)}
-                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#475569' }}
               >
                 ✕
               </button>
@@ -442,7 +448,7 @@ export const TaskBoardPage: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <p style={{ fontSize: '13px', color: '#94a3b8' }}>Chưa có bài nộp nào cho công việc này.</p>
+                <p style={{ fontSize: '13px', color: '#475569', fontWeight: 500 }}>Chưa có bài nộp nào cho công việc này.</p>
               )}
 
               {/* Submit Form */}

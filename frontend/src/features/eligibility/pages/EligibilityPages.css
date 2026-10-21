@@ -16,14 +16,14 @@
 .feature-page-title {
   margin: 0 0 6px 0;
   font-size: 1.625rem;
-  font-weight: 700;
-  color: var(--text-primary, #333333);
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
 }
 
 .feature-page-subtitle {
   margin: 0;
   font-size: 0.9375rem;
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary, #475569);
 }
 
 .header-actions {
@@ -38,7 +38,7 @@
   align-items: flex-end;
   background: var(--bg-secondary, #ffffff);
   border-radius: 8px;
-  border: 1px solid var(--border-color, #e0e0e0);
+  border: 1px solid var(--border-color, #cbd5e1);
   padding: 16px 20px;
   margin-bottom: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -53,8 +53,8 @@
 
 .filter-item label {
   font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-secondary, #666666);
+  font-weight: 700;
+  color: var(--text-secondary, #334155);
 }
 
 .filter-item.search-box {
@@ -78,7 +78,7 @@
   padding: 8px 16px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary, #475569);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -87,7 +87,7 @@
 
 .tab-filter-btn:hover {
   background-color: var(--bg-hover, #f0f0f0);
-  color: var(--text-primary, #333333);
+  color: var(--text-primary, #0f172a);
 }
 
 .tab-filter-btn.active {
@@ -113,18 +113,20 @@
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .text-reason {
   font-size: 0.875rem;
-  color: var(--text-primary, #333333);
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
   margin-bottom: 4px;
 }
 
 .text-note {
   font-size: 0.8125rem;
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary, #475569);
+  font-weight: 500;
 }
 
 .evidence-attachment-tag {
@@ -198,8 +200,8 @@
 
 .query-input-group label {
   font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary, #333333);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 .query-btn-group {
@@ -244,14 +246,15 @@
 .banner-content h2 {
   margin: 0 0 6px 0;
   font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary, #333333);
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
 }
 
 .banner-content p {
   margin: 0;
   font-size: 0.9375rem;
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary, #475569);
+  font-weight: 500;
 }
 
 /* Criteria Grid */
@@ -264,7 +267,7 @@
 .criteria-item-card {
   background: var(--bg-secondary, #ffffff);
   border-radius: 10px;
-  border: 1px solid var(--border-color, #e0e0e0);
+  border: 1px solid var(--border-color, #cbd5e1);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -289,8 +292,8 @@
 
 .criteria-title {
   font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-secondary, #666666);
+  font-weight: 700;
+  color: var(--text-secondary, #334155);
 }
 
 .criteria-status-icon {
@@ -307,39 +310,40 @@
 
 .score-value {
   font-size: 1.875rem;
-  font-weight: 700;
-  color: var(--text-primary, #333333);
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
 }
 
 .score-scale {
   font-size: 0.875rem;
-  color: var(--text-muted, #999999);
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
 }
 
 .score-status-text {
   font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary, #333333);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 .criteria-desc {
   font-size: 0.75rem;
-  color: var(--text-muted, #999999);
+  color: var(--text-muted, #475569);
   margin: 0;
 }
 
 .defense-reasons-card {
   background: var(--bg-secondary, #ffffff);
   border-radius: 10px;
-  border: 1px solid var(--border-color, #e0e0e0);
+  border: 1px solid var(--border-color, #cbd5e1);
   padding: 20px;
 }
 
 .defense-reasons-card h3 {
   margin: 0 0 12px 0;
   font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary, #333333);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 .defense-reasons-card ul {
@@ -350,4 +354,5 @@
 .defense-reasons-card li {
   margin-bottom: 6px;
   font-size: 0.875rem;
+  font-weight: 500;
 }

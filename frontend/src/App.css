@@ -117,6 +117,30 @@
   --scroll-shadow: linear-gradient(to right, transparent, #16213e);
 }
 
+/* Enforce high-contrast light theme CSS variables for UTC Dashboard */
+.utc-dashboard-wrapper,
+[data-theme="dark"] .utc-dashboard-wrapper {
+  --bg-primary: #ebf0f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f8fafc;
+  --bg-hover: #f1f5f9;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-tertiary: #64748b;
+  
+  --border-color: #cbd5e1;
+  --border-light: #e2e8f0;
+  
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-focus-border: #003366;
+  
+  --table-header-bg: #f8fafc;
+  --table-row-hover: #f1f5f9;
+}
+
 /* ==================== Base Styles ==================== */
 * {
   margin: 0;

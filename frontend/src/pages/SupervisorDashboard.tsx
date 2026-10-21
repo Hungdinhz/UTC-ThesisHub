@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
 import type { Supervisor, SupervisorOfStudentGroup } from '../types';
-import Navbar from '../components/Navbar';
 import UTCAppLayout from '../components/UTCAppLayout';
 import ChatRoom from '../components/ChatRoom';
 import DocumentReview from '../components/DocumentReview';
@@ -164,17 +163,28 @@ const SupervisorDashboard: React.FC = () => {
     }
   };
 
-  if (loading || !supervisor) {
+  if (loading && !profile) {
     return (
-      <div>
-        <Navbar user={supervisor} onLogout={logout} />
-        <div className="container" style={{ paddingTop: '30px' }}>
-          <SkeletonProfile />
-          <div style={{ marginTop: '30px' }}>
-            <SkeletonEvaluationGrid count={3} />
+      <UTCAppLayout user={supervisor || user} onLogout={logout} activeTab={activeTab} onTabChange={setActiveTab}>
+        <div className="container" style={{ padding: '20px 0' }}>
+          <div className="dashboard-header">
+            <div>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                {t('dashboard.supervisorTitle', 'Bảng Điều Khiển Giảng Viên Hướng Dẫn')}
+              </h1>
+              <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
+                {t('common.loading', 'Đang tải dữ liệu tổng quan hướng dẫn...')}
+              </p>
+            </div>
+          </div>
+          <div style={{ marginTop: '20px' }}>
+            <SkeletonProfile />
+            <div style={{ marginTop: '20px' }}>
+              <SkeletonEvaluationGrid count={3} />
+            </div>
           </div>
         </div>
-      </div>
+      </UTCAppLayout>
     );
   }
 

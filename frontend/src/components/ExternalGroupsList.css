@@ -109,7 +109,8 @@
   align-items: center;
   gap: 4px;
   font-size: 14px;
-  color: var(--text-secondary);
+  color: #334155 !important;
+  font-weight: 500;
 }
 
 .meta-icon {
@@ -232,12 +233,13 @@
   padding: 12px;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
+  color: #1e293b;
 }
 
 .students-table th {
   background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-weight: 600;
+  color: #0f172a !important;
+  font-weight: 700;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -270,12 +272,13 @@
 .slot-time {
   display: block;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #475569 !important;
+  font-weight: 500;
   margin-top: 2px;
 }
 
 .no-slot {
-  color: var(--text-secondary);
+  color: #475569 !important;
 }
 
 /* Student Names */
@@ -293,13 +296,14 @@
 }
 
 .student-name {
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: 600;
+  color: #0f172a !important;
 }
 
 .reg-no {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #475569 !important;
+  font-weight: 500;
 }
 
 /* Project Info */
@@ -310,17 +314,20 @@
 }
 
 .project-name {
-  color: var(--text-primary);
+  color: #0f172a !important;
+  font-weight: 600;
 }
 
 .project-category {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #475569 !important;
+  font-weight: 500;
 }
 
 /* Supervisor Name */
 .supervisor-name {
-  color: var(--text-primary);
+  color: #1e293b !important;
+  font-weight: 600;
 }
 
 /* Evaluation Result */
@@ -332,7 +339,8 @@
 
 .eval-marks {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #475569 !important;
+  font-weight: 600;
 }
 
 /* Grade Badges */

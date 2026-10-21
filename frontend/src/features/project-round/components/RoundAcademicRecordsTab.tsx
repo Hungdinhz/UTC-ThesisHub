@@ -356,8 +356,8 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
           </div>
         </div>
       ) : (
-        <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
-          Chưa có dữ liệu học vụ nào được import cho đợt đồ án này. Hãy bấm <strong>"Import học vụ (Excel)"</strong> ở trên để nạp dữ liệu.
+        <div style={{ padding: '36px', textAlign: 'center', color: '#475569', fontWeight: 500, border: '1px dashed #94a3b8', borderRadius: '8px' }}>
+          Chưa có dữ liệu học vụ nào được import cho đợt đồ án này. Hãy bấm <strong style={{ color: '#0f172a' }}>"Import học vụ (Excel)"</strong> ở trên để nạp dữ liệu.
         </div>
       )}
 

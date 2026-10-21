@@ -19,6 +19,7 @@ export const ProposalManagementPage: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const [onlyMyProposal, setOnlyMyProposal] = useState<boolean>(isStudent);
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [reviewModal, setReviewModal] = useState<boolean>(false);
   const [reviewStatus, setReviewStatus] = useState<string>('APPROVED');
@@ -27,13 +28,38 @@ export const ProposalManagementPage: React.FC = () => {
   const [signedProposalIds, setSignedProposalIds] = useState<Record<number, boolean>>({ 1: true });
   const [bannerMsg, setBannerMsg] = useState<string | null>(null);
 
-  // New proposal form state
+  // Proposal form state
   const [titleVn, setTitleVn] = useState('');
   const [titleEn, setTitleEn] = useState('');
   const [description, setDescription] = useState('');
   const [objectives, setObjectives] = useState('');
   const [expectedResults, setExpectedResults] = useState('');
   const [fileUrl, setFileUrl] = useState('');
+
+  // Selection states for proposal creation
+  const [selectedStudentId, setSelectedStudentId] = useState<number>(2);
+  const [selectedLecturerId, setSelectedLecturerId] = useState<number>(1);
+  const [selectedRoundId, setSelectedRoundId] = useState<number>(1);
+
+  const availableStudents = [
+    { id: 2, code: '201200101', name: 'Nguyễn Văn An', class: 'CNTT1 - K62' },
+    { id: 3, code: '201200102', name: 'Trần Thị Bình', class: 'CNTT1 - K62' },
+    { id: 4, code: '201200103', name: 'Lê Hoàng Cường', class: 'CNTT2 - K62' },
+    { id: 5, code: '201200104', name: 'Phạm Minh Đức', class: 'CNTT2 - K62' },
+    { id: 6, code: '211209999', name: 'Nguyen Van Test Manual', class: 'CNTT3 - K62' },
+    { id: 1, code: '2021601234', name: 'Nguyễn Văn Sinh Viên', class: 'CNTT1 - K62' },
+  ];
+
+  const availableLecturers = [
+    { id: 1, code: 'GV001', name: 'TS. Trần Văn Giảng Viên', degree: 'TIEN_SI' },
+    { id: 2, code: 'HD001', name: 'PGS.TS. Lê Văn Hội Đồng', degree: 'PGS' },
+    { id: 3, code: 'GV002', name: 'TS. Nguyen Van Cong', degree: 'TIEN_SI' },
+  ];
+
+  const availableRounds = [
+    { id: 1, code: 'DA_CNTT_K62_HK1', name: 'Đợt Đồ án Tốt nghiệp K62 CNTT - HK1 2026-2027' },
+    { id: 2, code: 'DA_CNTT1_K64', name: 'Đợt đồ án tốt nghiệp CNTT 2027' },
+  ];
 
   useEffect(() => {
     loadProposals();
@@ -43,156 +69,158 @@ export const ProposalManagementPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await thesisService.searchProposals();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setProposals(data);
         return;
       }
-      throw new Error('Empty proposals');
-    } catch {
-      // Fallback sample data if backend is not yet populated
-      setProposals([
-        {
-          id: 1,
-          projectRoundId: 1,
-          projectRoundName: 'Đợt Đồ án Tốt nghiệp K62 CNTT - HK1 2026-2027',
-          studentId: 1,
-          studentCode: '21120001',
-          studentFullName: 'Đỗ Minh Quân',
-          studentClass: 'CNTT1 - K62',
-          lecturerId: 1,
-          lecturerCode: 'GV001',
-          lecturerFullName: 'PGS.TS. Nguyễn Văn Hùng',
-          lecturerDegree: 'PGS',
-          titleVn: 'Nghiên cứu và xây dựng hệ thống quản lý đồ án tốt nghiệp UTC-ThesisHub',
-          titleEn: 'Research and development of UTC-ThesisHub graduation thesis management system',
-          description: 'Hệ thống quản lý trực tuyến toàn bộ vòng đời 6 giai đoạn đồ án tốt nghiệp tại Trường ĐH Giao thông Vận tải.',
-          objectives: 'Số hóa 100% hồ sơ, tự động hóa phân công nguyện vọng và xếp lịch hội đồng 1CT-2TK-2UV.',
-          expectedResults: 'Ứng dụng hoàn thiện Spring Boot 3 và React TypeScript.',
-          status: 'APPROVED',
-          supervisorApproved: true,
-          supervisorComment: 'Đề tài thiết thực, cấu trúc đề cương chuẩn quy định Khoa CNTT.',
-          version: 1,
-          createdAt: '2026-10-10T08:00:00Z',
-          updatedAt: '2026-10-15T08:00:00Z',
-        },
-        {
-          id: 2,
-          projectRoundId: 1,
-          projectRoundName: 'Đợt Đồ án Tốt nghiệp K62 CNTT - HK1 2026-2027',
-          studentId: 2,
-          studentCode: '21120002',
-          studentFullName: 'Trần Thị Mai Anh',
-          studentClass: 'CNTT1 - K62',
-          lecturerId: 2,
-          lecturerCode: 'GV002',
-          lecturerFullName: 'TS. Trần Thị Phương',
-          lecturerDegree: 'TIEN_SI',
-          titleVn: 'Ứng dụng Machine Learning trong phát hiện gian lận thi cử trực tuyến',
-          titleEn: 'Applying Machine Learning for Online Exam Cheating Detection',
-          description: 'Sử dụng thị giác máy tính và nhận diện khuôn mặt để phát hiện bất thường trong phòng thi.',
-          objectives: 'Mô hình nhận diện độ chính xác trên 90%.',
-          expectedResults: 'Bộ dữ liệu và API nhận diện thời gian thực.',
-          status: 'UNDER_REVIEW',
-          supervisorApproved: true,
-          supervisorComment: 'Đã hoàn thiện các mục theo yêu cầu của GVHD.',
-          version: 1,
-          createdAt: '2026-10-12T09:00:00Z',
-          updatedAt: '2026-10-14T10:00:00Z',
-        },
-      ]);
+    } catch (err) {
+      console.error('Không thể tải đề cương từ backend:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateProposal = async (e: React.FormEvent) => {
+  const handleOpenCreateModal = () => {
+    // Check if current student already has a proposal in the project round
+    if (isStudent) {
+      const userCode = user?.student_id || user?.studentCode || user?.username;
+      const myExisting = proposals.find(
+        (p) =>
+          (userCode && (p.studentCode === userCode || String(p.studentId) === String(user?.id))) ||
+          (user?.id && p.studentId === user.id)
+      );
+      if (myExisting) {
+        if (myExisting.status === 'DRAFT' || myExisting.status === 'REVISE_REQUIRED') {
+          if (
+            window.confirm(
+              `Bạn đã có đề cương ở trạng thái [${myExisting.status === 'DRAFT' ? 'Bản Nháp (DRAFT)' : 'Yêu Cầu Chỉnh Sửa (REVISE_REQUIRED)'}].\n\nTheo quy chế, mỗi sinh viên chỉ thực hiện 1 đề tài trong một đợt đồ án.\nBạn có muốn mở để CHỈNH SỬA đề cương này không?`
+            )
+          ) {
+            handleOpenEditModal(myExisting);
+          }
+          return;
+        } else {
+          alert(
+            `Bạn đã có đề tài/đề cương "${myExisting.titleVn}" đang ở trạng thái [${myExisting.status}].\nTheo quy chế, mỗi sinh viên chỉ được phép có 1 đề tài trong 1 đợt đồ án.`
+          );
+          return;
+        }
+      }
+    }
+    setEditingProposal(null);
+    setTitleVn('');
+    setTitleEn('');
+    setDescription('');
+    setObjectives('');
+    setExpectedResults('');
+    setFileUrl('');
+    setShowModal(true);
+  };
+
+  const handleOpenEditModal = (proposal: Proposal) => {
+    setEditingProposal(proposal);
+    setSelectedRoundId(proposal.projectRoundId);
+    setSelectedLecturerId(proposal.lecturerId);
+    setSelectedStudentId(proposal.studentId);
+    setTitleVn(proposal.titleVn || '');
+    setTitleEn(proposal.titleEn || '');
+    setDescription(proposal.description || '');
+    setObjectives(proposal.objectives || '');
+    setExpectedResults(proposal.expectedResults || '');
+    setFileUrl(proposal.fileUrl || '');
+    setShowModal(true);
+  };
+
+  const handleSaveProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const created = await thesisService.createProposal({
-        projectRoundId: 1,
-        studentId: 1,
-        lecturerId: 1,
-        titleVn,
-        titleEn,
-        description,
-        objectives,
-        expectedResults,
-        fileUrl: fileUrl || '/uploads/proposals/de_cuong_mau.pdf',
-      });
-      setProposals((prev) => [created, ...prev]);
-      setBannerMsg('Đã tạo và gửi bản nháp Đề cương đề tài thành công!');
+      if (editingProposal) {
+        await thesisService.updateProposal(editingProposal.id, {
+          titleVn,
+          titleEn,
+          description,
+          objectives,
+          expectedResults,
+          fileUrl: fileUrl || '/uploads/proposals/de_cuong_mau.pdf',
+        });
+        setBannerMsg(
+          editingProposal.status === 'REVISE_REQUIRED'
+            ? `Cập nhật đề cương "${titleVn}" thành công! Bạn có thể bấm 'Nộp Lại' để gửi GVHD/Khoa duyệt lại.`
+            : 'Nội dung bản nháp đã được lưu.'
+        );
+      } else {
+        const effectiveStudentId = isStudent ? (user?.student_id || user?.id || 1) : selectedStudentId;
+        await thesisService.createProposal({
+          projectRoundId: selectedRoundId,
+          studentId: effectiveStudentId,
+          lecturerId: selectedLecturerId,
+          titleVn,
+          titleEn,
+          description,
+          objectives,
+          expectedResults,
+          fileUrl: fileUrl || '/uploads/proposals/de_cuong_mau.pdf',
+        });
+        setBannerMsg('Đã tạo và lưu Đề cương đề tài thành công vào CSDL!');
+      }
       setShowModal(false);
-    } catch {
-      const fallbackProposal: Proposal = {
-        id: Date.now(),
-        projectRoundId: 1,
-        projectRoundName: 'Đợt Đồ án Tốt nghiệp K62 CNTT - HK1 2026-2027',
-        studentId: 1,
-        studentCode: '21120001',
-        studentFullName: 'Đỗ Minh Quân',
-        studentClass: 'CNTT1 - K62',
-        lecturerId: 1,
-        lecturerCode: 'GV001',
-        lecturerFullName: 'PGS.TS. Nguyễn Văn Hùng',
-        lecturerDegree: 'PGS',
-        titleVn,
-        titleEn,
-        description,
-        objectives,
-        expectedResults,
-        status: 'SUBMITTED',
-        supervisorApproved: false,
-        version: 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setProposals((prev) => [fallbackProposal, ...prev]);
-      setBannerMsg('Đã khởi tạo Đề cương đề tài và chuyển sang chờ GVHD xác nhận!');
-      setShowModal(false);
+      setEditingProposal(null);
+      setTitleVn('');
+      setTitleEn('');
+      setDescription('');
+      setObjectives('');
+      setExpectedResults('');
+      setFileUrl('');
+      await loadProposals();
+    } catch (err: any) {
+      console.error('Lỗi lưu đề cương:', err);
+      const errMsg = err?.response?.data?.message || err?.message || 'Không thể lưu đề cương';
+      alert('Không thể lưu đề cương vào hệ thống: ' + errMsg);
+    }
+  };
+
+  const handleSubmitProposalToSupervisor = async (proposal: Proposal) => {
+    const isRevise = proposal.status === 'REVISE_REQUIRED';
+    const confirmMsg = isRevise
+      ? `Xác nhận NỘP LẠI đề cương "${proposal.titleVn}" sau khi đã hoàn thiện chỉnh sửa?`
+      : `Xác nhận NỘP đề cương "${proposal.titleVn}" để Giảng viên hướng dẫn kiểm tra & phê duyệt?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await thesisService.submitProposal(proposal.id);
+      setBannerMsg(`Đã nộp đề cương "${proposal.titleVn}" thành công! Trạng thái chuyển sang SUBMITTED (Chờ GVHD xác nhận).`);
+      await loadProposals();
+    } catch (err: any) {
+      alert('Lỗi nộp đề cương: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
   const handleSupervisorConfirm = async (proposal: Proposal) => {
     try {
       await thesisService.supervisorApprove(proposal.id, true, 'GVHD đồng ý xác nhận đề tài, chuyển Khoa/Ban duyệt.');
-    } catch {
-      // Fallback
+      await loadProposals();
+      setBannerMsg(`GVHD đã xác nhận đề tài của SV ${proposal.studentFullName} thành công!`);
+    } catch (err: any) {
+      alert('Lỗi xác nhận: ' + (err?.response?.data?.message || err?.message));
     }
-    setProposals((prev) =>
-      prev.map((p) =>
-        p.id === proposal.id
-          ? { ...p, supervisorApproved: true, status: 'UNDER_REVIEW', supervisorComment: 'GVHD đã xác nhận đề tài.' }
-          : p
-      )
-    );
-    setBannerMsg(`GVHD đã xác nhận đề tài của SV ${proposal.studentFullName} (Bước 21 -> Bước 22 chờ Khoa duyệt).`);
   };
 
   const handleReview = async () => {
     if (!selectedProposal) return;
     try {
       await thesisService.reviewProposal(selectedProposal.id, 1, reviewStatus, reviewNotes);
-    } catch {
-      // Fallback local update
+      await loadProposals();
+      setBannerMsg(
+        reviewStatus === 'APPROVED'
+          ? `Khoa/Ban đã PHÊ DUYỆT đề tài của SV ${selectedProposal.studentFullName}. Hệ thống đã tự động tạo Đề tài tốt nghiệp chính thức!`
+          : `Khoa/Ban yêu cầu chỉnh sửa lại đề tài của SV ${selectedProposal.studentFullName}.`
+      );
+      setReviewModal(false);
+      setSelectedProposal(null);
+    } catch (err: any) {
+      alert('Lỗi đánh giá đề cương: ' + (err?.response?.data?.message || err?.message));
     }
-    setProposals((prev) =>
-      prev.map((p) =>
-        p.id === selectedProposal.id
-          ? {
-              ...p,
-              status: reviewStatus as any,
-              supervisorComment: reviewNotes || p.supervisorComment,
-            }
-          : p
-      )
-    );
-    setBannerMsg(
-      reviewStatus === 'APPROVED'
-        ? `Khoa/Ban đã PHÊ DUYỆT đề tài của SV ${selectedProposal.studentFullName}. Hệ thống đã sinh đề cương PDF sẵn sàng để ký nộp!`
-        : `Khoa/Ban yêu cầu chỉnh sửa lại đề tài của SV ${selectedProposal.studentFullName} (quay về chỉnh sửa).`
-    );
-    setReviewModal(false);
-    setSelectedProposal(null);
   };
 
   const handleSignAndArchive = (proposal: Proposal) => {
@@ -265,7 +293,7 @@ export const ProposalManagementPage: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={handleOpenCreateModal}
           style={{
             background: '#2563eb',
             color: '#fff',
@@ -353,13 +381,13 @@ export const ProposalManagementPage: React.FC = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>
                   Đang tải danh sách đề cương...
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>
                   Không tìm thấy đề cương nào phù hợp.
                 </td>
               </tr>
@@ -387,6 +415,46 @@ export const ProposalManagementPage: React.FC = () => {
                   <td style={{ padding: '12px 16px' }}>{getStatusBadge(p.status)}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {/* Nút Sửa đề cương khi DRAFT hoặc REVISE_REQUIRED */}
+                      {(p.status === 'DRAFT' || p.status === 'REVISE_REQUIRED') && (
+                        <button
+                          onClick={() => handleOpenEditModal(p)}
+                          style={{
+                            background: '#fef3c7',
+                            color: '#b45309',
+                            border: '1px solid #fde68a',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}
+                          title="Chỉnh sửa nội dung đề cương (tiêu đề, mục tiêu, kết quả dự kiến)"
+                        >
+                          ✏️ Sửa Đề Cương
+                        </button>
+                      )}
+
+                      {/* Nút Nộp đề cương khi DRAFT hoặc REVISE_REQUIRED */}
+                      {(isStudent || isAdmin) && (p.status === 'DRAFT' || p.status === 'REVISE_REQUIRED') && (
+                        <button
+                          onClick={() => handleSubmitProposalToSupervisor(p)}
+                          style={{
+                            background: '#ecfdf5',
+                            color: '#047857',
+                            border: '1px solid #a7f3d0',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}
+                          title="Nộp đề cương chính thức để Giảng viên hướng dẫn duyệt"
+                        >
+                          {p.status === 'REVISE_REQUIRED' ? '🚀 Nộp Lại' : '🚀 Nộp Đề Cương'}
+                        </button>
+                      )}
+
                       {canSupervisorApprove && !p.supervisorApproved && (
                         <button
                           onClick={() => handleSupervisorConfirm(p)}
@@ -456,6 +524,44 @@ export const ProposalManagementPage: React.FC = () => {
                       >
                         🖨️ Xuất PDF Đề cương
                       </button>
+                      {p.status === 'APPROVED' && (
+                        <a
+                          href={`/thesis/detail?id=${p.id}`}
+                          style={{
+                            background: '#ecfdf5',
+                            color: '#065f46',
+                            border: '1px solid #a7f3d0',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            textDecoration: 'none',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          🎓 Đề Tài
+                        </a>
+                      )}
+                      {p.status === 'APPROVED' && (
+                        <a
+                          href={`/progress/tasks?thesisId=${p.id}`}
+                          style={{
+                            background: '#eff6ff',
+                            color: '#1e40af',
+                            border: '1px solid #bfdbfe',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            textDecoration: 'none',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          📋 Bảng Task
+                        </a>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -696,9 +802,121 @@ export const ProposalManagementPage: React.FC = () => {
             zIndex: 1000,
           }}
         >
-          <div style={{ background: '#fff', borderRadius: '8px', width: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>Biên Soạn & Nộp Đề Cương Đồ Án</h2>
-            <form onSubmit={handleCreateProposal}>
+          <div style={{ background: '#fff', borderRadius: '8px', width: '620px', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#0f172a' }}>
+                {editingProposal
+                  ? editingProposal.status === 'REVISE_REQUIRED'
+                    ? '✏️ Chỉnh Sửa & Bổ Sung Đề Cương (Yêu Cầu Sửa Đổi)'
+                    : '✏️ Chỉnh Sửa Bản Nháp Đề Cương'
+                  : 'Biên Soạn & Nộp Đề Cương Đồ Án Mới'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => { setShowModal(false); setEditingProposal(null); }}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {editingProposal && (
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '6px',
+                  marginBottom: '16px',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  background: editingProposal.status === 'REVISE_REQUIRED' ? '#fef2f2' : '#f0f9ff',
+                  border: `1px solid ${editingProposal.status === 'REVISE_REQUIRED' ? '#fecaca' : '#bae6fd'}`,
+                  color: editingProposal.status === 'REVISE_REQUIRED' ? '#991b1b' : '#0369a1',
+                }}
+              >
+                {editingProposal.status === 'REVISE_REQUIRED' ? (
+                  <>
+                    <strong style={{ display: 'block', marginBottom: '4px' }}>⚠️ Yêu Cầu Chỉnh Sửa:</strong>
+                    <div>Sinh viên sửa đổi trực tiếp trên đề cương này theo yêu cầu của Khoa/Hội đồng. Sau khi nhấn <strong>Lưu Thay Đổi Đề Cương</strong>, sinh viên bấm <strong>"Nộp Lại"</strong> ngoài danh sách để gửi xét duyệt lại.</div>
+                  </>
+                ) : (
+                  <>
+                    <strong style={{ display: 'block', marginBottom: '4px' }}>💡 Đang Chỉnh Sửa Bản Nháp (DRAFT):</strong>
+                    <div>Bạn có thể sửa đổi tiêu đề, mô tả, mục tiêu hoặc file đính kèm. Sau khi lưu, bạn có thể tiếp tục sửa hoặc bấm <strong>"🚀 Nộp Đề Cương"</strong> để chuyển đến Giảng viên hướng dẫn duyệt.</div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProposal}>
+              {editingProposal ? (
+                <div style={{ marginBottom: '14px', background: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '13px' }}>
+                  <div style={{ marginBottom: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Sinh viên:</span> <strong>{editingProposal.studentFullName} ({editingProposal.studentCode})</strong> - Lớp: {editingProposal.studentClass || 'CNTT'}
+                  </div>
+                  <div style={{ marginBottom: '4px' }}>
+                    <span style={{ color: '#64748b' }}>GV Hướng dẫn:</span> <strong>{editingProposal.lecturerFullName}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Đợt đồ án:</span> <strong>{editingProposal.projectRoundName || 'Đợt Đồ án Tốt nghiệp'}</strong>
+                  </div>
+                </div>
+              ) : !isStudent ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Sinh viên thực hiện *</label>
+                    <select
+                      value={selectedStudentId}
+                      onChange={(e) => setSelectedStudentId(Number(e.target.value))}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      {availableStudents.map(s => (
+                        <option key={s.id} value={s.id}>{s.code} - {s.name} ({s.class})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Giảng viên hướng dẫn *</label>
+                    <select
+                      value={selectedLecturerId}
+                      onChange={(e) => setSelectedLecturerId(Number(e.target.value))}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      {availableLecturers.map(l => (
+                        <option key={l.id} value={l.id}>{l.code} - {l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Giảng viên hướng dẫn *</label>
+                  <select
+                    value={selectedLecturerId}
+                    onChange={(e) => setSelectedLecturerId(Number(e.target.value))}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                  >
+                    {availableLecturers.map(l => (
+                      <option key={l.id} value={l.id}>{l.code} - {l.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {!editingProposal && (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Đợt đồ án *</label>
+                  <select
+                    value={selectedRoundId}
+                    onChange={(e) => setSelectedRoundId(Number(e.target.value))}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                  >
+                    {availableRounds.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Tên đề tài (Tiếng Việt) *</label>
                 <input
@@ -764,7 +982,7 @@ export const ProposalManagementPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => { setShowModal(false); setEditingProposal(null); }}
                   style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   Hủy
@@ -773,7 +991,7 @@ export const ProposalManagementPage: React.FC = () => {
                   type="submit"
                   style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}
                 >
-                  Gửi Đề Cương
+                  {editingProposal ? 'Lưu Thay Đổi Đề Cương' : 'Gửi Đề Cương'}
                 </button>
               </div>
             </form>

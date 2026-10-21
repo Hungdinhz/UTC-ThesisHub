@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
 import type { Student, Group, Project, ProjectCategory, SupervisorOfStudentGroup, ExternalEvaluation } from '../types';
-import Navbar from '../components/Navbar';
 import UTCAppLayout from '../components/UTCAppLayout';
 import GroupRequestModal from '../components/GroupRequestModal';
 import ProjectModal from '../components/ProjectModal';
@@ -236,20 +235,25 @@ const StudentDashboard: React.FC = () => {
     }
   };
 
-  if (loading || !student) {
+  if (loading && !profile) {
     return (
-      <div>
-        <Navbar user={student} onLogout={logout} />
-        <div className="container">
+      <UTCAppLayout user={student || user} onLogout={logout} activeTab={activeTab} onTabChange={setActiveTab}>
+        <div className="container" style={{ padding: '20px 0' }}>
           <div className="dashboard-header">
-            <h1>Student Dashboard</h1>
-            <p>Loading your dashboard...</p>
+            <div>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                {t('dashboard.studentTitle', 'Bảng Điều Khiển Sinh Viên UTC')}
+              </h1>
+              <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0 }}>
+                {t('common.loading', 'Đang tải dữ liệu tổng quan đồ án...')}
+              </p>
+            </div>
           </div>
-          <div className="card">
+          <div className="card" style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '24px', border: '1px solid var(--border-color)' }}>
             <SkeletonProfile />
           </div>
         </div>
-      </div>
+      </UTCAppLayout>
     );
   }
 
@@ -441,22 +445,22 @@ const StudentDashboard: React.FC = () => {
                       </div>
                       {panel.members && panel.members.length > 0 && (
                         <div style={{ marginTop: '15px' }}>
-                          <h4 style={{ marginBottom: '10px', color: '#555' }}>Committee Members</h4>
+                          <h4 style={{ marginBottom: '10px', color: '#1e293b', fontWeight: 600 }}>Committee Members</h4>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                             {panel.members.map(member => (
                               <div 
                                 key={member.id} 
                                 style={{ 
                                   padding: '8px 12px', 
-                                  backgroundColor: '#f0f4f8', 
+                                  backgroundColor: '#f8fafc', 
                                   borderRadius: '6px',
-                                  border: '1px solid #e0e0e0'
+                                  border: '1px solid #e2e8f0'
                                 }}
                               >
-                                <span style={{ fontWeight: '500' }}>
+                                <span style={{ fontWeight: '600', color: '#0f172a' }}>
                                   {member.user.first_name || member.user.username} {member.user.last_name || ''}
                                 </span>
-                                <span style={{ color: '#666', fontSize: '0.9em', marginLeft: '8px' }}>
+                                <span style={{ color: '#475569', fontSize: '0.9em', marginLeft: '8px' }}>
                                   ({member.committee_id})
                                 </span>
                               </div>
