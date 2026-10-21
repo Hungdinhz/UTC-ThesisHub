@@ -421,35 +421,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               </div>
             </>
           )}
-
-          {/* MENU DÀNH CHO CÁN BỘ CHẤM NGOÀI (EXTERNAL EXAMINER) */}
-          {(currentRole === 'external_examiner' || currentRole === 'external') && (
-            <>
-              <div
-                className={`utc-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/external_examiner/dashboard', true)}
-              >
-                <span className="utc-nav-icon">🏠</span>
-                <span className="utc-nav-label">Tổng quan chấm ngoài</span>
-              </div>
-
-              <div
-                className={`utc-nav-item ${activeTab === 'defense-schedules' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/admin/defense-schedules', true)}
-              >
-                <span className="utc-nav-icon">📅</span>
-                <span className="utc-nav-label">Lịch chấm bảo vệ</span>
-              </div>
-
-              <div
-                className={`utc-nav-item ${activeTab === 'defense-scoring' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/admin/defense-scoring', true)}
-              >
-                <span className="utc-nav-icon">📝</span>
-                <span className="utc-nav-label">Chấm điểm phản biện ngoài</span>
-              </div>
-            </>
-          )}
         </nav>
 
         <div className="utc-sidebar-footer">
