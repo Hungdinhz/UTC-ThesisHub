@@ -179,6 +179,28 @@ export interface ChatMessage {
   supervisor?: Supervisor;
 }
 
+
+export interface AdminRegisterPayload {
+  username: string;
+  email: string;
+  password: string;
+  confirm_password?: string;
+  confirmPassword?: string;
+  full_name?: string;
+  fullName?: string;
+  phone?: string;
+  admin_secret_key?: string;
+  adminSecretKey?: string;
+}
+
+export interface AdminLoginPayload {
+  username?: string;
+  email?: string;
+  password: string;
+  admin_secret_key?: string;
+  adminSecretKey?: string;
+}
+
 export interface LoginResponse {
   access: string;
   refresh: string;

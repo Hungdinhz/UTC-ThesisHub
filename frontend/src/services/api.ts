@@ -2,6 +2,8 @@ import axios from 'axios';
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import type {
   LoginResponse,
+  AdminRegisterPayload,
+  AdminLoginPayload,
   Student,
   Supervisor,
   CommitteeMember,
@@ -133,6 +135,50 @@ class ApiService {
         return Promise.reject(error);
       }
     );
+  }
+
+
+  // Admin Auth
+  async adminRegister(payload: AdminRegisterPayload): Promise<any> {
+    const response = await this.api.post(AUTH.ADMIN_REGISTER, {
+      username: payload.username,
+      email: payload.email,
+      password: payload.password,
+      confirm_password: payload.confirmPassword || payload.confirm_password,
+      full_name: payload.fullName || payload.full_name,
+      phone: payload.phone,
+      admin_secret_key: payload.adminSecretKey || payload.admin_secret_key,
+    });
+    return response.data;
+  }
+
+  async adminLogin(
+    payloadOrIdentifier: AdminLoginPayload | string,
+    password?: string,
+    adminSecretKey?: string
+  ): Promise<LoginResponse> {
+    let identifier: string;
+    let pwd: string;
+    let secretKey: string | undefined;
+
+    if (typeof payloadOrIdentifier === 'object') {
+      identifier = payloadOrIdentifier.username || payloadOrIdentifier.email || '';
+      pwd = payloadOrIdentifier.password;
+      secretKey = payloadOrIdentifier.adminSecretKey || payloadOrIdentifier.admin_secret_key;
+    } else {
+      identifier = payloadOrIdentifier;
+      pwd = password || '';
+      secretKey = adminSecretKey;
+    }
+
+    const isEmail = identifier.includes('@');
+    const response = await this.api.post<LoginResponse>(AUTH.ADMIN_LOGIN, {
+      username: isEmail ? undefined : identifier,
+      email: isEmail ? identifier : undefined,
+      password: pwd,
+      admin_secret_key: secretKey,
+    });
+    return response.data;
   }
 
   // General Auth (Admin & Unified)
