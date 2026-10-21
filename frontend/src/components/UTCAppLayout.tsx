@@ -348,7 +348,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/thesis/proposals', true)}
               >
                 <span className="utc-nav-icon">📑</span>
-                <span className="utc-nav-label">GĐ3: Xác nhận Đề tài & Đề cương</span>
+                <span className="utc-nav-label">GĐ3: Xác nhận Đề cương</span>
               </div>
 
               <div
@@ -364,7 +364,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/thesis/detail', true)}
               >
                 <span className="utc-nav-icon">✅</span>
-                <span className="utc-nav-label">GĐ6: Xác nhận Đủ khả năng BV</span>
+                <span className="utc-nav-label">GĐ6: Đủ điều kiện Bảo vệ</span>
               </div>
 
               <div
@@ -372,7 +372,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-scoring', true)}
               >
                 <span className="utc-nav-icon">🏆</span>
-                <span className="utc-nav-label">GĐ6: Chấm điểm GVHD / GVPB</span>
+                <span className="utc-nav-label">GĐ6: Chấm điểm GVHD & GVPB</span>
               </div>
 
               <div
@@ -401,7 +401,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/councils', true)}
               >
                 <span className="utc-nav-icon">⚖️</span>
-                <span className="utc-nav-label">Danh sách Hội đồng (1CT-2TK-2UV)</span>
+                <span className="utc-nav-label">Hội đồng chấm (1CT-2TK-2UV)</span>
               </div>
 
               <div
@@ -417,7 +417,36 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-scoring', true)}
               >
                 <span className="utc-nav-icon">📝</span>
-                <span className="utc-nav-label">Chấm điểm & Xuất Biên bản PDF</span>
+                <span className="utc-nav-label">Chấm điểm & Biên bản PDF</span>
+              </div>
+            </>
+          )}
+
+          {/* MENU DÀNH CHO CÁN BỘ CHẤM NGOÀI (EXTERNAL EXAMINER) */}
+          {(currentRole === 'external_examiner' || currentRole === 'external') && (
+            <>
+              <div
+                className={`utc-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/external_examiner/dashboard', true)}
+              >
+                <span className="utc-nav-icon">🏠</span>
+                <span className="utc-nav-label">Tổng quan chấm ngoài</span>
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'defense-schedules' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/admin/defense-schedules', true)}
+              >
+                <span className="utc-nav-icon">📅</span>
+                <span className="utc-nav-label">Lịch chấm bảo vệ</span>
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'defense-scoring' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/admin/defense-scoring', true)}
+              >
+                <span className="utc-nav-icon">📝</span>
+                <span className="utc-nav-label">Chấm điểm phản biện ngoài</span>
               </div>
             </>
           )}
