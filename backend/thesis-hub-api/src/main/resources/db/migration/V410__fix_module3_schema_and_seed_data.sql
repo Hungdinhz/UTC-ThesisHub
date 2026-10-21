@@ -4,14 +4,26 @@
 -- Description: Align schema with JPA entities, adjust constraints, and seed data.
 -- =============================================================================
 
--- 1. Proposals: drop old not-null constraints
-ALTER TABLE proposals ALTER COLUMN thesis_id DROP NOT NULL;
-ALTER TABLE proposals ALTER COLUMN title DROP NOT NULL;
+-- 1. Proposals: drop old not-null constraints safely
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='proposals' AND column_name='thesis_id') THEN
+        ALTER TABLE proposals ALTER COLUMN thesis_id DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='proposals' AND column_name='title') THEN
+        ALTER TABLE proposals ALTER COLUMN title DROP NOT NULL;
+    END IF;
+END $$;
 
--- 2. Theses: drop old not-null title
-ALTER TABLE theses ALTER COLUMN title DROP NOT NULL;
+-- 2. Theses: drop old not-null title safely
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='theses' AND column_name='title') THEN
+        ALTER TABLE theses ALTER COLUMN title DROP NOT NULL;
+    END IF;
+END $$;
 
--- 3. Review Groups: add missing columns
+-- 3. Review Groups: add missing columns safely
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='review_groups' AND column_name='code') THEN
@@ -22,16 +34,18 @@ BEGIN
     END IF;
 END $$;
 
--- 4. Review Group Members: add review_group_id and drop not null on group_id
+-- 4. Review Group Members: add review_group_id and drop not null on group_id safely
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='review_group_members' AND column_name='review_group_id') THEN
         ALTER TABLE review_group_members ADD COLUMN review_group_id BIGINT REFERENCES review_groups(id) ON DELETE CASCADE;
     END IF;
-    ALTER TABLE review_group_members ALTER COLUMN group_id DROP NOT NULL;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='review_group_members' AND column_name='group_id') THEN
+        ALTER TABLE review_group_members ALTER COLUMN group_id DROP NOT NULL;
+    END IF;
 END $$;
 
--- 5. Proposal Review Assignments: add review_group_id, evaluation_notes, decision_date
+-- 5. Proposal Review Assignments: add review_group_id, evaluation_notes, decision_date safely
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='proposal_review_assignments' AND column_name='review_group_id') THEN
@@ -43,27 +57,59 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='proposal_review_assignments' AND column_name='decision_date') THEN
         ALTER TABLE proposal_review_assignments ADD COLUMN decision_date TIMESTAMP WITH TIME ZONE;
     END IF;
-    ALTER TABLE proposal_review_assignments ALTER COLUMN group_id DROP NOT NULL;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='proposal_review_assignments' AND column_name='group_id') THEN
+        ALTER TABLE proposal_review_assignments ALTER COLUMN group_id DROP NOT NULL;
+    END IF;
 END $$;
 
--- 6. Documents: drop old not null columns
-ALTER TABLE documents ALTER COLUMN doc_type DROP NOT NULL;
-ALTER TABLE documents ALTER COLUMN file_name DROP NOT NULL;
-ALTER TABLE documents ALTER COLUMN uploaded_by DROP NOT NULL;
-ALTER TABLE documents ALTER COLUMN status DROP NOT NULL;
+-- 6. Documents: drop old not null columns safely
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='doc_type') THEN
+        ALTER TABLE documents ALTER COLUMN doc_type DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='file_name') THEN
+        ALTER TABLE documents ALTER COLUMN file_name DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='uploaded_by') THEN
+        ALTER TABLE documents ALTER COLUMN uploaded_by DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='status') THEN
+        ALTER TABLE documents ALTER COLUMN status DROP NOT NULL;
+    END IF;
+END $$;
 
--- 7. Tasks: drop old not null columns
-ALTER TABLE tasks ALTER COLUMN assignee_id DROP NOT NULL;
-ALTER TABLE tasks ALTER COLUMN assigner_id DROP NOT NULL;
+-- 7. Tasks: drop old not null columns safely
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='assignee_id') THEN
+        ALTER TABLE tasks ALTER COLUMN assignee_id DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='assigner_id') THEN
+        ALTER TABLE tasks ALTER COLUMN assigner_id DROP NOT NULL;
+    END IF;
+END $$;
 
--- 8. Comments: drop old not null columns
-ALTER TABLE comments ALTER COLUMN author_id DROP NOT NULL;
+-- 8. Comments: drop old not null columns safely
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='comments' AND column_name='author_id') THEN
+        ALTER TABLE comments ALTER COLUMN author_id DROP NOT NULL;
+    END IF;
+END $$;
 
--- 9. Progress Reports: drop old not null columns
-ALTER TABLE progress_reports ALTER COLUMN title DROP NOT NULL;
-ALTER TABLE progress_reports ALTER COLUMN report_date DROP NOT NULL;
+-- 9. Progress Reports: drop old not null columns safely
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='progress_reports' AND column_name='title') THEN
+        ALTER TABLE progress_reports ALTER COLUMN title DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='progress_reports' AND column_name='report_date') THEN
+        ALTER TABLE progress_reports ALTER COLUMN report_date DROP NOT NULL;
+    END IF;
+END $$;
 
--- 10. Progress Feedbacks: add missing columns & drop old not null
+-- 10. Progress Feedbacks: add missing columns & drop old not null safely
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='progress_feedbacks' AND column_name='progress_report_id') THEN
@@ -81,13 +127,20 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='progress_feedbacks' AND column_name='feedback_at') THEN
         ALTER TABLE progress_feedbacks ADD COLUMN feedback_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     END IF;
-    ALTER TABLE progress_feedbacks ALTER COLUMN report_id DROP NOT NULL;
-    ALTER TABLE progress_feedbacks ALTER COLUMN feedback DROP NOT NULL;
-    ALTER TABLE progress_feedbacks ALTER COLUMN is_satisfactory DROP NOT NULL;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='progress_feedbacks' AND column_name='report_id') THEN
+        ALTER TABLE progress_feedbacks ALTER COLUMN report_id DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='progress_feedbacks' AND column_name='feedback') THEN
+        ALTER TABLE progress_feedbacks ALTER COLUMN feedback DROP NOT NULL;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='progress_feedbacks' AND column_name='is_satisfactory') THEN
+        ALTER TABLE progress_feedbacks ALTER COLUMN is_satisfactory DROP NOT NULL;
+    END IF;
 END $$;
 
--- 11. Update check constraints to match entity enums
+-- 11. Update check constraints to match entity enums safely
 ALTER TABLE proposals DROP CONSTRAINT IF EXISTS chk_proposals_status;
+UPDATE proposals SET status = 'DRAFT' WHERE status NOT IN ('DRAFT', 'SUBMITTED', 'ASSIGNED', 'UNDER_REVIEW', 'APPROVED', 'REVISE_REQUIRED', 'REVISION_REQUIRED', 'REJECTED');
 ALTER TABLE proposals ADD CONSTRAINT chk_proposals_status CHECK (
     status IN ('DRAFT', 'SUBMITTED', 'ASSIGNED', 'UNDER_REVIEW', 'APPROVED', 'REVISE_REQUIRED', 'REVISION_REQUIRED', 'REJECTED')
 );
@@ -95,26 +148,31 @@ ALTER TABLE proposals ADD CONSTRAINT chk_proposals_status CHECK (
 ALTER TABLE proposal_review_assignments DROP CONSTRAINT IF EXISTS chk_proposal_review_assignments_status;
 ALTER TABLE proposal_review_assignments DROP CONSTRAINT IF EXISTS chk_proposal_review_assignments_result;
 ALTER TABLE proposal_review_assignments DROP CONSTRAINT IF EXISTS chk_proposal_review_status;
+UPDATE proposal_review_assignments SET status = 'PENDING' WHERE status NOT IN ('PENDING', 'IN_REVIEW', 'REVIEWING', 'REVIEWED', 'APPROVED', 'REVISE_REQUIRED', 'REVISION_REQUIRED', 'REJECTED');
 ALTER TABLE proposal_review_assignments ADD CONSTRAINT chk_proposal_review_status CHECK (
     status IN ('PENDING', 'IN_REVIEW', 'REVIEWING', 'REVIEWED', 'APPROVED', 'REVISE_REQUIRED', 'REVISION_REQUIRED', 'REJECTED')
 );
 
 ALTER TABLE review_group_members DROP CONSTRAINT IF EXISTS chk_review_group_members_role;
+UPDATE review_group_members SET role = 'MEMBER' WHERE role NOT IN ('LEADER', 'SECRETARY', 'MEMBER');
 ALTER TABLE review_group_members ADD CONSTRAINT chk_review_group_members_role CHECK (
     role IN ('LEADER', 'SECRETARY', 'MEMBER')
 );
 
 ALTER TABLE submissions DROP CONSTRAINT IF EXISTS chk_submissions_status;
+UPDATE submissions SET status = 'SUBMITTED' WHERE status NOT IN ('SUBMITTED', 'PENDING', 'ACCEPTED', 'REVISE_REQUIRED', 'REVISION_REQUIRED', 'REJECTED');
 ALTER TABLE submissions ADD CONSTRAINT chk_submissions_status CHECK (
     status IN ('SUBMITTED', 'PENDING', 'ACCEPTED', 'REVISE_REQUIRED', 'REVISION_REQUIRED', 'REJECTED')
 );
 
 ALTER TABLE theses DROP CONSTRAINT IF EXISTS chk_theses_status;
+UPDATE theses SET status = 'IN_PROGRESS' WHERE status NOT IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'IN_PROGRESS', 'UNDER_REVIEW', 'DEFENSE_READY', 'COMPLETED', 'CANCELLED', 'CANCELED', 'REVISION_REQUIRED', 'REJECTED');
 ALTER TABLE theses ADD CONSTRAINT chk_theses_status CHECK (
     status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'IN_PROGRESS', 'UNDER_REVIEW', 'DEFENSE_READY', 'COMPLETED', 'CANCELLED', 'CANCELED', 'REVISION_REQUIRED', 'REJECTED')
 );
 
 ALTER TABLE tasks DROP CONSTRAINT IF EXISTS chk_tasks_status;
+UPDATE tasks SET status = 'TODO' WHERE status NOT IN ('TODO', 'IN_PROGRESS', 'SUBMITTED', 'REVISE', 'REVISE_REQUIRED', 'REVISION_REQUIRED', 'COMPLETED', 'CANCELLED');
 ALTER TABLE tasks ADD CONSTRAINT chk_tasks_status CHECK (
     status IN ('TODO', 'IN_PROGRESS', 'SUBMITTED', 'REVISE', 'REVISE_REQUIRED', 'REVISION_REQUIRED', 'COMPLETED', 'CANCELLED')
 );
@@ -122,30 +180,36 @@ ALTER TABLE tasks ADD CONSTRAINT chk_tasks_status CHECK (
 ALTER TABLE documents DROP CONSTRAINT IF EXISTS chk_documents_type;
 ALTER TABLE documents DROP CONSTRAINT IF EXISTS chk_documents_status;
 
--- 12. Add Unique Constraints
+-- 12. Add Unique Constraints safely (cleanup duplicates if any exist first)
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_review_groups_round_code') THEN
+        DELETE FROM review_groups a USING review_groups b WHERE a.id < b.id AND a.project_round_id = b.project_round_id AND a.code = b.code;
         ALTER TABLE review_groups ADD CONSTRAINT uk_review_groups_round_code UNIQUE (project_round_id, code);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_review_group_members') THEN
+        DELETE FROM review_group_members a USING review_group_members b WHERE a.id < b.id AND a.review_group_id = b.review_group_id AND a.lecturer_id = b.lecturer_id;
         ALTER TABLE review_group_members ADD CONSTRAINT uk_review_group_members UNIQUE (review_group_id, lecturer_id);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_proposals_student_round') THEN
+        DELETE FROM proposals a USING proposals b WHERE a.id < b.id AND a.student_id = b.student_id AND a.project_round_id = b.project_round_id;
         ALTER TABLE proposals ADD CONSTRAINT uk_proposals_student_round UNIQUE (student_id, project_round_id);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_proposal_review_assignments') THEN
+        DELETE FROM proposal_review_assignments a USING proposal_review_assignments b WHERE a.id < b.id AND a.proposal_id = b.proposal_id AND a.review_group_id = b.review_group_id;
         ALTER TABLE proposal_review_assignments ADD CONSTRAINT uk_proposal_review_assignments UNIQUE (proposal_id, review_group_id);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_theses_student_round') THEN
+        DELETE FROM theses a USING theses b WHERE a.id < b.id AND a.student_id = b.student_id AND a.project_round_id = b.project_round_id;
         ALTER TABLE theses ADD CONSTRAINT uk_theses_student_round UNIQUE (student_id, project_round_id);
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_progress_feedbacks_report') THEN
+        DELETE FROM progress_feedbacks a USING progress_feedbacks b WHERE a.id < b.id AND a.progress_report_id = b.progress_report_id;
         ALTER TABLE progress_feedbacks ADD CONSTRAINT uk_progress_feedbacks_report UNIQUE (progress_report_id);
     END IF;
 END $$;
 
--- 13. Seed sample data for Module 3
+-- 13. Seed sample data for Module 3 safely
 INSERT INTO review_groups (project_round_id, department_id, code, name, description, status)
 SELECT 
     r.id, 
