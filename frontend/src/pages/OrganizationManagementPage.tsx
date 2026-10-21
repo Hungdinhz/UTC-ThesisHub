@@ -460,22 +460,14 @@ const OrganizationManagementPage: React.FC = () => {
             {/* Departments List */}
             <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <h3 style={{ margin: '0 0 16px 0', color: '#1e293b' }}>Bộ môn trực thuộc ({departments.length})</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
-                    <th style={{ padding: '10px' }}>Mã BM</th>
-                    <th style={{ padding: '10px' }}>Tên bộ môn</th>
-                    <th style={{ padding: '10px' }}>Khoa</th>
-                    <th style={{ padding: '10px' }}>Mô tả</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {departments.map((d) => (
-                    <tr key={d.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px 10px', fontWeight: 600, color: '#0a3273' }}>{d.code}</td>
-                      <td style={{ padding: '12px 10px', fontWeight: 500 }}>{d.name}</td>
-                      <td style={{ padding: '12px 10px', color: '#64748b' }}>{d.facultyName || 'Khoa CNTT'}</td>
-                      <td style={{ padding: '12px 10px', color: '#475569', fontSize: '0.85rem' }}>{d.description || '—'}</td>
+              <div className="org-table-wrapper">
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem' }}>
+                      <th style={{ padding: '10px' }}>Mã BM</th>
+                      <th style={{ padding: '10px' }}>Tên bộ môn</th>
+                      <th style={{ padding: '10px' }}>Khoa</th>
+                      <th style={{ padding: '10px' }}>Mô tả</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -484,7 +476,7 @@ const OrganizationManagementPage: React.FC = () => {
                         <td style={{ padding: '12px 10px', fontWeight: 600, color: '#0a3273' }}>{d.code}</td>
                         <td style={{ padding: '12px 10px', fontWeight: 500 }}>{d.name}</td>
                         <td style={{ padding: '12px 10px', color: '#64748b' }}>{d.facultyName || 'Khoa CNTT'}</td>
-                        <td style={{ padding: '12px 10px', color: '#94a3b8', fontSize: '0.85rem' }}>{d.description || '—'}</td>
+                        <td style={{ padding: '12px 10px', color: '#475569', fontSize: '0.85rem' }}>{d.description || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
