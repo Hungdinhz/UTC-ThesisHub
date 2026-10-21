@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
 import type { Student, Group, Project, ProjectCategory, SupervisorOfStudentGroup, ExternalEvaluation } from '../types';
-import Navbar from '../components/Navbar';
 import UTCAppLayout from '../components/UTCAppLayout';
 import GroupRequestModal from '../components/GroupRequestModal';
 import ProjectModal from '../components/ProjectModal';
@@ -238,18 +237,17 @@ const StudentDashboard: React.FC = () => {
 
   if (loading || !student) {
     return (
-      <div>
-        <Navbar user={student} onLogout={logout} />
+      <UTCAppLayout user={student} onLogout={logout} activeTab={activeTab} onTabChange={setActiveTab}>
         <div className="container">
           <div className="dashboard-header">
-            <h1>Student Dashboard</h1>
-            <p>Loading your dashboard...</p>
+            <h1>{t('dashboard.studentTitle', 'Bảng Điều Khiển Sinh Viên UTC')}</h1>
+            <p>Đang tải dữ liệu học vụ...</p>
           </div>
           <div className="card">
             <SkeletonProfile />
           </div>
         </div>
-      </div>
+      </UTCAppLayout>
     );
   }
 

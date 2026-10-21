@@ -339,7 +339,8 @@ export const DefenseScoringPage: React.FC = () => {
                 <strong>3. Tổng hợp kết quả chấm điểm của Hội đồng (1 Chủ tịch - 2 Thư ký - 2 Ủy viên):</strong>
               </p>
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', margin: '12px 0' }}>
+              <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: '520px', borderCollapse: 'collapse', margin: '12px 0' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
                     <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Thành phần chấm</th>
@@ -361,6 +362,7 @@ export const DefenseScoringPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
 
               <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: '6px', margin: '16px 0', fontWeight: 600 }}>
                 Điểm GVHD (30%): {graduationResult.supervisorScore?.toFixed(2)} | Điểm GVPB (20%): {graduationResult.reviewerScore?.toFixed(2)} |
@@ -404,7 +406,8 @@ export const DefenseScoringPage: React.FC = () => {
             <p style={{ color: '#475569', fontSize: '14px', marginBottom: '16px' }}>
               Bảng tổng hợp kết quả cuối kỳ bao gồm cả danh sách Sinh viên Đạt bảo vệ và Sinh viên được duyệt Bảo lưu kết quả sang đợt kế tiếp.
             </p>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '20px' }}>
+            <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table style={{ width: '100%', minWidth: '580px', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '20px' }}>
               <thead>
                 <tr style={{ background: '#f1f5f9' }}>
                   <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>MSSV</th>
@@ -433,6 +436,7 @@ export const DefenseScoringPage: React.FC = () => {
                 </tr>
               </tbody>
             </table>
+            </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button

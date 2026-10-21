@@ -35,7 +35,9 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   const user = propUser || authUser;
   const onLogout = propLogout || authLogout;
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    typeof window !== 'undefined' ? window.innerWidth > 1024 : true
+  );
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -126,6 +128,9 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   // Xử lý click chuyển tab hoặc điều hướng trang
   const handleNavClick = (tabOrRoute: string, isRoute: boolean = false) => {
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
     if (isRoute) {
       navigate(tabOrRoute);
     } else {
@@ -139,16 +144,34 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   return (
     <div className={`utc-dashboard-wrapper ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>
+      {/* Mobile Backdrop Overlay */}
+      {sidebarOpen && (
+        <div
+          className="utc-sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* 1. Left Sidebar Navigation */}
       <aside className="utc-sidebar">
-        <div className="utc-sidebar-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <span className="utc-seal">
-            <img src={utcLogo} alt="UTC Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} />
-          </span>
-          <div className="utc-logo-text-group">
-            <span className="utc-school-title">TRƯỜNG ĐẠI HỌC</span>
-            <span className="utc-school-title-sub">GIAO THÔNG VẬN TẢI</span>
+        <div className="utc-sidebar-header-row">
+          <div className="utc-sidebar-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+            <span className="utc-seal">
+              <img src={utcLogo} alt="UTC Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} />
+            </span>
+            <div className="utc-logo-text-group">
+              <span className="utc-school-title">TRƯỜNG ĐẠI HỌC</span>
+              <span className="utc-school-title-sub">GIAO THÔNG VẬN TẢI</span>
+            </div>
           </div>
+          <button
+            className="utc-sidebar-close-mobile-btn"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Đóng menu"
+          >
+            ✕
+          </button>
         </div>
 
         <nav className="utc-sidebar-nav">

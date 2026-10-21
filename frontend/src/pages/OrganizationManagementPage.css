@@ -1,0 +1,107 @@
+/* OrganizationManagementPage.css */
+
+.org-page-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.org-tabs-container {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 24px;
+  background-color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 8px 8px 0 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.org-tab-button {
+  padding: 10px 18px;
+  border: none;
+  background-color: transparent;
+  font-size: 0.95rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.org-two-col-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .org-two-col-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.org-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 8px;
+}
+
+.org-table-wrapper table {
+  min-width: 600px;
+}
+
+.org-filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .org-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .org-filter-bar input,
+  .org-filter-bar select,
+  .org-filter-bar button {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+.org-form-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 580px) {
+  .org-form-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.org-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .org-header-flex {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .org-header-flex > div:last-child {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+  }
+}

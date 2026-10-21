@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
 import type { Supervisor, SupervisorOfStudentGroup } from '../types';
-import Navbar from '../components/Navbar';
 import UTCAppLayout from '../components/UTCAppLayout';
 import ChatRoom from '../components/ChatRoom';
 import DocumentReview from '../components/DocumentReview';
@@ -166,15 +165,14 @@ const SupervisorDashboard: React.FC = () => {
 
   if (loading || !supervisor) {
     return (
-      <div>
-        <Navbar user={supervisor} onLogout={logout} />
-        <div className="container" style={{ paddingTop: '30px' }}>
+      <UTCAppLayout user={supervisor} onLogout={logout} activeTab={activeTab} onTabChange={setActiveTab}>
+        <div className="container" style={{ paddingTop: '10px' }}>
           <SkeletonProfile />
-          <div style={{ marginTop: '30px' }}>
+          <div style={{ marginTop: '20px' }}>
             <SkeletonEvaluationGrid count={3} />
           </div>
         </div>
-      </div>
+      </UTCAppLayout>
     );
   }
 
