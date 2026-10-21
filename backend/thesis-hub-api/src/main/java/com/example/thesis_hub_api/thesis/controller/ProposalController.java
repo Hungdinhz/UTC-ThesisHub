@@ -18,13 +18,13 @@ public class ProposalController {
     private final ProposalService proposalService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
     public ApiResponse<ProposalResponse> createProposal(@Valid @RequestBody CreateProposalRequest request) {
         return ApiResponse.success("Tạo đề cương thành công", proposalService.createProposal(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
     public ApiResponse<ProposalResponse> updateProposal(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProposalRequest request) {
@@ -32,7 +32,7 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
     public ApiResponse<ProposalResponse> submitProposal(@PathVariable Long id) {
         return ApiResponse.success("Nộp đề cương thành công", proposalService.submitProposal(id));
     }

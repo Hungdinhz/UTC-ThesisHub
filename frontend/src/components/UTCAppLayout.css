@@ -1,10 +1,31 @@
 /* UTC Portal Internal Dashboard Layout Styles - Exact Official UTC Vibe */
 
-.utc-dashboard-wrapper {
+.utc-dashboard-wrapper,
+[data-theme="dark"] .utc-dashboard-wrapper {
+  --bg-primary: #ebf0f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f8fafc;
+  --bg-hover: #f1f5f9;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-tertiary: #64748b;
+  
+  --border-color: #cbd5e1;
+  --border-light: #e2e8f0;
+  
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-focus-border: #003366;
+  
+  --table-header-bg: #f8fafc;
+  --table-row-hover: #f1f5f9;
+
   display: flex;
   min-height: 100vh;
   background: #ebf0f7;
-  color: #1e293b;
+  color: #0f172a;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   transition: all 0.3s ease;
 }
@@ -127,7 +148,7 @@
 .utc-sub-item {
   padding: 8px 12px;
   font-size: 0.82rem;
-  color: #94a3b8;
+  color: #cbd5e1;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -555,7 +576,8 @@
 
 .news-date {
   font-size: 0.76rem;
-  color: #94a3b8;
+  color: #64748b;
+  font-weight: 500;
 }
 
 /* 6. Children Inner Content Container */

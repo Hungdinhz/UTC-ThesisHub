@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { progressService } from '../services/progressService';
 import type { ProgressReport, ThesisProgressSummary } from '../types';
 
 export const ProgressReportPage: React.FC = () => {
-  const { userType } = useAuth();
+  const { userType, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const currentThesisId = Number(searchParams.get('thesisId') || searchParams.get('id')) || 1;
+
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor';
   const isAdmin = userType === 'admin';
@@ -32,14 +36,14 @@ export const ProgressReportPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentThesisId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [rList, sData] = await Promise.all([
-        progressService.getReportsByThesis(1),
-        progressService.getThesisProgressSummary(1)
+        progressService.getReportsByThesis(currentThesisId),
+        progressService.getThesisProgressSummary(currentThesisId)
       ]);
       setReports(rList);
       setSummary(sData);
@@ -104,15 +108,16 @@ export const ProgressReportPage: React.FC = () => {
 
   const handleSubmitReport = async (e: React.FormEvent) => {
     e.preventDefault();
+    const effectiveStudentId = (user as unknown as { student_id?: number })?.student_id || user?.id || 1;
     try {
-      const created = await progressService.createProgressReport(1, {
-        studentId: 1,
+      const created = await progressService.createProgressReport(currentThesisId, {
+        studentId: effectiveStudentId,
         reportTitle,
         completedWork,
         plannedWork,
         difficulties,
         progressPercent,
-        fileUrl: fileUrl || '/files/reports/bao_cao_moi.pdf'
+        fileUrl: fileUrl || `/files/reports/bao_cao_${currentThesisId}.pdf`
       });
       setReports(prev => [created, ...prev]);
     } catch {
@@ -124,9 +129,10 @@ export const ProgressReportPage: React.FC = () => {
 
   const handleFeedback = async () => {
     if (!selectedReport) return;
+    const effectiveLecturerId = (user as unknown as { lecturer_id?: number })?.lecturer_id || user?.id || 1;
     try {
       const updated = await progressService.feedbackProgressReport(selectedReport.id, {
-        lecturerId: 1,
+        lecturerId: effectiveLecturerId,
         feedbackContent,
         assessment,
         confirmedCompletionRate: confirmedRate
@@ -194,7 +200,7 @@ export const ProgressReportPage: React.FC = () => {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div>
-              <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
+              <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#e2e8f0', fontWeight: 600 }}>
                 Tổng Quan Tiến Độ Đồ Án ({summary.thesisCode})
               </span>
               <h2 style={{ fontSize: '18px', margin: '4px 0 0 0', fontWeight: 'bold' }}>
@@ -202,7 +208,7 @@ export const ProgressReportPage: React.FC = () => {
               </h2>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '13px', color: '#cbd5e1' }}>Điều kiện bảo vệ (Module 4):</span>
+              <span style={{ fontSize: '13px', color: '#f1f5f9', fontWeight: 500 }}>Điều kiện bảo vệ (Module 4):</span>
               <div style={{ marginTop: '4px' }}>
                 {summary.readyForDefense ? (
                   <span style={{ background: '#16a34a', color: '#fff', padding: '4px 10px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px' }}>
@@ -244,9 +250,9 @@ export const ProgressReportPage: React.FC = () => {
       {/* Reports List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Đang tải báo cáo tiến độ...</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: '#475569', fontWeight: 600 }}>Đang tải báo cáo tiến độ...</div>
         ) : reports.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Chưa có báo cáo tiến độ nào được gửi.</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: '#475569', fontWeight: 600 }}>Chưa có báo cáo tiến độ nào được gửi.</div>
         ) : (
           reports.map(r => (
             <div

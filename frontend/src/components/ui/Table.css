@@ -21,8 +21,8 @@
 
 .ui-table-th {
   padding: 12px 16px;
-  font-weight: 600;
-  color: var(--text-primary, #333333);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
   white-space: nowrap;
 }
 
@@ -45,7 +45,7 @@
 
 .ui-table-td {
   padding: 12px 16px;
-  color: var(--text-primary, #333333);
+  color: var(--text-primary, #0f172a);
   vertical-align: middle;
 }
 
@@ -53,7 +53,8 @@
 .ui-table-empty-cell {
   text-align: center;
   padding: 36px 16px;
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary, #475569);
+  font-weight: 500;
 }
 
 .ui-table-spinner {

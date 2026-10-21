@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { thesisService } from '../services/thesisService';
 import type { Thesis, ThesisDocument } from '../types';
 
 export const ThesisDetailPage: React.FC = () => {
   const { userType, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const targetId = Number(searchParams.get('id') || searchParams.get('thesisId')) || 1;
+
   const isStudent = userType === 'student';
   const isLecturerOrAdmin = userType === 'supervisor' || userType === 'admin';
 
@@ -21,14 +25,14 @@ export const ThesisDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadThesisData();
-  }, []);
+  }, [targetId]);
 
   const loadThesisData = async () => {
     setLoading(true);
     try {
       const [tData, dList] = await Promise.all([
-        thesisService.getThesisById(1),
-        thesisService.getDocumentsByThesis(1)
+        thesisService.getThesisById(targetId),
+        thesisService.getDocumentsByThesis(targetId)
       ]);
       setThesis(tData);
       setDocuments(dList);
@@ -87,10 +91,10 @@ export const ThesisDetailPage: React.FC = () => {
     e.preventDefault();
     const effectiveUploaderId = (user as unknown as { student_id?: number })?.student_id || user?.id || 1;
     try {
-      const doc = await thesisService.uploadDocument(1, effectiveUploaderId, {
+      const doc = await thesisService.uploadDocument(targetId, effectiveUploaderId, {
         name: docName,
         documentType: docType,
-        fileUrl: docUrl || '/files/theses/DT_2026_CNTT_001/tailieu_demo.pdf',
+        fileUrl: docUrl || `/files/theses/DT_${targetId}/tailieu_demo.pdf`,
         description: docDesc
       });
       setDocuments(prev => [doc, ...prev]);
@@ -123,11 +127,11 @@ export const ThesisDetailPage: React.FC = () => {
   };
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Đang tải thông tin đề tài...</div>;
+    return <div style={{ padding: '40px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Đang tải thông tin đề tài...</div>;
   }
 
   if (!thesis) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Không tìm thấy đề tài.</div>;
+    return <div style={{ padding: '40px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Không tìm thấy đề tài.</div>;
   }
 
   return (
@@ -268,7 +272,7 @@ export const ThesisDetailPage: React.FC = () => {
             )}
 
             {isStudent && (
-              <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>
+              <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#475569', fontStyle: 'italic', fontWeight: 500 }}>
                 * Quyền xác nhận đủ điều kiện bảo vệ thuộc về Giảng viên hướng dẫn.
               </p>
             )}

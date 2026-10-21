@@ -2,8 +2,9 @@
 
 .cm-analytics-container {
   padding: 20px;
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-tertiary, #f8fafc);
   border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
   margin-bottom: 20px;
   transition: background-color 0.3s ease;
 }
@@ -11,14 +12,14 @@
 .cm-analytics-title {
   margin: 0 0 20px 0;
   font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 .cm-analytics-loading {
   padding: 40px;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
 }
 
 .cm-analytics-error {
@@ -34,8 +35,9 @@
 
 /* Card */
 .cm-card {
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-secondary, #ffffff);
   border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
   padding: 20px;
   margin-bottom: 16px;
   box-shadow: var(--card-shadow);
@@ -45,8 +47,8 @@
 .cm-card-title {
   margin: 0 0 16px 0;
   font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 /* Panel Info */
@@ -71,21 +73,22 @@
 .cm-panel-stat {
   text-align: center;
   padding: 12px 24px;
-  background-color: var(--primary-light);
+  background-color: var(--primary-light, #eff6ff);
   border-radius: 8px;
   transition: background-color 0.3s ease;
 }
 
 .cm-panel-stat-value {
   font-size: 28px;
-  font-weight: bold;
-  color: var(--text-primary);
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
   display: block;
 }
 
 .cm-panel-stat-label {
   font-size: 13px;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
 }
 
 /* Completion Circle */
@@ -140,8 +143,8 @@
   left: 50%;
   transform: translate(-50%, -50%);
   font-size: 24px;
-  font-weight: bold;
-  color: var(--text-primary);
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
 }
 
 .cm-completion-details {
@@ -158,13 +161,14 @@
 
 .cm-completion-stat-label {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #475569);
+  font-weight: 500;
 }
 
 .cm-completion-stat-value {
   font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
 }
 
 /* Evaluation List */
@@ -188,14 +192,15 @@
 
 .cm-evaluation-label {
   font-size: 14px;
-  color: var(--text-primary);
+  color: var(--text-primary, #0f172a);
+  font-weight: 600;
   text-transform: capitalize;
 }
 
 .cm-evaluation-count {
   font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
 }
 
 .cm-progress-bar {
@@ -246,7 +251,8 @@
 
 .cm-mark-label {
   font-size: 12px;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-secondary, #334155);
   margin-top: 4px;
   text-transform: capitalize;
 }

@@ -42,14 +42,16 @@
 .assignment-card .student-info h4 {
   margin: 0 0 4px 0;
   font-size: 16px;
-  color: var(--text-primary);
+  color: #0f172a !important;
+  font-weight: 700;
 }
 
 .assignment-card .student-info .registration-no {
   margin: 0;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: #475569 !important;
   font-family: monospace;
+  font-weight: 600;
 }
 
 /* Status Badge */
@@ -98,12 +100,13 @@
 }
 
 .assignment-card .detail-label {
-  color: var(--text-secondary);
+  color: #334155 !important;
+  font-weight: 500;
 }
 
 .assignment-card .detail-value {
-  color: var(--text-primary);
-  font-weight: 500;
+  color: #0f172a !important;
+  font-weight: 600;
   text-align: right;
   max-width: 60%;
   overflow: hidden;
@@ -132,7 +135,8 @@
 }
 
 .assignment-card .evaluation-row span:first-child {
-  color: var(--text-secondary);
+  color: #334155 !important;
+  font-weight: 500;
 }
 
 .assignment-card .evaluation-row strong.pass {

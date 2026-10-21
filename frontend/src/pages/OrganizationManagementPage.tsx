@@ -500,7 +500,7 @@ const OrganizationManagementPage: React.FC = () => {
                       <td style={{ padding: '12px 10px', fontWeight: 600, color: '#0a3273' }}>{d.code}</td>
                       <td style={{ padding: '12px 10px', fontWeight: 500 }}>{d.name}</td>
                       <td style={{ padding: '12px 10px', color: '#64748b' }}>{d.facultyName || 'Khoa CNTT'}</td>
-                      <td style={{ padding: '12px 10px', color: '#94a3b8', fontSize: '0.85rem' }}>{d.description || '—'}</td>
+                      <td style={{ padding: '12px 10px', color: '#475569', fontSize: '0.85rem' }}>{d.description || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

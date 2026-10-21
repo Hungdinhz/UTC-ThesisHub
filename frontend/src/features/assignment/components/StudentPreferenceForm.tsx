@@ -122,7 +122,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
         <div className="banner-icon">📝</div>
         <div>
           <h3>Đăng ký Hướng đồ án & Nguyện vọng Giảng viên hướng dẫn</h3>
-          <p className="text-muted text-sm">
+          <p style={{ color: '#1e293b', fontSize: '0.95rem', fontWeight: 500, margin: '4px 0 0 0' }}>
             Sinh viên lựa chọn hướng chuyên môn và đăng ký tối đa 3 nguyện vọng giảng viên.
             {studentProgram === 'KY_SU' && (
               <span className="badge-kysu-note">
