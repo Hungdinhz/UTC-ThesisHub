@@ -54,13 +54,21 @@ public class StudentProjectRoundService {
     private final StudentExcelParser studentExcelParser;
     private final PasswordEncoder passwordEncoder;
 
+    private ProjectRound getAndValidateActiveRound(Long roundId) {
+        ProjectRound round = projectRoundRepository.findById(roundId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+        if ("CLOSED".equalsIgnoreCase(round.getStatus()) || "ARCHIVED".equalsIgnoreCase(round.getStatus())) {
+            throw new AppException(ErrorCode.PROJECT_ROUND_CLOSED);
+        }
+        return round;
+    }
+
     /**
      * Xem trước kết quả phân tích file Excel import sinh viên vào đợt đồ án
      */
     @Transactional(readOnly = true)
     public StudentImportPreviewResponseDTO previewImportStudents(Long roundId, MultipartFile file) {
-        ProjectRound round = projectRoundRepository.findById(roundId)
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+        ProjectRound round = getAndValidateActiveRound(roundId);
 
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.INVALID_FILE_FORMAT);
@@ -136,8 +144,7 @@ public class StudentProjectRoundService {
      */
     @Transactional
     public StudentImportResultResponseDTO commitImportStudents(Long roundId, StudentImportCommitRequestDTO requestDTO) {
-        ProjectRound round = projectRoundRepository.findById(roundId)
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+        ProjectRound round = getAndValidateActiveRound(roundId);
 
         Role studentRole = roleRepository.findByName("ROLE_STUDENT")
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
@@ -271,8 +278,7 @@ public class StudentProjectRoundService {
 
     @Transactional
     public StudentProjectRoundResponseDTO addStudentManually(Long roundId, CreateRoundStudentManualDTO dto) {
-        ProjectRound round = projectRoundRepository.findById(roundId)
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+        ProjectRound round = getAndValidateActiveRound(roundId);
 
         String studentCode = dto.getStudentCode().trim();
         String fullName = dto.getFullName().trim();
@@ -430,6 +436,7 @@ public class StudentProjectRoundService {
             Long studentId,
             UpdateStudentRoundStatusRequestDTO dto) {
 
+        getAndValidateActiveRound(roundId);
         StudentProjectRound spr = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
 
@@ -454,6 +461,7 @@ public class StudentProjectRoundService {
      */
     @Transactional
     public void removeStudentFromRound(Long roundId, Long studentId) {
+        getAndValidateActiveRound(roundId);
         StudentProjectRound spr = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
 

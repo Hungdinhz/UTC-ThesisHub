@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiService } from '../../../services/api';
+import type { ProjectRoundItem } from '../../../types';
 import type {
   ProjectDirection,
   LecturerCapacity,
@@ -19,7 +21,9 @@ interface Props {
   projectRoundId?: number;
 }
 
-export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 }) => {
+export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: propRoundId }) => {
+  const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
+  const [selectedRoundId, setSelectedRoundId] = useState<number | null>(propRoundId || null);
   const [activeTab, setActiveTab] = useState<'proposals' | 'capacities' | 'registrations' | 'preferences'>('proposals');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -33,42 +37,83 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
   const [proposals, setProposals] = useState<SupervisorAssignment[]>([]);
   const [stats, setStats] = useState<AssignmentStats | null>(null);
 
+  // 1. Fetch project rounds list
+  useEffect(() => {
+    const fetchRounds = async () => {
+      try {
+        const roundList = await apiService.getProjectRounds();
+        setRounds(roundList || []);
+        if (!propRoundId && roundList && roundList.length > 0) {
+          const activeRound =
+            roundList.find((r) => r.status === 'OPEN') ||
+            roundList.find((r) => r.status === 'IN_PROGRESS') ||
+            roundList.find((r) => r.currentMilestone?.phaseType === 'REGISTRATION') ||
+            roundList[0];
+          setSelectedRoundId(activeRound.roundId);
+        }
+      } catch (err) {
+        console.error('Failed to load project rounds in AssignmentManagementPage:', err);
+        if (!selectedRoundId) {
+          setSelectedRoundId(propRoundId || 1);
+        }
+      }
+    };
+    fetchRounds();
+  }, [propRoundId]);
+
+  const effectiveRoundId = selectedRoundId || propRoundId || 1;
+  const currentRound = rounds.find((r) => r.roundId === effectiveRoundId);
+  const isRoundClosed = currentRound?.status === 'CLOSED' || currentRound?.status === 'ARCHIVED';
+
   const isFinalized = proposals.length > 0 && proposals.every((p) => p.status === 'FINALIZED');
 
-  const loadAllData = useCallback(async () => {
+  const loadAllData = useCallback(async (roundIdToLoad?: number) => {
+    const targetRoundId = roundIdToLoad || effectiveRoundId;
+    if (!targetRoundId) return;
+
     try {
       setLoading(true);
       const [dirsData, capsData, regsData, prefsData, propsData, statsData] = await Promise.all([
         assignmentService.getDirections(),
-        assignmentService.getCapacities(projectRoundId),
-        assignmentService.getRegistrations(projectRoundId),
-        assignmentService.getPreferences(projectRoundId),
-        assignmentService.getProposals(projectRoundId),
-        assignmentService.getStats(projectRoundId),
+        assignmentService.getCapacities(targetRoundId),
+        assignmentService.getRegistrations(targetRoundId),
+        assignmentService.getPreferences(targetRoundId),
+        assignmentService.getProposals(targetRoundId),
+        assignmentService.getStats(targetRoundId),
       ]);
 
-      setDirections(dirsData);
-      setCapacities(capsData);
-      setRegistrations(regsData);
-      setPreferences(prefsData);
-      setProposals(propsData);
-      setStats(statsData);
+      setDirections(dirsData || []);
+      setCapacities(capsData || []);
+      setRegistrations(regsData || []);
+      setPreferences(prefsData || []);
+      setProposals(propsData || []);
+      setStats(statsData || null);
     } catch {
       setAlert({
         type: 'danger',
-        message: 'Không thể tải toàn bộ dữ liệu phân công. Vui lòng thử lại.',
+        message: 'Không thể tải toàn bộ dữ liệu phân công cho đợt này. Vui lòng kiểm tra kết nối máy chủ.',
       });
     } finally {
       setLoading(false);
     }
-  }, [projectRoundId]);
+  }, [effectiveRoundId]);
 
   useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+    if (effectiveRoundId) {
+      loadAllData(effectiveRoundId);
+    }
+  }, [effectiveRoundId, loadAllData]);
 
   // Execute Algorithm: POST /assignments/generate
   const handleGenerate = async () => {
+    if (isRoundClosed) {
+      setAlert({
+        type: 'warning',
+        message: 'Đợt đồ án này đã đóng. Không thể chạy thuật toán phân công.',
+      });
+      return;
+    }
+
     if (isFinalized) {
       if (!window.confirm('Đợt đồ án này đã được chốt phân công. Bạn có chắc muốn chạy lại thuật toán phân công đề xuất?')) {
         return;
@@ -78,16 +123,16 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
     try {
       setActionLoading(true);
       setAlert(null);
-      const generated = await assignmentService.generateAssignments(projectRoundId, true);
+      const generated = await assignmentService.generateAssignments(effectiveRoundId, true);
       setProposals(generated);
-      const updatedStats = await assignmentService.getStats(projectRoundId);
+      const updatedStats = await assignmentService.getStats(effectiveRoundId);
       setStats(updatedStats);
-      const updatedCapacities = await assignmentService.getCapacities(projectRoundId);
+      const updatedCapacities = await assignmentService.getCapacities(effectiveRoundId);
       setCapacities(updatedCapacities);
 
       setAlert({
         type: 'success',
-        message: `Thuật toán phân công đã thực thi thành công! Đã sinh phương án cho ${generated.length} sinh viên.`,
+        message: `Thuật toán phân công đã thực thi thành công! Đã sinh phương án cho ${generated.length} sinh viên trong đợt ${currentRound?.name || effectiveRoundId}.`,
       });
       setActiveTab('proposals');
     } catch {
@@ -102,14 +147,21 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
 
   // Manual Override: PUT /assignments/{id}/override
   const handleOverride = async (assignmentId: number, newLecturerId: number, reason: string) => {
+    if (isRoundClosed) {
+      setAlert({
+        type: 'warning',
+        message: 'Đợt đồ án này đã đóng. Không thể điều chuyển giảng viên.',
+      });
+      return;
+    }
     try {
       setAlert(null);
       await assignmentService.overrideAssignment(assignmentId, newLecturerId, reason);
       // Reload proposals and capacities
       const [updatedProps, updatedCaps, updatedStats] = await Promise.all([
-        assignmentService.getProposals(projectRoundId),
-        assignmentService.getCapacities(projectRoundId),
-        assignmentService.getStats(projectRoundId),
+        assignmentService.getProposals(effectiveRoundId),
+        assignmentService.getCapacities(effectiveRoundId),
+        assignmentService.getStats(effectiveRoundId),
       ]);
       setProposals(updatedProps);
       setCapacities(updatedCaps);
@@ -128,6 +180,14 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
 
   // Finalize Assignments: POST /assignments/finalize
   const handleFinalize = async () => {
+    if (isRoundClosed) {
+      setAlert({
+        type: 'warning',
+        message: 'Đợt đồ án này đã đóng. Không thể chốt kết quả phân công.',
+      });
+      return;
+    }
+
     if (proposals.length === 0) {
       setAlert({
         type: 'warning',
@@ -137,21 +197,21 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
     }
 
     const confirmed = window.confirm(
-      'Bạn có chắc chắn muốn CHỐT KẾT QUẢ PHÂN CÔNG cuối cùng cho đợt đồ án này? Sau khi chốt, danh sách sẽ được khóa và gửi thông báo chính thức đến Giảng viên và Sinh viên.'
+      `Bạn có chắc chắn muốn CHỐT KẾT QUẢ PHÂN CÔNG cuối cùng cho đợt [${currentRound?.name || effectiveRoundId}]? Sau khi chốt, danh sách sẽ được khóa và gửi thông báo chính thức đến Giảng viên và Sinh viên.`
     );
     if (!confirmed) return;
 
     try {
       setActionLoading(true);
       setAlert(null);
-      const finalStats = await assignmentService.finalizeAssignments(projectRoundId);
+      const finalStats = await assignmentService.finalizeAssignments(effectiveRoundId);
       setStats(finalStats);
-      const updatedProps = await assignmentService.getProposals(projectRoundId);
+      const updatedProps = await assignmentService.getProposals(effectiveRoundId);
       setProposals(updatedProps);
 
       setAlert({
         type: 'success',
-        message: 'Khoa đã CHỐT thành công kết quả phân công Giảng viên hướng dẫn!',
+        message: `Khoa đã CHỐT thành công kết quả phân công Giảng viên hướng dẫn cho đợt ${currentRound?.name || effectiveRoundId}!`,
       });
     } catch {
       setAlert({
@@ -165,10 +225,17 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
 
   // Update Lecturer Capacity
   const handleUpdateCapacity = async (id: number, data: Partial<LecturerCapacity>) => {
+    if (isRoundClosed) {
+      setAlert({
+        type: 'warning',
+        message: 'Đợt đồ án này đã đóng. Không thể cập nhật chỉ tiêu giảng viên.',
+      });
+      return;
+    }
     await assignmentService.updateCapacity(id, data);
-    const updatedCaps = await assignmentService.getCapacities(projectRoundId);
+    const updatedCaps = await assignmentService.getCapacities(effectiveRoundId);
     setCapacities(updatedCaps);
-    const updatedStats = await assignmentService.getStats(projectRoundId);
+    const updatedStats = await assignmentService.getStats(effectiveRoundId);
     setStats(updatedStats);
     setAlert({
       type: 'success',
@@ -186,13 +253,18 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
           </h2>
           <p>
             Quy trình ghép nối nguyện vọng, kiểm soát capacity, tối ưu thuật toán và can thiệp thủ công
+            {currentRound && (
+              <span style={{ display: 'block', marginTop: '6px', color: '#0369a1', fontWeight: 600 }}>
+                📌 Đang phân công cho: <strong>{currentRound.name}</strong> ({currentRound.roundCode}) — Năm học {currentRound.academicYear} ({currentRound.semester})
+              </span>
+            )}
           </p>
         </div>
 
         <div className="header-action-group">
           <button
             className="btn-secondary-action"
-            onClick={loadAllData}
+            onClick={() => loadAllData(effectiveRoundId)}
             disabled={loading || actionLoading}
             title="Làm mới dữ liệu từ máy chủ"
           >
@@ -202,7 +274,8 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
           <button
             className="btn-generate-algo"
             onClick={handleGenerate}
-            disabled={actionLoading || loading}
+            disabled={actionLoading || loading || isRoundClosed}
+            title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể chạy phân công' : undefined}
           >
             ⚡ {actionLoading ? 'Đang tính toán...' : 'Chạy thuật toán phân công'}
           </button>
@@ -210,12 +283,102 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
           <button
             className="btn-finalize-action"
             onClick={handleFinalize}
-            disabled={actionLoading || loading || proposals.length === 0}
+            disabled={actionLoading || loading || proposals.length === 0 || isRoundClosed}
+            title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể chốt kết quả' : undefined}
           >
             🔒 {isFinalized ? 'Đã chốt danh sách' : 'Chốt kết quả phân công'}
           </button>
         </div>
       </div>
+
+      {/* Active Project Round Banner & Selector */}
+      <div className="assignment-round-control-card">
+        <div className="round-control-left">
+          <div className="round-icon-badge">🎯</div>
+          <div className="round-info-content">
+            <div className="round-label-row">
+              <span className="round-context-label">ĐANG PHÂN CÔNG CHO ĐỢT ĐỒ ÁN:</span>
+              {currentRound?.status && (
+                <span className={`round-status-pill status-${currentRound.status.toLowerCase()}`}>
+                  ● {currentRound.status === 'OPEN' ? 'Đang mở (OPEN)' : currentRound.status === 'IN_PROGRESS' ? 'Đang diễn ra' : currentRound.status}
+                </span>
+              )}
+              {currentRound?.trainingProgram && (
+                <span className="round-meta-pill program-pill">
+                  🎓 {currentRound.trainingProgram === 'KY_SU' ? 'Hệ Kỹ sư' : 'Hệ Cử nhân'}
+                </span>
+              )}
+            </div>
+            <div className="round-title-row">
+              <h3 className="current-round-heading">
+                {currentRound?.name || `Đợt đồ án #${effectiveRoundId}`}
+              </h3>
+              <span className="round-code-badge">{currentRound?.roundCode || `DA_${effectiveRoundId}`}</span>
+            </div>
+            <div className="round-meta-row">
+              <span>📅 <strong>Năm học:</strong> {currentRound?.academicYear || '2026-2027'}</span>
+              <span className="meta-divider">•</span>
+              <span>⏰ <strong>Học kỳ:</strong> {currentRound?.semester || 'HK1'}</span>
+              {currentRound?.currentMilestone && (
+                <>
+                  <span className="meta-divider">•</span>
+                  <span className="milestone-text">
+                    🚩 <strong>Mốc:</strong> {currentRound.currentMilestone.name || 'Giai đoạn 2: Phân công GVHD'}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="round-control-right">
+          <label htmlFor="admin-round-select" className="round-select-label">
+            Chọn đợt đồ án cần phân công:
+          </label>
+          {rounds.length > 0 ? (
+            <select
+              id="admin-round-select"
+              className="round-select-dropdown"
+              value={effectiveRoundId}
+              onChange={(e) => {
+                const newRoundId = Number(e.target.value);
+                setSelectedRoundId(newRoundId);
+              }}
+            >
+              {rounds.map((r) => (
+                <option key={r.roundId} value={r.roundId}>
+                  [{r.roundCode}] {r.name} ({r.academicYear || '2026-2027'} - {r.semester || 'HK1'})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span style={{ color: '#64748b', fontSize: '0.9rem' }}>Đang tải danh sách đợt đồ án...</span>
+          )}
+        </div>
+      </div>
+
+      {/* Closed Round Alert Banner */}
+      {isRoundClosed && (
+        <div
+          className="alert-box alert-warning"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            backgroundColor: '#fffbeb',
+            border: '1px solid #fde68a',
+            color: '#92400e',
+            padding: '12px 18px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+          }}
+        >
+          <span style={{ fontSize: '1.4rem' }}>🔒</span>
+          <div>
+            <strong>Đợt đồ án đã đóng hoặc đã lưu trữ (Chế độ chỉ xem):</strong> Mọi thao tác ghi danh, phân công thuật toán, chốt kết quả, override và chỉnh sửa chỉ tiêu capacity đã bị khóa đối với đợt này.
+          </div>
+        </div>
+      )}
 
       {/* Alert Banner */}
       {alert && (
@@ -276,6 +439,8 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
           onOverride={handleOverride}
           isFinalized={isFinalized}
           loading={loading}
+          roundName={currentRound?.name}
+          isRoundClosed={isRoundClosed}
         />
       )}
 
@@ -284,6 +449,8 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
           capacities={capacities}
           onUpdateCapacity={handleUpdateCapacity}
           loading={loading}
+          roundName={currentRound?.name}
+          isRoundClosed={isRoundClosed}
         />
       )}
 
@@ -292,11 +459,16 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId = 10 
           registrations={registrations}
           directions={directions}
           loading={loading}
+          roundName={currentRound?.name}
         />
       )}
 
       {activeTab === 'preferences' && (
-        <PreferenceList preferences={preferences} loading={loading} />
+        <PreferenceList
+          preferences={preferences}
+          loading={loading}
+          roundName={currentRound?.name}
+        />
       )}
     </div>
   );

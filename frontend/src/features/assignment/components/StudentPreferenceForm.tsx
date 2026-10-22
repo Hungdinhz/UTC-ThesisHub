@@ -14,6 +14,22 @@ interface Props {
   }) => Promise<void>;
   studentProgram?: 'CU_NHAN' | 'KY_SU';
   loading?: boolean;
+  projectRoundName?: string;
+  projectRoundCode?: string;
+  academicYear?: string;
+  semester?: string;
+  isRoundClosed?: boolean;
+  hasSubmitted?: boolean;
+  canEdit?: boolean;
+  isAssignmentFinalized?: boolean;
+  initialValues?: {
+    directionId?: number;
+    nv1LecturerId?: number;
+    nv2LecturerId?: number;
+    nv3LecturerId?: number;
+    gpa?: number;
+    prioritizationCriteria?: string;
+  };
 }
 
 export const StudentPreferenceForm: React.FC<Props> = ({
@@ -22,23 +38,48 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   onSubmit,
   studentProgram = 'CU_NHAN',
   loading,
+  projectRoundName,
+  projectRoundCode,
+  academicYear,
+  semester,
+  isRoundClosed = false,
+  hasSubmitted = false,
+  canEdit = true,
+  isAssignmentFinalized = false,
+  initialValues,
 }) => {
-  const [selectedDirectionId, setSelectedDirectionId] = useState<number | ''>('');
-  const [nv1, setNv1] = useState<number | ''>('');
-  const [nv2, setNv2] = useState<number | ''>('');
-  const [nv3, setNv3] = useState<number | ''>('');
-  const [gpa, setGpa] = useState<string>('3.2');
-  const [criteria, setCriteria] = useState<string>('');
+  const [selectedDirectionId, setSelectedDirectionId] = useState<number | ''>(initialValues?.directionId || '');
+  const [nv1, setNv1] = useState<number | ''>(initialValues?.nv1LecturerId || '');
+  const [nv2, setNv2] = useState<number | ''>(initialValues?.nv2LecturerId || '');
+  const [nv3, setNv3] = useState<number | ''>(initialValues?.nv3LecturerId || '');
+  const [gpa, setGpa] = useState<string>(initialValues?.gpa !== undefined ? String(initialValues.gpa) : '3.2');
+  const [criteria, setCriteria] = useState<string>(initialValues?.prioritizationCriteria || '');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Auto-select first direction if available
+  const isFormDisabled = isRoundClosed || isAssignmentFinalized || !canEdit || submitting;
+
+  // Sync initialValues when loaded asynchronously
   useEffect(() => {
-    if (directions.length > 0 && selectedDirectionId === '') {
+    if (initialValues) {
+      if (initialValues.directionId) setSelectedDirectionId(initialValues.directionId);
+      if (initialValues.nv1LecturerId) setNv1(initialValues.nv1LecturerId);
+      if (initialValues.nv2LecturerId) setNv2(initialValues.nv2LecturerId);
+      if (initialValues.nv3LecturerId) setNv3(initialValues.nv3LecturerId);
+      if (initialValues.gpa !== undefined && initialValues.gpa !== null) setGpa(String(initialValues.gpa));
+      if (initialValues.prioritizationCriteria !== undefined && initialValues.prioritizationCriteria !== null) {
+        setCriteria(initialValues.prioritizationCriteria);
+      }
+    }
+  }, [initialValues]);
+
+  // Auto-select first direction if available and no initial direction
+  useEffect(() => {
+    if (directions.length > 0 && selectedDirectionId === '' && !initialValues?.directionId) {
       setSelectedDirectionId(directions[0].id);
     }
-  }, [directions, selectedDirectionId]);
+  }, [directions, selectedDirectionId, initialValues]);
 
   // Selected direction object
   const currentDirection = directions.find((d) => d.id === selectedDirectionId);
@@ -63,6 +104,15 @@ export const StudentPreferenceForm: React.FC<Props> = ({
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
+
+    if (isRoundClosed) {
+      setErrorMessage('Đợt đồ án này đã đóng. Cổng đăng ký không còn tiếp nhận thao tác!');
+      return;
+    }
+    if (isAssignmentFinalized || !canEdit) {
+      setErrorMessage('Kết quả phân công GVHD đã được Khoa chốt chính thức. Bạn không thể chỉnh sửa nguyện vọng nữa!');
+      return;
+    }
 
     if (!selectedDirectionId) {
       setErrorMessage('Vui lòng chọn Hướng đồ án tốt nghiệp.');
@@ -104,7 +154,11 @@ export const StudentPreferenceForm: React.FC<Props> = ({
         gpa: gpa ? Number(gpa) : undefined,
         prioritizationCriteria: criteria.trim() || undefined,
       });
-      setSuccessMessage('Đăng ký hướng đồ án và nộp nguyện vọng thành công!');
+      setSuccessMessage(
+        hasSubmitted
+          ? 'Chỉnh sửa và lưu thay đổi nguyện vọng thành công!'
+          : 'Đăng ký hướng đồ án và nộp nguyện vọng thành công!'
+      );
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMessage(err.message);
@@ -119,11 +173,24 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   return (
     <div className="student-reg-card">
       <div className="form-intro-banner">
-        <div className="banner-icon">📝</div>
-        <div>
-          <h3>Đăng ký Hướng đồ án & Nguyện vọng Giảng viên hướng dẫn</h3>
+        <div className="banner-icon">{hasSubmitted ? '✏️' : '📝'}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
+            <h3 style={{ margin: 0 }}>
+              {hasSubmitted
+                ? 'Chỉnh sửa Hướng đồ án & Nguyện vọng Giảng viên hướng dẫn'
+                : 'Đăng ký Hướng đồ án & Nguyện vọng Giảng viên hướng dẫn'}
+            </h3>
+            {projectRoundName && (
+              <span className="round-tag-indicator">
+                🎓 Đang phân công cho: <strong>{projectRoundName}</strong> {projectRoundCode ? `(${projectRoundCode})` : ''}
+              </span>
+            )}
+          </div>
           <p style={{ color: '#1e293b', fontSize: '0.95rem', fontWeight: 500, margin: '4px 0 0 0' }}>
-            Sinh viên lựa chọn hướng chuyên môn và đăng ký tối đa 3 nguyện vọng giảng viên.
+            Sinh viên lựa chọn hướng chuyên môn và đăng ký tối đa 3 nguyện vọng giảng viên cho đợt đồ án{' '}
+            <strong>{projectRoundName || 'tốt nghiệp'}</strong>
+            {academicYear ? ` (${academicYear}${semester ? ` - ${semester}` : ''})` : ''}.
             {studentProgram === 'KY_SU' && (
               <span className="badge-kysu-note">
                 Chương trình Kỹ sư: Yêu cầu GVHD có học vị Tiến sĩ (TS/PGS/GS) trở lên.
@@ -132,6 +199,42 @@ export const StudentPreferenceForm: React.FC<Props> = ({
           </p>
         </div>
       </div>
+
+      {isRoundClosed && (
+        <div className="alert-box alert-warning" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderLeft: '4px solid #f59e0b' }}>
+          <span style={{ fontSize: '1.3rem' }}>🔒</span>
+          <div>
+            <strong>ĐỢT ĐỒ ÁN ĐÃ ĐÓNG (KẾT THÚC):</strong>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.88rem' }}>
+              Cổng đăng ký hướng chuyên môn và nộp nguyện vọng GVHD cho đợt <strong>{projectRoundName || 'này'}</strong> đã kết thúc. Không thể thực hiện thao tác gửi mới hoặc sửa đổi.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!isRoundClosed && isAssignmentFinalized && (
+        <div className="alert-box alert-warning" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderLeft: '4px solid #f59e0b', backgroundColor: '#fffbeb', color: '#92400e' }}>
+          <span style={{ fontSize: '1.3rem' }}>🔒</span>
+          <div>
+            <strong>KẾT QUẢ PHÂN CÔNG ĐÃ ĐƯỢC CHỐT CHÍNH THỨC:</strong>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.88rem' }}>
+              Khoa / Quản trị viên đã chốt danh sách phân công Giảng viên hướng dẫn. Nguyện vọng của bạn hiện đã được khóa và không thể chỉnh sửa.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!isRoundClosed && !isAssignmentFinalized && hasSubmitted && (
+        <div className="alert-box alert-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderLeft: '4px solid #0284c7' }}>
+          <span style={{ fontSize: '1.3rem' }}>✏️</span>
+          <div>
+            <strong>BẠN ĐÃ NỘP NGUYỆN VỌNG TRƯỚC ĐÓ:</strong>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.88rem' }}>
+              Khoa chưa chốt kết quả phân công, bạn có thể thoải mái điều chỉnh lại hướng đồ án và các nguyện vọng GVHD bên dưới, sau đó bấm <strong>"Chỉnh sửa & Lưu thay đổi nguyện vọng"</strong> để cập nhật.
+            </p>
+          </div>
+        </div>
+      )}
 
       {errorMessage && <div className="alert-box alert-danger">{errorMessage}</div>}
       {successMessage && <div className="alert-box alert-success">{successMessage}</div>}
@@ -149,14 +252,17 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                 key={d.id}
                 className={`direction-option-card ${
                   selectedDirectionId === d.id ? 'selected' : ''
-                }`}
+                } ${isFormDisabled ? 'disabled' : ''}`}
+                style={isFormDisabled ? { cursor: 'not-allowed', opacity: 0.85 } : undefined}
               >
                 <input
                   type="radio"
                   name="direction"
                   value={d.id}
+                  disabled={isFormDisabled}
                   checked={selectedDirectionId === d.id}
                   onChange={() => {
+                    if (isFormDisabled) return;
                     setSelectedDirectionId(d.id);
                     // Reset preferences if changing direction
                     setNv1('');
@@ -261,6 +367,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
               <select
                 className="form-select"
                 value={nv1}
+                disabled={isFormDisabled}
                 onChange={(e) => setNv1(e.target.value ? Number(e.target.value) : '')}
                 required
               >
@@ -278,6 +385,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
               <select
                 className="form-select"
                 value={nv2}
+                disabled={isFormDisabled}
                 onChange={(e) => setNv2(e.target.value ? Number(e.target.value) : '')}
               >
                 <option value="">-- Chọn Giảng viên NV2 (Tùy chọn) --</option>
@@ -296,6 +404,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
               <select
                 className="form-select"
                 value={nv3}
+                disabled={isFormDisabled}
                 onChange={(e) => setNv3(e.target.value ? Number(e.target.value) : '')}
               >
                 <option value="">-- Chọn Giảng viên NV3 (Tùy chọn) --</option>
@@ -327,6 +436,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                 max="4.0"
                 className="form-input"
                 placeholder="VD: 3.45"
+                disabled={isFormDisabled}
                 value={gpa}
                 onChange={(e) => setGpa(e.target.value)}
               />
@@ -341,6 +451,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                 className="form-textarea"
                 rows={3}
                 placeholder="Ví dụ: Đã có chứng chỉ IELTS 6.5 / AWS Certified / Có kinh nghiệm làm dự án React, Spring Boot / Mong muốn làm về đề tài AI Agents..."
+                disabled={isFormDisabled}
                 value={criteria}
                 onChange={(e) => setCriteria(e.target.value)}
               />
@@ -349,8 +460,27 @@ export const StudentPreferenceForm: React.FC<Props> = ({
         </div>
 
         <div className="form-actions">
-          <button type="submit" className="btn-submit-preference" disabled={submitting || loading}>
-            {submitting ? 'Đang gửi đăng ký...' : '🚀 Xác nhận & Nộp đăng ký nguyện vọng'}
+          <button
+            type="submit"
+            className="btn-submit-preference"
+            disabled={isFormDisabled || loading}
+            style={
+              !canEdit
+                ? { backgroundColor: '#94a3b8', cursor: 'not-allowed' }
+                : hasSubmitted
+                ? { backgroundColor: '#d97706', borderColor: '#b45309', color: '#fff' }
+                : undefined
+            }
+          >
+            {isRoundClosed
+              ? '🔒 Đợt đồ án đã đóng (Không thể thao tác)'
+              : isAssignmentFinalized
+              ? '🔒 Đã chốt kết quả phân công (Không thể chỉnh sửa)'
+              : submitting
+              ? 'Đang lưu nguyện vọng...'
+              : hasSubmitted
+              ? '✏️ Chỉnh sửa & Lưu thay đổi nguyện vọng'
+              : '🚀 Xác nhận & Nộp đăng ký nguyện vọng'}
           </button>
         </div>
       </form>

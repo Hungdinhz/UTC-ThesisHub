@@ -4,9 +4,10 @@ import type { PreferenceResponse } from '../types';
 interface Props {
   preferences: PreferenceResponse[];
   loading?: boolean;
+  roundName?: string;
 }
 
-export const PreferenceList: React.FC<Props> = ({ preferences, loading }) => {
+export const PreferenceList: React.FC<Props> = ({ preferences, loading, roundName }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 1 | 2 | 3>('ALL');
 
@@ -32,7 +33,10 @@ export const PreferenceList: React.FC<Props> = ({ preferences, loading }) => {
     <div className="preference-list-card">
       <div className="card-header-bar">
         <div className="header-titles">
-          <h3>Danh sách nguyện vọng của sinh viên (NV1, NV2, NV3)</h3>
+          <h3>
+            Danh sách nguyện vọng của sinh viên (NV1, NV2, NV3)
+            {roundName && <span className="table-round-name"> — {roundName}</span>}
+          </h3>
           <span className="count-badge">{filtered.length} nguyện vọng</span>
         </div>
 
