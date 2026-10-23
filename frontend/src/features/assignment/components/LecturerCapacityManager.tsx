@@ -5,12 +5,16 @@ interface Props {
   capacities: LecturerCapacity[];
   onUpdateCapacity: (id: number, data: Partial<LecturerCapacity>) => Promise<void>;
   loading?: boolean;
+  roundName?: string;
+  isRoundClosed?: boolean;
 }
 
 export const LecturerCapacityManager: React.FC<Props> = ({
   capacities,
   onUpdateCapacity,
   loading,
+  roundName,
+  isRoundClosed,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCapacity, setEditingCapacity] = useState<LecturerCapacity | null>(null);
@@ -27,6 +31,7 @@ export const LecturerCapacityManager: React.FC<Props> = ({
   );
 
   const handleOpenEdit = (cap: LecturerCapacity) => {
+    if (isRoundClosed) return;
     setEditingCapacity(cap);
     setQuotaInput(cap.maxQuota);
     setFactorInput(cap.capacityFactor);
@@ -56,7 +61,10 @@ export const LecturerCapacityManager: React.FC<Props> = ({
     <div className="capacity-manager-card">
       <div className="card-header-bar">
         <div className="header-titles">
-          <h3>Quản lý năng lực hướng dẫn & Chỉ tiêu giảng viên</h3>
+          <h3>
+            Quản lý năng lực hướng dẫn & Chỉ tiêu giảng viên
+            {roundName && <span className="table-round-name"> — {roundName}</span>}
+          </h3>
           <span className="count-badge">{filtered.length} giảng viên</span>
         </div>
 
@@ -162,13 +170,17 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                       </div>
                     </td>
                     <td>
-                      <button
-                        className="btn-action-edit"
-                        onClick={() => handleOpenEdit(cap)}
-                        title="Chỉnh sửa chỉ tiêu và hệ số"
-                      >
-                        ⚙️ Sửa
-                      </button>
+                      {!isRoundClosed ? (
+                        <button
+                          className="btn-action-edit"
+                          onClick={() => handleOpenEdit(cap)}
+                          title="Chỉnh sửa chỉ tiêu và hệ số"
+                        >
+                          ⚙️ Sửa
+                        </button>
+                      ) : (
+                        <span className="text-muted text-xs">Đã khóa</span>
+                      )}
                     </td>
                   </tr>
                 );

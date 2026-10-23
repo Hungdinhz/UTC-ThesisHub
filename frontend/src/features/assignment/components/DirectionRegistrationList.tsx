@@ -5,12 +5,14 @@ interface Props {
   registrations: DirectionRegistration[];
   directions: ProjectDirection[];
   loading?: boolean;
+  roundName?: string;
 }
 
 export const DirectionRegistrationList: React.FC<Props> = ({
   registrations,
   directions,
   loading,
+  roundName,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDirection, setSelectedDirection] = useState<number | 'ALL'>('ALL');
@@ -37,7 +39,10 @@ export const DirectionRegistrationList: React.FC<Props> = ({
     <div className="registration-list-card">
       <div className="card-header-bar">
         <div className="header-titles">
-          <h3>Danh sách sinh viên đăng ký hướng đồ án</h3>
+          <h3>
+            Danh sách sinh viên đăng ký hướng đồ án
+            {roundName && <span className="table-round-name"> — {roundName}</span>}
+          </h3>
           <span className="count-badge">{filtered.length} sinh viên</span>
         </div>
 

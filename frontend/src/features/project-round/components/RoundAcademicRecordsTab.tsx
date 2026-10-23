@@ -10,12 +10,14 @@ interface RoundAcademicRecordsTabProps {
   roundId: number;
   roundName: string;
   roundCode: string;
+  isRoundClosed?: boolean;
 }
 
 export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = ({
   roundId,
   roundName,
   roundCode,
+  isRoundClosed,
 }) => {
   // Data states
   const [records, setRecords] = useState<AcademicRecordItem[]>([]);
@@ -120,6 +122,10 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
 
   // Commit import
   const handleCommitImport = async () => {
+    if (isRoundClosed) {
+      setError('Đợt đồ án đã đóng. Không thể import dữ liệu học vụ.');
+      return;
+    }
     if (!previewData || !previewData.rows) return;
 
     try {
@@ -144,6 +150,14 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
 
   return (
     <div>
+      {/* Closed Round Notice Banner */}
+      {isRoundClosed && (
+        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '1.2rem' }}>🔒</span>
+          <span><strong>Đợt đồ án đã đóng:</strong> Dữ liệu học vụ đang ở chế độ chỉ xem. Không thể nạp thêm hồ sơ học vụ cho đợt này.</span>
+        </div>
+      )}
+
       {/* Alert Messages */}
       {error && (
         <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
@@ -187,25 +201,28 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
             📥 Tải Excel mẫu học vụ
           </button>
           <button
+            disabled={isRoundClosed}
             onClick={() => {
+              if (isRoundClosed) return;
               setShowImportModal(true);
               setImportResultMsg(null);
               setPreviewData(null);
               setImportFile(null);
             }}
             style={{
-              backgroundColor: '#16a34a',
+              backgroundColor: isRoundClosed ? '#94a3b8' : '#16a34a',
               color: '#fff',
               border: 'none',
               padding: '8px 16px',
               borderRadius: '6px',
               fontWeight: 600,
               fontSize: '0.85rem',
-              cursor: 'pointer',
+              cursor: isRoundClosed ? 'not-allowed' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
             }}
+            title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể import học vụ' : undefined}
           >
             📤 Import học vụ (Excel)
           </button>

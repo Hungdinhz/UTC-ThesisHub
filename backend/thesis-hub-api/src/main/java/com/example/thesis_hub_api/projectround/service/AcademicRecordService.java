@@ -45,13 +45,21 @@ public class AcademicRecordService {
     private final MajorRepository majorRepository;
     private final AcademicRecordExcelParser academicRecordExcelParser;
 
+    private ProjectRound getAndValidateActiveRound(Long roundId) {
+        ProjectRound round = projectRoundRepository.findById(roundId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+        if ("CLOSED".equalsIgnoreCase(round.getStatus()) || "ARCHIVED".equalsIgnoreCase(round.getStatus())) {
+            throw new AppException(ErrorCode.PROJECT_ROUND_CLOSED);
+        }
+        return round;
+    }
+
     /**
      * Xem trước (Preview) kết quả phân tích file Excel điểm học vụ xét điều kiện
      */
     @Transactional(readOnly = true)
     public AcademicRecordImportPreviewResponseDTO previewImport(Long roundId, MultipartFile file) {
-        ProjectRound round = projectRoundRepository.findById(roundId)
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+        ProjectRound round = getAndValidateActiveRound(roundId);
 
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.INVALID_FILE_FORMAT);
@@ -114,8 +122,7 @@ public class AcademicRecordService {
      */
     @Transactional
     public AcademicRecordImportResultResponseDTO commitImport(Long roundId, AcademicRecordImportCommitRequestDTO requestDTO) {
-        ProjectRound round = projectRoundRepository.findById(roundId)
-                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+        ProjectRound round = getAndValidateActiveRound(roundId);
 
         int totalProcessed = 0;
         int recordsCreated = 0;

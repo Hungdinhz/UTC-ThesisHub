@@ -7,6 +7,7 @@ import type {
   LecturerCapacity,
   SupervisorAssignment,
   DirectionRegistration,
+  PreferenceResponse,
 } from '../types';
 import { assignmentService } from '../services/assignmentService';
 import { StudentPreferenceForm } from '../components/StudentPreferenceForm';
@@ -31,9 +32,11 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   const [directions, setDirections] = useState<ProjectDirection[]>([]);
   const [capacities, setCapacities] = useState<LecturerCapacity[]>([]);
   const [currentRegistration, setCurrentRegistration] = useState<DirectionRegistration | null>(null);
+  const [myPreferences, setMyPreferences] = useState<PreferenceResponse[]>([]);
   const [myAssignment, setMyAssignment] = useState<SupervisorAssignment | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeProgram, setActiveProgram] = useState<'CU_NHAN' | 'KY_SU'>(initialProgram);
+  const [isRoundFinalized, setIsRoundFinalized] = useState(false);
 
   // 1. Load project rounds
   useEffect(() => {
@@ -43,8 +46,10 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         setRounds(roundList || []);
 
         if (!propRoundId && roundList && roundList.length > 0) {
-          // Find active/in-progress round first
-          const activeRound = roundList.find((r) => r.status === 'IN_PROGRESS') ||
+          // Find active/open/in-progress round first
+          const activeRound =
+            roundList.find((r) => r.status === 'OPEN') ||
+            roundList.find((r) => r.status === 'IN_PROGRESS') ||
             roundList.find((r) => r.currentMilestone?.phaseType === 'REGISTRATION') ||
             roundList[0];
           setSelectedRoundId(activeRound.roundId);
@@ -54,7 +59,6 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         }
       } catch (err) {
         console.error('Failed to load project rounds:', err);
-        // Fallback default round ID
         if (!selectedRoundId) setSelectedRoundId(1);
       }
     };
@@ -64,26 +68,43 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   const effectiveRoundId = selectedRoundId || propRoundId || 1;
   const currentRound = rounds.find((r) => r.roundId === effectiveRoundId);
 
-  // 2. Load directions, capacities, registrations, assignments for effective round
+  // 2. Load directions, capacities, registrations, preferences, assignments for effective round
   const loadData = async (roundId: number) => {
     try {
       setLoading(true);
-      const [dirsData, capsData, propsData, regsData] = await Promise.all([
+      const [dirsData, capsData, propsData, regsData, prefsData] = await Promise.all([
         assignmentService.getDirections(true),
         assignmentService.getCapacities(roundId),
         assignmentService.getProposals(roundId),
         assignmentService.getRegistrations(roundId),
+        assignmentService.getPreferences(roundId),
       ]);
 
       setDirections(dirsData || []);
       setCapacities(capsData || []);
 
-      // Check current registration and assignment for this student
-      const myReg = regsData?.find((r) => r.studentId === effectiveStudentId);
+      // Check current registration, preferences, and assignment for this student
+      const userCode = (user as any)?.registration_no || (user as any)?.studentCode || (user as any)?.student_code || user?.username;
+      const myReg = regsData?.find((r) =>
+        (effectiveStudentId && r.studentId === effectiveStudentId) ||
+        (userCode && r.studentCode === userCode)
+      );
       setCurrentRegistration(myReg || null);
 
-      const assigned = propsData?.find((p) => p.studentId === effectiveStudentId);
+      const studentPrefs = prefsData?.filter((p) =>
+        (effectiveStudentId && p.studentId === effectiveStudentId) ||
+        (userCode && (p as any).studentCode === userCode)
+      ) || [];
+      setMyPreferences(studentPrefs);
+
+      const assigned = propsData?.find((p) =>
+        (effectiveStudentId && p.studentId === effectiveStudentId) ||
+        (userCode && (p as any).studentCode === userCode)
+      );
       setMyAssignment(assigned || null);
+
+      const finalized = propsData?.some((p) => p.status === 'FINALIZED') || assigned?.status === 'FINALIZED';
+      setIsRoundFinalized(!!finalized);
     } catch (err) {
       console.error('Failed to load assignment data:', err);
     } finally {
@@ -97,6 +118,29 @@ export const StudentAssignmentPage: React.FC<Props> = ({
     }
   }, [effectiveRoundId, effectiveStudentId]);
 
+  // Synchronize student program automatically from profile or round (student cannot manually change)
+  useEffect(() => {
+    const userProg = (user as any)?.trainingProgram || (user as any)?.training_program || (user as any)?.program;
+    if (userProg === 'KY_SU' || userProg === 'CU_NHAN') {
+      setActiveProgram(userProg);
+    } else if (currentRound?.trainingProgram === 'KY_SU' || currentRound?.trainingProgram === 'CU_NHAN') {
+      setActiveProgram(currentRound.trainingProgram);
+    }
+  }, [user, currentRound]);
+
+  const isRoundClosed = currentRound?.status === 'CLOSED' || currentRound?.status === 'ARCHIVED';
+  const hasSubmitted = !!currentRegistration || myPreferences.length > 0;
+  const canEdit = !isRoundClosed && !isRoundFinalized;
+
+  const initialFormValues = {
+    directionId: currentRegistration?.directionId,
+    nv1LecturerId: myPreferences.find((p) => p.priority === 1)?.lecturerId,
+    nv2LecturerId: myPreferences.find((p) => p.priority === 2)?.lecturerId,
+    nv3LecturerId: myPreferences.find((p) => p.priority === 3)?.lecturerId,
+    gpa: myPreferences[0]?.gpa,
+    prioritizationCriteria: myPreferences[0]?.prioritizationCriteria,
+  };
+
   const handleSubmit = async (data: {
     directionId: number;
     nv1LecturerId: number;
@@ -105,6 +149,15 @@ export const StudentAssignmentPage: React.FC<Props> = ({
     gpa?: number;
     prioritizationCriteria?: string;
   }) => {
+    if (!canEdit) {
+      if (isRoundClosed) {
+        alert('Đợt đồ án này đã đóng. Không thể đăng ký hoặc thay đổi nguyện vọng.');
+      } else if (isRoundFinalized) {
+        alert('Kết quả phân công Giảng viên hướng dẫn đã được Khoa chốt chính thức. Bạn không thể chỉnh sửa nguyện vọng nữa.');
+      }
+      return;
+    }
+
     // 1. Register direction
     await assignmentService.registerDirection({
       projectRoundId: effectiveRoundId,
@@ -133,117 +186,113 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
   return (
     <div className="assignment-container">
-      {/* Round Selector Bar */}
-      <div
-        style={{
-          backgroundColor: '#fff',
-          border: '1px solid #cbd5e1',
-          borderRadius: '10px',
-          padding: '16px 20px',
-          marginBottom: '20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '1.2rem' }}>🎓</span>
-            <strong style={{ color: '#0a3273', fontSize: '1rem' }}>
-              Đợt Đồ án Tốt nghiệp & Khóa sinh viên:
-            </strong>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {rounds.length > 0 ? (
-              <select
-                value={effectiveRoundId}
-                onChange={(e) => {
-                  const rId = Number(e.target.value);
-                  setSelectedRoundId(rId);
-                  const selected = rounds.find((r) => r.roundId === rId);
-                  if (selected?.trainingProgram === 'KY_SU' || selected?.trainingProgram === 'CU_NHAN') {
-                    setActiveProgram(selected.trainingProgram);
-                  }
-                }}
-                style={{
-                  padding: '7px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #003366',
-                  fontWeight: 600,
-                  color: '#003366',
-                  backgroundColor: '#f8fafc',
-                  cursor: 'pointer',
-                  minWidth: '280px',
-                }}
-              >
-                {rounds.map((r) => (
-                  <option key={r.roundId} value={r.roundId}>
-                    [{r.roundCode}] {r.name} ({r.academicYear || '2026-2027'})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span style={{ color: '#64748b' }}>Đang tải danh sách đợt đồ án...</span>
-            )}
-
-            {currentRound?.currentMilestone && (
-              <span
-                style={{
-                  backgroundColor: '#dcfce7',
-                  color: '#15803d',
-                  padding: '4px 10px',
-                  borderRadius: '14px',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  border: '1px solid #bbf7d0',
-                }}
-              >
-                🎯 {currentRound.currentMilestone.name || 'Giai đoạn đăng ký nguyện vọng'}
+      {/* Project Round Context & Selector Bar */}
+      <div className="assignment-round-control-card">
+        <div className="round-control-left">
+          <div className="round-icon-badge">🎓</div>
+          <div className="round-info-content">
+            <div className="round-label-row">
+              <span className="round-context-label">ĐANG ĐĂNG KÝ CHO ĐỢT ĐỒ ÁN:</span>
+              {currentRound?.status && (
+                <span className={`round-status-pill status-${currentRound.status.toLowerCase()}`}>
+                  ● {currentRound.status === 'OPEN' ? 'Đang mở đăng ký' : currentRound.status === 'IN_PROGRESS' ? 'Đang diễn ra' : currentRound.status}
+                </span>
+              )}
+              <span className="round-meta-pill program-pill">
+                {activeProgram === 'KY_SU' ? 'Hệ Kỹ sư (Yêu cầu TS+)' : 'Hệ Cử nhân'}
               </span>
-            )}
+            </div>
+            <div className="round-title-row">
+              <h3 className="current-round-heading">
+                {currentRound?.name || `Đợt đồ án #${effectiveRoundId}`}
+              </h3>
+              <span className="round-code-badge">{currentRound?.roundCode || `DA_${effectiveRoundId}`}</span>
+            </div>
+            <div className="round-meta-row">
+              <span>📅 <strong>Năm học:</strong> {currentRound?.academicYear || '2026-2027'}</span>
+              <span className="meta-divider">•</span>
+              <span>⏰ <strong>Học kỳ:</strong> {currentRound?.semester || 'HK1'}</span>
+              {currentRound?.currentMilestone && (
+                <>
+                  <span className="meta-divider">•</span>
+                  <span className="milestone-text">
+                    🎯 <strong>Mốc:</strong> {currentRound.currentMilestone.name || 'Giai đoạn đăng ký nguyện vọng'}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Program Toggle (Cử nhân / Kỹ sư) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>
-            Hệ đào tạo:
-          </span>
-          <button
-            type="button"
-            onClick={() => setActiveProgram('CU_NHAN')}
-            style={{
-              padding: '6px 12px',
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px', alignItems: 'flex-end', justifyContent: 'center' }}>
+          {/* Read-only Round Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+            <span style={{ color: '#64748b', fontWeight: 500 }}>Đợt đồ án:</span>
+            <span style={{
+              background: '#f8fafc',
+              color: '#0f172a',
+              padding: '4px 10px',
               borderRadius: '6px',
-              border: activeProgram === 'CU_NHAN' ? '2px solid #0a3273' : '1px solid #cbd5e1',
-              backgroundColor: activeProgram === 'CU_NHAN' ? '#0a3273' : '#fff',
-              color: activeProgram === 'CU_NHAN' ? '#fff' : '#334155',
               fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-            }}
-          >
-            Hệ Cử nhân
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveProgram('KY_SU')}
-            style={{
-              padding: '6px 12px',
+              border: '1px solid #cbd5e1'
+            }}>
+              🔒 {currentRound ? `[${currentRound.roundCode}] ${currentRound.name}` : `Đợt #${effectiveRoundId}`}
+            </span>
+          </div>
+
+          {/* Read-only Program Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+            <span style={{ color: '#64748b', fontWeight: 500 }}>Hệ đào tạo:</span>
+            <span style={{
+              background: activeProgram === 'KY_SU' ? '#fef3c7' : '#eff6ff',
+              color: activeProgram === 'KY_SU' ? '#92400e' : '#1e40af',
+              padding: '4px 10px',
               borderRadius: '6px',
-              border: activeProgram === 'KY_SU' ? '2px solid #b45309' : '1px solid #cbd5e1',
-              backgroundColor: activeProgram === 'KY_SU' ? '#d97706' : '#fff',
-              color: activeProgram === 'KY_SU' ? '#fff' : '#334155',
               fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-            }}
-          >
-            Hệ Kỹ sư (Yêu cầu TS+)
-          </button>
+              border: `1px solid ${activeProgram === 'KY_SU' ? '#fde68a' : '#bfdbfe'}`
+            }}>
+              🔒 {activeProgram === 'KY_SU' ? 'Hệ Kỹ sư (Yêu cầu GVHD TS+)' : 'Hệ Cử nhân'}
+            </span>
+          </div>
+
+          {/* Registration / Finalization State Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+            <span style={{ color: '#64748b', fontWeight: 500 }}>Trạng thái:</span>
+            {isRoundFinalized ? (
+              <span style={{
+                background: '#f0fdf4',
+                color: '#166534',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontWeight: 700,
+                border: '1px solid #bbf7d0'
+              }}>
+                🔒 Đã chốt phân công
+              </span>
+            ) : hasSubmitted ? (
+              <span style={{
+                background: '#fffbeb',
+                color: '#b45309',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontWeight: 700,
+                border: '1px solid #fde68a'
+              }}>
+                ✏️ Đã nộp (Có thể sửa)
+              </span>
+            ) : (
+              <span style={{
+                background: '#f8fafc',
+                color: '#64748b',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontWeight: 600,
+                border: '1px solid #e2e8f0'
+              }}>
+                📝 Chưa nộp nguyện vọng
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -290,6 +339,15 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         onSubmit={handleSubmit}
         studentProgram={activeProgram}
         loading={loading}
+        projectRoundName={currentRound?.name}
+        projectRoundCode={currentRound?.roundCode}
+        academicYear={currentRound?.academicYear}
+        semester={currentRound?.semester}
+        isRoundClosed={isRoundClosed}
+        hasSubmitted={hasSubmitted}
+        canEdit={canEdit}
+        isAssignmentFinalized={isRoundFinalized}
+        initialValues={initialFormValues}
       />
     </div>
   );

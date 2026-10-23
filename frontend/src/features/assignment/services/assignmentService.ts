@@ -25,49 +25,49 @@ const getAuthHeaders = () => {
 export const mockDirections: ProjectDirection[] = [
   {
     id: 1,
-    code: 'HD_AI',
-    name: 'Trí tuệ nhân tạo & Học máy chuyên sâu',
-    description: 'Nghiên cứu thị giác máy tính, NLP, Generative AI, LLMs và AI Agents.',
+    code: 'HD_PM_APP',
+    name: 'Phát triển phần mềm và ứng dụng (webApp, MobileApp)',
+    description: 'Phát triển các hệ thống phần mềm quy mô lớn, ứng dụng Web và Mobile App, kiến trúc phần mềm, CI/CD và DevOps.',
+    departmentId: 1,
+    departmentName: 'Công nghệ phần mềm',
+    isActive: true,
+    lecturerCount: 3,
+  },
+  {
+    id: 2,
+    code: 'HD_DATA_AI',
+    name: 'Dữ liệu và trí tuệ nhân tạo',
+    description: 'Khai phá dữ liệu lớn (Big Data), học máy (Machine Learning), Deep Learning, thị giác máy tính, NLP và ứng dụng AI.',
     departmentId: 3,
     departmentName: 'Khoa học máy tính',
     isActive: true,
     lecturerCount: 3,
   },
   {
-    id: 2,
-    code: 'HD_SE',
-    name: 'Kỹ thuật phần mềm & Kiến trúc Microservices',
-    description: 'Thiết kế hệ thống phần mềm lớn, Clean Architecture, CI/CD, DevOps.',
-    departmentId: 1,
-    departmentName: 'Công nghệ phần mềm',
-    isActive: true,
-    lecturerCount: 4,
-  },
-  {
     id: 3,
-    code: 'HD_WEB_CLOUD',
-    name: 'Ứng dụng Web hiện đại & Điện toán đám mây',
-    description: 'Xây dựng web phân tán, Cloud-Native, Kubernetes, AWS/GCP.',
+    code: 'HD_GAME',
+    name: 'Lập trình Game',
+    description: 'Thiết kế và phát triển trò chơi đa nền tảng (Unity, Unreal Engine), mô phỏng vật lý, đồ họa 3D và tương tác thời gian thực.',
     departmentId: 1,
     departmentName: 'Công nghệ phần mềm',
     isActive: true,
-    lecturerCount: 3,
+    lecturerCount: 2,
   },
   {
     id: 4,
-    code: 'HD_SECURITY',
-    name: 'An toàn thông tin & Bảo mật mạng',
-    description: 'Mật mã học, kiểm thử thâm nhập, bảo vệ hạ tầng thông tin.',
-    departmentId: 4,
-    departmentName: 'Mạng máy tính & ATTT',
+    code: 'HD_TESTING',
+    name: 'Kiểm thử phần mềm',
+    description: 'Kiểm thử tự động (Automation Testing), quy trình bảo đảm chất lượng QA/QC, Performance Testing, Security Testing.',
+    departmentId: 1,
+    departmentName: 'Công nghệ phần mềm',
     isActive: true,
     lecturerCount: 2,
   },
   {
     id: 5,
-    code: 'HD_IOT',
-    name: 'Internet vạn vật (IoT) & Hệ thống nhúng',
-    description: 'Thiết bị thông minh, Smart City, vi điều khiển và xử lý cảm biến.',
+    code: 'HD_NET_INFRA',
+    name: 'Hệ thống, mạng và hạ tầng CNTT',
+    description: 'Thiết kế hạ tầng mạng doanh nghiệp, quản trị hệ thống Linux/Windows, ảo hóa, điện toán đám mây và triển khai hạ tầng CNTT.',
     departmentId: 4,
     departmentName: 'Mạng máy tính & ATTT',
     isActive: true,
@@ -75,13 +75,23 @@ export const mockDirections: ProjectDirection[] = [
   },
   {
     id: 6,
-    code: 'HD_DATA',
-    name: 'Khoa học dữ liệu & Big Data Analytics',
-    description: 'Data Pipeline, Business Intelligence, Data Warehouse và khai phá dữ liệu.',
-    departmentId: 2,
-    departmentName: 'Hệ thống thông tin',
+    code: 'HD_SECURITY',
+    name: 'An toàn thông tin và an ninh mạng',
+    description: 'An toàn thông tin, bảo mật mạng, kiểm thử xâm nhập (Penetration Testing), điều tra số và an toàn ứng dụng.',
+    departmentId: 4,
+    departmentName: 'Mạng máy tính & ATTT',
     isActive: true,
-    lecturerCount: 3,
+    lecturerCount: 2,
+  },
+  {
+    id: 7,
+    code: 'HD_ALGO',
+    name: 'Nghiên cứu và ứng dụng thuật toán',
+    description: 'Cấu trúc dữ liệu và giải thuật nâng cao, tối ưu hóa tổ hợp, lý thuyết đồ thị và ứng dụng thuật toán giải quyết các bài toán thực tế.',
+    departmentId: 3,
+    departmentName: 'Khoa học máy tính',
+    isActive: true,
+    lecturerCount: 2,
   },
 ];
 
@@ -313,22 +323,10 @@ export const assignmentService = {
     try {
       const res = await axios.post(`${API_BASE}/register-direction`, data, { headers: getAuthHeaders() });
       return res.data?.data || res.data;
-    } catch {
-      // Mock fallback
-      const dir = mockDirections.find((d) => d.id === data.directionId) || mockDirections[0];
-      return {
-        id: Date.now(),
-        studentId: data.studentId || 201,
-        studentCode: '2021600101',
-        studentName: 'Trần Minh Quang',
-        projectRoundId: data.projectRoundId,
-        directionId: data.directionId,
-        directionCode: dir.code,
-        directionName: dir.name,
-        status: 'REGISTERED',
-        registeredAt: new Date().toISOString(),
-        note: data.note,
-      };
+    } catch (err: any) {
+      console.error('Failed to register direction:', err);
+      const msg = err.response?.data?.message || err.message || 'Lỗi khi đăng ký hướng đồ án';
+      throw new Error(msg);
     }
   },
 
@@ -338,38 +336,10 @@ export const assignmentService = {
         params: { projectRoundId, directionId },
         headers: getAuthHeaders(),
       });
-      return res.data?.data || res.data;
-    } catch {
-      return [
-        {
-          id: 1,
-          studentId: 201,
-          studentCode: '2021600101',
-          studentName: 'Trần Minh Quang',
-          studentClass: 'CNTT1 - K62',
-          trainingProgramCode: 'CU_NHAN',
-          projectRoundId,
-          directionId: 1,
-          directionCode: 'HD_AI',
-          directionName: 'Trí tuệ nhân tạo & Học máy chuyên sâu',
-          status: 'REGISTERED',
-          registeredAt: new Date().toISOString(),
-        },
-        {
-          id: 2,
-          studentId: 202,
-          studentCode: '2021600102',
-          studentName: 'Lê Thùy Dung',
-          studentClass: 'KTPM - K62',
-          trainingProgramCode: 'KY_SU',
-          projectRoundId,
-          directionId: 1,
-          directionCode: 'HD_AI',
-          directionName: 'Trí tuệ nhân tạo & Học máy chuyên sâu',
-          status: 'REGISTERED',
-          registeredAt: new Date().toISOString(),
-        },
-      ];
+      return res.data?.data || res.data || [];
+    } catch (err) {
+      console.error('Failed to get registrations:', err);
+      return [];
     }
   },
 
@@ -380,26 +350,10 @@ export const assignmentService = {
         params: { projectRoundId, studentId },
         headers: getAuthHeaders(),
       });
-      return res.data?.data || res.data;
-    } catch {
-      return [
-        {
-          id: 1,
-          studentId: studentId || 201,
-          studentCode: '2021600101',
-          studentName: 'Trần Minh Quang',
-          trainingProgramCode: 'CU_NHAN',
-          projectRoundId,
-          lecturerId: 101,
-          lecturerCode: 'GV001',
-          lecturerName: 'TS. Nguyễn Văn Hướng',
-          academicDegree: 'TIEN_SI',
-          priority: 1,
-          gpa: 3.65,
-          prioritizationCriteria: 'Có chứng chỉ AWS, IELTS 7.0, định hướng làm AI Agent',
-          status: 'PENDING',
-        },
-      ];
+      return res.data?.data || res.data || [];
+    } catch (err) {
+      console.error('Failed to get preferences:', err);
+      return [];
     }
   },
 
@@ -407,24 +361,10 @@ export const assignmentService = {
     try {
       const res = await axios.post(`${API_BASE}/preferences`, data, { headers: getAuthHeaders() });
       return res.data?.data || res.data;
-    } catch {
-      // Return simulated preferences
-      return data.preferences.map((p, idx) => ({
-        id: idx + 1,
-        studentId: data.studentId || 201,
-        studentCode: '2021600101',
-        studentName: 'Sinh viên',
-        trainingProgramCode: 'CU_NHAN',
-        projectRoundId: data.projectRoundId,
-        lecturerId: p.lecturerId,
-        lecturerCode: `GV00${p.lecturerId}`,
-        lecturerName: `Giảng viên ${p.lecturerId}`,
-        academicDegree: 'TIEN_SI',
-        priority: p.priority,
-        gpa: data.gpa,
-        prioritizationCriteria: data.prioritizationCriteria,
-        status: 'PENDING',
-      }));
+    } catch (err: any) {
+      console.error('Failed to submit preferences:', err);
+      const msg = err.response?.data?.message || err.message || 'Lỗi khi gửi nguyện vọng giảng viên';
+      throw new Error(msg);
     }
   },
 

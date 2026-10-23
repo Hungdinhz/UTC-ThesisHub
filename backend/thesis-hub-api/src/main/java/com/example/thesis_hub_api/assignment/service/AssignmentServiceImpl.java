@@ -5,6 +5,8 @@ import com.example.thesis_hub_api.assignment.dto.*;
 import com.example.thesis_hub_api.assignment.entity.*;
 import com.example.thesis_hub_api.assignment.mapper.AssignmentMapper;
 import com.example.thesis_hub_api.assignment.repository.*;
+import com.example.thesis_hub_api.common.exception.AppException;
+import com.example.thesis_hub_api.common.exception.ErrorCode;
 import com.example.thesis_hub_api.common.exception.ResourceNotFoundException;
 import com.example.thesis_hub_api.organization.entity.Department;
 import com.example.thesis_hub_api.organization.entity.Lecturer;
@@ -16,6 +18,7 @@ import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.organization.repository.TrainingProgramRepository;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,6 +43,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
     private final ProjectRoundRepository projectRoundRepository;
+    private final StudentProjectRoundRepository studentProjectRoundRepository;
     private final DepartmentRepository departmentRepository;
     private final TrainingProgramRepository trainingProgramRepository;
 
@@ -48,6 +52,15 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final AssignmentAlgorithm algorithm;
     private final CapacityCalculator capacityCalculator;
     private final AssignmentOverrideManager overrideManager;
+
+    private ProjectRound getAndValidateActiveRound(Long projectRoundId) {
+        ProjectRound round = projectRoundRepository.findById(projectRoundId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đợt đồ án với ID: " + projectRoundId));
+        if ("CLOSED".equalsIgnoreCase(round.getStatus()) || "ARCHIVED".equalsIgnoreCase(round.getStatus())) {
+            throw new AppException(ErrorCode.PROJECT_ROUND_CLOSED);
+        }
+        return round;
+    }
 
     // ==========================================
     // 1. Project Directions (Mục A)
@@ -205,11 +218,21 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Override
     @Transactional
     public DirectionRegistrationResponseDTO registerDirection(DirectionRegistrationRequestDTO request, Long currentUserId) {
-        Long studentId = request.getStudentId();
-        if (studentId == null && currentUserId != null) {
-            studentId = studentRepository.findByUserId(currentUserId)
-                    .map(Student::getId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ sinh viên cho tài khoản người dùng"));
+        ProjectRound round = getAndValidateActiveRound(request.getProjectRoundId());
+
+        if (assignmentRepository.countByProjectRoundIdAndStatus(request.getProjectRoundId(), "FINALIZED") > 0) {
+            throw new AppException(ErrorCode.ASSIGNMENT_ALREADY_FINALIZED);
+        }
+
+        Long studentId = null;
+        if (currentUserId != null) {
+            Optional<Student> studentOpt = studentRepository.findByUserId(currentUserId);
+            if (studentOpt.isPresent()) {
+                studentId = studentOpt.get().getId();
+            }
+        }
+        if (studentId == null) {
+            studentId = request.getStudentId();
         }
         if (studentId == null) {
             throw new IllegalArgumentException("Student ID không được để trống");
@@ -218,8 +241,6 @@ public class AssignmentServiceImpl implements AssignmentService {
         final Long finalStudentId = studentId;
         Student student = studentRepository.findById(finalStudentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sinh viên với ID: " + finalStudentId));
-        ProjectRound round = projectRoundRepository.findById(request.getProjectRoundId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đợt đồ án với ID: " + request.getProjectRoundId()));
         ProjectDirection direction = directionRepository.findById(request.getDirectionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hướng đồ án với ID: " + request.getDirectionId()));
 
@@ -242,6 +263,13 @@ public class AssignmentServiceImpl implements AssignmentService {
                     .build();
         }
         DirectionRegistration saved = registrationRepository.save(reg);
+
+        // Đồng bộ trạng thái vào bảng student_project_rounds nếu có
+        studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, request.getProjectRoundId())
+                .ifPresent(spr -> {
+                    spr.setStatus("REGISTERED");
+                    studentProjectRoundRepository.save(spr);
+                });
 
         String sCode = student.getStudentCode();
         String sName = student.getUser() != null ? student.getUser().getFullName() : "";
@@ -317,11 +345,21 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Override
     @Transactional
     public List<PreferenceResponseDTO> submitPreferences(PreferenceSubmitRequestDTO request, Long currentUserId) {
-        Long studentId = request.getStudentId();
-        if (studentId == null && currentUserId != null) {
-            studentId = studentRepository.findByUserId(currentUserId)
-                    .map(Student::getId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ sinh viên cho tài khoản này"));
+        ProjectRound round = getAndValidateActiveRound(request.getProjectRoundId());
+
+        if (assignmentRepository.countByProjectRoundIdAndStatus(request.getProjectRoundId(), "FINALIZED") > 0) {
+            throw new AppException(ErrorCode.ASSIGNMENT_ALREADY_FINALIZED);
+        }
+
+        Long studentId = null;
+        if (currentUserId != null) {
+            Optional<Student> studentOpt = studentRepository.findByUserId(currentUserId);
+            if (studentOpt.isPresent()) {
+                studentId = studentOpt.get().getId();
+            }
+        }
+        if (studentId == null) {
+            studentId = request.getStudentId();
         }
         if (studentId == null) {
             throw new IllegalArgumentException("Student ID không được để trống");
@@ -330,9 +368,6 @@ public class AssignmentServiceImpl implements AssignmentService {
         final Long finalStudentId = studentId;
         Student student = studentRepository.findById(finalStudentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sinh viên ID: " + finalStudentId));
-        if (!projectRoundRepository.existsById(request.getProjectRoundId())) {
-            throw new ResourceNotFoundException("Không tìm thấy đợt đồ án ID: " + request.getProjectRoundId());
-        }
 
         // Kiểm tra sinh viên đã đăng ký hướng đồ án chưa (Mục A.2)
         DirectionRegistration directionReg = registrationRepository.findByStudentIdAndProjectRoundId(studentId, request.getProjectRoundId())
@@ -499,6 +534,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     public LecturerCapacityResponseDTO updateCapacity(Long id, CapacityUpdateRequestDTO request) {
         LecturerCapacity capacity = capacityRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chỉ tiêu giảng viên ID: " + id));
+        getAndValidateActiveRound(capacity.getProjectRoundId());
 
         if (request.getMaxQuota() != null) {
             capacity.setMaxQuota(request.getMaxQuota());
@@ -523,9 +559,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Override
     @Transactional
     public void initializeCapacitiesForRound(Long projectRoundId, int defaultQuota) {
-        if (!projectRoundRepository.existsById(projectRoundId)) {
-            throw new ResourceNotFoundException("Không tìm thấy đợt đồ án ID: " + projectRoundId);
-        }
+        getAndValidateActiveRound(projectRoundId);
         List<Lecturer> lecturers = lecturerRepository.findAll();
         for (Lecturer l : lecturers) {
             if (capacityRepository.findByLecturerIdAndProjectRoundId(l.getId(), projectRoundId).isEmpty()) {
@@ -550,8 +584,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Transactional
     public List<SupervisorAssignmentResponseDTO> generateAssignments(AssignmentGenerateRequestDTO request) {
         Long roundId = request.getProjectRoundId();
-        ProjectRound round = projectRoundRepository.findById(roundId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đợt đồ án ID: " + roundId));
+        ProjectRound round = getAndValidateActiveRound(roundId);
 
         log.info("Executing supervisor allocation algorithm for round: {}", round.getRoundCode());
 
@@ -740,6 +773,9 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Override
     @Transactional
     public SupervisorAssignmentResponseDTO overrideAssignment(Long assignmentId, AssignmentOverrideRequestDTO request, Long currentUserId) {
+        SupervisorAssignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bản ghi phân công ID: " + assignmentId));
+        getAndValidateActiveRound(assignment.getProjectRoundId());
         log.info("Faculty requested manual override for assignment: {}, new lecturer: {}", assignmentId, request.getNewLecturerId());
         SupervisorAssignment updated = overrideManager.executeOverride(assignmentId, request.getNewLecturerId(), request.getReason(), currentUserId);
         return getProposalsByRound(updated.getProjectRoundId(), null).stream()
@@ -752,6 +788,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Transactional
     public AssignmentStatsResponseDTO finalizeAssignments(AssignmentFinalizeRequestDTO request, Long currentUserId) {
         Long roundId = request.getProjectRoundId();
+        getAndValidateActiveRound(roundId);
         List<SupervisorAssignment> assignments = assignmentRepository.findByProjectRoundId(roundId);
         if (assignments.isEmpty()) {
             throw new IllegalStateException("Chưa có danh sách phân công đề xuất để chốt kết quả.");

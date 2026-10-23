@@ -8,6 +8,8 @@ interface Props {
   onOverride: (assignmentId: number, newLecturerId: number, reason: string) => Promise<void>;
   isFinalized?: boolean;
   loading?: boolean;
+  roundName?: string;
+  isRoundClosed?: boolean;
 }
 
 export const AssignmentProposalTable: React.FC<Props> = ({
@@ -16,6 +18,8 @@ export const AssignmentProposalTable: React.FC<Props> = ({
   onOverride,
   isFinalized,
   loading,
+  roundName,
+  isRoundClosed,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 1 | 2 | 3 | 'FALLBACK' | 'OVERRIDE'>('ALL');
@@ -51,7 +55,10 @@ export const AssignmentProposalTable: React.FC<Props> = ({
     <div className="proposal-table-card">
       <div className="card-header-bar">
         <div className="header-titles">
-          <h3>Kết quả phân công Giảng viên hướng dẫn</h3>
+          <h3>
+            Kết quả phân công Giảng viên hướng dẫn
+            {roundName && <span className="table-round-name"> — {roundName}</span>}
+          </h3>
           <span className="count-badge">{filtered.length} sinh viên</span>
         </div>
 
@@ -210,7 +217,7 @@ export const AssignmentProposalTable: React.FC<Props> = ({
                     </span>
                   </td>
                   <td>
-                    {!isFinalized && item.status !== 'FINALIZED' ? (
+                    {!isFinalized && item.status !== 'FINALIZED' && !isRoundClosed ? (
                       <button
                         className="btn-action-override"
                         onClick={() => setSelectedForOverride(item)}
@@ -219,7 +226,9 @@ export const AssignmentProposalTable: React.FC<Props> = ({
                         ✏️ Override
                       </button>
                     ) : (
-                      <span className="text-muted text-xs">Đã khóa</span>
+                      <span className="text-muted text-xs">
+                        {isRoundClosed ? 'Đợt đã đóng' : 'Đã khóa'}
+                      </span>
                     )}
                   </td>
                 </tr>

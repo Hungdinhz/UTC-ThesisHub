@@ -12,12 +12,14 @@ interface RoundStudentsTabProps {
   roundId: number;
   roundName: string;
   roundCode: string;
+  isRoundClosed?: boolean;
 }
 
 export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   roundId,
   roundName,
   roundCode,
+  isRoundClosed,
 }) => {
   // Data states
   const [students, setStudents] = useState<StudentProjectRoundItem[]>([]);
@@ -196,6 +198,10 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
   // Commit import
   const handleCommitImport = async () => {
+    if (isRoundClosed) {
+      setError('Đợt đồ án đã đóng. Không thể import dữ liệu.');
+      return;
+    }
     if (!previewData || !previewData.rows) return;
 
     try {
@@ -220,6 +226,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
   // Update status
   const handleOpenStatusModal = (st: StudentProjectRoundItem) => {
+    if (isRoundClosed) return;
     setEditingStudent(st);
     setNewStatus(st.status);
     setNewNote(st.note || '');
@@ -227,6 +234,10 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
   const handleSaveStatus = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRoundClosed) {
+      setError('Đợt đồ án đã đóng. Không thể cập nhật trạng thái.');
+      return;
+    }
     if (!editingStudent) return;
 
     try {
@@ -245,6 +256,10 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
   // Remove student from round
   const handleRemoveStudent = async (studentId: number, code: string) => {
+    if (isRoundClosed) {
+      setError('Đợt đồ án đã đóng. Không thể xóa sinh viên khỏi đợt.');
+      return;
+    }
     if (!window.confirm(`Bạn có chắc chắn muốn xóa sinh viên ${code} khỏi đợt đồ án này?`)) return;
 
     try {
@@ -283,6 +298,14 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
   return (
     <div>
+      {/* Closed Round Notice Banner */}
+      {isRoundClosed && (
+        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '1.2rem' }}>🔒</span>
+          <span><strong>Đợt đồ án đã đóng:</strong> Danh sách sinh viên đang ở chế độ chỉ xem. Không thể nạp file Excel, cập nhật trạng thái hay xóa sinh viên khỏi đợt này.</span>
+        </div>
+      )}
+
       {/* Alert Messages */}
       {error && (
         <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
@@ -326,25 +349,28 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             📥 Tải Excel mẫu UTC
           </button>
           <button
+            disabled={isRoundClosed}
             onClick={() => {
+              if (isRoundClosed) return;
               setShowImportModal(true);
               setImportResultMsg(null);
               setPreviewData(null);
               setImportFile(null);
             }}
             style={{
-              backgroundColor: '#16a34a',
+              backgroundColor: isRoundClosed ? '#94a3b8' : '#16a34a',
               color: '#fff',
               border: 'none',
               padding: '8px 16px',
               borderRadius: '6px',
               fontWeight: 600,
               fontSize: '0.85rem',
-              cursor: 'pointer',
+              cursor: isRoundClosed ? 'not-allowed' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
             }}
+            title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể import sinh viên' : undefined}
           >
             📤 Import SV từ Excel
           </button>
@@ -452,22 +478,26 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                       </span>
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', gap: '6px' }}>
-                        <button
-                          onClick={() => handleOpenStatusModal(st)}
-                          title="Đổi trạng thái"
-                          style={{ backgroundColor: '#eff6ff', color: '#0a3273', border: '1px solid #bfdbfe', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
-                          title="Xóa khỏi đợt"
-                          style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                        >
-                          Xóa
-                        </button>
-                      </div>
+                      {!isRoundClosed ? (
+                        <div style={{ display: 'inline-flex', gap: '6px' }}>
+                          <button
+                            onClick={() => handleOpenStatusModal(st)}
+                            title="Đổi trạng thái"
+                            style={{ backgroundColor: '#eff6ff', color: '#0a3273', border: '1px solid #bfdbfe', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
+                            title="Xóa khỏi đợt"
+                            style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Đã khóa</span>
+                      )}
                     </td>
                   </tr>
                 );

@@ -48,6 +48,12 @@ public class ProposalServiceImpl implements ProposalService {
     @Override
     @Transactional
     public ProposalResponse createProposal(CreateProposalRequest request) {
+        ProjectRound round = projectRoundRepository.findById(request.getProjectRoundId())
+                .orElseThrow(() -> new ResourceNotFoundException("ProjectRound", request.getProjectRoundId()));
+        if ("CLOSED".equalsIgnoreCase(round.getStatus()) || "ARCHIVED".equalsIgnoreCase(round.getStatus())) {
+            throw new AppException(ErrorCode.PROJECT_ROUND_CLOSED);
+        }
+
         java.util.Optional<Proposal> existingOpt = proposalRepository.findByStudentIdAndProjectRoundId(request.getStudentId(), request.getProjectRoundId());
         if (existingOpt.isPresent()) {
             Proposal existing = existingOpt.get();
@@ -68,9 +74,6 @@ public class ProposalServiceImpl implements ProposalService {
             }
             throw new DuplicateResourceException("Sinh viên đã có đề cương trong đợt đồ án này (trạng thái: " + existing.getStatus() + ")");
         }
-
-        ProjectRound round = projectRoundRepository.findById(request.getProjectRoundId())
-                .orElseThrow(() -> new ResourceNotFoundException("ProjectRound", request.getProjectRoundId()));
 
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Student", request.getStudentId()));

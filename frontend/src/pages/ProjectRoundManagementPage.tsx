@@ -463,12 +463,14 @@ const ProjectRoundManagementPage: React.FC = () => {
                     roundId={selectedRound.roundId}
                     roundName={selectedRound.name}
                     roundCode={selectedRound.roundCode}
+                    isRoundClosed={selectedRound.status === 'CLOSED' || selectedRound.status === 'ARCHIVED'}
                   />
                 ) : roundActiveTab === 'academic' ? (
                   <RoundAcademicRecordsTab
                     roundId={selectedRound.roundId}
                     roundName={selectedRound.name}
                     roundCode={selectedRound.roundCode}
+                    isRoundClosed={selectedRound.status === 'CLOSED' || selectedRound.status === 'ARCHIVED'}
                   />
                 ) : (
                   <div>
@@ -480,21 +482,27 @@ const ProjectRoundManagementPage: React.FC = () => {
                           Cung cấp API cho hệ thống tự động kiểm tra thời hạn đăng ký, nộp đề cương và bảo vệ
                         </p>
                       </div>
-                      <button
-                        onClick={() => setShowAddMilestoneModal(true)}
-                        style={{
-                          backgroundColor: '#0a3273',
-                          color: '#fff',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          fontWeight: 600,
-                          fontSize: '0.85rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ➕ Thêm mốc Timeline
-                      </button>
+                      {selectedRound.status !== 'CLOSED' && selectedRound.status !== 'ARCHIVED' ? (
+                        <button
+                          onClick={() => setShowAddMilestoneModal(true)}
+                          style={{
+                            backgroundColor: '#0a3273',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ➕ Thêm mốc Timeline
+                        </button>
+                      ) : (
+                        <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>
+                          🔒 Đợt đã đóng (Không thể thêm mốc)
+                        </span>
+                      )}
                     </div>
 
                     {/* Milestones Stepper / Table */}
@@ -560,21 +568,23 @@ const ProjectRoundManagementPage: React.FC = () => {
                               </div>
                             </div>
 
-                            <button
-                              onClick={() => handleDeleteMilestone(m.milestoneId)}
-                              style={{
-                                backgroundColor: '#fee2e2',
-                                color: '#dc2626',
-                                border: 'none',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                                fontSize: '0.8rem'
-                              }}
-                            >
-                              Xóa
-                            </button>
+                            {selectedRound.status !== 'CLOSED' && selectedRound.status !== 'ARCHIVED' && (
+                              <button
+                                onClick={() => handleDeleteMilestone(m.milestoneId)}
+                                style={{
+                                  backgroundColor: '#fee2e2',
+                                  color: '#dc2626',
+                                  border: 'none',
+                                  padding: '6px 12px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                  fontSize: '0.8rem'
+                                }}
+                              >
+                                Xóa
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
