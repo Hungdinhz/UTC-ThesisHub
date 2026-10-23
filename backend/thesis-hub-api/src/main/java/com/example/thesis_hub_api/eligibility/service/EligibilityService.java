@@ -8,6 +8,8 @@ import com.example.thesis_hub_api.eligibility.entity.ReservationRequest;
 import com.example.thesis_hub_api.eligibility.repository.ReservationRequestRepository;
 import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockService;
 import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockService.StudentAcademicRecord;
+import com.example.thesis_hub_api.organization.entity.Student;
+import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.AcademicRecordRepository;
@@ -41,6 +43,9 @@ public class EligibilityService {
     private StudentProjectRoundRepository studentProjectRoundRepository;
 
     @Autowired(required = false)
+    private StudentRepository studentRepository;
+
+    @Autowired(required = false)
     private ThesisRepository thesisRepository;
 
     // Track overrides in-memory for testing and decoupling
@@ -62,10 +67,22 @@ public class EligibilityService {
             }
             if (dbRecordOpt.isPresent()) {
                 AcademicRecord ar = dbRecordOpt.get();
-                String code = ar.getStudent() != null ? ar.getStudent().getStudentCode() : ("SV" + studentId);
+                String code = ar.getStudent() != null ? ar.getStudent().getStudentCode() : null;
                 String name = (ar.getStudent() != null && ar.getStudent().getUser() != null)
                         ? ar.getStudent().getUser().getFullName()
-                        : ("Sinh viên #" + studentId);
+                        : null;
+                if (code == null && studentRepository != null) {
+                    Optional<Student> sOpt = studentRepository.findById(studentId);
+                    if (sOpt.isPresent()) {
+                        code = sOpt.get().getStudentCode();
+                        if (name == null && sOpt.get().getUser() != null) {
+                            name = sOpt.get().getUser().getFullName();
+                        }
+                    }
+                }
+                if (code == null) code = "SV" + studentId;
+                if (name == null) name = "Sinh viên #" + studentId;
+
                 return StudentAcademicRecord.builder()
                         .studentId(studentId)
                         .studentCode(code)
@@ -80,7 +97,19 @@ public class EligibilityService {
                         .build();
             }
         }
-        return academicMockService.getRecord(studentId);
+
+        StudentAcademicRecord mockRecord = academicMockService.getRecord(studentId);
+        if (studentRepository != null && studentId != null) {
+            studentRepository.findById(studentId).ifPresent(s -> {
+                if (s.getStudentCode() != null && !s.getStudentCode().isBlank()) {
+                    mockRecord.setStudentCode(s.getStudentCode());
+                }
+                if (s.getUser() != null && s.getUser().getFullName() != null && !s.getUser().getFullName().isBlank()) {
+                    mockRecord.setFullName(s.getUser().getFullName());
+                }
+            });
+        }
+        return mockRecord;
     }
 
     @Transactional(readOnly = true)
@@ -154,9 +183,29 @@ public class EligibilityService {
             finalStatus = statusOverrides.get(overrideKey);
             reasons.add("Trạng thái can thiệp bởi Khoa: " + finalStatus + " (" + overrideReasons.getOrDefault(overrideKey, "") + ")");
         } else {
-            finalStatus = eligible ? "ELIGIBLE" : "INELIGIBLE";
-            if (eligible) {
-                reasons.add("Đủ điều kiện làm đồ án tốt nghiệp");
+            Optional<StudentProjectRound> sprOpt = Optional.empty();
+            if (studentProjectRoundRepository != null && projectRoundId != null) {
+                sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
+            }
+            if (sprOpt.isPresent()) {
+                StudentProjectRound spr = sprOpt.get();
+                if ("DROPPED".equalsIgnoreCase(spr.getStatus()) || "DISQUALIFIED".equalsIgnoreCase(spr.getStatus())) {
+                    finalStatus = "DISQUALIFIED";
+                    reasons.add("Sinh viên đã bị loại khỏi đợt đồ án" + (spr.getNote() != null ? ": " + spr.getNote() : ""));
+                } else if (spr.getNote() != null && spr.getNote().toLowerCase().contains("force approve")) {
+                    finalStatus = "FORCE_APPROVED";
+                    reasons.add("Trạng thái can thiệp bởi Khoa: FORCE_APPROVED (" + spr.getNote() + ")");
+                } else {
+                    finalStatus = eligible ? "ELIGIBLE" : "INELIGIBLE";
+                    if (eligible) {
+                        reasons.add("Đủ điều kiện làm đồ án tốt nghiệp");
+                    }
+                }
+            } else {
+                finalStatus = eligible ? "ELIGIBLE" : "INELIGIBLE";
+                if (eligible) {
+                    reasons.add("Đủ điều kiện làm đồ án tốt nghiệp");
+                }
             }
         }
 

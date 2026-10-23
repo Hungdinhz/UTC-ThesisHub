@@ -35,7 +35,8 @@ public class SubmissionServiceImpl implements SubmissionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", taskId));
 
         Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Student", request.getStudentId()));
+                .orElseGet(() -> studentRepository.findByUserId(request.getStudentId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Student", request.getStudentId())));
 
         Submission submission = Submission.builder()
                 .task(task)

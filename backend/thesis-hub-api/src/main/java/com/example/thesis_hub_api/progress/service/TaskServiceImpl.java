@@ -37,10 +37,16 @@ public class TaskServiceImpl implements TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Thesis", request.getThesisId()));
 
         User createdBy = userRepository.findById(request.getCreatedById())
-                .orElseThrow(() -> new ResourceNotFoundException("User", request.getCreatedById()));
+                .orElse(thesis.getLecturer() != null ? thesis.getLecturer().getUser() : null);
+        if (createdBy == null) {
+            throw new ResourceNotFoundException("User", request.getCreatedById());
+        }
 
         User assignedTo = userRepository.findById(request.getAssignedToId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", request.getAssignedToId()));
+                .orElse(thesis.getStudent() != null ? thesis.getStudent().getUser() : null);
+        if (assignedTo == null) {
+            throw new ResourceNotFoundException("User", request.getAssignedToId());
+        }
 
         Task task = Task.builder()
                 .thesis(thesis)

@@ -5,10 +5,14 @@ import { EligibilitySummaryCard } from '../components/EligibilitySummaryCard';
 import { ForceApproveModal } from '../components/ForceApproveModal';
 import { DisqualifyModal } from '../components/DisqualifyModal';
 import { eligibilityService } from '../services/eligibilityService';
+import { apiService } from '../../../services/api';
+import type { ProjectRoundItem } from '../../../types';
 import type { EligibilityCheckResponse } from '../types';
 import './EligibilityPages.css';
 
 export const ThesisEligibilityPage: React.FC = () => {
+  const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
+  const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
   const [students, setStudents] = useState<EligibilityCheckResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,13 +22,40 @@ export const ThesisEligibilityPage: React.FC = () => {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
-    loadStudents();
+    fetchRounds();
   }, []);
 
-  const loadStudents = async () => {
+  const fetchRounds = async () => {
+    try {
+      const roundList = await apiService.getProjectRounds();
+      if (roundList && roundList.length > 0) {
+        setRounds(roundList);
+        const activeRound =
+          roundList.find((r) => r.status === 'OPEN') ||
+          roundList.find((r) => r.status === 'IN_PROGRESS') ||
+          roundList[0];
+        if (activeRound?.roundId) {
+          setSelectedRoundId(activeRound.roundId);
+        }
+      } else {
+        loadStudents(undefined);
+      }
+    } catch (err) {
+      console.error('Không thể tải danh sách đợt đồ án:', err);
+      loadStudents(undefined);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedRoundId !== null) {
+      loadStudents(selectedRoundId);
+    }
+  }, [selectedRoundId]);
+
+  const loadStudents = async (roundId?: number) => {
     try {
       setLoading(true);
-      const data = await eligibilityService.getAllStudentsEligibility(10);
+      const data = await eligibilityService.getAllStudentsEligibility(roundId ?? selectedRoundId ?? undefined);
       setStudents(data);
     } catch (error: any) {
       setNotification({ type: 'error', message: error.message || 'Không thể tải danh sách sinh viên' });
@@ -38,7 +69,7 @@ export const ThesisEligibilityPage: React.FC = () => {
     try {
       await eligibilityService.forceApprove({
         studentId: selectedStudentForForce.studentId,
-        projectRoundId: selectedStudentForForce.projectRoundId || 10,
+        projectRoundId: selectedStudentForForce.projectRoundId || selectedRoundId || 1,
         reason,
         approvedBy,
       });
@@ -46,7 +77,7 @@ export const ThesisEligibilityPage: React.FC = () => {
         type: 'success',
         message: `Đã duyệt đặc cách thành công cho sinh viên ${selectedStudentForForce.studentName} (${selectedStudentForForce.studentCode})`,
       });
-      await loadStudents();
+      await loadStudents(selectedRoundId || undefined);
     } catch (error: any) {
       setNotification({ type: 'error', message: error.message || 'Thất bại khi duyệt đặc cách' });
     }
@@ -57,7 +88,7 @@ export const ThesisEligibilityPage: React.FC = () => {
     try {
       await eligibilityService.disqualify({
         studentId: selectedStudentForDisqualify.studentId,
-        projectRoundId: selectedStudentForDisqualify.projectRoundId || 10,
+        projectRoundId: selectedStudentForDisqualify.projectRoundId || selectedRoundId || 1,
         reason,
         disqualifiedBy,
       });
@@ -65,7 +96,7 @@ export const ThesisEligibilityPage: React.FC = () => {
         type: 'success',
         message: `Đã loại sinh viên ${selectedStudentForDisqualify.studentName} (${selectedStudentForDisqualify.studentCode}) khỏi đợt làm đồ án`,
       });
-      await loadStudents();
+      await loadStudents(selectedRoundId || undefined);
     } catch (error: any) {
       setNotification({ type: 'error', message: error.message || 'Thất bại khi loại sinh viên' });
     }
@@ -190,7 +221,7 @@ export const ThesisEligibilityPage: React.FC = () => {
             Hệ thống xét duyệt điều kiện làm đồ án dựa trên kết quả tích lũy GPA, số tín chỉ và nợ môn tiên quyết.
           </p>
         </div>
-        <Button variant="primary" onClick={loadStudents} loading={loading}>
+        <Button variant="primary" onClick={() => loadStudents(selectedRoundId || undefined)} loading={loading}>
           Làm mới dữ liệu
         </Button>
       </div>
@@ -207,6 +238,22 @@ export const ThesisEligibilityPage: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="feature-filter-card">
+        <div className="filter-item" style={{ minWidth: '260px' }}>
+          <label htmlFor="roundSelect">Đợt đồ án:</label>
+          <select
+            id="roundSelect"
+            className="form-control"
+            value={selectedRoundId || ''}
+            onChange={(e) => setSelectedRoundId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">-- Tất cả các đợt --</option>
+            {rounds.map((r) => (
+              <option key={r.roundId} value={r.roundId}>
+                {r.name} ({r.roundCode})
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="filter-item search-box">
           <label htmlFor="searchStd">Tìm kiếm:</label>
           <input

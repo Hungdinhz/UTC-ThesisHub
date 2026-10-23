@@ -214,17 +214,22 @@ public class ProposalServiceImpl implements ProposalService {
                         java.util.List<ReviewGroup> groups = reviewGroupRepository.findByProjectRoundId(proposal.getProjectRound().getId());
                         if (!groups.isEmpty()) {
                             rg = groups.get(0);
+                        } else {
+                            rg = reviewGroupRepository.save(ReviewGroup.builder()
+                                    .projectRound(proposal.getProjectRound())
+                                    .code("RG_" + proposal.getProjectRound().getRoundCode() + "_" + System.currentTimeMillis() % 10000)
+                                    .name("Tiểu ban Xét duyệt Đề cương - " + proposal.getProjectRound().getName())
+                                    .description("Tiểu ban xét duyệt đề cương đợt đồ án")
+                                    .status("ACTIVE")
+                                    .build());
                         }
                     }
-                    if (rg != null) {
-                        return reviewAssignmentRepository.save(ProposalReviewAssignment.builder()
-                                .proposal(proposal)
-                                .reviewGroup(rg)
-                                .assignedAt(Instant.now())
-                                .status("PENDING")
-                                .build());
-                    }
-                    throw new ResourceNotFoundException("Phân công xét duyệt đề cương không tồn tại");
+                    return reviewAssignmentRepository.save(ProposalReviewAssignment.builder()
+                            .proposal(proposal)
+                            .reviewGroup(rg)
+                            .assignedAt(Instant.now())
+                            .status("PENDING")
+                            .build());
                 });
 
         assignment.setStatus(request.getStatus());

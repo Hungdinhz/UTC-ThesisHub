@@ -15,9 +15,9 @@ export const ProposalManagementPage: React.FC = () => {
   const isSupervisor = userType === 'supervisor';
   const isAdmin = userType === 'admin';
 
-  // Giảng viên là người duyệt hoặc phân công đề tài chứ không phải admin; admin chỉ xem và theo dõi
-  const canSupervisorApprove = isSupervisor;
-  const canReview = isSupervisor;
+  // Quyền duyệt: Giảng viên hướng dẫn xác nhận đề cương, Khoa (Admin/Tiểu ban) phê duyệt chính thức
+  const canSupervisorApprove = isSupervisor || isAdmin;
+  const canReview = isSupervisor || isAdmin || userType === 'committee_member';
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -644,7 +644,7 @@ export const ProposalManagementPage: React.FC = () => {
                             fontWeight: 600,
                           }}
                         >
-                          ✓ GV Xác nhận
+                          ✓ Phê duyệt đề cương (GVHD)
                         </button>
                       )}
                       {canReview && (
@@ -654,9 +654,9 @@ export const ProposalManagementPage: React.FC = () => {
                             setReviewModal(true);
                           }}
                           style={{
-                            background: '#f1f5f9',
-                            color: '#334155',
-                            border: '1px solid #cbd5e1',
+                            background: isAdmin ? '#ecfdf5' : '#f1f5f9',
+                            color: isAdmin ? '#065f46' : '#334155',
+                            border: `1px solid ${isAdmin ? '#a7f3d0' : '#cbd5e1'}`,
                             padding: '6px 10px',
                             borderRadius: '4px',
                             cursor: 'pointer',
@@ -664,7 +664,7 @@ export const ProposalManagementPage: React.FC = () => {
                             fontWeight: 600,
                           }}
                         >
-                          Đánh Giá
+                          {isAdmin ? '⚖️ Khoa Duyệt Đề Tài' : 'Đánh Giá'}
                         </button>
                       )}
                       {isStudent && p.status === 'APPROVED' && !signedProposalIds[p.id] && (

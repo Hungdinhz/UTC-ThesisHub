@@ -136,7 +136,8 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
   // Synchronize student program automatically from profile or round (student cannot manually change)
   useEffect(() => {
-    const userProg = (user as any)?.trainingProgram || (user as any)?.training_program || (user as any)?.program;
+    const progId = (user as any)?.training_program_id || (user as any)?.trainingProgramId || (user as any)?.student?.training_program_id;
+    const userProg = (user as any)?.trainingProgram || (user as any)?.training_program || (user as any)?.program || (progId === 2 ? 'KY_SU' : (progId === 1 ? 'CU_NHAN' : undefined));
     if (userProg === 'KY_SU' || userProg === 'CU_NHAN') {
       setActiveProgram(userProg);
     } else if (currentRound?.trainingProgram === 'KY_SU' || currentRound?.trainingProgram === 'CU_NHAN') {

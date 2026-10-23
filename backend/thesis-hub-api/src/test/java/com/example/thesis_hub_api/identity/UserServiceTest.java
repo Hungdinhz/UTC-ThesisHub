@@ -49,6 +49,9 @@ class UserServiceTest {
     private LecturerRepository lecturerRepository;
 
     @Mock
+    private com.example.thesis_hub_api.organization.repository.TrainingProgramRepository trainingProgramRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @InjectMocks

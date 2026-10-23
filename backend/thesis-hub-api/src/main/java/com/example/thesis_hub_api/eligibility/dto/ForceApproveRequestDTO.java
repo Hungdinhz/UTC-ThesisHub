@@ -12,6 +12,6 @@ import lombok.NoArgsConstructor;
 public class ForceApproveRequestDTO {
     private Long studentId;
     private Long projectRoundId;
-    private Long approvedBy;
+    private String approvedBy;
     private String reason;
 }
