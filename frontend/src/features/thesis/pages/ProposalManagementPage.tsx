@@ -419,30 +419,67 @@ export const ProposalManagementPage: React.FC = () => {
         <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           📅 <strong>Đợt đồ án:</strong>
         </span>
-        <select
-          value={selectedRoundId}
-          onChange={(e) => setSelectedRoundId(Number(e.target.value))}
-          style={{
-            padding: '7px 12px',
-            border: '1px solid #cbd5e1',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: 500,
-            background: '#fff',
-            color: '#0f172a',
-            minWidth: '280px',
-            cursor: 'pointer',
-          }}
-        >
-          {(rounds.length > 0 ? rounds : availableRounds).map((r: any) => (
-            <option key={r.roundId || r.id} value={r.roundId || r.id}>
-              {r.name} {r.status ? `(${r.status})` : ''}
-            </option>
-          ))}
-        </select>
+        {/* Với Sinh viên và Giảng viên: Cố định vào đợt đồ án đang mở của học kỳ, không cho chọn đợt khác */}
+        {!isAdmin ? (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              padding: '6px 14px',
+              borderRadius: '6px',
+            }}
+          >
+            <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 600 }}>
+              🔒 {rounds.find((r) => r.roundId === selectedRoundId)?.name || availableRounds.find((r) => r.id === selectedRoundId)?.name || 'Đợt Đồ án Tốt nghiệp K62 CNTT - HK1 2026-2027'}
+            </span>
+            <span
+              style={{
+                background: '#16a34a',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '12px',
+              }}
+            >
+              {rounds.find((r) => r.roundId === selectedRoundId)?.status || 'OPEN'} (Hiện tại)
+            </span>
+          </div>
+        ) : (
+          /* Quản trị viên: Có quyền chuyển đợt để tra cứu và giám sát các đợt khác */
+          <select
+            value={selectedRoundId}
+            onChange={(e) => setSelectedRoundId(Number(e.target.value))}
+            style={{
+              padding: '7px 12px',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 500,
+              background: '#fff',
+              color: '#0f172a',
+              minWidth: '280px',
+              cursor: 'pointer',
+            }}
+          >
+            {(rounds.length > 0 ? rounds : availableRounds).map((r: any) => (
+              <option key={r.roundId || r.id} value={r.roundId || r.id}>
+                {r.name} {r.status ? `(${r.status})` : ''}
+              </option>
+            ))}
+          </select>
+        )}
+        {isStudent && (
+          <span style={{ fontSize: '13px', color: '#15803d', background: '#dcfce7', padding: '4px 10px', borderRadius: '4px', fontWeight: 500 }}>
+            🎓 Sinh viên: <strong>Chỉ thuộc đợt đồ án hiện tại</strong>
+          </span>
+        )}
         {isSupervisor && (
           <span style={{ fontSize: '13px', color: '#0369a1', background: '#e0f2fe', padding: '4px 10px', borderRadius: '4px', fontWeight: 500 }}>
-            👨‍🏫 Vai trò: <strong>Giảng viên hướng dẫn</strong> (Chỉ duyệt đề tài của sinh viên được phân công)
+            👨‍🏫 Vai trò: <strong>Giảng viên hướng dẫn</strong> (Chỉ duyệt đề tài của sinh viên được phân công trong đợt)
           </span>
         )}
         {isAdmin && (
@@ -1098,18 +1135,32 @@ export const ProposalManagementPage: React.FC = () => {
                   </div>
 
                   <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Đợt đồ án *</label>
-                    <select
-                      value={selectedRoundId}
-                      onChange={(e) => setSelectedRoundId(Number(e.target.value))}
-                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                    >
-                      {(rounds.length > 0 ? rounds : availableRounds).map((r: any) => (
-                        <option key={r.roundId || r.id} value={r.roundId || r.id}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                      Đợt đồ án (Hiện tại)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      disabled
+                      value={
+                        rounds.find((r) => r.roundId === selectedRoundId)?.name ||
+                        availableRounds.find((r) => r.id === selectedRoundId)?.name ||
+                        'Đợt Đồ án Tốt nghiệp K62 CNTT - HK1 2026-2027'
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        background: '#f8fafc',
+                        color: '#0f172a',
+                        fontWeight: '600',
+                        cursor: 'not-allowed',
+                      }}
+                    />
+                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                      🔒 Cố định theo đợt đồ án đang mở trong học kỳ hiện tại.
+                    </span>
                   </div>
                 </>
               ) : isStudent ? (

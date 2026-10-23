@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { progressService } from '../services/progressService';
@@ -23,6 +23,33 @@ export const TaskBoardPage: React.FC = () => {
     return Number(searchParams.get('thesisId') || searchParams.get('id')) || 0;
   });
   const [currentThesis, setCurrentThesis] = useState<Thesis | null>(null);
+
+  // Filter visible theses by user role:
+  // - Sinh viên: chỉ thấy duy nhất đề tài của chính mình
+  // - Giảng viên hướng dẫn: chỉ thấy danh sách các đề tài mình đang hướng dẫn
+  // - Quản trị viên: xem tất cả các đề tài của khoa
+  const visibleTheses = useMemo(() => {
+    if (isStudent && user) {
+      const userCode = user.student_id || user.studentCode || user.username;
+      const myTheses = theses.filter(t =>
+        (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
+        (userCode && t.studentCode === userCode)
+      );
+      return myTheses.length > 0 ? myTheses : (theses.length > 0 ? [theses[0]] : []);
+    }
+    if (isSupervisor && user) {
+      const lecturerId = (user as any).lecturer_id || user.id;
+      const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
+      const lecturerFullName = user.fullName;
+      const myTheses = theses.filter(t =>
+        (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
+        (lecturerCode && t.lecturerCode === lecturerCode) ||
+        (lecturerFullName && t.lecturerFullName && t.lecturerFullName.toLowerCase() === lecturerFullName.toLowerCase())
+      );
+      return myTheses.length > 0 ? myTheses : theses;
+    }
+    return theses;
+  }, [theses, isStudent, isSupervisor, user]);
 
   // Tasks & detail state
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -61,13 +88,7 @@ export const TaskBoardPage: React.FC = () => {
       if (list && list.length > 0) {
         setTheses(list);
 
-        const paramId = Number(searchParams.get('thesisId') || searchParams.get('id'));
-        if (paramId && list.some(t => t.id === paramId)) {
-          setSelectedThesisId(paramId);
-          return;
-        }
-
-        // If student, auto-select thesis of this student
+        // Sinh viên: Tự động khóa và gán duy nhất đề tài của sinh viên này
         if (isStudent && user) {
           const userCode = user.student_id || user.studentCode || user.username;
           const myThesis = list.find(t =>
@@ -78,6 +99,28 @@ export const TaskBoardPage: React.FC = () => {
             setSelectedThesisId(myThesis.id);
             return;
           }
+        }
+
+        // Giảng viên hướng dẫn: Tự động chọn đề tài đầu tiên mà GV hướng dẫn
+        if (isSupervisor && user) {
+          const lecturerId = (user as any).lecturer_id || user.id;
+          const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
+          const lecturerFullName = user.fullName;
+          const myThesis = list.find(t =>
+            (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
+            (lecturerCode && t.lecturerCode === lecturerCode) ||
+            (lecturerFullName && t.lecturerFullName && t.lecturerFullName.toLowerCase() === lecturerFullName.toLowerCase())
+          );
+          if (myThesis) {
+            setSelectedThesisId(myThesis.id);
+            return;
+          }
+        }
+
+        const paramId = Number(searchParams.get('thesisId') || searchParams.get('id'));
+        if (paramId && list.some(t => t.id === paramId)) {
+          setSelectedThesisId(paramId);
+          return;
         }
 
         // Default to first thesis or thesis 8
@@ -419,24 +462,58 @@ export const TaskBoardPage: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            {/* Thesis Selector for GVHD/Admin */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label htmlFor="thesisSelect" style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
-                Chọn đề tài:
-              </label>
-              <select
-                id="thesisSelect"
-                value={selectedThesisId}
-                onChange={e => setSelectedThesisId(Number(e.target.value))}
-                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', minWidth: '280px', fontWeight: 600, color: '#0a3273' }}
+            {/* Sinh viên: Khóa cố định vào đề tài của chính mình, KHÔNG hiển thị dropdown chọn đề tài */}
+            {isStudent ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                }}
               >
-                {theses.map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.thesisCode} — {t.titleVn} ({t.studentFullName || t.studentCode})
-                  </option>
-                ))}
-              </select>
-            </div>
+                <span style={{ fontSize: '18px' }}>🎯</span>
+                <div>
+                  <div style={{ fontSize: '11px', color: '#166534', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Đề tài của bạn (Cố định)
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#14532d' }}>
+                    {currentThesis?.thesisCode} — {currentThesis?.titleVn || 'Đang tải thông tin đề tài...'}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Giảng viên hoặc Quản trị viên */
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label htmlFor="thesisSelect" style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
+                  {isSupervisor ? '👨‍🏫 Đề tài đang hướng dẫn:' : '👁️ Chọn đề tài theo dõi:'}
+                </label>
+                <select
+                  id="thesisSelect"
+                  value={selectedThesisId}
+                  onChange={e => setSelectedThesisId(Number(e.target.value))}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    minWidth: '280px',
+                    fontWeight: 600,
+                    color: '#0a3273',
+                    background: '#fff',
+                  }}
+                >
+                  {visibleTheses.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.thesisCode} — {t.titleVn} ({t.studentFullName || t.studentCode})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {canCreateTask && (
               <button
