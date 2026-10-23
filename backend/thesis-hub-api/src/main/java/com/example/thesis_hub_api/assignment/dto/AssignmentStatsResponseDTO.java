@@ -27,4 +27,5 @@ public class AssignmentStatsResponseDTO {
     private int totalLecturers;
     private int totalCapacity;
     private double averageLoadRatio;
+    private int droppedCount;
 }

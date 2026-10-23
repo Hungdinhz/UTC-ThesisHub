@@ -141,4 +141,5 @@ export interface AssignmentStats {
   totalLecturers: number;
   totalCapacity: number;
   averageLoadRatio: number;
+  droppedCount?: number;
 }

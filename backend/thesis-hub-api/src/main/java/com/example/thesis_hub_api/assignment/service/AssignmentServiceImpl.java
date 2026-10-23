@@ -17,6 +17,7 @@ import com.example.thesis_hub_api.organization.repository.LecturerRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.organization.repository.TrainingProgramRepository;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
+import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import lombok.RequiredArgsConstructor;
@@ -576,6 +577,72 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
     }
 
+    @Override
+    @Transactional
+    public void addLecturersToRound(Long projectRoundId, List<Long> lecturerIds, Integer defaultQuota) {
+        addLecturersToRound(projectRoundId, lecturerIds, defaultQuota, null);
+    }
+
+    @Override
+    @Transactional
+    public void addLecturersToRound(Long projectRoundId, List<Long> lecturerIds, Integer defaultQuota, Map<Long, Integer> lecturerQuotas) {
+        getAndValidateActiveRound(projectRoundId);
+        int fallbackQuota = (defaultQuota != null && defaultQuota > 0) ? defaultQuota : 5;
+        List<Lecturer> lecturers = (lecturerIds == null || lecturerIds.isEmpty())
+                ? lecturerRepository.findAll()
+                : lecturerRepository.findAllById(lecturerIds);
+
+        for (Lecturer l : lecturers) {
+            if (capacityRepository.findByLecturerIdAndProjectRoundId(l.getId(), projectRoundId).isEmpty()) {
+                int assignedQuota = fallbackQuota;
+                if (lecturerQuotas != null && lecturerQuotas.containsKey(l.getId())) {
+                    Integer q = lecturerQuotas.get(l.getId());
+                    if (q != null && q > 0) {
+                        assignedQuota = q;
+                    }
+                } else if (l.getMaxThesisQuota() != null && l.getMaxThesisQuota() > 0) {
+                    assignedQuota = l.getMaxThesisQuota();
+                }
+
+                LecturerCapacity cap = LecturerCapacity.builder()
+                        .lecturerId(l.getId())
+                        .projectRoundId(projectRoundId)
+                        .maxQuota(assignedQuota)
+                        .capacityFactor(1.0)
+                        .currentAssigned(0)
+                        .isActive(true)
+                        .build();
+                capacityRepository.save(cap);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deleteCapacity(Long id) {
+        LecturerCapacity capacity = capacityRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chỉ tiêu giảng viên ID: " + id));
+        getAndValidateActiveRound(capacity.getProjectRoundId());
+        if (capacity.getCurrentAssigned() != null && capacity.getCurrentAssigned() > 0) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Không thể xóa giảng viên đã được phân công sinh viên hướng dẫn.");
+        }
+        capacityRepository.delete(capacity);
+        log.info("Removed lecturer capacity ID: {} for project round {}", id, capacity.getProjectRoundId());
+    }
+
+    @Override
+    @Transactional
+    public void deleteCapacityByRoundAndLecturer(Long projectRoundId, Long lecturerId) {
+        LecturerCapacity capacity = capacityRepository.findByLecturerIdAndProjectRoundId(lecturerId, projectRoundId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giảng viên trong đợt đồ án (Round ID: " + projectRoundId + ", Lecturer ID: " + lecturerId + ")"));
+        getAndValidateActiveRound(projectRoundId);
+        if (capacity.getCurrentAssigned() != null && capacity.getCurrentAssigned() > 0) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Không thể xóa giảng viên đã được phân công sinh viên hướng dẫn.");
+        }
+        capacityRepository.delete(capacity);
+        log.info("Removed lecturer capacity for lecturer ID: {} in project round {}", lecturerId, projectRoundId);
+    }
+
     // ==========================================
     // 6. Algorithm Execution & Proposals (Mục C & E)
     // ==========================================
@@ -803,6 +870,49 @@ public class AssignmentServiceImpl implements AssignmentService {
                 sa.setNote(request.getNote());
             }
             assignmentRepository.save(sa);
+
+            // Đồng bộ trạng thái ASSIGNED vào StudentProjectRound
+            if (studentProjectRoundRepository != null && sa.getStudentId() != null) {
+                studentProjectRoundRepository.findByStudentIdAndProjectRoundId(sa.getStudentId(), roundId)
+                        .ifPresent(spr -> {
+                            spr.setStatus("ASSIGNED");
+                            if (spr.getNote() == null || spr.getNote().isBlank()) {
+                                spr.setNote("Đã được phân công GVHD chính thức");
+                            }
+                            studentProjectRoundRepository.save(spr);
+                        });
+            }
+        }
+
+        // Những sinh viên chưa đăng kí sau khi đã chốt phân công thì loại khỏi đợt đồ án
+        if (studentProjectRoundRepository != null) {
+            Set<Long> registeredStudentIds = registrationRepository.findByProjectRoundId(roundId).stream()
+                    .map(DirectionRegistration::getStudentId)
+                    .collect(Collectors.toSet());
+            Set<Long> preferenceStudentIds = preferenceRepository.findByProjectRoundIdOrderByStudentIdAscPriorityAsc(roundId).stream()
+                    .map(Preference::getStudentId)
+                    .collect(Collectors.toSet());
+            Set<Long> assignedStudentIds = assignments.stream()
+                    .map(SupervisorAssignment::getStudentId)
+                    .collect(Collectors.toSet());
+
+            List<StudentProjectRound> roundStudents = studentProjectRoundRepository.findByProjectRoundId(roundId);
+            int droppedCount = 0;
+            for (StudentProjectRound spr : roundStudents) {
+                if (spr.getStudent() == null || spr.getStudent().getId() == null) {
+                    continue;
+                }
+                Long sId = spr.getStudent().getId();
+                boolean hasRegistered = registeredStudentIds.contains(sId) || preferenceStudentIds.contains(sId) || assignedStudentIds.contains(sId);
+                // Nếu sinh viên chưa từng đăng ký hướng/nguyện vọng và chưa bị loại/bảo lưu từ trước
+                if (!hasRegistered && !"DROPPED".equalsIgnoreCase(spr.getStatus()) && !"RESERVED".equalsIgnoreCase(spr.getStatus())) {
+                    spr.setStatus("DROPPED");
+                    spr.setNote("Chưa đăng ký nguyện vọng đồ án khi đã chốt phân công - Bị loại khỏi đợt");
+                    studentProjectRoundRepository.save(spr);
+                    droppedCount++;
+                }
+            }
+            log.info("Chốt phân công đợt {}: Đã loại {} sinh viên chưa đăng ký khỏi đợt đồ án", roundId, droppedCount);
         }
 
         log.info("Finalized {} supervisor assignments for project round {}", assignments.size(), roundId);
@@ -832,6 +942,13 @@ public class AssignmentServiceImpl implements AssignmentService {
         double nv2Rate = totalStudents > 0 ? ((double) nv2 / (double) totalStudents) * 100.0 : 0.0;
         double nv3Rate = totalStudents > 0 ? ((double) nv3 / (double) totalStudents) * 100.0 : 0.0;
 
+        int dropped = 0;
+        if (studentProjectRoundRepository != null) {
+            dropped = (int) studentProjectRoundRepository.findByProjectRoundId(projectRoundId).stream()
+                    .filter(spr -> "DROPPED".equalsIgnoreCase(spr.getStatus()))
+                    .count();
+        }
+
         return AssignmentStatsResponseDTO.builder()
                 .projectRoundId(projectRoundId)
                 .totalStudents((int) totalStudents)
@@ -849,6 +966,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .totalLecturers(capacities.size())
                 .totalCapacity(totalCap)
                 .averageLoadRatio(Math.round(avgLoad * 100.0) / 100.0)
+                .droppedCount(dropped)
                 .build();
     }
 }

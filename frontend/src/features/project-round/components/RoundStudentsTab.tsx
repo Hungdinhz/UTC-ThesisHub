@@ -62,6 +62,194 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   const [newStatus, setNewStatus] = useState('');
   const [newNote, setNewNote] = useState('');
 
+  // Real-time validation for Add Student Manually
+  const [manualErrors, setManualErrors] = useState<Record<string, string>>({});
+  const [manualTouched, setManualTouched] = useState<Record<string, boolean>>({});
+  const [manualModalError, setManualModalError] = useState<string | null>(null);
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
+  const [eligibilityResult, setEligibilityResult] = useState<{
+    studentCode?: string;
+    eligible: boolean;
+    message: string;
+    existsInSystem: boolean;
+    fullName?: string;
+  } | null>(null);
+
+  const checkStudentEligibilityNow = async (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) {
+      setEligibilityResult(null);
+      return;
+    }
+
+    if (!/^\d{9}$/.test(code)) {
+      setManualTouched((prev) => ({ ...prev, studentCode: true }));
+      setManualErrors((prev) => ({
+        ...prev,
+        studentCode: 'Mã sinh viên chỉ gồm đúng 9 chữ số (VD: 202160001)',
+      }));
+      setEligibilityResult(null);
+      return;
+    }
+
+    // 1. Kiểm tra danh sách cục bộ trong đợt hiện tại
+    if (students.some((s) => s.studentCode?.trim().toLowerCase() === code.toLowerCase())) {
+      const errMsg = `Kiểm tra trùng lặp: Sinh viên (MSSV: ${code}) đã có trong đợt đồ án này`;
+      setManualTouched((prev) => ({ ...prev, studentCode: true }));
+      setManualErrors((prev) => ({ ...prev, studentCode: errMsg }));
+      setManualModalError(errMsg);
+      setEligibilityResult({
+        studentCode: code,
+        eligible: false,
+        message: errMsg,
+        existsInSystem: true,
+      });
+      return;
+    }
+
+    // 2. Gọi API backend kiểm tra trùng lặp đợt khác và tính hợp lệ theo thời gian thực
+    try {
+      setCheckingEligibility(true);
+      const res = await apiService.checkStudentEligibility(roundId, code);
+      if (!res.eligible) {
+        setManualTouched((prev) => ({ ...prev, studentCode: true }));
+        setManualErrors((prev) => ({ ...prev, studentCode: res.message }));
+        setManualModalError(res.message);
+        setEligibilityResult({
+          studentCode: code,
+          eligible: false,
+          message: res.message,
+          existsInSystem: res.existsInSystem,
+          fullName: res.fullName,
+        });
+      } else {
+        setManualErrors((prev) => ({ ...prev, studentCode: '' }));
+        setManualModalError(null);
+        setEligibilityResult({
+          studentCode: code,
+          eligible: true,
+          message: res.message,
+          existsInSystem: res.existsInSystem,
+          fullName: res.fullName,
+        });
+
+        // Nếu sinh viên đã có trong hệ thống UTC, tự động điền các trường còn lại
+        if (res.existsInSystem) {
+          setManualForm((prev) => ({
+            ...prev,
+            fullName: res.fullName || prev.fullName,
+            className: res.className || prev.className,
+            majorId: res.majorId || prev.majorId,
+            email: res.email || prev.email,
+            phone: res.phone || prev.phone,
+          }));
+          setManualTouched((prev) => ({
+            ...prev,
+            studentCode: true,
+            fullName: Boolean(res.fullName) || prev.fullName,
+            className: Boolean(res.className) || prev.className,
+            majorId: Boolean(res.majorId) || prev.majorId,
+            email: Boolean(res.email) || prev.email,
+            phone: Boolean(res.phone) || prev.phone,
+          }));
+          setManualErrors((prev) => ({
+            ...prev,
+            studentCode: '',
+            fullName: res.fullName ? '' : prev.fullName,
+            className: res.className ? '' : prev.className,
+            majorId: res.majorId ? '' : prev.majorId,
+          }));
+        }
+      }
+    } catch (err: unknown) {
+      console.error('Failed to check student eligibility:', err);
+    } finally {
+      setCheckingEligibility(false);
+    }
+  };
+
+  const validateManualField = (field: string, value: any): string => {
+    switch (field) {
+      case 'studentCode': {
+        const val = String(value || '').trim();
+        if (!val) return 'Mã sinh viên không được để trống';
+        if (!/^\d{9}$/.test(val)) return 'Mã sinh viên chỉ gồm đúng 9 chữ số (VD: 202160001)';
+        if (students.some((s) => s.studentCode?.trim().toLowerCase() === val.toLowerCase())) {
+          return 'Sinh viên này đã có trong danh sách đợt đồ án hiện tại';
+        }
+        if (eligibilityResult && !eligibilityResult.eligible && eligibilityResult.studentCode === val) {
+          return eligibilityResult.message;
+        }
+        return '';
+      }
+      case 'fullName': {
+        const val = String(value || '').trim();
+        if (!val) return 'Họ và tên sinh viên không được để trống';
+        if (!/^[a-zA-ZÀ-ỹ\s]{3,50}$/.test(val) || val.split(/\s+/).length < 2) {
+          return 'Họ và tên phải có ít nhất 2 từ và chỉ chứa chữ cái (VD: Nguyễn Văn An)';
+        }
+        return '';
+      }
+      case 'className': {
+        const val = String(value || '').trim();
+        if (!val) return 'Lớp sinh hoạt không được để trống (VD: CNTT1 - K64)';
+        if (val.length < 3) return 'Tên lớp quá ngắn (VD: CNTT1 - K64)';
+        return '';
+      }
+      case 'majorId': {
+        const id = Number(value);
+        if (!id || id <= 0) return 'Vui lòng chọn ngành đào tạo';
+        return '';
+      }
+      case 'email': {
+        const val = String(value || '').trim();
+        if (val && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val)) {
+          return 'Email không đúng định dạng chuẩn (VD: mssv@lms.utc.edu.vn)';
+        }
+        return '';
+      }
+      case 'phone': {
+        const val = String(value || '').trim();
+        if (val && !/^0\d{9}$/.test(val)) {
+          return 'Số điện thoại phải gồm 10 chữ số bắt đầu bằng 0 (VD: 0912345678)';
+        }
+        return '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  const handleManualFieldChange = (field: keyof CreateRoundStudentManualPayload, value: any) => {
+    if (manualModalError) setManualModalError(null);
+    const updated = { ...manualForm, [field]: value };
+    // Auto populate email when studentCode has 9 digits if email empty or matches old pattern
+    if (field === 'studentCode') {
+      const code = String(value || '').trim();
+      setEligibilityResult(null);
+      if (/^\d{9}$/.test(code)) {
+        if (!manualForm.email || manualForm.email.includes('@lms.utc.edu.vn')) {
+          updated.email = `${code}@lms.utc.edu.vn`;
+        }
+        checkStudentEligibilityNow(code);
+      }
+    }
+    setManualForm(updated);
+    if (manualTouched[field]) {
+      const err = validateManualField(field, value);
+      setManualErrors((prev) => ({ ...prev, [field]: err }));
+    }
+  };
+
+  const handleManualFieldBlur = (field: keyof CreateRoundStudentManualPayload) => {
+    setManualTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateManualField(field, manualForm[field]);
+    setManualErrors((prev) => ({ ...prev, [field]: err }));
+    if (field === 'studentCode') {
+      checkStudentEligibilityNow(manualForm.studentCode);
+    }
+  };
+
   // Load majors for filter
   useEffect(() => {
     const fetchMajors = async () => {
@@ -158,15 +346,49 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   // Manual student submit
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualForm.studentCode.trim() || !manualForm.fullName.trim() || !manualForm.majorId) {
-      setError('Vui lòng điền đầy đủ Mã SV, Họ tên và chọn Ngành đào tạo');
+    const fieldsToValidate: (keyof CreateRoundStudentManualPayload)[] = [
+      'studentCode',
+      'fullName',
+      'className',
+      'majorId',
+      'email',
+      'phone',
+    ];
+    const newErrors: Record<string, string> = {};
+    const newTouched: Record<string, boolean> = {};
+    let hasError = false;
+
+    fieldsToValidate.forEach((f) => {
+      newTouched[f] = true;
+      const err = validateManualField(f, manualForm[f]);
+      if (err) {
+        newErrors[f] = err;
+        hasError = true;
+      }
+    });
+
+    setManualTouched(newTouched);
+    setManualErrors(newErrors);
+
+    if (hasError) {
+      setError('Vui lòng kiểm tra và hoàn thiện các trường dữ liệu chưa đúng định dạng chuẩn.');
+      return;
+    }
+
+    const code = manualForm.studentCode.trim();
+    if (students.some((s) => s.studentCode?.trim().toLowerCase() === code.toLowerCase())) {
+      setManualModalError(`Kiểm tra trùng lặp: Sinh viên (MSSV: ${code}) đã có trong danh sách đợt đồ án này.`);
+      return;
+    }
+    if (eligibilityResult && !eligibilityResult.eligible) {
+      setManualModalError(eligibilityResult.message);
       return;
     }
 
     try {
       setManualLoading(true);
       setError(null);
-      const code = manualForm.studentCode.trim();
+      setManualModalError(null);
       const emailVal = manualForm.email?.trim() || `${code.toLowerCase()}@lms.utc.edu.vn`;
       await apiService.addStudentToRoundManually(roundId, {
         ...manualForm,
@@ -187,10 +409,15 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         status: 'ELIGIBLE',
         note: '',
       });
+      setManualErrors({});
+      setManualTouched({});
+      setManualModalError(null);
       loadStudents();
       setTimeout(() => setSuccessMsg(null), 5000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi thêm sinh viên thủ công vào đợt');
+      const msg = err instanceof Error ? err.message : 'Lỗi khi thêm sinh viên thủ công vào đợt';
+      setError(msg);
+      setManualModalError(msg);
     } finally {
       setManualLoading(false);
     }
@@ -329,14 +556,14 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             onClick={handleDownloadTemplate}
             style={{
               backgroundColor: '#f8fafc',
               color: '#0a3273',
               border: '1px solid #cbd5e1',
-              padding: '8px 14px',
+              padding: '8px 12px',
               borderRadius: '6px',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -361,7 +588,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               backgroundColor: isRoundClosed ? '#94a3b8' : '#16a34a',
               color: '#fff',
               border: 'none',
-              padding: '8px 16px',
+              padding: '8px 14px',
               borderRadius: '6px',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -373,6 +600,32 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể import sinh viên' : undefined}
           >
             📤 Import SV từ Excel
+          </button>
+          <button
+            disabled={isRoundClosed}
+            onClick={() => {
+              if (isRoundClosed) return;
+              setManualModalError(null);
+              setEligibilityResult(null);
+              setCheckingEligibility(false);
+              setShowManualModal(true);
+            }}
+            style={{
+              backgroundColor: isRoundClosed ? '#94a3b8' : '#0284c7',
+              color: '#fff',
+              border: 'none',
+              padding: '8px 14px',
+              borderRadius: '6px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: isRoundClosed ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            title={isRoundClosed ? 'Đợt đồ án đã đóng' : 'Thêm từng sinh viên thủ công vào đợt'}
+          >
+            ➕ Thêm thủ công SV
           </button>
         </div>
       </div>
@@ -763,83 +1016,268 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               🔐 <strong>Cấp tài khoản đăng nhập tự động:</strong> Khi lưu, hệ thống tự động tạo tài khoản Sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu khởi tạo = Mã SV</strong>.
             </div>
 
+            {manualModalError && (
+              <div
+                style={{
+                  backgroundColor: '#fee2e2',
+                  border: '1.5px solid #ef4444',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  marginBottom: '16px',
+                  fontSize: '0.88rem',
+                  color: '#991b1b',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>⚠️</span>
+                <div style={{ flex: 1 }}>
+                  <strong>Không thể thêm sinh viên:</strong>
+                  <div style={{ marginTop: '2px', lineHeight: 1.4 }}>{manualModalError}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setManualModalError(null)}
+                  style={{ background: 'none', border: 'none', color: '#991b1b', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleManualSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Mã sinh viên (MSSV) *</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Mã sinh viên (MSSV) *
+                  </label>
                   <input
                     type="text"
                     value={manualForm.studentCode}
-                    onChange={(e) => setManualForm({ ...manualForm, studentCode: e.target.value })}
-                    placeholder="VD: 201200101"
+                    onChange={(e) => handleManualFieldChange('studentCode', e.target.value)}
+                    onBlur={() => handleManualFieldBlur('studentCode')}
+                    placeholder="VD: 201200101 (đúng 9 số)"
+                    maxLength={9}
                     required
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.studentCode
+                        ? manualErrors.studentCode
+                          ? '1.5px solid #ef4444'
+                          : '1.5px solid #22c55e'
+                        : '1px solid #cbd5e1',
+                      backgroundColor: manualTouched.studentCode && manualErrors.studentCode ? '#fef2f2' : '#fff',
+                      outline: 'none',
+                    }}
                   />
+                  {checkingEligibility && (
+                    <div style={{ color: '#2563eb', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⏳ Đang kiểm tra trùng lặp & đợt đồ án...
+                    </div>
+                  )}
+                  {!checkingEligibility && manualTouched.studentCode && manualErrors.studentCode && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 600, lineHeight: 1.4 }}>
+                      ⚠️ {manualErrors.studentCode}
+                    </div>
+                  )}
+                  {!checkingEligibility && manualTouched.studentCode && !manualErrors.studentCode && manualForm.studentCode && (
+                    <div style={{ color: '#16a34a', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      {eligibilityResult?.existsInSystem
+                        ? `✓ Hợp lệ: ${eligibilityResult.fullName || 'Đã có hồ sơ'} (Đủ điều kiện tham gia đợt)`
+                        : '✓ Hợp lệ (chuẩn 9 chữ số)'}
+                    </div>
+                  )}
                 </div>
+
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Họ và tên sinh viên *</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Họ và tên sinh viên *
+                  </label>
                   <input
                     type="text"
                     value={manualForm.fullName}
-                    onChange={(e) => setManualForm({ ...manualForm, fullName: e.target.value })}
+                    onChange={(e) => handleManualFieldChange('fullName', e.target.value)}
+                    onBlur={() => handleManualFieldBlur('fullName')}
                     placeholder="VD: Nguyễn Văn An"
                     required
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.fullName
+                        ? manualErrors.fullName
+                          ? '1.5px solid #ef4444'
+                          : '1.5px solid #22c55e'
+                        : '1px solid #cbd5e1',
+                      backgroundColor: manualTouched.fullName && manualErrors.fullName ? '#fef2f2' : '#fff',
+                      outline: 'none',
+                    }}
                   />
+                  {manualTouched.fullName && manualErrors.fullName && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {manualErrors.fullName}
+                    </div>
+                  )}
+                  {manualTouched.fullName && !manualErrors.fullName && manualForm.fullName && (
+                    <div style={{ color: '#16a34a', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ✓ Hợp lệ
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Lớp sinh hoạt</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Lớp sinh hoạt *
+                  </label>
                   <input
                     type="text"
                     value={manualForm.className || ''}
-                    onChange={(e) => setManualForm({ ...manualForm, className: e.target.value })}
+                    onChange={(e) => handleManualFieldChange('className', e.target.value)}
+                    onBlur={() => handleManualFieldBlur('className')}
                     placeholder="VD: CNTT1 - K64"
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.className
+                        ? manualErrors.className
+                          ? '1.5px solid #ef4444'
+                          : '1.5px solid #22c55e'
+                        : '1px solid #cbd5e1',
+                      backgroundColor: manualTouched.className && manualErrors.className ? '#fef2f2' : '#fff',
+                      outline: 'none',
+                    }}
                   />
+                  {manualTouched.className && manualErrors.className && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {manualErrors.className}
+                    </div>
+                  )}
+                  {manualTouched.className && !manualErrors.className && manualForm.className && (
+                    <div style={{ color: '#16a34a', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ✓ Hợp lệ
+                    </div>
+                  )}
                 </div>
+
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Ngành đào tạo *</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Ngành đào tạo *
+                  </label>
                   <select
                     value={manualForm.majorId}
-                    onChange={(e) => setManualForm({ ...manualForm, majorId: Number(e.target.value) })}
+                    onChange={(e) => handleManualFieldChange('majorId', Number(e.target.value))}
+                    onBlur={() => handleManualFieldBlur('majorId')}
                     required
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.majorId
+                        ? manualErrors.majorId
+                          ? '1.5px solid #ef4444'
+                          : '1.5px solid #22c55e'
+                        : '1px solid #cbd5e1',
+                      backgroundColor: manualTouched.majorId && manualErrors.majorId ? '#fef2f2' : '#fff',
+                      outline: 'none',
+                    }}
                   >
+                    <option value={0}>-- Chọn ngành đào tạo --</option>
                     {majors.map((m) => (
                       <option key={m.id} value={m.id}>{m.name} ({m.code})</option>
                     ))}
                   </select>
+                  {manualTouched.majorId && manualErrors.majorId && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {manualErrors.majorId}
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Email sinh viên</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Email sinh viên
+                  </label>
                   <input
                     type="email"
                     value={manualForm.email || ''}
-                    onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })}
+                    onChange={(e) => handleManualFieldChange('email', e.target.value)}
+                    onBlur={() => handleManualFieldBlur('email')}
                     placeholder="Tự động: mssv@lms.utc.edu.vn"
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.email && manualErrors.email
+                        ? '1.5px solid #ef4444'
+                        : manualTouched.email && manualForm.email
+                          ? '1.5px solid #22c55e'
+                          : '1px solid #cbd5e1',
+                      backgroundColor: manualTouched.email && manualErrors.email ? '#fef2f2' : '#fff',
+                      outline: 'none',
+                    }}
                   />
+                  {manualTouched.email && manualErrors.email && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {manualErrors.email}
+                    </div>
+                  )}
+                  {manualTouched.email && !manualErrors.email && manualForm.email && (
+                    <div style={{ color: '#16a34a', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ✓ Email hợp lệ
+                    </div>
+                  )}
                 </div>
+
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Số điện thoại</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Số điện thoại
+                  </label>
                   <input
                     type="text"
                     value={manualForm.phone || ''}
-                    onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
-                    placeholder="VD: 0912345678"
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleManualFieldChange('phone', e.target.value)}
+                    onBlur={() => handleManualFieldBlur('phone')}
+                    placeholder="VD: 0912345678 (10 số)"
+                    maxLength={10}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.phone && manualErrors.phone
+                        ? '1.5px solid #ef4444'
+                        : manualTouched.phone && manualForm.phone
+                          ? '1.5px solid #22c55e'
+                          : '1px solid #cbd5e1',
+                      backgroundColor: manualTouched.phone && manualErrors.phone ? '#fef2f2' : '#fff',
+                      outline: 'none',
+                    }}
                   />
+                  {manualTouched.phone && manualErrors.phone && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {manualErrors.phone}
+                    </div>
+                  )}
+                  {manualTouched.phone && !manualErrors.phone && manualForm.phone && (
+                    <div style={{ color: '#16a34a', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ✓ SĐT hợp lệ
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Trạng thái ban đầu trong đợt</label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                  Trạng thái ban đầu trong đợt
+                </label>
                 <select
                   value={manualForm.status}
                   onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}

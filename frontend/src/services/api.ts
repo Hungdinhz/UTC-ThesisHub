@@ -51,6 +51,7 @@ import type {
   StudentImportResultResponse,
   StudentProjectRoundItem,
   CreateRoundStudentManualPayload,
+  StudentEligibilityCheckResponse,
   AcademicRecordImportPreviewResponse,
   AcademicRecordImportCommitPayload,
   AcademicRecordImportResultResponse,
@@ -1027,7 +1028,7 @@ class ApiService {
     await this.api.delete(ORGANIZATION.student(id));
   }
 
-  async getLecturers(params?: { departmentId?: number; degree?: string; search?: string }): Promise<LecturerItem[]> {
+  async getLecturers(params?: { departmentId?: number; degree?: string; search?: string; projectRoundId?: number }): Promise<LecturerItem[]> {
     const response = await this.api.get<LecturerItem[]>(ORGANIZATION.LECTURERS, { params });
     return response.data;
   }
@@ -1037,6 +1038,7 @@ class ApiService {
     programId?: number;
     className?: string;
     search?: string;
+    projectRoundId?: number;
     page?: number;
     size?: number;
   }): Promise<OrganizationPageResponse<StudentItem>> {
@@ -1156,6 +1158,19 @@ class ApiService {
     const response = await this.api.post<StudentProjectRoundItem>(
       PROJECT_ROUNDS.studentManual(roundId),
       payload
+    );
+    return response.data;
+  }
+
+  async checkStudentEligibility(
+    roundId: number,
+    studentCode: string
+  ): Promise<StudentEligibilityCheckResponse> {
+    const response = await this.api.get<StudentEligibilityCheckResponse>(
+      PROJECT_ROUNDS.studentCheckEligibility(roundId),
+      {
+        params: { studentCode },
+      }
     );
     return response.data;
   }

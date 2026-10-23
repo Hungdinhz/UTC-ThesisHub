@@ -80,7 +80,23 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         assignmentService.getPreferences(roundId),
       ]);
 
-      setDirections(dirsData || []);
+      // Synchronize each direction's lecturer count dynamically with active capacities
+      const syncedDirections = (dirsData || []).map((dir) => {
+        const matchingCount = (capsData || []).filter((c) =>
+          c.directionNames?.some(
+            (dn) =>
+              dn.toLowerCase() === dir.code.toLowerCase() ||
+              dn.toLowerCase().includes(dir.code.toLowerCase()) ||
+              dn.toLowerCase() === dir.name.toLowerCase()
+          )
+        ).length;
+        return {
+          ...dir,
+          lecturerCount: matchingCount > 0 ? matchingCount : (capsData && capsData.length > 0 ? 0 : dir.lecturerCount || 0),
+        };
+      });
+
+      setDirections(syncedDirections);
       setCapacities(capsData || []);
 
       // Check current registration, preferences, and assignment for this student

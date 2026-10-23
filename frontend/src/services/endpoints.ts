@@ -185,6 +185,7 @@ export const PROJECT_ROUNDS = {
   studentImportPreview: (roundId: number) => `/project-rounds/${roundId}/students/import-preview` as const,
   studentImportCommit:  (roundId: number) => `/project-rounds/${roundId}/students/import-commit` as const,
   studentManual:        (roundId: number) => `/project-rounds/${roundId}/students/manual` as const,
+  studentCheckEligibility: (roundId: number) => `/project-rounds/${roundId}/students/check-eligibility` as const,
 } as const;
 
 // ─── Academic Records (Contract 4) ────────────────────────────────

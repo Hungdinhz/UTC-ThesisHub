@@ -406,6 +406,83 @@ export const assignmentService = {
     );
   },
 
+  async addLecturersToRound(
+    projectRoundId: number,
+    lecturerIds?: number[],
+    defaultQuota = 5,
+    lecturerQuotas?: Record<number, number>
+  ): Promise<void> {
+    try {
+      await axios.post(
+        `${API_BASE}/capacities/add-lecturers`,
+        {
+          lecturerIds: lecturerIds && lecturerIds.length > 0 ? lecturerIds : [],
+          defaultQuota,
+          lecturerQuotas: lecturerQuotas || {},
+        },
+        {
+          params: { projectRoundId, defaultQuota },
+          headers: getAuthHeaders(),
+        }
+      );
+    } catch {
+      // Fallback to initCapacities if endpoint is unavailable
+      await this.initCapacities(projectRoundId, defaultQuota);
+    }
+  },
+
+  async deleteCapacity(id: number, projectRoundId?: number, lecturerId?: number): Promise<void> {
+    const headers = getAuthHeaders();
+    let lastErr: any = null;
+
+    // 1. Try standard DELETE /assignments/capacities/{id}
+    try {
+      await axios.delete(`${API_BASE}/capacities/${id}`, { headers });
+      const idx = mockCapacities.findIndex((c) => c.id === id);
+      if (idx !== -1) mockCapacities.splice(idx, 1);
+      return;
+    } catch (err: any) {
+      lastErr = err;
+      console.warn('DELETE /capacities/:id failed, trying POST fallback...', err?.response?.status || err?.message);
+    }
+
+    // 2. Try POST fallback: /assignments/capacities/{id}/delete
+    try {
+      await axios.post(`${API_BASE}/capacities/${id}/delete`, {}, { headers });
+      const idx = mockCapacities.findIndex((c) => c.id === id);
+      if (idx !== -1) mockCapacities.splice(idx, 1);
+      return;
+    } catch (err: any) {
+      lastErr = err;
+      console.warn('POST /capacities/:id/delete fallback failed, trying round endpoint...', err?.response?.status || err?.message);
+    }
+
+    // 3. Try round-scoped endpoints if projectRoundId & lecturerId available
+    if (projectRoundId && lecturerId) {
+      try {
+        await axios.delete(`${BASE_URL}/project-rounds/${projectRoundId}/lecturers/${lecturerId}`, { headers });
+        const idx = mockCapacities.findIndex((c) => c.id === id);
+        if (idx !== -1) mockCapacities.splice(idx, 1);
+        return;
+      } catch (err: any) {
+        lastErr = err;
+      }
+
+      try {
+        await axios.post(`${BASE_URL}/project-rounds/${projectRoundId}/lecturers/${lecturerId}/delete`, {}, { headers });
+        const idx = mockCapacities.findIndex((c) => c.id === id);
+        if (idx !== -1) mockCapacities.splice(idx, 1);
+        return;
+      } catch (err: any) {
+        lastErr = err;
+      }
+    }
+
+    console.error('All delete capacity attempts failed:', lastErr);
+    const msg = lastErr?.response?.data?.message || lastErr?.message || 'Lỗi khi xóa giảng viên khỏi đợt';
+    throw new Error(msg);
+  },
+
   // 6. Algorithm Execution & Result Management (Step C & E)
   async generateAssignments(projectRoundId: number, reassignAll = true): Promise<SupervisorAssignment[]> {
     try {

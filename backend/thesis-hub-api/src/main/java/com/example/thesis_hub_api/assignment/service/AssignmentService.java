@@ -31,6 +31,10 @@ public interface AssignmentService {
     List<LecturerCapacityResponseDTO> getCapacitiesByRound(Long projectRoundId);
     LecturerCapacityResponseDTO updateCapacity(Long id, CapacityUpdateRequestDTO request);
     void initializeCapacitiesForRound(Long projectRoundId, int defaultQuota);
+    void addLecturersToRound(Long projectRoundId, List<Long> lecturerIds, Integer defaultQuota);
+    void addLecturersToRound(Long projectRoundId, List<Long> lecturerIds, Integer defaultQuota, java.util.Map<Long, Integer> lecturerQuotas);
+    void deleteCapacity(Long id);
+    void deleteCapacityByRoundAndLecturer(Long projectRoundId, Long lecturerId);
 
     // 6. Algorithm & Assignment Results
     List<SupervisorAssignmentResponseDTO> generateAssignments(AssignmentGenerateRequestDTO request);

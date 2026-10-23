@@ -273,7 +273,22 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                 <div className="card-content">
                   <div className="card-top">
                     <span className="direction-tag">{d.code}</span>
-                    <span className="lecturer-tag">{d.lecturerCount || 0} GV</span>
+                    <span className="lecturer-tag">
+                      {(() => {
+                        if (capacities && capacities.length > 0) {
+                          const count = capacities.filter((c) =>
+                            c.directionNames?.some(
+                              (dn) =>
+                                dn.toLowerCase() === d.code.toLowerCase() ||
+                                dn.toLowerCase().includes(d.code.toLowerCase()) ||
+                                dn.toLowerCase() === d.name.toLowerCase()
+                            )
+                          ).length;
+                          return `${count} GV`;
+                        }
+                        return `${d.lecturerCount !== undefined ? d.lecturerCount : 0} GV`;
+                      })()}
+                    </span>
                   </div>
                   <h5 className="direction-title">{d.name}</h5>
                   <p className="direction-desc">{d.description || 'Chuyên đề đào tạo chuyên sâu'}</p>

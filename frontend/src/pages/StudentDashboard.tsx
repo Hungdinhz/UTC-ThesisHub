@@ -20,6 +20,8 @@ import UTCFypTimeline from '../components/UTCFypTimeline';
 import UTCEvaluationSheetModal from '../components/UTCEvaluationSheetModal';
 import { UTCStudentGraduationView } from '../components/UTCStudentGraduationView';
 import { SkeletonProfile, SkeletonCardGrid } from '../components/SkeletonLoader';
+import { assignmentService } from '../features/assignment/services/assignmentService';
+import type { SupervisorAssignment } from '../features/assignment/types';
 import './Dashboard.css';
 import '../components/SkeletonLoader.css';
 import '../components/CommentsSection.css';
@@ -50,6 +52,8 @@ const StudentDashboard: React.FC = () => {
   const [externalLoading, setExternalLoading] = useState(false);
   const [selectedProjectForSupervisor, setSelectedProjectForSupervisor] = useState<Project | null>(null);
   const [showUTCSheet, setShowUTCSheet] = useState(false);
+  const [mySupervisorAssignment, setMySupervisorAssignment] = useState<SupervisorAssignment | null>(null);
+  const [isAssignmentFinalized, setIsAssignmentFinalized] = useState(false);
 
   const handleProjectSearch = useCallback((search: string) => {
     setProjectSearch(search);
@@ -91,12 +95,39 @@ const StudentDashboard: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [profileData, categoriesData] = await Promise.all([
+      const [profileData, categoriesData, roundsData] = await Promise.all([
         apiService.getStudentProfile(),
         apiService.getProjectCategories(),
+        apiService.getProjectRounds().catch(() => []),
       ]);
       setProfile(profileData);
       setProjectCategories(categoriesData.results || []);
+
+      // Check assignment status in active round
+      if (roundsData && roundsData.length > 0) {
+        const activeRound =
+          roundsData.find((r) => r.status === 'OPEN') ||
+          roundsData.find((r) => r.status === 'IN_PROGRESS') ||
+          roundsData[0];
+        if (activeRound?.roundId) {
+          try {
+            const proposals = await assignmentService.getProposals(activeRound.roundId);
+            const userCode = (user as any)?.registration_no || (user as any)?.studentCode || (user as any)?.student_code || user?.username;
+            const studentId = (user as any)?.id || profileData?.id;
+            const myAssign = proposals?.find((p) =>
+              (studentId && p.studentId === studentId) ||
+              (userCode && (p as any).studentCode === userCode)
+            );
+            if (myAssign) {
+              setMySupervisorAssignment(myAssign);
+              const isFinal = myAssign.status === 'FINALIZED' || Boolean(myAssign.lecturerName);
+              setIsAssignmentFinalized(isFinal);
+            }
+          } catch (e) {
+            console.error('Failed to load assignment proposal in dashboard:', e);
+          }
+        }
+      }
 
       if (profileData.groupmate_id) {
         const supervisorRequestsData = await apiService.getSupervisorRequests();
@@ -337,12 +368,14 @@ const StudentDashboard: React.FC = () => {
           {activeTab === 'overview' && (
             <>
               {/* UTC FYP Progress Timeline */}
-              <UTCFypTimeline currentStep={profile?.groupmate_id ? 3 : 1} />
+              <UTCFypTimeline currentStep={isAssignmentFinalized ? 2 : (profile?.groupmate_id ? 3 : 1)} />
 
               {/* Callout Card: Giai đoạn 2 - Chọn Hướng đồ án & Nguyện vọng Giảng viên */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, #003366 0%, #0a4d8c 100%)',
+                  background: isAssignmentFinalized
+                    ? 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)'
+                    : 'linear-gradient(135deg, #003366 0%, #0a4d8c 100%)',
                   color: '#fff',
                   borderRadius: '12px',
                   padding: '20px 24px',
@@ -357,13 +390,13 @@ const StudentDashboard: React.FC = () => {
               >
                 <div style={{ maxWidth: '680px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '1.4rem' }}>🎯</span>
+                    <span style={{ fontSize: '1.4rem' }}>{isAssignmentFinalized ? '✅' : '🎯'}</span>
                     <h3 style={{ margin: 0, color: '#fff', fontSize: '1.15rem' }}>
                       Giai đoạn 2: Chọn Hướng Đồ Án & Đăng Ký Nguyện Vọng GVHD (NV1–NV3)
                     </h3>
                     <span
                       style={{
-                        backgroundColor: '#22c55e',
+                        backgroundColor: isAssignmentFinalized ? '#10b981' : '#22c55e',
                         color: '#fff',
                         fontSize: '0.75rem',
                         fontWeight: 700,
@@ -371,36 +404,72 @@ const StudentDashboard: React.FC = () => {
                         borderRadius: '12px',
                       }}
                     >
-                      ĐANG MỞ
+                      {isAssignmentFinalized ? '✓ ĐÃ CHỐT PHÂN CÔNG' : 'ĐANG MỞ'}
                     </span>
                   </div>
-                  <p style={{ margin: 0, color: '#e0f2fe', fontSize: '0.9rem', lineHeight: '1.4' }}>
-                    Sinh viên đăng ký hướng nghiên cứu chuyên môn (AI, Phần mềm, Web/Cloud, ATTT, IoT, Big Data) và lựa chọn tối đa 3 nguyện vọng giảng viên hướng dẫn theo quy định Khoa CNTT.
-                  </p>
+                  {isAssignmentFinalized && mySupervisorAssignment ? (
+                    <div style={{ margin: 0, color: '#d1fae5', fontSize: '0.92rem', lineHeight: '1.5' }}>
+                      <p style={{ margin: '4px 0', fontSize: '0.95rem' }}>
+                        👨‍🏫 <strong>Giảng viên hướng dẫn:</strong> <span style={{ color: '#fef08a', fontWeight: 600 }}>{mySupervisorAssignment.lecturerName || 'TS. Trần Văn Giảng Viên'}</span> {mySupervisorAssignment.lecturerCode ? `(${mySupervisorAssignment.lecturerCode})` : ''}
+                      </p>
+                      <p style={{ margin: '4px 0', fontSize: '0.85rem', color: '#a7f3d0' }}>
+                        Hệ thống đã chốt kết quả phân công GVHD. Vui lòng chuyển sang Giai đoạn 3 để biên soạn & nộp đề cương chi tiết.
+                      </p>
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, color: '#e0f2fe', fontSize: '0.9rem', lineHeight: '1.4' }}>
+                      Sinh viên đăng ký hướng nghiên cứu chuyên môn (AI, Phần mềm, Web/Cloud, ATTT, IoT, Big Data) và lựa chọn tối đa 3 nguyện vọng giảng viên hướng dẫn theo quy định Khoa CNTT.
+                    </p>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => navigate('/student/assignment')}
-                  style={{
-                    backgroundColor: '#f59e0b',
-                    color: '#0f172a',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '11px 22px',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#d97706')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f59e0b')}
-                >
-                  🚀 Đăng ký Hướng & GVHD ngay
-                </button>
+                {isAssignmentFinalized ? (
+                  <button
+                    type="button"
+                    disabled
+                    style={{
+                      backgroundColor: '#475569',
+                      color: '#cbd5e1',
+                      border: '1px solid #64748b',
+                      borderRadius: '8px',
+                      padding: '11px 22px',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      cursor: 'not-allowed',
+                      boxShadow: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      opacity: 0.9,
+                    }}
+                    title="Đã chốt phân công giảng viên hướng dẫn. Không thể đăng ký lại."
+                  >
+                    🔒 Đã chốt phân công (Đã khóa)
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/student/assignment')}
+                    style={{
+                      backgroundColor: '#f59e0b',
+                      color: '#0f172a',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '11px 22px',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#d97706')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f59e0b')}
+                  >
+                    🚀 Đăng ký Hướng & GVHD ngay
+                  </button>
+                )}
               </div>
 
               <div className="card">

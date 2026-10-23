@@ -82,15 +82,24 @@ export const AssignmentStatsOverview: React.FC<Props> = ({ stats, loading }) => 
       <div className="stat-card stat-danger">
         <div className="stat-icon">⚠️</div>
         <div className="stat-info">
-          <span className="stat-label">Chưa phân công / Override</span>
+          <span className="stat-label">Chưa phân công / Bị loại</span>
           <div className="stat-value-group">
             <span className="stat-value text-danger">{stats.unassignedCount}</span>
+            {stats.droppedCount !== undefined && stats.droppedCount > 0 && (
+              <span className="stat-badge" style={{ backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #f87171' }} title="Sinh viên chưa đăng ký bị loại khỏi đợt">
+                🚫 Loại {stats.droppedCount} SV
+              </span>
+            )}
             {stats.overriddenCount > 0 && (
               <span className="stat-badge badge-amber">{stats.overriddenCount} Override</span>
             )}
           </div>
           <span className="stat-sub">
-            {stats.finalizedCount > 0 ? 'Đã chốt danh sách' : 'Phương án đề xuất'}
+            {stats.finalizedCount > 0 ? (
+              stats.droppedCount && stats.droppedCount > 0
+                ? `Đã chốt (loại ${stats.droppedCount} SV chưa ĐK)`
+                : 'Đã chốt danh sách'
+            ) : 'Phương án đề xuất'}
           </span>
         </div>
       </div>

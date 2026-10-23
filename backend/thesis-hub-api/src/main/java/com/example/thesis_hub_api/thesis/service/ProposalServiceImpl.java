@@ -54,12 +54,32 @@ public class ProposalServiceImpl implements ProposalService {
             throw new AppException(ErrorCode.PROJECT_ROUND_CLOSED);
         }
 
-        java.util.Optional<Proposal> existingOpt = proposalRepository.findByStudentIdAndProjectRoundId(request.getStudentId(), request.getProjectRoundId());
+        Student student = null;
+        if (request.getStudentId() != null) {
+            student = studentRepository.findById(request.getStudentId())
+                    .orElseGet(() -> studentRepository.findByUserId(request.getStudentId())
+                            .orElseGet(() -> studentRepository.findByStudentCode(String.valueOf(request.getStudentId()))
+                                    .orElse(null)));
+        }
+        if (student == null) {
+            throw new ResourceNotFoundException("Student", request.getStudentId());
+        }
+
+        Lecturer lecturer = null;
+        if (request.getLecturerId() != null) {
+            lecturer = lecturerRepository.findById(request.getLecturerId())
+                    .orElseGet(() -> lecturerRepository.findByUserId(request.getLecturerId())
+                            .orElseGet(() -> lecturerRepository.findByLecturerCode(String.valueOf(request.getLecturerId()))
+                                    .orElse(null)));
+        }
+        if (lecturer == null) {
+            throw new ResourceNotFoundException("Lecturer", request.getLecturerId());
+        }
+
+        java.util.Optional<Proposal> existingOpt = proposalRepository.findByStudentIdAndProjectRoundId(student.getId(), request.getProjectRoundId());
         if (existingOpt.isPresent()) {
             Proposal existing = existingOpt.get();
             if ("DRAFT".equals(existing.getStatus()) || "REVISE_REQUIRED".equals(existing.getStatus())) {
-                Lecturer lecturer = lecturerRepository.findById(request.getLecturerId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Lecturer", request.getLecturerId()));
                 existing.setLecturer(lecturer);
                 existing.setTitleVn(request.getTitleVn());
                 if (request.getTitleEn() != null) existing.setTitleEn(request.getTitleEn());
@@ -74,12 +94,6 @@ public class ProposalServiceImpl implements ProposalService {
             }
             throw new DuplicateResourceException("Sinh viên đã có đề cương trong đợt đồ án này (trạng thái: " + existing.getStatus() + ")");
         }
-
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Student", request.getStudentId()));
-
-        Lecturer lecturer = lecturerRepository.findById(request.getLecturerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Lecturer", request.getLecturerId()));
 
         Proposal proposal = Proposal.builder()
                 .projectRound(round)

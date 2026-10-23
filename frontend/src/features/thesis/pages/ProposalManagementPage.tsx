@@ -4,16 +4,20 @@ import { thesisService } from '../services/thesisService';
 import type { Proposal } from '../types';
 import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
+import type { ProjectRoundItem } from '../../../types';
+import { apiService } from '../../../services/api';
+import { assignmentService } from '../../assignment/services/assignmentService';
+import type { SupervisorAssignment } from '../../assignment/types';
 
 export const ProposalManagementPage: React.FC = () => {
   const { user, userType } = useAuth();
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor';
   const isAdmin = userType === 'admin';
-  const isCommittee = userType === 'committee_member';
 
-  const canSupervisorApprove = isSupervisor || isAdmin;
-  const canReview = isCommittee || isAdmin || isSupervisor;
+  // Giảng viên là người duyệt hoặc phân công đề tài chứ không phải admin; admin chỉ xem và theo dõi
+  const canSupervisorApprove = isSupervisor;
+  const canReview = isSupervisor;
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -29,6 +33,11 @@ export const ProposalManagementPage: React.FC = () => {
   const [pdfPreviewProposal, setPdfPreviewProposal] = useState<Proposal | null>(null);
   const [signedProposalIds, setSignedProposalIds] = useState<Record<number, boolean>>({ 1: true });
   const [bannerMsg, setBannerMsg] = useState<string | null>(null);
+
+  // Round and assignment integration
+  const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
+  const [mySupervisorAssignment, setMySupervisorAssignment] = useState<SupervisorAssignment | null>(null);
+  const [lecturerAssignedStudents, setLecturerAssignedStudents] = useState<SupervisorAssignment[]>([]);
 
   // Proposal form state
   const [titleVn, setTitleVn] = useState('');
@@ -65,7 +74,69 @@ export const ProposalManagementPage: React.FC = () => {
 
   useEffect(() => {
     loadProposals();
+    fetchRounds();
   }, []);
+
+  const fetchRounds = async () => {
+    try {
+      const roundList = await apiService.getProjectRounds();
+      if (roundList && roundList.length > 0) {
+        setRounds(roundList);
+        const activeRound =
+          roundList.find((r) => r.status === 'OPEN') ||
+          roundList.find((r) => r.status === 'IN_PROGRESS') ||
+          roundList[0];
+        if (activeRound?.roundId) {
+          setSelectedRoundId(activeRound.roundId);
+        }
+      }
+    } catch (err) {
+      console.error('Không thể tải danh sách đợt đồ án:', err);
+    }
+  };
+
+  useEffect(() => {
+    const fetchRoundAssignments = async () => {
+      if (!selectedRoundId) return;
+      try {
+        const assignments = await assignmentService.getProposals(selectedRoundId);
+
+        // Sinh viên: tìm giảng viên hướng dẫn đã phân công chính thức
+        if (isStudent) {
+          const userCode = user?.student_id || user?.studentCode || user?.username;
+          const myAssign = (assignments || []).find(
+            (p) =>
+              (user?.id && (p.studentId === user.id || String(p.studentId) === String(user?.id))) ||
+              (userCode && p.studentCode === userCode)
+          );
+          if (myAssign) {
+            setMySupervisorAssignment(myAssign);
+            if (myAssign.lecturerId) {
+              setSelectedLecturerId(myAssign.lecturerId);
+            }
+          }
+        }
+
+        // Giảng viên: lấy danh sách sinh viên đã phân công cho mình trong đợt này
+        if (isSupervisor) {
+          const lecturerId = user?.lecturer_id || user?.id;
+          const lecturerCode = (user as any)?.lecturerCode || (user as any)?.registration_no || user?.username;
+          const myStudents = (assignments || []).filter(
+            (p) =>
+              (lecturerId && (p.lecturerId === lecturerId || String(p.lecturerId) === String(lecturerId))) ||
+              (lecturerCode && p.lecturerCode === lecturerCode)
+          );
+          setLecturerAssignedStudents(myStudents);
+          if (myStudents.length > 0) {
+            setSelectedStudentId(myStudents[0].studentId);
+          }
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải kết quả phân công đợt đồ án:', err);
+      }
+    };
+    fetchRoundAssignments();
+  }, [selectedRoundId, isStudent, isSupervisor, user]);
 
   const loadProposals = async () => {
     setLoading(true);
@@ -85,11 +156,15 @@ export const ProposalManagementPage: React.FC = () => {
   const handleOpenCreateModal = () => {
     // Check if current student already has a proposal in the project round
     if (isStudent) {
+      if (mySupervisorAssignment?.lecturerId) {
+        setSelectedLecturerId(mySupervisorAssignment.lecturerId);
+      }
       const userCode = user?.student_id || user?.studentCode || user?.username;
       const myExisting = proposals.find(
         (p) =>
-          (userCode && (p.studentCode === userCode || String(p.studentId) === String(user?.id))) ||
-          (user?.id && p.studentId === user.id)
+          (p.projectRoundId === selectedRoundId || !p.projectRoundId) &&
+          ((userCode && (p.studentCode === userCode || String(p.studentId) === String(user?.id))) ||
+            (user?.id && p.studentId === user.id))
       );
       if (myExisting) {
         if (myExisting.status === 'DRAFT' || myExisting.status === 'REVISE_REQUIRED') {
@@ -108,6 +183,12 @@ export const ProposalManagementPage: React.FC = () => {
           return;
         }
       }
+    } else if (isSupervisor) {
+      if (lecturerAssignedStudents.length > 0) {
+        setSelectedStudentId(lecturerAssignedStudents[0].studentId);
+      }
+      const myLecturerId = user?.lecturer_id || user?.id || 1;
+      setSelectedLecturerId(myLecturerId);
     }
     setEditingProposal(null);
     setTitleVn('');
@@ -152,10 +233,15 @@ export const ProposalManagementPage: React.FC = () => {
         );
       } else {
         const effectiveStudentId = isStudent ? (user?.student_id || user?.id || 1) : selectedStudentId;
+        const effectiveLecturerId = isSupervisor
+          ? (user?.lecturer_id || user?.id || selectedLecturerId || 1)
+          : isStudent && mySupervisorAssignment?.lecturerId
+            ? mySupervisorAssignment.lecturerId
+            : selectedLecturerId;
         await thesisService.createProposal({
           projectRoundId: selectedRoundId,
           studentId: effectiveStudentId,
-          lecturerId: selectedLecturerId,
+          lecturerId: effectiveLecturerId,
           titleVn,
           titleEn,
           description,
@@ -233,6 +319,10 @@ export const ProposalManagementPage: React.FC = () => {
   };
 
   const filtered = proposals.filter((p) => {
+    // Lọc theo Đợt đồ án được chọn ở đầu trang
+    if (selectedRoundId && p.projectRoundId && p.projectRoundId !== selectedRoundId) {
+      return false;
+    }
     if (onlyMyProposal) {
       const userCode = user?.student_id || user?.studentCode || user?.username || user?.user?.username;
       const userName = user?.fullName || user?.user?.fullName;
@@ -287,7 +377,7 @@ export const ProposalManagementPage: React.FC = () => {
 
   return (
     <div style={{ padding: '16px', maxWidth: '1240px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 6px 0', color: '#1a202c' }}>
             Giai đoạn 3: Xây dựng, Xét duyệt Đề tài & Sinh Đề cương PDF
@@ -310,6 +400,56 @@ export const ProposalManagementPage: React.FC = () => {
         >
           + Tạo Đề Cương Mới
         </button>
+      </div>
+
+      {/* Đợt đồ án ở đầu mỗi giai đoạn (Page 8: Từng giai đoạn đều có đợt đồ án ở đầu) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          padding: '10px 16px',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          📅 <strong>Đợt đồ án:</strong>
+        </span>
+        <select
+          value={selectedRoundId}
+          onChange={(e) => setSelectedRoundId(Number(e.target.value))}
+          style={{
+            padding: '7px 12px',
+            border: '1px solid #cbd5e1',
+            borderRadius: '6px',
+            fontSize: '14px',
+            fontWeight: 500,
+            background: '#fff',
+            color: '#0f172a',
+            minWidth: '280px',
+            cursor: 'pointer',
+          }}
+        >
+          {(rounds.length > 0 ? rounds : availableRounds).map((r: any) => (
+            <option key={r.roundId || r.id} value={r.roundId || r.id}>
+              {r.name} {r.status ? `(${r.status})` : ''}
+            </option>
+          ))}
+        </select>
+        {isSupervisor && (
+          <span style={{ fontSize: '13px', color: '#0369a1', background: '#e0f2fe', padding: '4px 10px', borderRadius: '4px', fontWeight: 500 }}>
+            👨‍🏫 Vai trò: <strong>Giảng viên hướng dẫn</strong> (Chỉ duyệt đề tài của sinh viên được phân công)
+          </span>
+        )}
+        {isAdmin && (
+          <span style={{ fontSize: '13px', color: '#475569', background: '#f1f5f9', padding: '4px 10px', borderRadius: '4px', fontWeight: 500 }}>
+            👁️ Quản trị viên (Chế độ xem & theo dõi đề tài)
+          </span>
+        )}
       </div>
 
       {bannerMsg && (
@@ -412,6 +552,7 @@ export const ProposalManagementPage: React.FC = () => {
                           href={resolveFileUrl(p.fileUrl)}
                           target="_blank"
                           rel="noreferrer"
+                          download
                           style={{
                             fontSize: '12px',
                             color: '#0a3273',
@@ -432,7 +573,7 @@ export const ProposalManagementPage: React.FC = () => {
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
                             {extractFileName(p.fileUrl)}
                           </span>
-                          <span style={{ fontSize: '11px', color: '#2563eb' }}>⬇️ Mở</span>
+                          <span style={{ fontSize: '11px', color: '#2563eb' }}>👁️ Mở / ⬇️ Tải</span>
                         </a>
                       </div>
                     )}
@@ -918,61 +1059,162 @@ export const ProposalManagementPage: React.FC = () => {
                     <span style={{ color: '#64748b' }}>Đợt đồ án:</span> <strong>{editingProposal.projectRoundName || 'Đợt Đồ án Tốt nghiệp'}</strong>
                   </div>
                 </div>
-              ) : !isStudent ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Sinh viên thực hiện *</label>
+              ) : isSupervisor ? (
+                /* Giảng viên hướng dẫn tạo đề tài cho sinh viên (Page 8: Không cần hiện mục GVHD, sinh viên thực hiện là danh sách SV đã được phân công) */
+                <>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                      Sinh viên thực hiện (Đã được phân công với Thầy/Cô) *
+                    </label>
                     <select
                       value={selectedStudentId}
                       onChange={(e) => setSelectedStudentId(Number(e.target.value))}
                       style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                      required
                     >
-                      {availableStudents.map(s => (
-                        <option key={s.id} value={s.id}>{s.code} - {s.name} ({s.class})</option>
-                      ))}
+                      {lecturerAssignedStudents.length > 0 ? (
+                        lecturerAssignedStudents.map((s) => (
+                          <option key={s.studentId} value={s.studentId}>
+                            {s.studentCode} - {s.studentName}
+                          </option>
+                        ))
+                      ) : (
+                        availableStudents.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.code} - {s.name} ({s.class})
+                          </option>
+                        ))
+                      )}
                     </select>
+                    {lecturerAssignedStudents.length > 0 ? (
+                      <span style={{ fontSize: '11px', color: '#059669', marginTop: '2px', display: 'block' }}>
+                        ✓ Danh sách gồm {lecturerAssignedStudents.length} sinh viên đã được phân công cho Thầy/Cô trong đợt này.
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#f59e0b', marginTop: '2px', display: 'block' }}>
+                        (Chưa có sinh viên nào được phân công chính thức trong đợt này - hiển thị danh sách SV mẫu)
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Giảng viên hướng dẫn *</label>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Đợt đồ án *</label>
                     <select
-                      value={selectedLecturerId}
-                      onChange={(e) => setSelectedLecturerId(Number(e.target.value))}
+                      value={selectedRoundId}
+                      onChange={(e) => setSelectedRoundId(Number(e.target.value))}
                       style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
                     >
-                      {availableLecturers.map(l => (
-                        <option key={l.id} value={l.id}>{l.code} - {l.name}</option>
+                      {(rounds.length > 0 ? rounds : availableRounds).map((r: any) => (
+                        <option key={r.roundId || r.id} value={r.roundId || r.id}>
+                          {r.name}
+                        </option>
                       ))}
                     </select>
                   </div>
-                </div>
-              ) : (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Giảng viên hướng dẫn *</label>
-                  <select
-                    value={selectedLecturerId}
-                    onChange={(e) => setSelectedLecturerId(Number(e.target.value))}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  >
-                    {availableLecturers.map(l => (
-                      <option key={l.id} value={l.id}>{l.code} - {l.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                </>
+              ) : isStudent ? (
+                /* Sinh viên tạo đề cương (Page 6: Tự động điền GVHD và Đợt đồ án, khóa không cho chỉnh sửa/chọn vì đã được phân công) */
+                <>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                      Giảng viên hướng dẫn (Đã phân công chính thức)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      disabled
+                      value={
+                        mySupervisorAssignment
+                          ? `${mySupervisorAssignment.lecturerName || 'TS. Trần Văn Giảng Viên'} (${mySupervisorAssignment.lecturerCode || 'GV001'})`
+                          : availableLecturers.find((l) => l.id === selectedLecturerId)?.name || 'TS. Trần Văn Giảng Viên (GV001)'
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        background: '#f8fafc',
+                        color: '#0f172a',
+                        fontWeight: '600',
+                        cursor: 'not-allowed',
+                      }}
+                    />
+                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                      🔒 Tự động cập nhật theo kết quả phân công GVHD của Khoa. Sinh viên không thể thay đổi.
+                    </span>
+                  </div>
 
-              {!editingProposal && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Đợt đồ án *</label>
-                  <select
-                    value={selectedRoundId}
-                    onChange={(e) => setSelectedRoundId(Number(e.target.value))}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  >
-                    {availableRounds.map(r => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                  </select>
-                </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                      Đợt đồ án (Đã tham gia)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      disabled
+                      value={
+                        rounds.find((r) => r.roundId === selectedRoundId)?.name ||
+                        availableRounds.find((r) => r.id === selectedRoundId)?.name ||
+                        'Đợt Đồ án Tốt nghiệp K62 CNTT - HK1 2026-2027'
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        background: '#f8fafc',
+                        color: '#0f172a',
+                        fontWeight: '600',
+                        cursor: 'not-allowed',
+                      }}
+                    />
+                    <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                      🔒 Sinh viên chỉ thuộc 1 đợt đồ án tốt nghiệp hiện tại.
+                    </span>
+                  </div>
+                </>
+              ) : (
+                /* Quản trị viên/Khác */
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Sinh viên thực hiện *</label>
+                      <select
+                        value={selectedStudentId}
+                        onChange={(e) => setSelectedStudentId(Number(e.target.value))}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                      >
+                        {availableStudents.map((s) => (
+                          <option key={s.id} value={s.id}>{s.code} - {s.name} ({s.class})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Giảng viên hướng dẫn *</label>
+                      <select
+                        value={selectedLecturerId}
+                        onChange={(e) => setSelectedLecturerId(Number(e.target.value))}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                      >
+                        {availableLecturers.map((l) => (
+                          <option key={l.id} value={l.id}>{l.code} - {l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Đợt đồ án *</label>
+                    <select
+                      value={selectedRoundId}
+                      onChange={(e) => setSelectedRoundId(Number(e.target.value))}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      {(rounds.length > 0 ? rounds : availableRounds).map((r: any) => (
+                        <option key={r.roundId || r.id} value={r.roundId || r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
 
               <div style={{ marginBottom: '12px' }}>

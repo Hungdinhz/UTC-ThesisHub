@@ -18,6 +18,7 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     Page<Student> findByMajorId(Long majorId, Pageable pageable);
 
     @Query("SELECT s FROM Student s JOIN s.user u WHERE " +
+           "(:projectRoundId IS NULL OR s.id IN (SELECT spr.student.id FROM StudentProjectRound spr WHERE spr.projectRound.id = :projectRoundId)) AND " +
            "(:majorId IS NULL OR s.majorId = :majorId) AND " +
            "(:trainingProgramId IS NULL OR s.trainingProgramId = :trainingProgramId) AND " +
            "(:className IS NULL OR LOWER(s.className) LIKE :className) AND " +
@@ -31,5 +32,10 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             @Param("trainingProgramId") Long trainingProgramId,
             @Param("className") String className,
             @Param("search") String search,
+            @Param("projectRoundId") Long projectRoundId,
             Pageable pageable);
+
+    default Page<Student> searchStudents(Long majorId, Long trainingProgramId, String className, String search, Pageable pageable) {
+        return searchStudents(majorId, trainingProgramId, className, search, null, pageable);
+    }
 }

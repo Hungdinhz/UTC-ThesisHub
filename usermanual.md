@@ -36,6 +36,15 @@ Bấm "📤 Import danh sách sinh viên", chọn file Excel, bấm "Phân tích
 Xem bảng xem trước: Các dòng hợp lệ có tích xanh Hợp lệ.
 Bấm "Xác nhận ghi dữ liệu (Commit Import)".
 Kết quả mong đợi: Hệ thống báo thành công tạo mới User, Sinh viên và ghi danh vào đợt với trạng thái ELIGIBLE.
+Quản lý Giảng viên trong đợt đồ án:
+Tại trang "Đợt đồ án & SV" (/admin/project-rounds), chuyển sang tab "👨‍🏫 Giảng viên trong đợt".
+Xem thẻ thống kê: Tổng số GV tham gia đợt, Tổng chỉ tiêu (Quota), Đã phân công, Chỉ tiêu còn lại.
+Bấm nút "➕ Thêm Giảng viên vào đợt" để đưa thêm GV từ danh mục vào đợt đồ án.
+Có thể điều chỉnh hạn mức hướng dẫn (maxQuota), ghi chú hoặc xóa GV khỏi đợt (nếu chưa có SV được phân công).
+Tra cứu theo đợt tại Dữ liệu Tổ chức (Giai đoạn 1):
+Tại menu "Dữ liệu Tổ chức & GV/SV" (/admin/organization):
+Tab Giảng viên: Có thêm bộ lọc "Tất cả đợt đồ án" và cột "Đợt đồ án tham gia" hiển thị huy hiệu các đợt GV đang phụ trách.
+Tab Sinh viên: Có thêm bộ lọc "Tất cả đợt đồ án" và cột "Đợt đồ án" hiển thị huy hiệu đợt đồ án SV đã được ghi danh.
 BƯỚC 2: Sinh viên đăng ký nguyện vọng & Khoa phân công (Giai đoạn 2)
 Sinh viên đăng nhập & Đăng ký nguyện vọng:
 Đăng xuất Admin, đăng nhập bằng tài khoản Sinh viên Kỹ sư (VD: 2021600001 / Password@123).
@@ -57,9 +66,14 @@ Danh sách phân công đề xuất hiển thị trên bảng AssignmentProposal
 Khoa xem xét & Điều chỉnh (Override):
 Nếu muốn đổi GVHD cho 1 SV, bấm nút "Override" trên dòng tương ứng, chọn GV mới và nhập lý do.
 Bấm "Xác nhận điều chỉnh" -> Hệ thống cập nhật phân công thủ công.
-Khoa chốt kết quả phân công:
+Khoa chốt kết quả phân công & Tự động loại sinh viên chưa đăng ký:
 Bấm nút "🔒 Chốt kết quả phân công (Finalize)".
-Trạng thái các phân công chuyển sang FINALIZED. Sinh viên đăng nhập vào sẽ thấy banner chúc mừng kèm tên GVHD chính thức.
+Hộp thoại xác nhận hiển thị thông báo quy định: "Những sinh viên chưa đăng ký nguyện vọng đồ án trong đợt này sẽ tự động bị LOẠI KHỎI ĐỢT theo quy định".
+Sau khi bấm xác nhận:
+Trạng thái các phân công chuyển sang FINALIZED.
+Hệ thống tự động quét toàn bộ sinh viên trong đợt chưa nộp đăng ký hướng / nguyện vọng, cập nhật trạng thái DROPPED (Bị loại khỏi đợt) kèm lý do rõ ràng.
+Thẻ thống kê phân công hiển thị số lượng SV bị loại: "🚫 Loại X SV".
+Sinh viên đã được phân công đăng nhập vào sẽ thấy banner chúc mừng kèm tên GVHD chính thức.
 BƯỚC 3: Xây dựng & Phê duyệt đề tài (Giai đoạn 3)
 Tạo và gửi đề cương (Draft):
 Sinh viên vào mục "📑 Đề cương đồ án" (/thesis/proposals), bấm "Tạo đề cương mới".

@@ -702,6 +702,8 @@ export interface LecturerItem {
   researchInterests?: string;
   maxThesisQuota?: number;
   isActive: boolean;
+  projectRoundCodes?: string[];
+  projectRoundNames?: string[];
 }
 
 export interface StudentItem {
@@ -721,6 +723,8 @@ export interface StudentItem {
   gender?: string;
   debtCredits?: number;
   isActive: boolean;
+  projectRoundCodes?: string[];
+  projectRoundNames?: string[];
 }
 
 export interface OrganizationPageResponse<T> {
@@ -843,6 +847,20 @@ export interface StudentProjectRoundItem {
   debtCredits: number;
   note?: string;
   enrolledAt?: string;
+}
+
+export interface StudentEligibilityCheckResponse {
+  studentCode: string;
+  eligible: boolean;
+  message: string;
+  existsInSystem: boolean;
+  studentId?: number;
+  fullName?: string;
+  className?: string;
+  majorId?: number;
+  majorName?: string;
+  email?: string;
+  phone?: string;
 }
 
 // ─── Academic Records Types (Phase 4 Ingestion & Contract 4) ─────

@@ -2,9 +2,11 @@ package com.example.thesis_hub_api.projectround.controller;
 
 import com.example.thesis_hub_api.common.pagination.PageResponse;
 import com.example.thesis_hub_api.common.response.ApiResponse;
+import com.example.thesis_hub_api.assignment.service.AssignmentService;
 import com.example.thesis_hub_api.projectround.dto.request.CreateRoundStudentManualDTO;
 import com.example.thesis_hub_api.projectround.dto.request.StudentImportCommitRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.request.UpdateStudentRoundStatusRequestDTO;
+import com.example.thesis_hub_api.projectround.dto.response.StudentEligibilityCheckResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreviewResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportResultResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentProjectRoundResponseDTO;
@@ -31,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class StudentProjectRoundController {
 
     private final StudentProjectRoundService studentProjectRoundService;
+    private final AssignmentService assignmentService;
 
     @GetMapping("/students/template")
     @Operation(summary = "Tải file Excel mẫu import sinh viên chuẩn UTC (8 cột)")
@@ -69,6 +72,17 @@ public class StudentProjectRoundController {
 
         StudentImportResultResponseDTO result = studentProjectRoundService.commitImportStudents(roundId, requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(result));
+    }
+
+    @GetMapping("/{roundId}/students/check-eligibility")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @Operation(summary = "Kiểm tra trùng lặp và tính hợp lệ khi nhập MSSV (real-time check)")
+    public ResponseEntity<ApiResponse<StudentEligibilityCheckResponseDTO>> checkStudentEligibility(
+            @PathVariable Long roundId,
+            @RequestParam String studentCode) {
+
+        StudentEligibilityCheckResponseDTO result = studentProjectRoundService.checkStudentEligibilityForRound(roundId, studentCode);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     @PostMapping("/{roundId}/students/manual")
@@ -129,7 +143,7 @@ public class StudentProjectRoundController {
     }
 
     @DeleteMapping("/{roundId}/students/{studentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
     @Operation(summary = "Xóa sinh viên khỏi đợt đồ án")
     public ResponseEntity<ApiResponse<Void>> removeStudentFromRound(
             @PathVariable Long roundId,
@@ -137,5 +151,25 @@ public class StudentProjectRoundController {
 
         studentProjectRoundService.removeStudentFromRound(roundId, studentId);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @DeleteMapping("/{roundId}/lecturers/{lecturerId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @Operation(summary = "Xóa giảng viên khỏi đợt đồ án")
+    public ResponseEntity<ApiResponse<Void>> removeLecturerFromRound(
+            @PathVariable Long roundId,
+            @PathVariable Long lecturerId) {
+        assignmentService.deleteCapacityByRoundAndLecturer(roundId, lecturerId);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giảng viên khỏi đợt đồ án thành công", null));
+    }
+
+    @PostMapping("/{roundId}/lecturers/{lecturerId}/delete")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @Operation(summary = "Xóa giảng viên khỏi đợt đồ án (POST fallback)")
+    public ResponseEntity<ApiResponse<Void>> removeLecturerFromRoundPost(
+            @PathVariable Long roundId,
+            @PathVariable Long lecturerId) {
+        assignmentService.deleteCapacityByRoundAndLecturer(roundId, lecturerId);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giảng viên khỏi đợt đồ án thành công", null));
     }
 }

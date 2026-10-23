@@ -29,4 +29,6 @@ public class StudentResponseDTO {
     private String gender;
     private Integer debtCredits;
     private Boolean isActive;
+    private java.util.List<String> projectRoundCodes;
+    private java.util.List<String> projectRoundNames;
 }

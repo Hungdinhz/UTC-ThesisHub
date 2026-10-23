@@ -12,11 +12,22 @@ import type {
   UpdateLecturerPayload,
   CreateStudentPayload,
   UpdateStudentPayload,
+  ProjectRoundItem,
 } from '../types';
 import UTCAppLayout from '../components/UTCAppLayout';
 import './OrganizationManagementPage.css';
 
 type TabType = 'faculties' | 'majors' | 'lecturers' | 'students';
+
+const FACULTY_RESEARCH_DIRECTIONS = [
+  { code: 'HD_PM_APP', name: 'Phát triển phần mềm và ứng dụng (webApp, MobileApp)' },
+  { code: 'HD_DATA_AI', name: 'Dữ liệu và trí tuệ nhân tạo' },
+  { code: 'HD_GAME', name: 'Lập trình Game' },
+  { code: 'HD_TESTING', name: 'Kiểm thử phần mềm' },
+  { code: 'HD_NET_INFRA', name: 'Hệ thống, mạng và hạ tầng CNTT' },
+  { code: 'HD_SECURITY', name: 'An toàn thông tin và an ninh mạng' },
+  { code: 'HD_ALGO', name: 'Nghiên cứu và ứng dụng thuật toán' },
+];
 
 const OrganizationManagementPage: React.FC = () => {
   const { logout } = useAuth();
@@ -32,12 +43,14 @@ const OrganizationManagementPage: React.FC = () => {
 
   const [majors, setMajors] = useState<Major[]>([]);
   const [trainingPrograms, setTrainingPrograms] = useState<TrainingProgram[]>([]);
+  const [projectRounds, setProjectRounds] = useState<ProjectRoundItem[]>([]);
 
   // Lecturer states
   const [lecturers, setLecturers] = useState<LecturerItem[]>([]);
   const [lecturerSearch, setLecturerSearch] = useState('');
   const [lecturerDegree, setLecturerDegree] = useState('');
   const [lecturerDeptId, setLecturerDeptId] = useState<number | undefined>(undefined);
+  const [lecturerRoundId, setLecturerRoundId] = useState<number | undefined>(undefined);
 
   // Lecturer Modal states
   const [showLecturerModal, setShowLecturerModal] = useState(false);
@@ -60,6 +73,7 @@ const OrganizationManagementPage: React.FC = () => {
   const [studentSearch, setStudentSearch] = useState('');
   const [studentClass, setStudentClass] = useState('');
   const [studentMajorId, setStudentMajorId] = useState<number | undefined>(undefined);
+  const [studentRoundId, setStudentRoundId] = useState<number | undefined>(undefined);
   const [totalStudents, setTotalStudents] = useState(0);
 
   // Student Modal states
@@ -123,14 +137,26 @@ const OrganizationManagementPage: React.FC = () => {
     }
   };
 
+  // Load project rounds
+  const loadProjectRounds = async () => {
+    try {
+      const rounds = await apiService.getProjectRounds();
+      setProjectRounds(rounds || []);
+    } catch (err: unknown) {
+      console.error('Lỗi tải danh mục đợt đồ án:', err);
+    }
+  };
+
   // Load lecturers (Contract 1)
-  const loadLecturers = async () => {
+  const loadLecturers = async (roundId?: number) => {
     try {
       setLoading(true);
+      const targetRoundId = roundId !== undefined ? roundId : lecturerRoundId;
       const data = await apiService.getLecturers({
         departmentId: lecturerDeptId,
         degree: lecturerDegree || undefined,
         search: lecturerSearch || undefined,
+        projectRoundId: targetRoundId,
       });
       setLecturers(data || []);
     } catch (err: unknown) {
@@ -141,13 +167,15 @@ const OrganizationManagementPage: React.FC = () => {
   };
 
   // Load students
-  const loadStudents = async () => {
+  const loadStudents = async (roundId?: number) => {
     try {
       setLoading(true);
+      const targetRoundId = roundId !== undefined ? roundId : studentRoundId;
       const res = await apiService.getOrganizationStudents({
         majorId: studentMajorId,
         className: studentClass || undefined,
         search: studentSearch || undefined,
+        projectRoundId: targetRoundId,
         page: 0,
         size: 100,
       });
@@ -164,6 +192,7 @@ const OrganizationManagementPage: React.FC = () => {
     loadFaculties();
     loadDepartments();
     loadMajorsAndPrograms();
+    loadProjectRounds();
   }, []);
 
   useEffect(() => {
@@ -602,8 +631,23 @@ const OrganizationManagementPage: React.FC = () => {
                   </option>
                 ))}
               </select>
+              <select
+                value={lecturerRoundId || ''}
+                onChange={(e) => {
+                  const val = e.target.value ? Number(e.target.value) : undefined;
+                  setLecturerRoundId(val);
+                }}
+                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+              >
+                <option value="">-- Tất cả đợt đồ án --</option>
+                {projectRounds.map((r) => (
+                  <option key={r.roundId} value={r.roundId}>
+                    {r.name} ({r.roundCode})
+                  </option>
+                ))}
+              </select>
               <button
-                onClick={loadLecturers}
+                onClick={() => loadLecturers()}
                 style={{
                   backgroundColor: '#0a3273',
                   color: '#fff',
@@ -627,6 +671,7 @@ const OrganizationManagementPage: React.FC = () => {
                   <th style={{ padding: '10px' }}>Họ và tên</th>
                   <th style={{ padding: '10px' }}>Học vị</th>
                   <th style={{ padding: '10px' }}>Bộ môn</th>
+                  <th style={{ padding: '10px' }}>Đợt đồ án tham gia</th>
                   <th style={{ padding: '10px' }}>Hướng nghiên cứu</th>
                   <th style={{ padding: '10px' }}>Chỉ tiêu</th>
                   <th style={{ padding: '10px' }}>Trạng thái</th>
@@ -656,6 +701,31 @@ const OrganizationManagementPage: React.FC = () => {
                       </span>
                     </td>
                     <td style={{ padding: '12px 10px', color: '#475569' }}>{l.departmentName || '—'}</td>
+                    <td style={{ padding: '12px 10px' }}>
+                      {l.projectRoundCodes && l.projectRoundCodes.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {l.projectRoundCodes.map((code, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                backgroundColor: '#eff6ff',
+                                color: '#1d4ed8',
+                                border: '1px solid #bfdbfe',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                              }}
+                              title={l.projectRoundNames && l.projectRoundNames[idx] ? l.projectRoundNames[idx] : code}
+                            >
+                              📌 {code}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic' }}>Chưa tham gia đợt</span>
+                      )}
+                    </td>
                     <td style={{ padding: '12px 10px', color: '#047857', fontSize: '0.85rem' }}>{l.researchInterests || '—'}</td>
                     <td style={{ padding: '12px 10px', fontWeight: 600 }}>{l.maxThesisQuota || 5} SV</td>
                     <td style={{ padding: '12px 10px' }}>
@@ -747,8 +817,23 @@ const OrganizationManagementPage: React.FC = () => {
                   </option>
                 ))}
               </select>
+              <select
+                value={studentRoundId || ''}
+                onChange={(e) => {
+                  const val = e.target.value ? Number(e.target.value) : undefined;
+                  setStudentRoundId(val);
+                }}
+                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+              >
+                <option value="">-- Tất cả đợt đồ án --</option>
+                {projectRounds.map((r) => (
+                  <option key={r.roundId} value={r.roundId}>
+                    {r.name} ({r.roundCode})
+                  </option>
+                ))}
+              </select>
               <button
-                onClick={loadStudents}
+                onClick={() => loadStudents()}
                 style={{
                   backgroundColor: '#0a3273',
                   color: '#fff',
@@ -774,6 +859,7 @@ const OrganizationManagementPage: React.FC = () => {
                     <th style={{ padding: '10px' }}>Lớp</th>
                     <th style={{ padding: '10px' }}>Ngành</th>
                     <th style={{ padding: '10px' }}>CT Đào tạo</th>
+                    <th style={{ padding: '10px' }}>Đợt đồ án</th>
                     <th style={{ padding: '10px' }}>Nợ tín chỉ</th>
                     <th style={{ padding: '10px', textAlign: 'right' }}>Thao tác</th>
                   </tr>
@@ -799,6 +885,31 @@ const OrganizationManagementPage: React.FC = () => {
                         >
                           {s.trainingProgramName || 'Cử nhân'}
                         </span>
+                      </td>
+                      <td style={{ padding: '12px 10px' }}>
+                        {s.projectRoundCodes && s.projectRoundCodes.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {s.projectRoundCodes.map((code, idx) => (
+                              <span
+                                key={idx}
+                                style={{
+                                  backgroundColor: '#ede9fe',
+                                  color: '#6d28d9',
+                                  border: '1px solid #ddd6fe',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 600,
+                                }}
+                                title={s.projectRoundNames && s.projectRoundNames[idx] ? s.projectRoundNames[idx] : code}
+                              >
+                                🎯 {code}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic' }}>Chưa vào đợt</span>
+                        )}
                       </td>
                       <td style={{ padding: '12px 10px', color: (s.debtCredits || 0) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
                         {s.debtCredits || 0} TC
@@ -862,7 +973,7 @@ const OrganizationManagementPage: React.FC = () => {
               {!editingLecturer && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mã giảng viên (Mã CB) *</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mã giảng viên *</label>
                     <input
                       type="text"
                       required
@@ -930,7 +1041,7 @@ const OrganizationManagementPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mật khẩu khởi tạo (Mặc định: Mã SV)</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mật khẩu khởi tạo</label>
                     <input
                       type="text"
                       required
@@ -986,15 +1097,93 @@ const OrganizationManagementPage: React.FC = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
-                  Hướng nghiên cứu (Cách nhau bởi dấu phẩy, dùng để khớp với hướng chọn của SV)
+                  Hướng nghiên cứu / Chuyên môn hướng dẫn *
                 </label>
-                <textarea
-                  rows={3}
-                  placeholder="VD: Trí tuệ nhân tạo (AI & Machine Learning), Phát triển ứng dụng Web & Cloud, An toàn thông tin"
-                  value={lecturerForm.researchInterests || ''}
-                  onChange={(e) => setLecturerForm({ ...lecturerForm, researchInterests: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                />
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '8px' }}>
+                  Chọn các hướng nghiên cứu để hệ thống khớp chuyên môn với nguyện vọng đăng ký của sinh viên:
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    maxHeight: '190px',
+                    overflowY: 'auto',
+                    padding: '8px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    backgroundColor: '#f8fafc',
+                  }}
+                >
+                  {FACULTY_RESEARCH_DIRECTIONS.map((dir) => {
+                    const currentInterests = lecturerForm.researchInterests || '';
+                    const isSelected =
+                      currentInterests.includes(dir.code) ||
+                      currentInterests.toLowerCase().includes(dir.name.toLowerCase().substring(0, 15));
+
+                    const handleToggleDirection = (checked: boolean) => {
+                      const tokens = currentInterests
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                      let newTokens: string[];
+                      if (checked) {
+                        if (!tokens.includes(dir.code)) {
+                          newTokens = [...tokens, dir.code];
+                        } else {
+                          newTokens = tokens;
+                        }
+                      } else {
+                        newTokens = tokens.filter(
+                          (t) =>
+                            t !== dir.code &&
+                            !t.toLowerCase().includes(dir.name.toLowerCase().substring(0, 15))
+                        );
+                      }
+                      setLecturerForm({
+                        ...lecturerForm,
+                        researchInterests: newTokens.join(', '),
+                      });
+                    };
+
+                    return (
+                      <label
+                        key={dir.code}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: isSelected ? '#eff6ff' : '#fff',
+                          border: isSelected ? '1px solid #3b82f6' : '1px solid #e2e8f0',
+                          cursor: 'pointer',
+                          fontSize: '0.82rem',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => handleToggleDirection(e.target.checked)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            color: isSelected ? '#1d4ed8' : '#0369a1',
+                            fontFamily: 'monospace',
+                            fontSize: '0.8rem',
+                            minWidth: '100px',
+                          }}
+                        >
+                          {dir.code}
+                        </span>
+                        <span style={{ color: '#1e293b', flex: 1 }}>{dir.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
