@@ -326,6 +326,7 @@ class StudentProjectRoundServiceTest {
                 .note("Đã đăng ký đề tài thành công")
                 .build();
 
+        when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
         when(studentProjectRoundRepository.findByStudentIdAndProjectRoundId(10L, 100L))
                 .thenReturn(Optional.of(spr));
         when(studentProjectRoundRepository.save(any(StudentProjectRound.class)))
