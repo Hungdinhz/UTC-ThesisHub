@@ -519,14 +519,17 @@ public class AssignmentServiceImpl implements AssignmentService {
             Long deptId = l != null ? l.getDepartmentId() : null;
             String deptName = (deptId != null && deptMap.get(deptId) != null) ? deptMap.get(deptId).getName() : "";
 
-            List<String> dNames = allLd.stream()
+            List<ProjectDirection> matchingDirs = allLd.stream()
                     .filter(ld -> ld.getLecturerId().equals(cap.getLecturerId()))
                     .map(ld -> directionMap.get(ld.getDirectionId()))
                     .filter(Objects::nonNull)
-                    .flatMap(d -> java.util.stream.Stream.of(d.getCode(), d.getName()))
                     .collect(Collectors.toList());
 
-            return mapper.toCapacityResponse(cap, lCode, lName, email, phone, degree, deptId, deptName, dNames);
+            List<Long> dIds = matchingDirs.stream().map(ProjectDirection::getId).collect(Collectors.toList());
+            List<String> dCodes = matchingDirs.stream().map(ProjectDirection::getCode).collect(Collectors.toList());
+            List<String> dNames = matchingDirs.stream().map(ProjectDirection::getName).collect(Collectors.toList());
+
+            return mapper.toCapacityResponse(cap, lCode, lName, email, phone, degree, deptId, deptName, dNames, dIds, dCodes);
         }).collect(Collectors.toList());
     }
 
@@ -548,6 +551,20 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
         if (request.getNote() != null) {
             capacity.setNote(request.getNote());
+        }
+
+        if (request.getDirectionIds() != null) {
+            Long lecturerId = capacity.getLecturerId();
+            lecturerDirectionRepository.deleteByLecturerId(lecturerId);
+            for (Long dirId : request.getDirectionIds()) {
+                if (directionRepository.existsById(dirId)) {
+                    lecturerDirectionRepository.save(LecturerDirection.builder()
+                            .lecturerId(lecturerId)
+                            .directionId(dirId)
+                            .isPrimary(false)
+                            .build());
+                }
+            }
         }
 
         capacityRepository.save(capacity);

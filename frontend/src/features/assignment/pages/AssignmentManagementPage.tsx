@@ -452,6 +452,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       {activeTab === 'capacities' && (
         <LecturerCapacityManager
           capacities={capacities}
+          directions={directions}
           onUpdateCapacity={handleUpdateCapacity}
           loading={loading}
           roundName={currentRound?.name}

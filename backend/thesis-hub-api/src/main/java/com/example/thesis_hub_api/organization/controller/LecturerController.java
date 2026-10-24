@@ -99,6 +99,14 @@ public class LecturerController {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin giảng viên thành công", updated));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Operation(summary = "Xóa thông tin giảng viên (Admin)")
+    public ResponseEntity<ApiResponse<Void>> deleteLecturer(@PathVariable Long id) {
+        lecturerService.deleteLecturer(id);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giảng viên thành công", null));
+    }
+
     @PutMapping("/me/research-interests")
     @PreAuthorize("hasAnyAuthority('ROLE_LECTURER', 'ROLE_COMMITTEE')")
     @Operation(summary = "Giảng viên tự cập nhật Hướng nghiên cứu cá nhân")

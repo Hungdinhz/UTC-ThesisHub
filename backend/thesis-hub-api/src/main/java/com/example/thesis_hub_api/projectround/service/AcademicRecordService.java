@@ -263,6 +263,60 @@ public class AcademicRecordService {
         }
     }
 
+    @Transactional
+    public AcademicRecordResponseDTO saveManualAcademicRecord(Long roundId, com.example.thesis_hub_api.projectround.dto.request.CreateAcademicRecordManualRequestDTO dto) {
+        ProjectRound round = getAndValidateActiveRound(roundId);
+
+        Student student = null;
+        if (dto.getStudentId() != null) {
+            student = studentRepository.findById(dto.getStudentId()).orElse(null);
+        }
+        if (student == null && StringUtils.hasText(dto.getStudentCode())) {
+            student = studentRepository.findByStudentCode(dto.getStudentCode().trim()).orElse(null);
+        }
+        if (student == null) {
+            throw new AppException(ErrorCode.STUDENT_NOT_FOUND);
+        }
+
+        if (!studentProjectRoundRepository.existsByStudentIdAndProjectRoundId(student.getId(), round.getId())) {
+            throw new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Sinh viên " + student.getStudentCode() + " chưa được ghi danh trong đợt đồ án này.");
+        }
+
+        Optional<AcademicRecord> recordOpt = academicRecordRepository
+                .findByStudentIdAndProjectRoundId(student.getId(), round.getId());
+
+        AcademicRecord record;
+        if (recordOpt.isPresent()) {
+            record = recordOpt.get();
+            record.setCompletedCredits(dto.getCompletedCredits());
+            record.setGpa(dto.getGpa());
+            record.setTuitionDebt(dto.getTuitionDebt() != null ? dto.getTuitionDebt() : false);
+            record.setUnderDisciplinaryAction(dto.getUnderDisciplinaryAction() != null ? dto.getUnderDisciplinaryAction() : false);
+            record.setMissingPrerequisiteCount(dto.getMissingPrerequisiteCount() != null ? dto.getMissingPrerequisiteCount() : 0);
+            record.setNote(dto.getNote());
+            record.setImportedAt(Instant.now());
+        } else {
+            record = AcademicRecord.builder()
+                    .student(student)
+                    .projectRound(round)
+                    .completedCredits(dto.getCompletedCredits())
+                    .gpa(dto.getGpa())
+                    .tuitionDebt(dto.getTuitionDebt() != null ? dto.getTuitionDebt() : false)
+                    .underDisciplinaryAction(dto.getUnderDisciplinaryAction() != null ? dto.getUnderDisciplinaryAction() : false)
+                    .missingPrerequisiteCount(dto.getMissingPrerequisiteCount() != null ? dto.getMissingPrerequisiteCount() : 0)
+                    .note(dto.getNote())
+                    .importedAt(Instant.now())
+                    .build();
+        }
+
+        record = academicRecordRepository.save(record);
+
+        Map<Long, Major> majorMap = majorRepository.findAll().stream()
+                .collect(Collectors.toMap(Major::getId, m -> m, (a, b) -> a));
+
+        return toResponseDTO(record, majorMap);
+    }
+
     private AcademicRecordResponseDTO toResponseDTO(AcademicRecord r, Map<Long, Major> majorMap) {
         Student s = r.getStudent();
         User u = s != null ? s.getUser() : null;

@@ -56,6 +56,7 @@ import type {
   AcademicRecordImportCommitPayload,
   AcademicRecordImportResultResponse,
   AcademicRecordItem,
+  CreateAcademicRecordManualPayload,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
@@ -1226,6 +1227,17 @@ class ApiService {
   async getStudentAcademicRecord(roundId: number, studentId: number): Promise<AcademicRecordItem> {
     const response = await this.api.get<AcademicRecordItem>(
       ACADEMIC_RECORDS.studentInRound(roundId, studentId)
+    );
+    return response.data;
+  }
+
+  async saveManualAcademicRecord(
+    roundId: number,
+    payload: CreateAcademicRecordManualPayload
+  ): Promise<AcademicRecordItem> {
+    const response = await this.api.post<AcademicRecordItem>(
+      ACADEMIC_RECORDS.manual(roundId),
+      payload
     );
     return response.data;
   }

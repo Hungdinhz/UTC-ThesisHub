@@ -23,4 +23,6 @@ public interface ProposalService {
     ProposalResponse getProposalByStudentAndRound(Long studentId, Long roundId);
 
     Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, String status, String search, Pageable pageable);
+
+    Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, Long studentId, String status, String search, Pageable pageable);
 }

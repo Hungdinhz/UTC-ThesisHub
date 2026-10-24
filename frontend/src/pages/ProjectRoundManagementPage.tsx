@@ -118,18 +118,32 @@ const ProjectRoundManagementPage: React.FC = () => {
     }
   };
 
-  const handleUpdateStatus = async (roundId: number, newStatus: string) => {
+  // Status transition modal states (Page 4 & 5 requirements)
+  const [transitionTargetStatus, setTransitionTargetStatus] = useState<string | null>(null);
+  const [transitionLoading, setTransitionLoading] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
+
+  const openTransitionModal = (targetStatus: string) => {
+    setTransitionTargetStatus(targetStatus);
+    setTransitionError(null);
+  };
+
+  const handleConfirmTransition = async () => {
+    if (!selectedRound || !transitionTargetStatus) return;
     try {
-      setLoading(true);
-      setError(null);
-      const updated = await apiService.updateProjectRoundStatus(roundId, newStatus);
+      setTransitionLoading(true);
+      setTransitionError(null);
+      const updated = await apiService.updateProjectRoundStatus(selectedRound.roundId, transitionTargetStatus);
       setSuccessMsg(`Đã cập nhật trạng thái đợt sang: ${updated.status}`);
+      setTransitionTargetStatus(null);
       await loadRounds();
       setSelectedRound(updated);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi cập nhật trạng thái');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái';
+      setTransitionError(msg);
+      setError(msg);
     } finally {
-      setLoading(false);
+      setTransitionLoading(false);
     }
   };
 
@@ -349,7 +363,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                   <div style={{ display: 'flex', gap: '8px' }}>
                     {selectedRound.status === 'DRAFT' && (
                       <button
-                        onClick={() => handleUpdateStatus(selectedRound.roundId, 'OPEN')}
+                        onClick={() => openTransitionModal('OPEN')}
                         style={{
                           backgroundColor: '#16a34a',
                           color: '#fff',
@@ -366,7 +380,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                     )}
                     {selectedRound.status === 'OPEN' && (
                       <button
-                        onClick={() => handleUpdateStatus(selectedRound.roundId, 'IN_PROGRESS')}
+                        onClick={() => openTransitionModal('IN_PROGRESS')}
                         style={{
                           backgroundColor: '#0284c7',
                           color: '#fff',
@@ -383,7 +397,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                     )}
                     {(selectedRound.status === 'OPEN' || selectedRound.status === 'IN_PROGRESS') && (
                       <button
-                        onClick={() => handleUpdateStatus(selectedRound.roundId, 'CLOSED')}
+                        onClick={() => openTransitionModal('CLOSED')}
                         style={{
                           backgroundColor: '#dc2626',
                           color: '#fff',
@@ -760,15 +774,30 @@ const ProjectRoundManagementPage: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Loại giai đoạn (Phase Type) *</label>
                   <select
                     value={newMilestone.phaseType}
-                    onChange={(e) => setNewMilestone({ ...newMilestone, phaseType: e.target.value })}
+                    onChange={(e) => {
+                      const selectedPhase = e.target.value;
+                      const phaseTitles: Record<string, string> = {
+                        REGISTRATION: 'Đăng ký nguyện vọng & Hướng đề tài',
+                        PROPOSAL_SUBMISSION: 'Nộp đề cương đồ án tốt nghiệp',
+                        WEEKLY_REPORT: 'Thực hiện đồ án & Báo cáo tiến độ tuần',
+                        ELIGIBILITY_REVIEW: 'Xét điều kiện bảo vệ đồ án tốt nghiệp',
+                        COMMITTEE_ASSIGNMENT: 'Thành lập và phân công Hội đồng chấm bảo vệ',
+                        DEFENSE: 'Bảo vệ đồ án tốt nghiệp trước Hội đồng',
+                      };
+                      setNewMilestone((prev) => ({
+                        ...prev,
+                        phaseType: selectedPhase,
+                        name: phaseTitles[selectedPhase] || prev.name,
+                      }));
+                    }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   >
-                    <option value="REGISTRATION">Đăng ký nguyện vọng & Hướng đề tài</option>
-                    <option value="PROPOSAL_SUBMISSION">Nộp đề cương đồ án</option>
-                    <option value="WEEKLY_REPORT">Báo cáo tiến độ tuần</option>
-                    <option value="ELIGIBILITY_REVIEW">Xét điều kiện làm đồ án</option>
-                    <option value="COMMITTEE_ASSIGNMENT">Thành lập Hội đồng chấm</option>
-                    <option value="DEFENSE">Bảo vệ đồ án tốt nghiệp</option>
+                    <option value="REGISTRATION">Đăng ký nguyện vọng & Hướng đề tài (REGISTRATION)</option>
+                    <option value="PROPOSAL_SUBMISSION">Nộp đề cương đồ án tốt nghiệp (PROPOSAL_SUBMISSION)</option>
+                    <option value="WEEKLY_REPORT">Thực hiện đồ án & Báo cáo tiến độ tuần (WEEKLY_REPORT)</option>
+                    <option value="ELIGIBILITY_REVIEW">Xét điều kiện bảo vệ đồ án tốt nghiệp (ELIGIBILITY_REVIEW)</option>
+                    <option value="COMMITTEE_ASSIGNMENT">Thành lập và phân công Hội đồng chấm bảo vệ (COMMITTEE_ASSIGNMENT)</option>
+                    <option value="DEFENSE">Bảo vệ đồ án tốt nghiệp trước Hội đồng (DEFENSE)</option>
                   </select>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -809,6 +838,134 @@ const ProjectRoundManagementPage: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Xác nhận Chuyển Trạng Thái Đợt Đồ Án (Pages 4 & 5) */}
+        {transitionTargetStatus && selectedRound && (
+          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px 28px', width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#0a3273' }}>
+                    {transitionTargetStatus === 'OPEN' && '🚀 Mở Đợt Đồ Án (Chuyển sang OPEN)'}
+                    {transitionTargetStatus === 'IN_PROGRESS' && '⚡ Chuyển Sang Thực Hiện (IN_PROGRESS)'}
+                    {transitionTargetStatus === 'CLOSED' && '🔒 Xác Nhận Đóng Đợt Đồ Án (CLOSED)'}
+                  </h3>
+                  <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '2px' }}>
+                    Đợt: <strong>{selectedRound.name}</strong> ({selectedRound.roundCode})
+                  </div>
+                </div>
+                <button
+                  onClick={() => setTransitionTargetStatus(null)}
+                  style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {transitionError && (
+                <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem', lineHeight: '1.5' }}>
+                  ⚠️ <strong>Chưa đủ điều kiện chuyển trạng thái:</strong>
+                  <div style={{ marginTop: '4px', fontWeight: 600 }}>{transitionError}</div>
+                </div>
+              )}
+
+              {transitionTargetStatus === 'OPEN' && (
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#334155', fontWeight: 600 }}>
+                    Theo quy định nghiệp vụ, chỉ có thể chuyển từ <strong>Bản nháp (DRAFT)</strong> sang <strong>Đang mở (OPEN)</strong> khi thỏa mãn các điều kiện sau:
+                  </p>
+                  <div style={{ backgroundColor: '#f8fafc', padding: '14px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>👥</span>
+                      <span>Trong đợt có <strong>ít nhất 1 sinh viên</strong> tham gia</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>👨‍🏫</span>
+                      <span>Trong đợt có <strong>ít nhất 1 giảng viên</strong> hướng dẫn</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🎓</span>
+                      <span>Có sinh viên <strong>đủ điều kiện nhận đồ án (ELIGIBLE)</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🗓️</span>
+                      <span>Đã thiết lập mốc timeline: <strong>Đăng ký nguyện vọng & Hướng đề tài (REGISTRATION)</strong></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {transitionTargetStatus === 'IN_PROGRESS' && (
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#334155', fontWeight: 600 }}>
+                    Theo quy định nghiệp vụ, chỉ có thể chuyển từ <strong>Đang mở (OPEN)</strong> sang <strong>Đang làm (IN_PROGRESS)</strong> khi thỏa mãn các điều kiện sau:
+                  </p>
+                  <div style={{ backgroundColor: '#f8fafc', padding: '14px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>📌</span>
+                      <span>Đã <strong>chốt phân công giảng viên hướng dẫn (FINALIZED)</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>📝</span>
+                      <span>Mốc timeline 1: <strong>Nộp đề cương đồ án tốt nghiệp (PROPOSAL_SUBMISSION)</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>📊</span>
+                      <span>Mốc timeline 2: <strong>Thực hiện đồ án & Báo cáo tiến độ tuần (WEEKLY_REPORT)</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🔍</span>
+                      <span>Mốc timeline 3: <strong>Xét điều kiện bảo vệ đồ án tốt nghiệp (ELIGIBILITY_REVIEW)</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>👥</span>
+                      <span>Mốc timeline 4: <strong>Thành lập và phân công Hội đồng chấm bảo vệ (COMMITTEE_ASSIGNMENT)</strong></span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🎓</span>
+                      <span>Mốc timeline 5: <strong>Bảo vệ đồ án tốt nghiệp trước Hội đồng (DEFENSE)</strong></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {transitionTargetStatus === 'CLOSED' && (
+                <div style={{ marginBottom: '20px' }}>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#334155' }}>
+                    Khi đợt đồ án chuyển sang <strong>Đã đóng (CLOSED)</strong>, tất cả dữ liệu sinh viên, học vụ và mốc thời gian sẽ ở chế độ chỉ đọc. Bạn có chắc chắn muốn đóng đợt này?
+                  </p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setTransitionTargetStatus(null)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={transitionLoading}
+                  onClick={handleConfirmTransition}
+                  style={{
+                    backgroundColor: transitionTargetStatus === 'CLOSED' ? '#dc2626' : '#0a3273',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 20px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    cursor: transitionLoading ? 'not-allowed' : 'pointer',
+                    opacity: transitionLoading ? 0.6 : 1,
+                  }}
+                >
+                  {transitionLoading ? 'Đang kiểm tra...' : 'Xác nhận chuyển trạng thái'}
+                </button>
+              </div>
             </div>
           </div>
         )}

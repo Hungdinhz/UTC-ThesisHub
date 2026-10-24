@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { apiService } from '../../../services/api';
 import type { ProjectRoundItem } from '../../../types';
-import type {
-  ProjectDirection,
-  LecturerCapacity,
-  SupervisorAssignment,
-  DirectionRegistration,
-  PreferenceResponse,
+import {
+  isLecturerAssignedToDirection,
+  type ProjectDirection,
+  type LecturerCapacity,
+  type SupervisorAssignment,
+  type DirectionRegistration,
+  type PreferenceResponse,
 } from '../types';
 import { assignmentService } from '../services/assignmentService';
 import { StudentPreferenceForm } from '../components/StudentPreferenceForm';
@@ -82,14 +83,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
       // Synchronize each direction's lecturer count dynamically with active capacities
       const syncedDirections = (dirsData || []).map((dir) => {
-        const matchingCount = (capsData || []).filter((c) =>
-          c.directionNames?.some(
-            (dn) =>
-              dn.toLowerCase() === dir.code.toLowerCase() ||
-              dn.toLowerCase().includes(dir.code.toLowerCase()) ||
-              dn.toLowerCase() === dir.name.toLowerCase()
-          )
-        ).length;
+        const matchingCount = (capsData || []).filter((c) => isLecturerAssignedToDirection(c, dir)).length;
         return {
           ...dir,
           lecturerCount: matchingCount > 0 ? matchingCount : (capsData && capsData.length > 0 ? 0 : dir.lecturerCount || 0),

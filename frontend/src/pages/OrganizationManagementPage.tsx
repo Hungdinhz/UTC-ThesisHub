@@ -67,6 +67,9 @@ const OrganizationManagementPage: React.FC = () => {
     researchInterests: '',
     maxThesisQuota: 5,
   });
+  const [lecturerErrors, setLecturerErrors] = useState<Record<string, string>>({});
+  const [lecturerTouched, setLecturerTouched] = useState<Record<string, boolean>>({});
+  const [deleteLecturerTarget, setDeleteLecturerTarget] = useState<LecturerItem | null>(null);
 
   // Student states
   const [students, setStudents] = useState<StudentItem[]>([]);
@@ -92,6 +95,9 @@ const OrganizationManagementPage: React.FC = () => {
     gender: 'NAM',
     debtCredits: 0,
   });
+  const [studentErrors, setStudentErrors] = useState<Record<string, string>>({});
+  const [studentTouched, setStudentTouched] = useState<Record<string, boolean>>({});
+  const [deleteStudentTarget, setDeleteStudentTarget] = useState<StudentItem | null>(null);
 
   // Load initial faculties
   const loadFaculties = async () => {
@@ -209,8 +215,182 @@ const OrganizationManagementPage: React.FC = () => {
     }
   }, [activeTab, selectedFacultyId]);
 
+  // Realtime Validation Logic for Lecturer
+  const validateLecturerField = (field: string, value: any): string => {
+    switch (field) {
+      case 'lecturerCode': {
+        const val = String(value || '').trim();
+        if (!val) return 'Mã giảng viên không được để trống';
+        if (val.length < 3) return 'Mã giảng viên phải có ít nhất 3 ký tự (VD: GV015)';
+        return '';
+      }
+      case 'username': {
+        const val = String(value || '').trim();
+        if (!val) return 'Tên đăng nhập không được để trống';
+        if (/\s/.test(val)) return 'Tên đăng nhập không được chứa khoảng trắng';
+        if (val.length < 3) return 'Tên đăng nhập phải có ít nhất 3 ký tự';
+        return '';
+      }
+      case 'fullName': {
+        const val = String(value || '').trim();
+        if (!val) return 'Họ và tên giảng viên không được để trống';
+        if (val.length < 2) return 'Họ và tên quá ngắn';
+        return '';
+      }
+      case 'phone': {
+        const val = String(value || '').trim();
+        if (val && !/^0\d{9}$/.test(val)) {
+          return 'Số điện thoại phải gồm đúng 10 chữ số bắt đầu bằng 0 (VD: 0912345678)';
+        }
+        return '';
+      }
+      case 'email': {
+        const val = String(value || '').trim();
+        if (!val) return 'Email công vụ không được để trống';
+        if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val)) {
+          return 'Email không đúng định dạng chuẩn (VD: gv@utc.edu.vn)';
+        }
+        return '';
+      }
+      case 'password': {
+        if (!editingLecturer) {
+          const val = String(value || '');
+          if (!val) return 'Mật khẩu khởi tạo không được để trống';
+          if (val.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự';
+        }
+        return '';
+      }
+      case 'departmentId': {
+        const val = Number(value);
+        if (!val || val <= 0) return 'Vui lòng chọn bộ môn trực thuộc';
+        return '';
+      }
+      case 'academicDegree': {
+        if (!value) return 'Vui lòng chọn học vị của giảng viên';
+        return '';
+      }
+      case 'maxThesisQuota': {
+        const val = Number(value);
+        if (isNaN(val) || val < 1 || val > 30) return 'Chỉ tiêu hướng dẫn phải từ 1 đến 30 sinh viên';
+        return '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  const handleLecturerChange = (field: string, value: any) => {
+    let updated = { ...lecturerForm, [field]: value };
+    if (field === 'lecturerCode' && !editingLecturer) {
+      const code = String(value).trim();
+      updated.username = code.toLowerCase().replace(/\s+/g, '');
+      if (!lecturerTouched.email) {
+        updated.email = code ? `${code.toLowerCase()}@utc.edu.vn` : '';
+      }
+    }
+    setLecturerForm(updated);
+    const err = validateLecturerField(field, value);
+    setLecturerErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
+  const handleLecturerBlur = (field: string) => {
+    setLecturerTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateLecturerField(field, (lecturerForm as any)[field]);
+    setLecturerErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
+  // Realtime Validation Logic for Student
+  const validateStudentField = (field: string, value: any): string => {
+    switch (field) {
+      case 'studentCode': {
+        const val = String(value || '').trim();
+        if (!val) return 'Mã sinh viên không được để trống';
+        if (!/^\d{9}$/.test(val)) {
+          return `Mã sinh viên phải gồm đúng 9 chữ số (hiện tại: ${val.length} số)`;
+        }
+        return '';
+      }
+      case 'password': {
+        if (!editingStudent) {
+          const val = String(value || '');
+          if (!val) return 'Mật khẩu khởi tạo không được để trống';
+          if (val.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự';
+        }
+        return '';
+      }
+      case 'fullName': {
+        const val = String(value || '').trim();
+        if (!val) return 'Họ và tên sinh viên không được để trống';
+        if (val.length < 2) return 'Họ và tên quá ngắn';
+        return '';
+      }
+      case 'className': {
+        const val = String(value || '').trim();
+        if (!val) return 'Lớp hành chính không được để trống (VD: CNTT1-K62)';
+        return '';
+      }
+      case 'email': {
+        const val = String(value || '').trim();
+        if (!val) return 'Email sinh viên không được để trống';
+        if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val)) {
+          return 'Email không đúng định dạng (VD: 201200101@st.utc.edu.vn)';
+        }
+        return '';
+      }
+      case 'phone': {
+        const val = String(value || '').trim();
+        if (val && !/^0\d{9}$/.test(val)) {
+          return 'Số điện thoại phải gồm đúng 10 chữ số bắt đầu bằng 0 (VD: 0987654321)';
+        }
+        return '';
+      }
+      case 'majorId': {
+        const val = Number(value);
+        if (!val || val <= 0) return 'Vui lòng chọn ngành đào tạo';
+        return '';
+      }
+      case 'trainingProgramId': {
+        const val = Number(value);
+        if (!val || val <= 0) return 'Vui lòng chọn chương trình đào tạo';
+        return '';
+      }
+      case 'debtCredits': {
+        const val = Number(value);
+        if (isNaN(val) || val < 0) return 'Số tín chỉ nợ phải >= 0';
+        return '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  const handleStudentChange = (field: string, value: any) => {
+    let updated = { ...studentForm, [field]: value };
+    if (field === 'studentCode' && !editingStudent) {
+      const code = String(value).trim();
+      updated.username = code;
+      if (!studentTouched.email) {
+        updated.email = code ? `${code}@st.utc.edu.vn` : '';
+      }
+      if (!studentTouched.password) {
+        updated.password = code;
+      }
+    }
+    setStudentForm(updated);
+    const err = validateStudentField(field, value);
+    setStudentErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
+  const handleStudentBlur = (field: string) => {
+    setStudentTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateStudentField(field, (studentForm as any)[field]);
+    setStudentErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
   const handleOpenCreateLecturer = () => {
     setEditingLecturer(null);
+    setLecturerErrors({});
+    setLecturerTouched({});
     setLecturerForm({
       username: '',
       email: '',
@@ -228,6 +408,8 @@ const OrganizationManagementPage: React.FC = () => {
 
   const handleOpenEditLecturer = (lec: LecturerItem) => {
     setEditingLecturer(lec);
+    setLecturerErrors({});
+    setLecturerTouched({});
     setLecturerForm({
       username: lec.lecturerCode.toLowerCase(),
       email: lec.email,
@@ -245,14 +427,39 @@ const OrganizationManagementPage: React.FC = () => {
 
   const handleSubmitLecturer = async (e: React.FormEvent) => {
     e.preventDefault();
+    const fieldsToValidate = editingLecturer
+      ? ['fullName', 'phone', 'departmentId', 'academicDegree', 'maxThesisQuota']
+      : ['lecturerCode', 'username', 'fullName', 'phone', 'email', 'password', 'departmentId', 'academicDegree', 'maxThesisQuota'];
+
+    const newErrors: Record<string, string> = {};
+    const newTouched: Record<string, boolean> = {};
+    let hasErr = false;
+
+    fieldsToValidate.forEach((f) => {
+      newTouched[f] = true;
+      const err = validateLecturerField(f, (lecturerForm as any)[f]);
+      if (err) {
+        newErrors[f] = err;
+        hasErr = true;
+      }
+    });
+
+    setLecturerTouched((prev) => ({ ...prev, ...newTouched }));
+    setLecturerErrors(newErrors);
+
+    if (hasErr) {
+      setError('Vui lòng kiểm tra và sửa các thông tin chưa đúng định dạng.');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       setSuccessMsg(null);
       if (editingLecturer) {
         const updatePayload: UpdateLecturerPayload = {
-          fullName: lecturerForm.fullName,
-          phone: lecturerForm.phone,
+          fullName: lecturerForm.fullName.trim(),
+          phone: lecturerForm.phone?.trim() || '',
           departmentId: lecturerForm.departmentId,
           academicDegree: lecturerForm.academicDegree,
           researchInterests: lecturerForm.researchInterests,
@@ -264,8 +471,11 @@ const OrganizationManagementPage: React.FC = () => {
       } else {
         const createPayload: CreateLecturerPayload = {
           ...lecturerForm,
-          username: lecturerForm.username || lecturerForm.lecturerCode.toLowerCase(),
-          email: lecturerForm.email || `${lecturerForm.lecturerCode.toLowerCase()}@utc.edu.vn`,
+          lecturerCode: lecturerForm.lecturerCode.trim(),
+          fullName: lecturerForm.fullName.trim(),
+          username: (lecturerForm.username || lecturerForm.lecturerCode).trim().toLowerCase(),
+          email: (lecturerForm.email || `${lecturerForm.lecturerCode.toLowerCase()}@utc.edu.vn`).trim(),
+          phone: lecturerForm.phone?.trim() || '',
           password: lecturerForm.password || 'password123',
         };
         await apiService.createLecturer(createPayload);
@@ -282,12 +492,30 @@ const OrganizationManagementPage: React.FC = () => {
     }
   };
 
+  const handleDeleteLecturer = async () => {
+    if (!deleteLecturerTarget) return;
+    try {
+      setLoading(true);
+      setError(null);
+      await apiService.deleteLecturer(deleteLecturerTarget.lecturerId);
+      setSuccessMsg(`Đã xóa giảng viên ${deleteLecturerTarget.fullName} (${deleteLecturerTarget.lecturerCode}) thành công!`);
+      setDeleteLecturerTarget(null);
+      await loadLecturers();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Lỗi khi xóa giảng viên');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOpenCreateStudent = () => {
     setEditingStudent(null);
+    setStudentErrors({});
+    setStudentTouched({});
     setStudentForm({
       username: '',
       email: '',
-      password: 'password123',
+      password: '',
       fullName: '',
       phone: '',
       studentCode: '',
@@ -302,6 +530,8 @@ const OrganizationManagementPage: React.FC = () => {
 
   const handleOpenEditStudent = (st: StudentItem) => {
     setEditingStudent(st);
+    setStudentErrors({});
+    setStudentTouched({});
     setStudentForm({
       username: st.studentCode,
       email: st.email,
@@ -320,15 +550,40 @@ const OrganizationManagementPage: React.FC = () => {
 
   const handleSubmitStudent = async (e: React.FormEvent) => {
     e.preventDefault();
+    const fieldsToValidate = editingStudent
+      ? ['fullName', 'className', 'phone', 'majorId', 'trainingProgramId', 'debtCredits']
+      : ['studentCode', 'password', 'fullName', 'className', 'email', 'phone', 'majorId', 'trainingProgramId', 'debtCredits'];
+
+    const newErrors: Record<string, string> = {};
+    const newTouched: Record<string, boolean> = {};
+    let hasErr = false;
+
+    fieldsToValidate.forEach((f) => {
+      newTouched[f] = true;
+      const err = validateStudentField(f, (studentForm as any)[f]);
+      if (err) {
+        newErrors[f] = err;
+        hasErr = true;
+      }
+    });
+
+    setStudentTouched((prev) => ({ ...prev, ...newTouched }));
+    setStudentErrors(newErrors);
+
+    if (hasErr) {
+      setError('Vui lòng kiểm tra và sửa các thông tin sinh viên chưa đúng định dạng.');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       setSuccessMsg(null);
       if (editingStudent) {
         const updatePayload: UpdateStudentPayload = {
-          fullName: studentForm.fullName,
-          phone: studentForm.phone,
-          className: studentForm.className,
+          fullName: studentForm.fullName.trim(),
+          phone: studentForm.phone?.trim() || '',
+          className: studentForm.className?.trim() || '',
           majorId: studentForm.majorId,
           trainingProgramId: studentForm.trainingProgramId,
           gender: studentForm.gender,
@@ -342,9 +597,12 @@ const OrganizationManagementPage: React.FC = () => {
         const createPayload: CreateStudentPayload = {
           ...studentForm,
           studentCode: codeTrimmed,
-          username: studentForm.username || codeTrimmed,
-          email: studentForm.email || `${codeTrimmed}@st.utc.edu.vn`,
-          password: studentForm.password || 'password123',
+          fullName: studentForm.fullName.trim(),
+          className: studentForm.className?.trim() || '',
+          phone: studentForm.phone?.trim() || '',
+          username: (studentForm.username || codeTrimmed).trim(),
+          email: (studentForm.email || `${codeTrimmed}@st.utc.edu.vn`).trim(),
+          password: studentForm.password || codeTrimmed,
         };
         await apiService.createStudent(createPayload);
         setSuccessMsg(
@@ -355,6 +613,22 @@ const OrganizationManagementPage: React.FC = () => {
       await loadStudents();
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Lỗi lưu thông tin sinh viên');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!deleteStudentTarget) return;
+    try {
+      setLoading(true);
+      setError(null);
+      await apiService.deleteStudent(deleteStudentTarget.studentId);
+      setSuccessMsg(`Đã xóa sinh viên ${deleteStudentTarget.fullName} (${deleteStudentTarget.studentCode}) thành công!`);
+      setDeleteStudentTarget(null);
+      await loadStudents();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Lỗi khi xóa sinh viên');
     } finally {
       setLoading(false);
     }
@@ -734,21 +1008,39 @@ const OrganizationManagementPage: React.FC = () => {
                       </span>
                     </td>
                     <td style={{ padding: '12px 10px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => handleOpenEditLecturer(l)}
-                        style={{
-                          backgroundColor: '#eff6ff',
-                          color: '#1d4ed8',
-                          border: '1px solid #bfdbfe',
-                          padding: '5px 10px',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        ✏️ Cập nhật Học vị / Hướng NC
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => handleOpenEditLecturer(l)}
+                          style={{
+                            backgroundColor: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✏️ Cập nhật Học vị / Hướng NC
+                        </button>
+                        <button
+                          onClick={() => setDeleteLecturerTarget(l)}
+                          style={{
+                            backgroundColor: '#fef2f2',
+                            color: '#dc2626',
+                            border: '1px solid #fecaca',
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                          }}
+                          title="Xóa giảng viên khỏi hệ thống"
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -915,21 +1207,39 @@ const OrganizationManagementPage: React.FC = () => {
                         {s.debtCredits || 0} TC
                       </td>
                       <td style={{ padding: '12px 10px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => handleOpenEditStudent(s)}
-                          style={{
-                            backgroundColor: '#eff6ff',
-                            color: '#1d4ed8',
-                            border: '1px solid #bfdbfe',
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.82rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          ✏️ Sửa
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => handleOpenEditStudent(s)}
+                            style={{
+                              backgroundColor: '#eff6ff',
+                              color: '#1d4ed8',
+                              border: '1px solid #bfdbfe',
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            ✏️ Sửa
+                          </button>
+                          <button
+                            onClick={() => setDeleteStudentTarget(s)}
+                            style={{
+                              backgroundColor: '#fef2f2',
+                              color: '#dc2626',
+                              border: '1px solid #fecaca',
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                            }}
+                            title="Xóa sinh viên khỏi hệ thống"
+                          >
+                            🗑️ Xóa
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -979,15 +1289,21 @@ const OrganizationManagementPage: React.FC = () => {
                       required
                       placeholder="VD: GV015"
                       value={lecturerForm.lecturerCode}
-                      onChange={(e) =>
-                        setLecturerForm({
-                          ...lecturerForm,
-                          lecturerCode: e.target.value,
-                          username: e.target.value.toLowerCase(),
-                        })
-                      }
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(e) => handleLecturerChange('lecturerCode', e.target.value)}
+                      onBlur={() => handleLecturerBlur('lecturerCode')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: lecturerTouched.lecturerCode && lecturerErrors.lecturerCode ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        backgroundColor: lecturerTouched.lecturerCode && lecturerErrors.lecturerCode ? '#fff5f5' : '#fff',
+                      }}
                     />
+                    {lecturerTouched.lecturerCode && lecturerErrors.lecturerCode && (
+                      <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                        ⚠️ {lecturerErrors.lecturerCode}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Tên đăng nhập *</label>
@@ -996,9 +1312,21 @@ const OrganizationManagementPage: React.FC = () => {
                       required
                       placeholder="VD: gv015"
                       value={lecturerForm.username}
-                      onChange={(e) => setLecturerForm({ ...lecturerForm, username: e.target.value })}
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(e) => handleLecturerChange('username', e.target.value)}
+                      onBlur={() => handleLecturerBlur('username')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: lecturerTouched.username && lecturerErrors.username ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        backgroundColor: lecturerTouched.username && lecturerErrors.username ? '#fff5f5' : '#fff',
+                      }}
                     />
+                    {lecturerTouched.username && lecturerErrors.username && (
+                      <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                        ⚠️ {lecturerErrors.username}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1011,9 +1339,21 @@ const OrganizationManagementPage: React.FC = () => {
                     required
                     placeholder="VD: TS. Nguyễn Văn An"
                     value={lecturerForm.fullName}
-                    onChange={(e) => setLecturerForm({ ...lecturerForm, fullName: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleLecturerChange('fullName', e.target.value)}
+                    onBlur={() => handleLecturerBlur('fullName')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: lecturerTouched.fullName && lecturerErrors.fullName ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: lecturerTouched.fullName && lecturerErrors.fullName ? '#fff5f5' : '#fff',
+                    }}
                   />
+                  {lecturerTouched.fullName && lecturerErrors.fullName && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {lecturerErrors.fullName}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Số điện thoại</label>
@@ -1021,9 +1361,21 @@ const OrganizationManagementPage: React.FC = () => {
                     type="text"
                     placeholder="0912345678"
                     value={lecturerForm.phone || ''}
-                    onChange={(e) => setLecturerForm({ ...lecturerForm, phone: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleLecturerChange('phone', e.target.value)}
+                    onBlur={() => handleLecturerBlur('phone')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: lecturerTouched.phone && lecturerErrors.phone ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: lecturerTouched.phone && lecturerErrors.phone ? '#fff5f5' : '#fff',
+                    }}
                   />
+                  {lecturerTouched.phone && lecturerErrors.phone && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {lecturerErrors.phone}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1036,9 +1388,21 @@ const OrganizationManagementPage: React.FC = () => {
                       required
                       placeholder="annv@utc.edu.vn"
                       value={lecturerForm.email}
-                      onChange={(e) => setLecturerForm({ ...lecturerForm, email: e.target.value })}
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(e) => handleLecturerChange('email', e.target.value)}
+                      onBlur={() => handleLecturerBlur('email')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: lecturerTouched.email && lecturerErrors.email ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        backgroundColor: lecturerTouched.email && lecturerErrors.email ? '#fff5f5' : '#fff',
+                      }}
                     />
+                    {lecturerTouched.email && lecturerErrors.email && (
+                      <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                        ⚠️ {lecturerErrors.email}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mật khẩu khởi tạo</label>
@@ -1046,9 +1410,21 @@ const OrganizationManagementPage: React.FC = () => {
                       type="text"
                       required
                       value={lecturerForm.password}
-                      onChange={(e) => setLecturerForm({ ...lecturerForm, password: e.target.value })}
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(e) => handleLecturerChange('password', e.target.value)}
+                      onBlur={() => handleLecturerBlur('password')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: lecturerTouched.password && lecturerErrors.password ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        backgroundColor: lecturerTouched.password && lecturerErrors.password ? '#fff5f5' : '#fff',
+                      }}
                     />
+                    {lecturerTouched.password && lecturerErrors.password && (
+                      <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                        ⚠️ {lecturerErrors.password}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1058,8 +1434,15 @@ const OrganizationManagementPage: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Bộ môn trực thuộc</label>
                   <select
                     value={lecturerForm.departmentId || ''}
-                    onChange={(e) => setLecturerForm({ ...lecturerForm, departmentId: e.target.value ? Number(e.target.value) : undefined })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleLecturerChange('departmentId', e.target.value ? Number(e.target.value) : undefined)}
+                    onBlur={() => handleLecturerBlur('departmentId')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: lecturerTouched.departmentId && lecturerErrors.departmentId ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: lecturerTouched.departmentId && lecturerErrors.departmentId ? '#fff5f5' : '#fff',
+                    }}
                   >
                     <option value="">-- Chọn bộ môn --</option>
                     {departments.map((d) => (
@@ -1068,19 +1451,36 @@ const OrganizationManagementPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
+                  {lecturerTouched.departmentId && lecturerErrors.departmentId && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {lecturerErrors.departmentId}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Học vị (Xét CT Kỹ sư) *</label>
                   <select
                     value={lecturerForm.academicDegree}
-                    onChange={(e) => setLecturerForm({ ...lecturerForm, academicDegree: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleLecturerChange('academicDegree', e.target.value)}
+                    onBlur={() => handleLecturerBlur('academicDegree')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: lecturerTouched.academicDegree && lecturerErrors.academicDegree ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: lecturerTouched.academicDegree && lecturerErrors.academicDegree ? '#fff5f5' : '#fff',
+                    }}
                   >
                     <option value="THAC_SI">Thạc sĩ (THAC_SI)</option>
                     <option value="TIEN_SI">Tiến sĩ (TIEN_SI)</option>
                     <option value="PGS">Phó Giáo sư (PGS)</option>
                     <option value="GS">Giáo sư (GS)</option>
                   </select>
+                  {lecturerTouched.academicDegree && lecturerErrors.academicDegree && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {lecturerErrors.academicDegree}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Chỉ tiêu SV</label>
@@ -1089,9 +1489,21 @@ const OrganizationManagementPage: React.FC = () => {
                     min={1}
                     max={30}
                     value={lecturerForm.maxThesisQuota || 5}
-                    onChange={(e) => setLecturerForm({ ...lecturerForm, maxThesisQuota: Number(e.target.value) })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleLecturerChange('maxThesisQuota', Number(e.target.value))}
+                    onBlur={() => handleLecturerBlur('maxThesisQuota')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: lecturerTouched.maxThesisQuota && lecturerErrors.maxThesisQuota ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: lecturerTouched.maxThesisQuota && lecturerErrors.maxThesisQuota ? '#fff5f5' : '#fff',
+                    }}
                   />
+                  {lecturerTouched.maxThesisQuota && lecturerErrors.maxThesisQuota && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {lecturerErrors.maxThesisQuota}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1253,22 +1665,28 @@ const OrganizationManagementPage: React.FC = () => {
               {!editingStudent && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mã sinh viên (MSSV) *</label>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mã sinh viên (MSSV - đúng 9 số) *</label>
                     <input
                       type="text"
                       required
-                      placeholder="VD: 211200888"
+                      maxLength={9}
+                      placeholder="VD: 201200101"
                       value={studentForm.studentCode}
-                      onChange={(e) =>
-                        setStudentForm({
-                          ...studentForm,
-                          studentCode: e.target.value,
-                          username: e.target.value,
-                          email: e.target.value ? `${e.target.value}@st.utc.edu.vn` : '',
-                        })
-                      }
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(e) => handleStudentChange('studentCode', e.target.value)}
+                      onBlur={() => handleStudentBlur('studentCode')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: studentTouched.studentCode && studentErrors.studentCode ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        backgroundColor: studentTouched.studentCode && studentErrors.studentCode ? '#fff5f5' : '#fff',
+                      }}
                     />
+                    {studentTouched.studentCode && studentErrors.studentCode && (
+                      <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                        ⚠️ {studentErrors.studentCode}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Mật khẩu khởi tạo (Mặc định: Mã SV)</label>
@@ -1276,9 +1694,21 @@ const OrganizationManagementPage: React.FC = () => {
                       type="text"
                       required
                       value={studentForm.password}
-                      onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })}
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(e) => handleStudentChange('password', e.target.value)}
+                      onBlur={() => handleStudentBlur('password')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: studentTouched.password && studentErrors.password ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        backgroundColor: studentTouched.password && studentErrors.password ? '#fff5f5' : '#fff',
+                      }}
                     />
+                    {studentTouched.password && studentErrors.password && (
+                      <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                        ⚠️ {studentErrors.password}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1291,9 +1721,21 @@ const OrganizationManagementPage: React.FC = () => {
                     required
                     placeholder="VD: Nguyễn Văn Minh"
                     value={studentForm.fullName}
-                    onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleStudentChange('fullName', e.target.value)}
+                    onBlur={() => handleStudentBlur('fullName')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: studentTouched.fullName && studentErrors.fullName ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: studentTouched.fullName && studentErrors.fullName ? '#fff5f5' : '#fff',
+                    }}
                   />
+                  {studentTouched.fullName && studentErrors.fullName && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {studentErrors.fullName}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Lớp hành chính *</label>
@@ -1302,9 +1744,21 @@ const OrganizationManagementPage: React.FC = () => {
                     required
                     placeholder="VD: CNTT1-K62"
                     value={studentForm.className || ''}
-                    onChange={(e) => setStudentForm({ ...studentForm, className: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleStudentChange('className', e.target.value)}
+                    onBlur={() => handleStudentBlur('className')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: studentTouched.className && studentErrors.className ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: studentTouched.className && studentErrors.className ? '#fff5f5' : '#fff',
+                    }}
                   />
+                  {studentTouched.className && studentErrors.className && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {studentErrors.className}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1317,9 +1771,21 @@ const OrganizationManagementPage: React.FC = () => {
                       required
                       placeholder="211200888@st.utc.edu.vn"
                       value={studentForm.email}
-                      onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(e) => handleStudentChange('email', e.target.value)}
+                      onBlur={() => handleStudentBlur('email')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: studentTouched.email && studentErrors.email ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        backgroundColor: studentTouched.email && studentErrors.email ? '#fff5f5' : '#fff',
+                      }}
                     />
+                    {studentTouched.email && studentErrors.email && (
+                      <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                        ⚠️ {studentErrors.email}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Số điện thoại</label>
@@ -1327,9 +1793,21 @@ const OrganizationManagementPage: React.FC = () => {
                       type="text"
                       placeholder="0987654321"
                       value={studentForm.phone || ''}
-                      onChange={(e) => setStudentForm({ ...studentForm, phone: e.target.value })}
-                      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(e) => handleStudentChange('phone', e.target.value)}
+                      onBlur={() => handleStudentBlur('phone')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        border: studentTouched.phone && studentErrors.phone ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        backgroundColor: studentTouched.phone && studentErrors.phone ? '#fff5f5' : '#fff',
+                      }}
                     />
+                    {studentTouched.phone && studentErrors.phone && (
+                      <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                        ⚠️ {studentErrors.phone}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1339,41 +1817,77 @@ const OrganizationManagementPage: React.FC = () => {
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Ngành đào tạo *</label>
                   <select
                     value={studentForm.majorId || ''}
-                    onChange={(e) => setStudentForm({ ...studentForm, majorId: e.target.value ? Number(e.target.value) : undefined })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleStudentChange('majorId', e.target.value ? Number(e.target.value) : undefined)}
+                    onBlur={() => handleStudentBlur('majorId')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: studentTouched.majorId && studentErrors.majorId ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: studentTouched.majorId && studentErrors.majorId ? '#fff5f5' : '#fff',
+                    }}
                   >
+                    <option value="">-- Chọn ngành --</option>
                     {majors.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name} ({m.code})
                       </option>
                     ))}
                   </select>
+                  {studentTouched.majorId && studentErrors.majorId && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {studentErrors.majorId}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Chương trình đào tạo *</label>
                   <select
                     value={studentForm.trainingProgramId || ''}
-                    onChange={(e) =>
-                      setStudentForm({ ...studentForm, trainingProgramId: e.target.value ? Number(e.target.value) : undefined })
-                    }
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    onChange={(e) => handleStudentChange('trainingProgramId', e.target.value ? Number(e.target.value) : undefined)}
+                    onBlur={() => handleStudentBlur('trainingProgramId')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: studentTouched.trainingProgramId && studentErrors.trainingProgramId ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: studentTouched.trainingProgramId && studentErrors.trainingProgramId ? '#fff5f5' : '#fff',
+                    }}
                   >
+                    <option value="">-- Chọn CTĐT --</option>
                     {trainingPrograms.map((tp) => (
                       <option key={tp.id} value={tp.id}>
                         {tp.name} ({tp.code})
                       </option>
                     ))}
                   </select>
+                  {studentTouched.trainingProgramId && studentErrors.trainingProgramId && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {studentErrors.trainingProgramId}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Nợ TC</label>
                   <input
                     type="number"
                     min={0}
-                    value={studentForm.debtCredits || 0}
-                    onChange={(e) => setStudentForm({ ...studentForm, debtCredits: Number(e.target.value) })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    value={studentForm.debtCredits ?? 0}
+                    onChange={(e) => handleStudentChange('debtCredits', Number(e.target.value))}
+                    onBlur={() => handleStudentBlur('debtCredits')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: studentTouched.debtCredits && studentErrors.debtCredits ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      backgroundColor: studentTouched.debtCredits && studentErrors.debtCredits ? '#fff5f5' : '#fff',
+                    }}
                   />
+                  {studentTouched.debtCredits && studentErrors.debtCredits && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {studentErrors.debtCredits}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1407,6 +1921,88 @@ const OrganizationManagementPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận xóa Giảng viên */}
+      {deleteLecturerTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+        >
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '440px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <h3 style={{ margin: '0 0 12px 0', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🗑️ Xác nhận xóa Giảng viên
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '0.9rem', color: '#334155', lineHeight: 1.5 }}>
+              Bạn có chắc chắn muốn xóa giảng viên <strong>{deleteLecturerTarget.fullName}</strong> (Mã GV: {deleteLecturerTarget.lecturerCode}) khỏi hệ thống? Thao tác này sẽ xóa hồ sơ và tài khoản tương ứng.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteLecturerTarget(null)}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteLecturer}
+                style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#dc2626', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận xóa Sinh viên */}
+      {deleteStudentTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+        >
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '440px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <h3 style={{ margin: '0 0 12px 0', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🗑️ Xác nhận xóa Sinh viên
+            </h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '0.9rem', color: '#334155', lineHeight: 1.5 }}>
+              Bạn có chắc chắn muốn xóa sinh viên <strong>{deleteStudentTarget.fullName}</strong> (MSSV: {deleteStudentTarget.studentCode}) khỏi hệ thống? Thao tác này sẽ xóa hồ sơ sinh viên và tài khoản tương ứng.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteStudentTarget(null)}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteStudent}
+                style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#dc2626', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Xác nhận xóa
+              </button>
+            </div>
           </div>
         </div>
       )}

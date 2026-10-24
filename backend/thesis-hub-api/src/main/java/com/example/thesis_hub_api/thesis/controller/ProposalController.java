@@ -1,6 +1,8 @@
 package com.example.thesis_hub_api.thesis.controller;
 
 import com.example.thesis_hub_api.common.response.ApiResponse;
+import com.example.thesis_hub_api.identity.security.UserPrincipal;
+import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.thesis.dto.*;
 import com.example.thesis_hub_api.thesis.service.ProposalService;
 import jakarta.validation.Valid;
@@ -8,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProposalController {
 
     private final ProposalService proposalService;
+    private final StudentRepository studentRepository;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
@@ -82,9 +86,17 @@ public class ProposalController {
     public ApiResponse<Page<ProposalResponse>> searchProposals(
             @RequestParam(required = false) Long roundId,
             @RequestParam(required = false) Long lecturerId,
+            @RequestParam(required = false) Long studentId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
+            @AuthenticationPrincipal UserPrincipal currentUser,
             Pageable pageable) {
-        return ApiResponse.success(proposalService.searchProposals(roundId, lecturerId, status, search, pageable));
+        Long effectiveStudentId = studentId;
+        if (currentUser != null && currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))) {
+            effectiveStudentId = studentRepository.findByUserId(currentUser.getId())
+                    .map(com.example.thesis_hub_api.organization.entity.Student::getId)
+                    .orElse(currentUser.getId());
+        }
+        return ApiResponse.success(proposalService.searchProposals(roundId, lecturerId, effectiveStudentId, status, search, pageable));
     }
 }

@@ -63,7 +63,7 @@ class EligibilityServiceTest {
         ForceApproveRequestDTO request = ForceApproveRequestDTO.builder()
                 .studentId(102L)
                 .projectRoundId(10L)
-                .approvedBy(999L)
+                .approvedBy("999")
                 .reason("Chấp thuận trường hợp đặc biệt đã trả nợ môn")
                 .build();
 
@@ -78,7 +78,7 @@ class EligibilityServiceTest {
         DisqualifyRequestDTO request = DisqualifyRequestDTO.builder()
                 .studentId(101L)
                 .projectRoundId(10L)
-                .disqualifiedBy(999L)
+                .disqualifiedBy("999")
                 .reason("Gian lận học phần")
                 .build();
 

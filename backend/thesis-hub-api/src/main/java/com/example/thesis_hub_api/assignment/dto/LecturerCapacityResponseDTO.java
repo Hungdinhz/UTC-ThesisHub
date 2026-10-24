@@ -32,4 +32,6 @@ public class LecturerCapacityResponseDTO {
     private Boolean isActive;
     private String note;
     private List<String> directionNames;
+    private List<Long> directionIds;
+    private List<String> directionCodes;
 }

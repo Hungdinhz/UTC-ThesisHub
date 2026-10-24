@@ -108,9 +108,11 @@ public class StudentExcelParser {
         }
 
         // Cột B (1): Mã sinh viên (MSSV) *
-        String studentCode = getCellValue(row.getCell(1));
+        String studentCode = getCellValue(row.getCell(1)).trim();
         if (studentCode.isEmpty()) {
             errors.add("Mã sinh viên không được để trống");
+        } else if (!studentCode.matches("^\\d{9}$")) {
+            errors.add("MSSV không hợp lệ (phải đúng 9 chữ số: " + studentCode + ")");
         }
 
         String lastName;
@@ -174,19 +176,19 @@ public class StudentExcelParser {
 
         if (!phone.isEmpty()) {
             String cleanedPhone = phone.replaceAll("[\\s.-]", "");
-            if (cleanedPhone.length() < 8 || cleanedPhone.length() > 15) {
-                errors.add("Số điện thoại không hợp lệ");
+            if (!cleanedPhone.matches("^0\\d{9}$") && (cleanedPhone.length() < 9 || cleanedPhone.length() > 11)) {
+                errors.add("Số điện thoại không hợp lệ (phải là 10 chữ số bắt đầu bằng 0)");
             } else {
                 phone = cleanedPhone;
             }
         }
 
         if (email.isEmpty()) {
-            if (!studentCode.isEmpty()) {
+            if (!studentCode.isEmpty() && studentCode.matches("^\\d{9}$")) {
                 email = studentCode.toLowerCase() + "@lms.utc.edu.vn";
             }
-        } else if (!email.contains("@") || !email.contains(".")) {
-            errors.add("Email không đúng định dạng: " + email);
+        } else if (!email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
+            errors.add("Email không đúng định dạng chuẩn: " + email);
         }
 
         boolean isValid = errors.isEmpty();

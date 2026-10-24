@@ -294,10 +294,16 @@ public class ProposalServiceImpl implements ProposalService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, String status, String search, Pageable pageable) {
+        return searchProposals(roundId, lecturerId, null, status, search, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, Long studentId, String status, String search, Pageable pageable) {
         String searchPattern = (search != null && !search.trim().isEmpty())
                 ? "%" + search.trim().toLowerCase() + "%"
                 : null;
-        return proposalRepository.searchProposals(roundId, lecturerId, status, searchPattern, pageable)
+        return proposalRepository.searchProposals(roundId, lecturerId, studentId, status, searchPattern, pageable)
                 .map(this::mapToResponse);
     }
 

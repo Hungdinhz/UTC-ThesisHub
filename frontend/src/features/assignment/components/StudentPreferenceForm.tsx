@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { ProjectDirection, LecturerCapacity } from '../types';
+import { isLecturerAssignedToDirection, type ProjectDirection, type LecturerCapacity } from '../types';
 
 interface Props {
   directions: ProjectDirection[];
@@ -84,17 +84,10 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   // Selected direction object
   const currentDirection = directions.find((d) => d.id === selectedDirectionId);
 
-  // Filter eligible lecturers based on direction and training program degree constraint
-  const matchingLecturers = capacities.filter((c) => {
-    if (currentDirection && c.directionNames && c.directionNames.length > 0) {
-      return c.directionNames.some(
-        (nameOrCode) =>
-          nameOrCode.toLowerCase() === currentDirection.code.toLowerCase() ||
-          nameOrCode.toLowerCase() === currentDirection.name.toLowerCase()
-      );
-    }
-    return false;
-  });
+  // Filter eligible lecturers based strictly on direction assigned to lecturer in this round
+  const matchingLecturers = currentDirection
+    ? capacities.filter((c) => isLecturerAssignedToDirection(c, currentDirection))
+    : [];
 
   // If matching lecturers found for this direction, show them. Otherwise fallback to all capacities in round
   const eligibleLecturers = matchingLecturers.length > 0 ? matchingLecturers : capacities;
@@ -276,14 +269,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                     <span className="lecturer-tag">
                       {(() => {
                         if (capacities && capacities.length > 0) {
-                          const count = capacities.filter((c) =>
-                            c.directionNames?.some(
-                              (dn) =>
-                                dn.toLowerCase() === d.code.toLowerCase() ||
-                                dn.toLowerCase().includes(d.code.toLowerCase()) ||
-                                dn.toLowerCase() === d.name.toLowerCase()
-                            )
-                          ).length;
+                          const count = capacities.filter((c) => isLecturerAssignedToDirection(c, d)).length;
                           return `${count} GV`;
                         }
                         return `${d.lecturerCount !== undefined ? d.lecturerCount : 0} GV`;

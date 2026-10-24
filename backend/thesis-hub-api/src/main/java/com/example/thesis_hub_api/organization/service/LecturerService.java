@@ -192,6 +192,25 @@ public class LecturerService {
         return toResponseDTO(lecturer);
     }
 
+    @Transactional
+    public void deleteLecturer(Long id) {
+        Lecturer lecturer = lecturerRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.LECTURER_NOT_FOUND));
+
+        if (lecturerCapacityRepository != null) {
+            List<LecturerCapacity> caps = lecturerCapacityRepository.findByLecturerId(id);
+            if (!caps.isEmpty()) {
+                lecturerCapacityRepository.deleteAll(caps);
+            }
+        }
+
+        User user = lecturer.getUser();
+        lecturerRepository.delete(lecturer);
+        if (user != null) {
+            userRepository.delete(user);
+        }
+    }
+
     private LecturerResponseDTO toResponseDTO(Lecturer lecturer) {
         User user = lecturer.getUser();
         Department department = (lecturer.getDepartmentId() != null)

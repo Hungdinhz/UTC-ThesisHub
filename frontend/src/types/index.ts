@@ -919,6 +919,17 @@ export interface AcademicRecordItem {
   importedAt: string;
 }
 
+export interface CreateAcademicRecordManualPayload {
+  studentId?: number;
+  studentCode?: string;
+  completedCredits: number;
+  gpa: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
+  note?: string;
+}
+
 
 export interface CreateLecturerPayload {
   username: string;

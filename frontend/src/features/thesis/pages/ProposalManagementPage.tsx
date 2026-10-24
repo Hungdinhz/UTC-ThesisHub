@@ -23,7 +23,6 @@ export const ProposalManagementPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
-  const [onlyMyProposal, setOnlyMyProposal] = useState<boolean>(isStudent);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
@@ -141,7 +140,11 @@ export const ProposalManagementPage: React.FC = () => {
   const loadProposals = async () => {
     setLoading(true);
     try {
-      const data = await thesisService.searchProposals();
+      const studentId = isStudent ? (user?.id || user?.student_id) : undefined;
+      const data = await thesisService.searchProposals({
+        roundId: selectedRoundId,
+        studentId: studentId ? Number(studentId) : undefined,
+      });
       if (Array.isArray(data)) {
         setProposals(data);
         return;
@@ -318,21 +321,70 @@ export const ProposalManagementPage: React.FC = () => {
     setBannerMsg(`Sinh viên ${proposal.studentFullName} đã ký nộp và Khoa CNTT đã lưu hồ sơ đề cương (Bước 24 hoàn tất)!`);
   };
 
+  const isCurrentStudentProposal = (p: Proposal) => {
+    // 1. Check studentId
+    const studentId = user?.id || user?.student_id || (user as any)?.student?.id;
+    if (studentId && (p.studentId === studentId || String(p.studentId) === String(studentId))) {
+      return true;
+    }
+
+    // 2. Check studentCode / registration_no
+    const studentCode =
+      (user as any)?.registration_no ||
+      user?.student_id ||
+      user?.studentCode ||
+      (user as any)?.student_code ||
+      user?.username ||
+      user?.user?.username;
+    if (studentCode && p.studentCode) {
+      if (p.studentCode.trim().toLowerCase() === String(studentCode).trim().toLowerCase()) {
+        return true;
+      }
+    }
+
+    // 3. Check full name
+    const studentFullName =
+      user?.fullName ||
+      user?.user?.fullName ||
+      (user?.user?.first_name || user?.user?.last_name
+        ? `${user?.user?.first_name || ''} ${user?.user?.last_name || ''}`.trim()
+        : '');
+    if (studentFullName && p.studentFullName) {
+      const pName = p.studentFullName.trim().toLowerCase();
+      const uName = studentFullName.trim().toLowerCase();
+      if (pName === uName || pName.includes(uName) || uName.includes(pName)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const filtered = proposals.filter((p) => {
     // Lọc theo Đợt đồ án được chọn ở đầu trang
     if (selectedRoundId && p.projectRoundId && p.projectRoundId !== selectedRoundId) {
       return false;
     }
-    if (onlyMyProposal) {
-      const userCode = user?.student_id || user?.studentCode || user?.username || user?.user?.username;
-      const userName = user?.fullName || user?.user?.fullName;
-      const matchUser =
-        (userCode && (p.studentCode === userCode || String(p.studentId) === String(user?.id))) ||
-        (userName && p.studentFullName && p.studentFullName.toLowerCase().includes(userName.toLowerCase()));
-      if (!matchUser && proposals.length > 1) {
+
+    // Yêu cầu: "Sinh viên chỉ xem và ký đề cương của mình"
+    if (isStudent) {
+      if (!isCurrentStudentProposal(p)) {
         return false;
       }
     }
+
+    // Giảng viên chỉ xem đề cương mà mình hướng dẫn (trừ khi là Admin hoặc Hội đồng)
+    if (isSupervisor && !isAdmin) {
+      const myLecturerId = user?.lecturer_id || user?.id;
+      const myLecturerCode = (user as any)?.lecturerCode || (user as any)?.registration_no || user?.username;
+      const matchLecturer =
+        (myLecturerId && (p.lecturerId === myLecturerId || String(p.lecturerId) === String(myLecturerId))) ||
+        (myLecturerCode && p.lecturerCode === myLecturerCode);
+      if (!matchLecturer) {
+        return false;
+      }
+    }
+
     const matchStatus = filterStatus === 'ALL' || p.status === filterStatus;
     const matchKeyword =
       !searchKeyword ||
@@ -535,14 +587,26 @@ export const ProposalManagementPage: React.FC = () => {
           <option value="REVISE_REQUIRED">Yêu cầu sửa đổi (REVISE)</option>
         </select>
         {isStudent && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#1e293b', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={onlyMyProposal}
-              onChange={(e) => setOnlyMyProposal(e.target.checked)}
-            />
-            Chỉ hiển thị đề cương của tôi
-          </label>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: '#1d4ed8',
+            }}
+          >
+            <span>🔒 Đề cương cá nhân:</span>
+            <span>
+              {user?.fullName || user?.user?.fullName || (user as any)?.registration_no || user?.username}
+              {(user as any)?.registration_no ? ` (MSSV: ${(user as any).registration_no})` : ''}
+            </span>
+          </div>
         )}
       </div>
 
@@ -704,7 +768,7 @@ export const ProposalManagementPage: React.FC = () => {
                           {isAdmin ? '⚖️ Khoa Duyệt Đề Tài' : 'Đánh Giá'}
                         </button>
                       )}
-                      {isStudent && p.status === 'APPROVED' && !signedProposalIds[p.id] && (
+                      {isStudent && p.status === 'APPROVED' && !signedProposalIds[p.id] && isCurrentStudentProposal(p) && (
                         <button
                           onClick={() => handleSignAndArchive(p)}
                           style={{

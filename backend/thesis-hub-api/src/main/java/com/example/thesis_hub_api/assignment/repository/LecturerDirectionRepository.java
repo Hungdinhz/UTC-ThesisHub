@@ -21,4 +21,6 @@ public interface LecturerDirectionRepository extends JpaRepository<LecturerDirec
     Optional<LecturerDirection> findByLecturerIdAndDirectionId(Long lecturerId, Long directionId);
 
     boolean existsByLecturerIdAndDirectionId(Long lecturerId, Long directionId);
+
+    void deleteByLecturerId(Long lecturerId);
 }

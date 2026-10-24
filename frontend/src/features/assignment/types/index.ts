@@ -45,6 +45,8 @@ export interface LecturerCapacity {
   isActive: boolean;
   note?: string;
   directionNames?: string[];
+  directionIds?: number[];
+  directionCodes?: string[];
 }
 
 export interface DirectionRegistration {
@@ -143,3 +145,47 @@ export interface AssignmentStats {
   averageLoadRatio: number;
   droppedCount?: number;
 }
+
+/**
+ * Check if a lecturer's capacity record is assigned to a given project direction.
+ * Accurately matches by directionIds, directionCodes, or directionNames.
+ */
+export const isLecturerAssignedToDirection = (
+  capacity: LecturerCapacity,
+  direction: ProjectDirection
+): boolean => {
+  if (!capacity || !direction) return false;
+
+  // 1. Match by directionIds (Exact primary key match)
+  if (capacity.directionIds && Array.isArray(capacity.directionIds) && capacity.directionIds.length > 0) {
+    if (capacity.directionIds.includes(direction.id) || capacity.directionIds.includes(Number(direction.id))) {
+      return true;
+    }
+  }
+
+  // 2. Match by directionCodes (Exact code match, e.g. 'HD_PM_APP')
+  if (capacity.directionCodes && Array.isArray(capacity.directionCodes) && capacity.directionCodes.length > 0) {
+    const targetCode = direction.code.trim().toUpperCase();
+    if (capacity.directionCodes.some((code) => code.trim().toUpperCase() === targetCode)) {
+      return true;
+    }
+  }
+
+  // 3. Match by directionNames (Fuzzy/case-insensitive name or code match)
+  if (capacity.directionNames && Array.isArray(capacity.directionNames) && capacity.directionNames.length > 0) {
+    const targetCode = direction.code.trim().toLowerCase();
+    const targetName = direction.name.trim().toLowerCase();
+    return capacity.directionNames.some((dn) => {
+      const dnNorm = dn.trim().toLowerCase();
+      return (
+        dnNorm === targetCode ||
+        dnNorm === targetName ||
+        dnNorm.includes(targetCode) ||
+        targetName.includes(dnNorm) ||
+        dnNorm.includes(targetName)
+      );
+    });
+  }
+
+  return false;
+};

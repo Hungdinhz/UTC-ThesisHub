@@ -842,8 +842,10 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   {importLoading ? 'Đang phân tích...' : '🔍 Xem trước (Preview)'}
                 </button>
               </div>
-              <div style={{ marginTop: '8px', fontSize: '0.75rem', color: '#64748b' }}>
+              <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
                 💡 Nếu chưa có file đúng định dạng, hãy bấm <strong>"Tải Excel mẫu UTC"</strong> ở trang quản lý để lấy file mẫu chuẩn gồm 8 cột: STT, Mã sinh viên, Họ đệm, Tên, Ngành, Lớp, SĐT, Email.
+                <br />
+                <strong style={{ color: '#0a3273' }}>📌 Quy định dữ liệu:</strong> Kiểm tra đúng định dạng và số lượng của dữ liệu, Mã sinh viên (MSSV) <strong>chỉ có đúng 9 số</strong>.
               </div>
             </div>
 

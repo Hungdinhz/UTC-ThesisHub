@@ -4,6 +4,8 @@ import type {
   AcademicRecordItem,
   AcademicRecordImportPreviewResponse,
   AcademicRecordImportRow,
+  CreateAcademicRecordManualPayload,
+  StudentProjectRoundItem,
 } from '../../../types';
 
 interface RoundAcademicRecordsTabProps {
@@ -39,6 +41,133 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
   const [importLoading, setImportLoading] = useState(false);
   const [previewData, setPreviewData] = useState<AcademicRecordImportPreviewResponse | null>(null);
   const [importResultMsg, setImportResultMsg] = useState<string | null>(null);
+
+  // Modal Add Academic Record Manually states
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [roundStudents, setRoundStudents] = useState<StudentProjectRoundItem[]>([]);
+  const [manualForm, setManualForm] = useState<CreateAcademicRecordManualPayload>({
+    studentCode: '',
+    completedCredits: 120,
+    gpa: 3.0,
+    tuitionDebt: false,
+    underDisciplinaryAction: false,
+    missingPrerequisiteCount: 0,
+    note: '',
+  });
+  const [manualErrors, setManualErrors] = useState<Record<string, string>>({});
+  const [manualTouched, setManualTouched] = useState<Record<string, boolean>>({});
+
+  const validateManualField = (field: string, value: any): string => {
+    switch (field) {
+      case 'studentCode': {
+        const val = String(value || '').trim();
+        if (!val) return 'Mã sinh viên không được để trống';
+        if (!/^\d{9}$/.test(val)) return 'Mã sinh viên chỉ gồm đúng 9 chữ số (VD: 201200102)';
+        return '';
+      }
+      case 'completedCredits': {
+        if (value === '' || value === undefined || value === null) return 'Số tín chỉ không được để trống';
+        const num = Number(value);
+        if (isNaN(num) || num < 0) return 'Số tín chỉ phải là số nguyên >= 0';
+        return '';
+      }
+      case 'gpa': {
+        if (value === '' || value === undefined || value === null) return 'Điểm GPA không được để trống';
+        const num = Number(value);
+        if (isNaN(num) || num < 0 || num > 4.0) return 'GPA phải nằm trong khoảng từ 0.00 đến 4.00';
+        return '';
+      }
+      case 'missingPrerequisiteCount': {
+        if (value === '' || value === undefined || value === null) return 'Số môn nợ không được để trống';
+        const num = Number(value);
+        if (isNaN(num) || num < 0) return 'Số môn tiên quyết còn nợ phải >= 0';
+        return '';
+      }
+      default:
+        return '';
+    }
+  };
+
+  const handleManualChange = (field: keyof CreateAcademicRecordManualPayload, value: any) => {
+    setManualForm((prev) => ({ ...prev, [field]: value }));
+    const err = validateManualField(field, value);
+    setManualErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
+  const handleManualBlur = (field: keyof CreateAcademicRecordManualPayload) => {
+    setManualTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateManualField(field, manualForm[field]);
+    setManualErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
+  const handleOpenManualModal = async () => {
+    setManualForm({
+      studentCode: '',
+      completedCredits: 120,
+      gpa: 3.0,
+      tuitionDebt: false,
+      underDisciplinaryAction: false,
+      missingPrerequisiteCount: 0,
+      note: '',
+    });
+    setManualErrors({});
+    setManualTouched({});
+    setManualError(null);
+    setShowManualModal(true);
+    try {
+      const res = await apiService.getStudentsInRound(roundId, { size: 100 });
+      setRoundStudents(res?.content || []);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const fieldsToValidate: (keyof CreateAcademicRecordManualPayload)[] = [
+      'studentCode',
+      'completedCredits',
+      'gpa',
+      'missingPrerequisiteCount',
+    ];
+    const newErrors: Record<string, string> = {};
+    const newTouched: Record<string, boolean> = {};
+
+    fieldsToValidate.forEach((field) => {
+      newTouched[field] = true;
+      const err = validateManualField(field, manualForm[field]);
+      if (err) newErrors[field] = err;
+    });
+
+    setManualTouched((prev) => ({ ...prev, ...newTouched }));
+    setManualErrors(newErrors);
+
+    if (Object.values(newErrors).some(Boolean)) {
+      setManualError('Vui lòng kiểm tra và sửa các thông tin chưa hợp lệ');
+      return;
+    }
+
+    try {
+      setManualLoading(true);
+      setManualError(null);
+      await apiService.saveManualAcademicRecord(roundId, {
+        ...manualForm,
+        completedCredits: Number(manualForm.completedCredits),
+        gpa: Number(manualForm.gpa),
+        missingPrerequisiteCount: Number(manualForm.missingPrerequisiteCount),
+      });
+      setShowManualModal(false);
+      setSuccessMsg(`Lưu dữ liệu học vụ cho sinh viên ${manualForm.studentCode} thành công!`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+      loadRecords();
+    } catch (err: unknown) {
+      setManualError(err instanceof Error ? err.message : 'Lỗi khi lưu dữ liệu học vụ');
+    } finally {
+      setManualLoading(false);
+    }
+  };
 
   // Load records (Contract 4)
   const loadRecords = async () => {
@@ -199,6 +328,29 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
             }}
           >
             📥 Tải Excel mẫu học vụ
+          </button>
+          <button
+            disabled={isRoundClosed}
+            onClick={() => {
+              if (isRoundClosed) return;
+              handleOpenManualModal();
+            }}
+            style={{
+              backgroundColor: isRoundClosed ? '#94a3b8' : '#0284c7',
+              color: '#fff',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: isRoundClosed ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể thêm học vụ' : undefined}
+          >
+            ➕ Thêm học vụ thủ công
           </button>
           <button
             disabled={isRoundClosed}
@@ -533,6 +685,242 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Thêm Học Vụ Thủ Công */}
+      {showManualModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px 32px', width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#0a3273' }}>Thêm / Cập Nhật Học Vụ Thủ Công</h3>
+                <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '2px' }}>
+                  Đợt đồ án: <strong>{roundName}</strong> ({roundCode})
+                </div>
+              </div>
+              <button
+                onClick={() => setShowManualModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {manualError && (
+              <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', fontSize: '0.85rem' }}>
+                ⚠️ {manualError}
+              </div>
+            )}
+
+            <form onSubmit={handleManualSubmit}>
+              {/* Sinh viên chọn hoặc gõ MSSV */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Mã sinh viên (MSSV gồm đúng 9 chữ số) *
+                </label>
+                {roundStudents.length > 0 && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <select
+                      value={manualForm.studentCode}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleManualChange('studentCode', val);
+                        setManualTouched((prev) => ({ ...prev, studentCode: true }));
+                      }}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#f8fafc', marginBottom: '6px' }}
+                    >
+                      <option value="">-- Chọn nhanh từ danh sách sinh viên trong đợt --</option>
+                      {roundStudents.map((s) => (
+                        <option key={s.studentRoundId || s.studentCode} value={s.studentCode}>
+                          {s.studentCode} - {s.fullName} ({s.className || 'Chưa rõ lớp'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <input
+                  type="text"
+                  placeholder="Nhập MSSV (9 chữ số, VD: 201200102)..."
+                  value={manualForm.studentCode || ''}
+                  onChange={(e) => handleManualChange('studentCode', e.target.value)}
+                  onBlur={() => handleManualBlur('studentCode')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: manualTouched.studentCode && manualErrors.studentCode ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {manualTouched.studentCode && manualErrors.studentCode && (
+                  <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px' }}>
+                    {manualErrors.studentCode}
+                  </div>
+                )}
+              </div>
+
+              {/* Tín chỉ và GPA */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Tín chỉ tích lũy *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="VD: 120"
+                    value={manualForm.completedCredits ?? ''}
+                    onChange={(e) => handleManualChange('completedCredits', e.target.value)}
+                    onBlur={() => handleManualBlur('completedCredits')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.completedCredits && manualErrors.completedCredits ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {manualTouched.completedCredits && manualErrors.completedCredits && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px' }}>
+                      {manualErrors.completedCredits}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Điểm GPA (thang 4.0) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="4.0"
+                    placeholder="VD: 3.15"
+                    value={manualForm.gpa ?? ''}
+                    onChange={(e) => handleManualChange('gpa', e.target.value)}
+                    onBlur={() => handleManualBlur('gpa')}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.gpa && manualErrors.gpa ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {manualTouched.gpa && manualErrors.gpa && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px' }}>
+                      {manualErrors.gpa}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tình trạng học phí & Kỷ luật */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Tình trạng học phí
+                  </label>
+                  <select
+                    value={manualForm.tuitionDebt ? 'true' : 'false'}
+                    onChange={(e) => handleManualChange('tuitionDebt', e.target.value === 'true')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff', boxSizing: 'border-box' }}
+                  >
+                    <option value="false">Đã hoàn thành (Không nợ)</option>
+                    <option value="true">Còn nợ học phí</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Tình trạng kỷ luật
+                  </label>
+                  <select
+                    value={manualForm.underDisciplinaryAction ? 'true' : 'false'}
+                    onChange={(e) => handleManualChange('underDisciplinaryAction', e.target.value === 'true')}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff', boxSizing: 'border-box' }}
+                  >
+                    <option value="false">Bình thường (Không kỷ luật)</option>
+                    <option value="true">Đang bị kỷ luật</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Số môn tiên quyết còn nợ */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Số môn tiên quyết còn thiếu
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="VD: 0"
+                  value={manualForm.missingPrerequisiteCount ?? ''}
+                  onChange={(e) => handleManualChange('missingPrerequisiteCount', e.target.value)}
+                  onBlur={() => handleManualBlur('missingPrerequisiteCount')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: manualTouched.missingPrerequisiteCount && manualErrors.missingPrerequisiteCount ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {manualTouched.missingPrerequisiteCount && manualErrors.missingPrerequisiteCount && (
+                  <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px' }}>
+                    {manualErrors.missingPrerequisiteCount}
+                  </div>
+                )}
+              </div>
+
+              {/* Ghi chú */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Ghi chú
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ghi chú thêm về hồ sơ học vụ (không bắt buộc)..."
+                  value={manualForm.note || ''}
+                  onChange={(e) => handleManualChange('note', e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowManualModal(false)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={manualLoading}
+                  style={{
+                    backgroundColor: '#0284c7',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 20px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    cursor: manualLoading ? 'not-allowed' : 'pointer',
+                    opacity: manualLoading ? 0.6 : 1,
+                  }}
+                >
+                  {manualLoading ? 'Đang lưu...' : '💾 Lưu học vụ'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
