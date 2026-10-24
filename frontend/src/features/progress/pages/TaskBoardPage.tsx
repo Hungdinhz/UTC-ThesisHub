@@ -25,7 +25,7 @@ export const TaskBoardPage: React.FC = () => {
   const [currentThesis, setCurrentThesis] = useState<Thesis | null>(null);
 
   // Filter visible theses by user role:
-  // - Sinh viên: chỉ thấy duy nhất đề tài của chính mình
+  // - Sinh viên: chỉ thấy duy nhất đề tài của chính mình (nếu chưa có đề tài thì danh sách rỗng, không gán đề tài người khác)
   // - Giảng viên hướng dẫn: chỉ thấy danh sách các đề tài mình đang hướng dẫn
   // - Quản trị viên: xem tất cả các đề tài của khoa
   const visibleTheses = useMemo(() => {
@@ -35,7 +35,7 @@ export const TaskBoardPage: React.FC = () => {
         (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
         (userCode && t.studentCode === userCode)
       );
-      return myTheses.length > 0 ? myTheses : (theses.length > 0 ? [theses[0]] : []);
+      return myTheses;
     }
     if (isSupervisor && user) {
       const lecturerId = (user as any).lecturer_id || user.id;
@@ -97,8 +97,13 @@ export const TaskBoardPage: React.FC = () => {
           );
           if (myThesis) {
             setSelectedThesisId(myThesis.id);
-            return;
+          } else {
+            // Sinh viên mới được nạp vào đợt, chưa có đề tài được duyệt: không tự ý gán đề tài người khác
+            setSelectedThesisId(0);
+            setCurrentThesis(null);
+            setTasks([]);
           }
+          return;
         }
 
         // Giảng viên hướng dẫn: Tự động chọn đề tài đầu tiên mà GV hướng dẫn
@@ -151,69 +156,18 @@ export const TaskBoardPage: React.FC = () => {
   };
 
   const loadTasks = async (id: number) => {
+    if (!id || id <= 0) {
+      setTasks([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const data = await progressService.getTasksByThesis(id);
-      setTasks(data);
-    } catch {
-      // Fallback sample tasks
-      setTasks([
-        {
-          id: 22,
-          thesisId: id,
-          thesisTitle: currentThesis?.titleVn || 'Xây dựng hệ thống quản lý đồ án tốt nghiệp UTC-ThesisHub',
-          createdById: 2,
-          createdByFullName: 'TS. Nguyễn Văn Hướng',
-          assignedToId: 15,
-          assignedToFullName: 'Nguyễn Văn Sinh Viên Kỹ Sư',
-          title: 'Thiết kế Database',
-          description: 'Thiết kế CSDL quan hệ 37 bảng chuẩn hóa 3NF và kịch bản migration.',
-          priority: 'HIGH',
-          status: 'COMPLETED',
-          dueDate: '2026-10-15T17:00:00Z',
-          completedAt: '2026-10-14T15:30:00Z',
-          submissionCount: 1,
-          commentCount: 1,
-          createdAt: '2026-10-05T08:00:00Z',
-          updatedAt: '2026-10-14T15:30:00Z'
-        },
-        {
-          id: 23,
-          thesisId: id,
-          thesisTitle: currentThesis?.titleVn || 'Xây dựng hệ thống quản lý đồ án tốt nghiệp UTC-ThesisHub',
-          createdById: 2,
-          createdByFullName: 'TS. Nguyễn Văn Hướng',
-          assignedToId: 15,
-          assignedToFullName: 'Nguyễn Văn Sinh Viên Kỹ Sư',
-          title: 'Viết API Backend',
-          description: 'Triển khai REST API Spring Boot cho toàn bộ hệ thống đồ án UTC.',
-          priority: 'URGENT',
-          status: 'REVISE',
-          dueDate: '2026-10-25T17:00:00Z',
-          submissionCount: 1,
-          commentCount: 2,
-          createdAt: '2026-10-10T08:00:00Z',
-          updatedAt: '2026-10-20T08:00:00Z'
-        },
-        {
-          id: 24,
-          thesisId: id,
-          thesisTitle: currentThesis?.titleVn || 'Xây dựng hệ thống quản lý đồ án tốt nghiệp UTC-ThesisHub',
-          createdById: 2,
-          createdByFullName: 'TS. Nguyễn Văn Hướng',
-          assignedToId: 15,
-          assignedToFullName: 'Nguyễn Văn Sinh Viên Kỹ Sư',
-          title: 'Xây dựng giao diện React',
-          description: 'Phát triển giao diện React Vite chuẩn UI UTC-ThesisHub.',
-          priority: 'MEDIUM',
-          status: 'TODO',
-          dueDate: '2026-11-05T17:00:00Z',
-          submissionCount: 0,
-          commentCount: 0,
-          createdAt: '2026-10-12T08:00:00Z',
-          updatedAt: '2026-10-12T08:00:00Z'
-        }
-      ]);
+      setTasks(data || []);
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách nhiệm vụ:', err);
+      setTasks([]);
     } finally {
       setLoading(false);
     }
@@ -469,19 +423,19 @@ export const TaskBoardPage: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
+                  background: currentThesis ? '#f0fdf4' : '#fffbeb',
+                  border: `1px solid ${currentThesis ? '#bbf7d0' : '#fde68a'}`,
                   padding: '8px 16px',
                   borderRadius: '8px',
                 }}
               >
-                <span style={{ fontSize: '18px' }}>🎯</span>
+                <span style={{ fontSize: '18px' }}>{currentThesis ? '🎯' : '⏳'}</span>
                 <div>
-                  <div style={{ fontSize: '11px', color: '#166534', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Đề tài của bạn (Cố định)
+                  <div style={{ fontSize: '11px', color: currentThesis ? '#166534' : '#b45309', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {currentThesis ? 'Đề tài của bạn (Cố định)' : 'Trạng thái đề tài'}
                   </div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#14532d' }}>
-                    {currentThesis?.thesisCode} — {currentThesis?.titleVn || 'Đang tải thông tin đề tài...'}
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: currentThesis ? '#14532d' : '#92400e' }}>
+                    {currentThesis ? `${currentThesis.thesisCode} — ${currentThesis.titleVn}` : 'Chưa có đề tài chính thức được phê duyệt'}
                   </div>
                 </div>
               </div>
@@ -627,6 +581,65 @@ export const TaskBoardPage: React.FC = () => {
       )}
 
       {/* 5-Column Kanban Board */}
+      {isStudent && (!currentThesis || selectedThesisId === 0) ? (
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: '12px',
+            padding: '48px 24px',
+            textAlign: 'center',
+            border: '1px solid #e2e8f0',
+            maxWidth: '680px',
+            margin: '30px auto',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          }}
+        >
+          <div style={{ fontSize: '52px', marginBottom: '16px' }}>⏳</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', marginBottom: '12px' }}>
+            Bạn chưa có Đề tài Đồ án Tốt nghiệp chính thức
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.7, marginBottom: '24px' }}>
+            Sinh viên mới được import vào đợt đồ án cần thực hiện tuần tự các bước theo đúng quy trình học vụ:
+            <br />
+            1. <strong>Giai đoạn 2:</strong> Chọn hướng đề tài và đăng ký nguyện vọng GVHD (NV1–NV3).
+            <br />
+            2. <strong>Giai đoạn 3:</strong> Xây dựng đề cương và gửi để Khoa phê duyệt đề tài chính thức.
+            <br />
+            Sau khi đề tài được duyệt sang trạng thái <strong>ĐANG THỰC HIỆN</strong>, Giảng viên hướng dẫn sẽ giao các công việc (Task) lên bảng này để bạn làm bài và nộp kết quả.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a
+              href="/student/assignment"
+              style={{
+                background: '#2563eb',
+                color: '#fff',
+                padding: '10px 18px',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
+              }}
+            >
+              👉 Giai đoạn 2: Chọn Hướng & Đăng ký GVHD
+            </a>
+            <a
+              href="/thesis/proposals"
+              style={{
+                background: '#f8fafc',
+                color: '#0f172a',
+                border: '1px solid #cbd5e1',
+                padding: '10px 18px',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
+              }}
+            >
+              📄 Giai đoạn 3: Đề cương đồ án
+            </a>
+          </div>
+        </div>
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px', minHeight: '650px' }}>
         {columns.map(col => {
           const colTasks = tasks.filter(t => t.status === col.status);
@@ -729,6 +742,7 @@ export const TaskBoardPage: React.FC = () => {
           );
         })}
       </div>
+      )}
 
       {/* Task Detail Modal */}
       {selectedTask && (
