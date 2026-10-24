@@ -44,6 +44,8 @@ public class ProposalServiceImpl implements ProposalService {
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
     private final UserRepository userRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository supervisorAssignmentRepository;
 
     @Override
     @Transactional
@@ -63,6 +65,15 @@ public class ProposalServiceImpl implements ProposalService {
         }
         if (student == null) {
             throw new ResourceNotFoundException("Student", request.getStudentId());
+        }
+
+        // Kiểm tra sinh viên đã được phân công GVHD trong đợt đồ án chưa
+        if (supervisorAssignmentRepository != null) {
+            java.util.Optional<com.example.thesis_hub_api.assignment.entity.SupervisorAssignment> assignOpt =
+                    supervisorAssignmentRepository.findByStudentIdAndProjectRoundId(student.getId(), request.getProjectRoundId());
+            if (assignOpt.isEmpty() || assignOpt.get().getLecturerId() == null) {
+                throw new AppException(ErrorCode.VALIDATION_FAILED, "Sinh viên chưa được phân công giảng viên hướng dẫn trong đợt đồ án này nên không thể tạo đề cương.");
+            }
         }
 
         Lecturer lecturer = null;

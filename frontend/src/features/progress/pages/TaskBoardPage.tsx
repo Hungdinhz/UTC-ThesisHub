@@ -14,8 +14,7 @@ export const TaskBoardPage: React.FC = () => {
 
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor';
-  const isAdmin = userType === 'admin';
-  const canCreateTask = isSupervisor || isAdmin;
+  const canCreateTask = isSupervisor;
 
   // Theses state
   const [theses, setTheses] = useState<Thesis[]>([]);
@@ -50,6 +49,21 @@ export const TaskBoardPage: React.FC = () => {
     }
     return theses;
   }, [theses, isStudent, isSupervisor, user]);
+
+  // Thesis search filter
+  const [thesisSearchTerm, setThesisSearchTerm] = useState('');
+  const searchedTheses = useMemo(() => {
+    if (!thesisSearchTerm.trim()) return visibleTheses;
+    const term = thesisSearchTerm.trim().toLowerCase();
+    return visibleTheses.filter(t =>
+      (t.titleVn && t.titleVn.toLowerCase().includes(term)) ||
+      (t.titleEn && t.titleEn.toLowerCase().includes(term)) ||
+      (t.thesisCode && t.thesisCode.toLowerCase().includes(term)) ||
+      (t.studentFullName && t.studentFullName.toLowerCase().includes(term)) ||
+      (t.studentCode && t.studentCode.toLowerCase().includes(term)) ||
+      (t.lecturerFullName && t.lecturerFullName.toLowerCase().includes(term))
+    );
+  }, [visibleTheses, thesisSearchTerm]);
 
   // Tasks & detail state
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -441,31 +455,81 @@ export const TaskBoardPage: React.FC = () => {
               </div>
             ) : (
               /* Giảng viên hoặc Quản trị viên */
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label htmlFor="thesisSelect" style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
-                  {isSupervisor ? '👨‍🏫 Đề tài đang hướng dẫn:' : '👁️ Chọn đề tài theo dõi:'}
-                </label>
-                <select
-                  id="thesisSelect"
-                  value={selectedThesisId}
-                  onChange={e => setSelectedThesisId(Number(e.target.value))}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '13px',
-                    minWidth: '280px',
-                    fontWeight: 600,
-                    color: '#0a3273',
-                    background: '#fff',
-                  }}
-                >
-                  {visibleTheses.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.thesisCode} — {t.titleVn} ({t.studentFullName || t.studentCode})
-                    </option>
-                  ))}
-                </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={thesisSearchTerm}
+                    onChange={e => setThesisSearchTerm(e.target.value)}
+                    placeholder="🔍 Tìm đề tài, SV, GVHD..."
+                    style={{
+                      padding: '8px 12px',
+                      paddingRight: thesisSearchTerm ? '26px' : '12px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px',
+                      width: '210px',
+                      background: '#fff',
+                      color: '#1e293b',
+                    }}
+                  />
+                  {thesisSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setThesisSearchTerm('')}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        padding: 0
+                      }}
+                      title="Xóa tìm kiếm"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label htmlFor="thesisSelect" style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
+                    {isSupervisor ? '👨‍🏫 Đề tài:' : '👁️ Chọn đề tài:'}
+                  </label>
+                  <select
+                    id="thesisSelect"
+                    value={selectedThesisId}
+                    onChange={e => setSelectedThesisId(Number(e.target.value))}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px',
+                      maxWidth: '380px',
+                      minWidth: '240px',
+                      fontWeight: 600,
+                      color: '#0a3273',
+                      background: '#fff',
+                    }}
+                  >
+                    {searchedTheses.length === 0 ? (
+                      <option value="">Không tìm thấy đề tài</option>
+                    ) : (
+                      searchedTheses.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.thesisCode} — {t.titleVn} ({t.studentFullName || t.studentCode})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  {thesisSearchTerm && (
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      ({searchedTheses.length}/{visibleTheses.length})
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 

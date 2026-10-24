@@ -17,6 +17,7 @@ import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.entity.TimelineMilestone;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.TimelineMilestoneRepository;
+import com.example.thesis_hub_api.assignment.entity.LecturerCapacity;
 import com.example.thesis_hub_api.assignment.repository.LecturerCapacityRepository;
 import com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
@@ -195,9 +196,10 @@ public class ProjectRoundService {
         List<String> errors = new ArrayList<>();
         Long roundId = round.getId();
 
+        long studentCount = 0;
         // 1. Đợt đồ án phải có ít nhất 1 sinh viên & có sinh viên đủ điều kiện nhận đồ án (trạng thái ELIGIBLE)
         if (studentProjectRoundRepository != null) {
-            long studentCount = studentProjectRoundRepository.countByProjectRoundId(roundId);
+            studentCount = studentProjectRoundRepository.countByProjectRoundId(roundId);
             if (studentCount < 1) {
                 errors.add("Đợt đồ án phải có ít nhất 1 sinh viên (hiện tại chưa có sinh viên nào).");
             } else {
@@ -209,15 +211,27 @@ public class ProjectRoundService {
             }
         }
 
-        // 2. Đợt đồ án phải có ít nhất 1 giảng viên tham gia
+        // 2. Đợt đồ án phải có ít nhất 1 giảng viên tham gia và tổng chỉ tiêu hướng dẫn
+        int totalCapacity = 0;
         if (lecturerCapacityRepository != null) {
-            long lecturerCount = lecturerCapacityRepository.findByProjectRoundId(roundId).size();
+            List<LecturerCapacity> capacities = lecturerCapacityRepository.findByProjectRoundId(roundId);
+            long lecturerCount = capacities.size();
             if (lecturerCount < 1) {
                 errors.add("Đợt đồ án phải có ít nhất 1 giảng viên tham gia (hiện tại chưa có giảng viên nào).");
+            } else {
+                totalCapacity = capacities.stream()
+                        .filter(c -> c.getIsActive() == null || Boolean.TRUE.equals(c.getIsActive()))
+                        .mapToInt(LecturerCapacity::getEffectiveCapacity)
+                        .sum();
             }
         }
 
-        // 3. Đã thiết lập mốc timeline "Đăng ký nguyện vọng & Hướng đề tài" (REGISTRATION)
+        // 3. Đợt đồ án từ trạng thái nháp sang mở thì phải thỏa mãn điều kiện số sinh viên <= chỉ tiêu hướng dẫn.
+        if (studentCount > totalCapacity) {
+            errors.add(String.format("Số lượng sinh viên trong đợt (%d SV) vượt quá tổng chỉ tiêu hướng dẫn của giảng viên (%d SV). Điều kiện mở đợt: số sinh viên <= chỉ tiêu hướng dẫn.", studentCount, totalCapacity));
+        }
+
+        // 4. Đã thiết lập mốc timeline "Đăng ký nguyện vọng & Hướng đề tài" (REGISTRATION)
         List<TimelineMilestone> milestones = timelineMilestoneRepository
                 .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId);
         boolean hasRegistrationMilestone = milestones.stream().anyMatch(m ->

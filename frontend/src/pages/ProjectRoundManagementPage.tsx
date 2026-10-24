@@ -891,6 +891,10 @@ const ProjectRoundManagementPage: React.FC = () => {
                       <span>Có sinh viên <strong>đủ điều kiện nhận đồ án (ELIGIBLE)</strong></span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>📊</span>
+                      <span>Số sinh viên tham gia <strong>nhỏ hơn hoặc bằng tổng chỉ tiêu hướng dẫn</strong> (Số SV ≤ Chỉ tiêu GV)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span>🗓️</span>
                       <span>Đã thiết lập mốc timeline: <strong>Đăng ký nguyện vọng & Hướng đề tài (REGISTRATION)</strong></span>
                     </div>

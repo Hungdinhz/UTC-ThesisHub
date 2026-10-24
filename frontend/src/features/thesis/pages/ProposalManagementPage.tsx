@@ -157,6 +157,15 @@ export const ProposalManagementPage: React.FC = () => {
   };
 
   const handleOpenCreateModal = () => {
+    if (!isStudent) {
+      alert('Chức năng tạo mới đề cương chỉ dành cho sinh viên.');
+      return;
+    }
+    if (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId) {
+      alert('Sinh viên chưa được phân công giảng viên hướng dẫn thì không thể tạo đề cương mới.');
+      return;
+    }
+
     // Check if current student already has a proposal in the project round
     if (isStudent) {
       if (mySupervisorAssignment?.lecturerId) {
@@ -438,21 +447,53 @@ export const ProposalManagementPage: React.FC = () => {
             Quy trình: GV & SV xác định đề tài (Draft) → GV xác nhận → Khoa/Ban duyệt đề tài → Sinh đề cương PDF → SV ký nộp & Khoa lưu hồ sơ.
           </p>
         </div>
-        <button
-          onClick={handleOpenCreateModal}
+        {isStudent && (
+          <button
+            onClick={handleOpenCreateModal}
+            disabled={!mySupervisorAssignment || !mySupervisorAssignment.lecturerId}
+            style={{
+              background: (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId) ? '#94a3b8' : '#2563eb',
+              color: '#fff',
+              border: 'none',
+              padding: '10px 18px',
+              borderRadius: '6px',
+              fontWeight: '600',
+              cursor: (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId) ? 'not-allowed' : 'pointer',
+              opacity: (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId) ? 0.7 : 1,
+            }}
+            title={
+              (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId)
+                ? 'Sinh viên chưa được phân công giảng viên hướng dẫn thì không thể tạo đề cương mới'
+                : 'Tạo đề cương đề tài mới'
+            }
+          >
+            + Tạo Đề Cương Mới
+          </button>
+        )}
+      </div>
+
+      {/* Cảnh báo sinh viên chưa có GVHD */}
+      {isStudent && (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId) && (
+        <div
           style={{
-            background: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            padding: '10px 18px',
-            borderRadius: '6px',
-            fontWeight: '600',
-            cursor: 'pointer',
+            background: '#fffbeb',
+            border: '1px solid #fde68a',
+            color: '#92400e',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
-          + Tạo Đề Cương Mới
-        </button>
-      </div>
+          <span>⚠️</span>
+          <span>
+            <strong>Lưu ý:</strong> Sinh viên chưa được phân công giảng viên hướng dẫn thì không thể bấm tạo đề cương mới. Vui lòng chờ Khoa công bố danh sách phân công GVHD.
+          </span>
+        </div>
+      )}
 
       {/* Đợt đồ án ở đầu mỗi giai đoạn (Page 8: Từng giai đoạn đều có đợt đồ án ở đầu) */}
       <div
@@ -748,7 +789,7 @@ export const ProposalManagementPage: React.FC = () => {
                           ✓ Phê duyệt đề cương (GVHD)
                         </button>
                       )}
-                      {canReview && (
+                      {canReview && p.status !== 'APPROVED' && (
                         <button
                           onClick={() => {
                             setSelectedProposal(p);

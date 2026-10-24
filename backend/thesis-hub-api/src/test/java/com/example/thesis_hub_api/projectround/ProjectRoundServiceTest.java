@@ -30,6 +30,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.example.thesis_hub_api.assignment.repository.LecturerCapacityRepository;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import java.util.Collections;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -48,6 +52,12 @@ class ProjectRoundServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private StudentProjectRoundRepository studentProjectRoundRepository;
+
+    @Mock
+    private LecturerCapacityRepository lecturerCapacityRepository;
 
     @InjectMocks
     private ProjectRoundService projectRoundService;
@@ -79,6 +89,9 @@ class ProjectRoundServiceTest {
                 .endDate(LocalDate.now().plusMonths(3))
                 .milestones(new ArrayList<>())
                 .build();
+
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "studentProjectRoundRepository", studentProjectRoundRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "lecturerCapacityRepository", lecturerCapacityRepository);
 
         Instant now = Instant.now();
 
@@ -190,13 +203,30 @@ class ProjectRoundServiceTest {
     @Test
     @DisplayName("Chuyển đổi trạng thái đợt đồ án thành công")
     void updateRoundStatus_Success() {
+        sampleRound.setStatus("IN_PROGRESS");
         when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
         when(projectRoundRepository.save(any(ProjectRound.class))).thenReturn(sampleRound);
 
-        ProjectRoundResponseDTO result = projectRoundService.updateRoundStatus(10L, "IN_PROGRESS");
+        ProjectRoundResponseDTO result = projectRoundService.updateRoundStatus(10L, "CLOSED");
 
         assertNotNull(result);
-        assertEquals("IN_PROGRESS", sampleRound.getStatus());
+        assertEquals("CLOSED", sampleRound.getStatus());
+    }
+
+    @Test
+    @DisplayName("Mở đợt đồ án khi số SV > chỉ tiêu ném lỗi INVALID_STATUS_TRANSITION")
+    void updateRoundStatus_StudentCountExceedsCapacity_ThrowsException() {
+        sampleRound.setStatus("DRAFT");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        // 10 students, 0 capacity
+        when(studentProjectRoundRepository.countByProjectRoundId(10L)).thenReturn(10L);
+        when(studentProjectRoundRepository.findByProjectRoundId(10L)).thenReturn(Collections.emptyList());
+        when(lecturerCapacityRepository.findByProjectRoundId(10L)).thenReturn(Collections.emptyList());
+
+        AppException ex = assertThrows(AppException.class, () -> projectRoundService.updateRoundStatus(10L, "OPEN"));
+        assertEquals(ErrorCode.INVALID_STATUS_TRANSITION, ex.getErrorCode());
+        assertTrue(ex.getMessage().contains("chỉ tiêu hướng dẫn"));
     }
 
     @Test
