@@ -46,30 +46,18 @@ const AdminDashboard: React.FC = () => {
     },
     {
       stage: 'Giai đoạn 4',
-      title: 'Xét Điều kiện Làm Đồ án & Duyệt Đặc cách',
-      icon: '✅',
-      color: '#f59e0b',
-      description:
-        'Import điểm/học vụ xét điều kiện (Tín chỉ >= 110, GPA >= 2.0, Không nợ HP/Kỷ luật). Nếu không đủ: nút quyết định Force Approve (vẫn cho làm ĐA) hoặc Loại khỏi đợt.',
-      actions: [
-        { label: 'Xét ĐK & Force Approve', route: '/admin/eligibility' },
-        { label: 'Import Học vụ (Tab 3)', route: '/admin/project-rounds' },
-      ],
-    },
-    {
-      stage: 'Giai đoạn 5',
       title: 'Thực hiện Đồ án (Task, Submit, Review)',
       icon: '📋',
       color: '#0891b2',
       description:
-        'Tạo task, deadline, comment. SV nhận task và submit kết quả. GV review kết quả: Không đạt -> Yêu cầu sửa task làm lại; Đạt -> Hoàn thành project và chuyển sang Giai đoạn 6.',
+        'Tạo task, deadline, comment. SV nhận task và submit kết quả. GV review kết quả: Không đạt -> Yêu cầu sửa task làm lại; Đạt -> Hoàn thành project và chuyển sang Giai đoạn 5.',
       actions: [
         { label: 'Bảng Task & Review', route: '/progress/tasks' },
         { label: 'Báo cáo Tiến độ', route: '/progress/reports' },
       ],
     },
     {
-      stage: 'Giai đoạn 6',
+      stage: 'Giai đoạn 5',
       title: 'Xét Bảo vệ, Hội đồng (1CT-2TK-2UV), Bảo lưu & Kết thúc',
       icon: '🏆',
       color: '#dc2626',
@@ -102,11 +90,11 @@ const AdminDashboard: React.FC = () => {
             Chào mừng trở lại, {user?.fullName || user?.username || 'Quản trị viên Khoa CNTT'} 👋
           </h2>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.95rem' }}>
-            Trung tâm điều hành toàn trình <strong>6 Giai đoạn Đồ án Tốt nghiệp UTC</strong>. Bạn có thể chuyển nhanh tới bất kỳ giai đoạn nào bên dưới để kiểm thử và vận hành.
+            Trung tâm điều hành toàn trình <strong>5 Giai đoạn Đồ án Tốt nghiệp UTC</strong>. Bạn có thể chuyển nhanh tới bất kỳ giai đoạn nào bên dưới để kiểm thử và vận hành.
           </p>
         </div>
 
-        {/* 6-Stage Lifecycle Grid */}
+        {/* 5-Stage Lifecycle Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '20px' }}>
           {lifecycleStages.map((item) => (
             <div

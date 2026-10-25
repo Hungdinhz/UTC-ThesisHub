@@ -21,4 +21,6 @@ public class CapacityUpdateRequestDTO {
     private Boolean isActive;
 
     private String note;
+
+    private java.util.List<Long> directionIds;
 }

@@ -702,6 +702,8 @@ export interface LecturerItem {
   researchInterests?: string;
   maxThesisQuota?: number;
   isActive: boolean;
+  projectRoundCodes?: string[];
+  projectRoundNames?: string[];
 }
 
 export interface StudentItem {
@@ -721,6 +723,8 @@ export interface StudentItem {
   gender?: string;
   debtCredits?: number;
   isActive: boolean;
+  projectRoundCodes?: string[];
+  projectRoundNames?: string[];
 }
 
 export interface OrganizationPageResponse<T> {
@@ -799,6 +803,7 @@ export interface StudentImportRow {
   className: string;
   phone?: string;
   email?: string;
+  gpa?: number;
   isValid: boolean;
   errors: string[];
 }
@@ -841,8 +846,23 @@ export interface StudentProjectRoundItem {
   trainingProgram?: string;
   status: string;
   debtCredits: number;
+  gpa?: number;
   note?: string;
   enrolledAt?: string;
+}
+
+export interface StudentEligibilityCheckResponse {
+  studentCode: string;
+  eligible: boolean;
+  message: string;
+  existsInSystem: boolean;
+  studentId?: number;
+  fullName?: string;
+  className?: string;
+  majorId?: number;
+  majorName?: string;
+  email?: string;
+  phone?: string;
 }
 
 // ─── Academic Records Types (Phase 4 Ingestion & Contract 4) ─────
@@ -899,6 +919,17 @@ export interface AcademicRecordItem {
   missingPrerequisiteCount: number;
   note?: string;
   importedAt: string;
+}
+
+export interface CreateAcademicRecordManualPayload {
+  studentId?: number;
+  studentCode?: string;
+  completedCredits: number;
+  gpa: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
+  note?: string;
 }
 
 
@@ -960,6 +991,7 @@ export interface CreateRoundStudentManualPayload {
   className?: string;
   majorId: number;
   phone?: string;
+  gpa?: number;
   status?: string;
   note?: string;
 }

@@ -18,6 +18,8 @@ public interface StudentProjectRoundRepository extends JpaRepository<StudentProj
 
     boolean existsByStudentIdAndProjectRoundId(Long studentId, Long projectRoundId);
 
+    List<StudentProjectRound> findByStudentId(Long studentId);
+
     List<StudentProjectRound> findByProjectRoundId(Long projectRoundId);
 
     long countByProjectRoundId(Long projectRoundId);

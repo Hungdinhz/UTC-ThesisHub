@@ -27,6 +27,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
     @Query("SELECT p FROM Proposal p WHERE " +
            "(:roundId IS NULL OR p.projectRound.id = :roundId) AND " +
            "(:lecturerId IS NULL OR p.lecturer.id = :lecturerId) AND " +
+           "(:studentId IS NULL OR p.student.id = :studentId) AND " +
            "(:status IS NULL OR p.status = :status) AND " +
            "(:search IS NULL OR " +
            "LOWER(p.titleVn) LIKE :search OR " +
@@ -34,6 +35,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
     Page<Proposal> searchProposals(
             @Param("roundId") Long roundId,
             @Param("lecturerId") Long lecturerId,
+            @Param("studentId") Long studentId,
             @Param("status") String status,
             @Param("search") String search,
             Pageable pageable);

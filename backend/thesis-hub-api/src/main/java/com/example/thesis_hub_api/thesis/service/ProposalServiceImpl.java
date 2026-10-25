@@ -44,6 +44,8 @@ public class ProposalServiceImpl implements ProposalService {
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
     private final UserRepository userRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository supervisorAssignmentRepository;
 
     @Override
     @Transactional
@@ -54,12 +56,41 @@ public class ProposalServiceImpl implements ProposalService {
             throw new AppException(ErrorCode.PROJECT_ROUND_CLOSED);
         }
 
-        java.util.Optional<Proposal> existingOpt = proposalRepository.findByStudentIdAndProjectRoundId(request.getStudentId(), request.getProjectRoundId());
+        Student student = null;
+        if (request.getStudentId() != null) {
+            student = studentRepository.findById(request.getStudentId())
+                    .orElseGet(() -> studentRepository.findByUserId(request.getStudentId())
+                            .orElseGet(() -> studentRepository.findByStudentCode(String.valueOf(request.getStudentId()))
+                                    .orElse(null)));
+        }
+        if (student == null) {
+            throw new ResourceNotFoundException("Student", request.getStudentId());
+        }
+
+        // Kiểm tra sinh viên đã được phân công GVHD trong đợt đồ án chưa
+        if (supervisorAssignmentRepository != null) {
+            java.util.Optional<com.example.thesis_hub_api.assignment.entity.SupervisorAssignment> assignOpt =
+                    supervisorAssignmentRepository.findByStudentIdAndProjectRoundId(student.getId(), request.getProjectRoundId());
+            if (assignOpt.isEmpty() || assignOpt.get().getLecturerId() == null) {
+                throw new AppException(ErrorCode.VALIDATION_FAILED, "Sinh viên chưa được phân công giảng viên hướng dẫn trong đợt đồ án này nên không thể tạo đề cương.");
+            }
+        }
+
+        Lecturer lecturer = null;
+        if (request.getLecturerId() != null) {
+            lecturer = lecturerRepository.findById(request.getLecturerId())
+                    .orElseGet(() -> lecturerRepository.findByUserId(request.getLecturerId())
+                            .orElseGet(() -> lecturerRepository.findByLecturerCode(String.valueOf(request.getLecturerId()))
+                                    .orElse(null)));
+        }
+        if (lecturer == null) {
+            throw new ResourceNotFoundException("Lecturer", request.getLecturerId());
+        }
+
+        java.util.Optional<Proposal> existingOpt = proposalRepository.findByStudentIdAndProjectRoundId(student.getId(), request.getProjectRoundId());
         if (existingOpt.isPresent()) {
             Proposal existing = existingOpt.get();
             if ("DRAFT".equals(existing.getStatus()) || "REVISE_REQUIRED".equals(existing.getStatus())) {
-                Lecturer lecturer = lecturerRepository.findById(request.getLecturerId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Lecturer", request.getLecturerId()));
                 existing.setLecturer(lecturer);
                 existing.setTitleVn(request.getTitleVn());
                 if (request.getTitleEn() != null) existing.setTitleEn(request.getTitleEn());
@@ -74,12 +105,6 @@ public class ProposalServiceImpl implements ProposalService {
             }
             throw new DuplicateResourceException("Sinh viên đã có đề cương trong đợt đồ án này (trạng thái: " + existing.getStatus() + ")");
         }
-
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Student", request.getStudentId()));
-
-        Lecturer lecturer = lecturerRepository.findById(request.getLecturerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Lecturer", request.getLecturerId()));
 
         Proposal proposal = Proposal.builder()
                 .projectRound(round)
@@ -200,17 +225,22 @@ public class ProposalServiceImpl implements ProposalService {
                         java.util.List<ReviewGroup> groups = reviewGroupRepository.findByProjectRoundId(proposal.getProjectRound().getId());
                         if (!groups.isEmpty()) {
                             rg = groups.get(0);
+                        } else {
+                            rg = reviewGroupRepository.save(ReviewGroup.builder()
+                                    .projectRound(proposal.getProjectRound())
+                                    .code("RG_" + proposal.getProjectRound().getRoundCode() + "_" + System.currentTimeMillis() % 10000)
+                                    .name("Tiểu ban Xét duyệt Đề cương - " + proposal.getProjectRound().getName())
+                                    .description("Tiểu ban xét duyệt đề cương đợt đồ án")
+                                    .status("ACTIVE")
+                                    .build());
                         }
                     }
-                    if (rg != null) {
-                        return reviewAssignmentRepository.save(ProposalReviewAssignment.builder()
-                                .proposal(proposal)
-                                .reviewGroup(rg)
-                                .assignedAt(Instant.now())
-                                .status("PENDING")
-                                .build());
-                    }
-                    throw new ResourceNotFoundException("Phân công xét duyệt đề cương không tồn tại");
+                    return reviewAssignmentRepository.save(ProposalReviewAssignment.builder()
+                            .proposal(proposal)
+                            .reviewGroup(rg)
+                            .assignedAt(Instant.now())
+                            .status("PENDING")
+                            .build());
                 });
 
         assignment.setStatus(request.getStatus());
@@ -275,10 +305,16 @@ public class ProposalServiceImpl implements ProposalService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, String status, String search, Pageable pageable) {
+        return searchProposals(roundId, lecturerId, null, status, search, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, Long studentId, String status, String search, Pageable pageable) {
         String searchPattern = (search != null && !search.trim().isEmpty())
                 ? "%" + search.trim().toLowerCase() + "%"
                 : null;
-        return proposalRepository.searchProposals(roundId, lecturerId, status, searchPattern, pageable)
+        return proposalRepository.searchProposals(roundId, lecturerId, studentId, status, searchPattern, pageable)
                 .map(this::mapToResponse);
     }
 

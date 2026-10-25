@@ -20,6 +20,7 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
     Page<Lecturer> findByAcademicDegree(String academicDegree, Pageable pageable);
 
     @Query("SELECT l FROM Lecturer l JOIN l.user u WHERE " +
+           "(:projectRoundId IS NULL OR l.id IN (SELECT lc.lecturerId FROM LecturerCapacity lc WHERE lc.projectRoundId = :projectRoundId)) AND " +
            "(:departmentId IS NULL OR l.departmentId = :departmentId) AND " +
            "(:degree IS NULL OR l.academicDegree = :degree) AND " +
            "(:search IS NULL OR " +
@@ -30,9 +31,15 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
     List<Lecturer> findLecturersFiltered(
             @Param("departmentId") Long departmentId,
             @Param("degree") String degree,
-            @Param("search") String search);
+            @Param("search") String search,
+            @Param("projectRoundId") Long projectRoundId);
+
+    default List<Lecturer> findLecturersFiltered(Long departmentId, String degree, String search) {
+        return findLecturersFiltered(departmentId, degree, search, null);
+    }
 
     @Query("SELECT l FROM Lecturer l JOIN l.user u WHERE " +
+           "(:projectRoundId IS NULL OR l.id IN (SELECT lc.lecturerId FROM LecturerCapacity lc WHERE lc.projectRoundId = :projectRoundId)) AND " +
            "(:departmentId IS NULL OR l.departmentId = :departmentId) AND " +
            "(:degree IS NULL OR l.academicDegree = :degree) AND " +
            "(:search IS NULL OR " +
@@ -44,5 +51,10 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
             @Param("departmentId") Long departmentId,
             @Param("degree") String degree,
             @Param("search") String search,
+            @Param("projectRoundId") Long projectRoundId,
             Pageable pageable);
+
+    default Page<Lecturer> searchLecturers(Long departmentId, String degree, String search, Pageable pageable) {
+        return searchLecturers(departmentId, degree, search, null, pageable);
+    }
 }

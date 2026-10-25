@@ -214,12 +214,12 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Phase 5: Thesis Execution (Tasks, Deadlines, Submissions, Reviews) */}
+      {/* Phase 4: Thesis Execution (Tasks, Deadlines, Submissions, Reviews) */}
       <Route
         path="/progress/tasks"
         element={
           <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor', 'committee_member']}>
-            <LayoutPageWrapper activeTab="tasks" pageTitle="Giai đoạn 5: Thực hiện Đồ án — Giao Task, Nộp bài & Đánh giá">
+            <LayoutPageWrapper activeTab="tasks" pageTitle="Giai đoạn 4: Thực hiện Đồ án — Giao Task, Nộp bài & Đánh giá">
               <TaskBoardPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
@@ -229,19 +229,19 @@ const AppRoutes: React.FC = () => {
         path="/progress/reports"
         element={
           <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor', 'committee_member']}>
-            <LayoutPageWrapper activeTab="reports" pageTitle="Giai đoạn 5: Báo cáo Tiến độ Định kỳ">
+            <LayoutPageWrapper activeTab="reports" pageTitle="Giai đoạn 4: Báo cáo Tiến độ Định kỳ">
               <ProgressReportPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
         }
       />
 
-      {/* Phase 6: Final Defense Eligibility, Reservation, Councils (1CT-2TK-2UV), Schedule, Scoring & PDF Minutes */}
+      {/* Phase 5: Final Defense Eligibility, Reservation, Councils (1CT-2TK-2UV), Schedule, Scoring & PDF Minutes */}
       <Route
         path="/admin/final-eligibility"
         element={
           <ProtectedRoute allowedTypes={['admin', 'supervisor', 'committee_member']}>
-            <LayoutPageWrapper activeTab="final-eligibility" pageTitle="Giai đoạn 6: Kiểm tra Điều kiện Học vụ & Bảo vệ Cuối kỳ">
+            <LayoutPageWrapper activeTab="final-eligibility" pageTitle="Giai đoạn 5: Kiểm tra Điều kiện Học vụ & Bảo vệ Cuối kỳ">
               <FinalDefenseEligibilityPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
@@ -251,7 +251,7 @@ const AppRoutes: React.FC = () => {
         path="/admin/reservations"
         element={
           <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor']}>
-            <LayoutPageWrapper activeTab="reservations" pageTitle="Giai đoạn 6 (Nhánh Bảo lưu): Quản lý & Duyệt Đơn Bảo lưu Đồ án">
+            <LayoutPageWrapper activeTab="reservations" pageTitle="Giai đoạn 5 (Nhánh Bảo lưu): Quản lý & Duyệt Đơn Bảo lưu Đồ án">
               <ReservationManagementPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
@@ -271,7 +271,7 @@ const AppRoutes: React.FC = () => {
         path="/admin/councils"
         element={
           <ProtectedRoute allowedTypes={['admin', 'committee_member', 'supervisor']}>
-            <LayoutPageWrapper activeTab="councils" pageTitle="Giai đoạn 6: Thành lập Hội đồng (1CT-2TK-2UV) & Phân công Phản biện">
+            <LayoutPageWrapper activeTab="councils" pageTitle="Giai đoạn 5: Thành lập Hội đồng (1CT-2TK-2UV) & Phân công Phản biện">
               <CouncilManagementPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
@@ -281,7 +281,7 @@ const AppRoutes: React.FC = () => {
         path="/admin/defense-schedules"
         element={
           <ProtectedRoute allowedTypes={['admin', 'committee_member', 'supervisor', 'student']}>
-            <LayoutPageWrapper activeTab="defense-schedules" pageTitle="Giai đoạn 6: Xếp lịch Bảo vệ Đồ án Tốt nghiệp">
+            <LayoutPageWrapper activeTab="defense-schedules" pageTitle="Giai đoạn 5: Xếp lịch Bảo vệ Đồ án Tốt nghiệp">
               <DefenseSchedulePage />
             </LayoutPageWrapper>
           </ProtectedRoute>
@@ -291,7 +291,7 @@ const AppRoutes: React.FC = () => {
         path="/admin/defense-scoring"
         element={
           <ProtectedRoute allowedTypes={['admin', 'committee_member', 'supervisor']}>
-            <LayoutPageWrapper activeTab="defense-scoring" pageTitle="Giai đoạn 6: Chấm điểm, Tổng hợp, Xuất Biên bản PDF & Dữ liệu Cuối kỳ">
+            <LayoutPageWrapper activeTab="defense-scoring" pageTitle="Giai đoạn 5: Chấm điểm, Tổng hợp, Xuất Biên bản PDF & Dữ liệu Cuối kỳ">
               <DefenseScoringPage />
             </LayoutPageWrapper>
           </ProtectedRoute>

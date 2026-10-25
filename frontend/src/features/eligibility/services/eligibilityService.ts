@@ -155,10 +155,10 @@ let mockReservations: ReservationRequestItem[] = [
 ];
 
 class EligibilityService {
-  async getAllStudentsEligibility(projectRoundId: number = 10): Promise<EligibilityCheckResponse[]> {
+  async getAllStudentsEligibility(projectRoundId?: number): Promise<EligibilityCheckResponse[]> {
     try {
       const res = await axios.get<ApiResponse<any[]>>(`${API_BASE}/students`, {
-        params: { projectRoundId },
+        params: projectRoundId ? { projectRoundId } : {},
         headers: authHeaders(),
       });
       if (res.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
@@ -167,7 +167,8 @@ class EligibilityService {
     } catch {
       // Fallback mock
     }
-    return mockStudents.filter((s) => !projectRoundId || s.projectRoundId === projectRoundId || projectRoundId !== 10);
+    const filtered = mockStudents.filter((s) => !projectRoundId || s.projectRoundId === projectRoundId);
+    return filtered.length > 0 ? filtered : mockStudents;
   }
 
   async checkThesisEligibility(studentId: number, projectRoundId?: number): Promise<EligibilityCheckResponse> {
@@ -197,12 +198,18 @@ class EligibilityService {
 
   async forceApprove(request: ForceApproveRequest): Promise<EligibilityCheckResponse> {
     try {
-      const res = await axios.post<ApiResponse<any>>(`${API_BASE}/force-approve`, request, {
+      const payload: any = {
+        studentId: request.studentId,
+        projectRoundId: request.projectRoundId,
+        reason: request.approvedBy ? `[${request.approvedBy}] ${request.reason}` : request.reason,
+        approvedBy: !isNaN(Number(request.approvedBy)) ? Number(request.approvedBy) : 1,
+      };
+      const res = await axios.post<ApiResponse<any>>(`${API_BASE}/force-approve`, payload, {
         headers: authHeaders(),
       });
       if (res.data && res.data.data) return normalizeEligibility(res.data.data);
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error('Error calling force-approve API:', err);
     }
     const idx = mockStudents.findIndex((s) => s.studentId === request.studentId);
     if (idx !== -1) {
@@ -221,12 +228,18 @@ class EligibilityService {
 
   async disqualify(request: DisqualifyRequest): Promise<EligibilityCheckResponse> {
     try {
-      const res = await axios.post<ApiResponse<any>>(`${API_BASE}/disqualify`, request, {
+      const payload: any = {
+        studentId: request.studentId,
+        projectRoundId: request.projectRoundId,
+        reason: request.disqualifiedBy ? `[${request.disqualifiedBy}] ${request.reason}` : request.reason,
+        disqualifiedBy: !isNaN(Number(request.disqualifiedBy)) ? Number(request.disqualifiedBy) : 1,
+      };
+      const res = await axios.post<ApiResponse<any>>(`${API_BASE}/disqualify`, payload, {
         headers: authHeaders(),
       });
       if (res.data && res.data.data) return normalizeEligibility(res.data.data);
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error('Error calling disqualify API:', err);
     }
     const idx = mockStudents.findIndex((s) => s.studentId === request.studentId);
     if (idx !== -1) {

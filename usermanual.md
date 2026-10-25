@@ -31,22 +31,31 @@ Chương trình: Chương trình Kỹ sư (hoặc Chương trình Cử nhân)
 Bấm "Lưu đợt đồ án". Bấm nút "Mở đợt (OPEN)" trên thanh trạng thái.
 Import danh sách sinh viên qua Excel:
 Chọn đợt đồ án vừa tạo, tại tab "Danh sách sinh viên & Import Excel", bấm nút "📥 Tải file mẫu Excel UTC".
-Mở file vừa tải về, kiểm tra các cột STT, MSSV, Họ đệm, Tên, Ngành, Lớp, SĐT, Email.
+Mở file vừa tải về, kiểm tra các cột STT, MSSV, Họ đệm, Tên, Ngành, Lớp, SĐT, Email, Điểm GPA (Hệ 4.0).
 Bấm "📤 Import danh sách sinh viên", chọn file Excel, bấm "Phân tích trước (Preview)".
-Xem bảng xem trước: Các dòng hợp lệ có tích xanh Hợp lệ.
+Xem bảng xem trước: Cột GPA và các dòng hợp lệ có tích xanh Hợp lệ.
 Bấm "Xác nhận ghi dữ liệu (Commit Import)".
-Kết quả mong đợi: Hệ thống báo thành công tạo mới User, Sinh viên và ghi danh vào đợt với trạng thái ELIGIBLE.
+Kết quả mong đợi: Hệ thống tạo User, Sinh viên với điểm GPA chính thức và ghi danh vào đợt. Bảng sinh viên hiển thị cột GPA (thay thế cho Nợ TC). Khi thêm SV thủ công, form có ô nhập "Điểm GPA tích lũy".
+Quản lý Giảng viên trong đợt đồ án:
+Tại trang "Đợt đồ án & SV" (/admin/project-rounds), chuyển sang tab "👨‍🏫 Giảng viên trong đợt".
+Xem thẻ thống kê: Tổng số GV tham gia đợt, Tổng chỉ tiêu (Quota), Đã phân công, Chỉ tiêu còn lại.
+Bấm nút "➕ Thêm Giảng viên vào đợt" để đưa thêm GV từ danh mục vào đợt đồ án.
+Có thể điều chỉnh hạn mức hướng dẫn (maxQuota), ghi chú hoặc xóa GV khỏi đợt (nếu chưa có SV được phân công).
+Tra cứu theo đợt tại Dữ liệu Tổ chức (Giai đoạn 1):
+Tại menu "Dữ liệu Tổ chức & GV/SV" (/admin/organization):
+Tab Giảng viên: Có thêm bộ lọc "Tất cả đợt đồ án" và cột "Đợt đồ án tham gia" hiển thị huy hiệu các đợt GV đang phụ trách.
+Tab Sinh viên: Có thêm bộ lọc "Tất cả đợt đồ án" và cột "Đợt đồ án" hiển thị huy hiệu đợt đồ án SV đã được ghi danh.
 BƯỚC 2: Sinh viên đăng ký nguyện vọng & Khoa phân công (Giai đoạn 2)
 Sinh viên đăng nhập & Đăng ký nguyện vọng:
 Đăng xuất Admin, đăng nhập bằng tài khoản Sinh viên Kỹ sư (VD: 2021600001 / Password@123).
 Trên Sidebar, bấm vào "🎯 Đăng ký hướng & Nguyện vọng" (/student/assignment).
-Bước 1: Chọn Hướng đồ án: Công nghệ phần mềm & Web nâng cao.
-Bước 2: Danh sách Giảng viên hiển thị tương ứng theo hướng.
+Bước 1: Chọn Hướng đồ án từ danh sách 7 hướng chính thức: Phát triển phần mềm và ứng dụng (webApp, MobileApp).
+Bước 2: Điểm GPA của sinh viên được hiển thị và khóa cứng tự động (🔒 Đã khóa cứng theo hồ sơ đợt đồ án) nhằm không cho sinh viên tự ý sửa sai GPA.
 Thử nghiệm nhánh kiểm tra học vị Kỹ sư:
 Chọn NV1 là một Giảng viên có học vị Thạc sĩ (ThS. Pham Van Dong).
 Bấm nộp -> Hệ thống hiển thị cảnh báo đỏ: "Quy định đối với sinh viên chương trình Kỹ sư: Giảng viên hướng dẫn phải có học vị Tiến sĩ trở lên. Vui lòng chọn lại!"
 Đổi NV1 sang Giảng viên học vị Tiến sĩ (TS. Nguyen Van Huong).
-Chọn NV2, NV3, nhập GPA: 3.45, tiêu chí phụ.
+Chọn NV2, NV3, nhập tiêu chí phụ.
 Bấm "Xác nhận nộp nguyện vọng" -> Báo thành công.
 Khoa chạy thuật toán phân công tự động:
 Đăng nhập lại tài khoản admin.
@@ -57,9 +66,14 @@ Danh sách phân công đề xuất hiển thị trên bảng AssignmentProposal
 Khoa xem xét & Điều chỉnh (Override):
 Nếu muốn đổi GVHD cho 1 SV, bấm nút "Override" trên dòng tương ứng, chọn GV mới và nhập lý do.
 Bấm "Xác nhận điều chỉnh" -> Hệ thống cập nhật phân công thủ công.
-Khoa chốt kết quả phân công:
+Khoa chốt kết quả phân công & Tự động loại sinh viên chưa đăng ký:
 Bấm nút "🔒 Chốt kết quả phân công (Finalize)".
-Trạng thái các phân công chuyển sang FINALIZED. Sinh viên đăng nhập vào sẽ thấy banner chúc mừng kèm tên GVHD chính thức.
+Hộp thoại xác nhận hiển thị thông báo quy định: "Những sinh viên chưa đăng ký nguyện vọng đồ án trong đợt này sẽ tự động bị LOẠI KHỎI ĐỢT theo quy định".
+Sau khi bấm xác nhận:
+Trạng thái các phân công chuyển sang FINALIZED.
+Hệ thống tự động quét toàn bộ sinh viên trong đợt chưa nộp đăng ký hướng / nguyện vọng, cập nhật trạng thái DROPPED (Bị loại khỏi đợt) kèm lý do rõ ràng.
+Thẻ thống kê phân công hiển thị số lượng SV bị loại: "🚫 Loại X SV".
+Sinh viên đã được phân công đăng nhập vào sẽ thấy banner chúc mừng kèm tên GVHD chính thức.
 BƯỚC 3: Xây dựng & Phê duyệt đề tài (Giai đoạn 3)
 Tạo và gửi đề cương (Draft):
 Sinh viên vào mục "📑 Đề cương đồ án" (/thesis/proposals), bấm "Tạo đề cương mới".
@@ -72,17 +86,10 @@ Khoa duyệt đề tài:
 Hệ thống tự động tạo thực thể Đề tài chính thức (Thesis) trong CSDL với mã DT_DA_CNTT_K62_HK1_... và trạng thái IN_PROGRESS.
 Xuất đề cương PDF:
 Bấm nút "Xuất file Đề cương (PDF)" để in/tải file đề cương có chữ ký sinh viên và xác nhận của Khoa.
-BƯỚC 4: Xét duyệt điều kiện làm đồ án (Giai đoạn 4)
-Khoa nạp kết quả học vụ xét điều kiện:
-Tại trang Đợt đồ án (/admin/project-rounds), tab "Kết quả học vụ xét điều kiện", nạp dữ liệu tín chỉ tích lũy, GPA, nợ học phí, môn tiên quyết.
-Kiểm tra và xử lý đặc cách (Force Approve / Loại):
-Vào menu "⚖️ Xét điều kiện & Bảo lưu" (/admin/eligibility).
-Hệ thống liệt kê sinh viên đủ điều kiện (ELIGIBLE) và chưa đủ điều kiện (INELIGIBLE).
-Đối với SV thiếu 1-2 tín chỉ: Khoa bấm "Force Approve", nhập lý do miễn giảm -> SV được chuyển sang ELIGIBLE.
-Đối với SV không đạt: Bấm "Loại khỏi đợt" -> Chuyển sang DROPPED.
-BƯỚC 5: Thực hiện đồ án & Quản lý tiến độ (Giai đoạn 5)
+BƯỚC 4: Thực hiện đồ án & Quản lý tiến độ (Giai đoạn 4)
 Giao Task và hạn nộp (Deadline):
 Vào mục "📌 Bảng tiến độ & Task" (/progress/tasks).
+Tại thanh điều khiển trên cùng, hệ thống tách riêng 2 bộ chọn: chọn "📁 Đợt đồ án" để lọc danh sách đề tài theo từng đợt, sau đó chọn "🎯 Tên đề tài" cần theo dõi/giao việc.
 GVHD tạo các Task: "Thiết kế Database", "Viết API Backend", "Xây dựng giao diện React".
 Đặt mức độ ưu tiên, deadline và gán cho SV.
 Sinh viên nộp bài (Submission):
@@ -93,9 +100,14 @@ Nếu chưa đạt: Chọn REVISE_REQUIRED, nhập nhận xét sửa chữa -> T
 Nếu đạt: Chọn ACCEPTED -> Task chuyển sang COMPLETED, thanh tiến độ đề tài tăng lên.
 Xác nhận đủ điều kiện bảo vệ:
 Khi hoàn thành các mốc quan trọng, GVHD xác nhận đề tài đạt yêu cầu bảo vệ -> Cập nhật trạng thái DEFENSE_READY.
-BƯỚC 6: Hội đồng, Lịch bảo vệ, Chấm điểm & Kết thúc (Giai đoạn 6)
-Xét điều kiện bảo vệ cuối kỳ & Xử lý bảo lưu:
-Vào trang "Xét điều kiện bảo vệ cuối" (/admin/eligibility): Hệ thống kiểm tra tiến độ đề tài và xác nhận của GVHD.
+BƯỚC 5: Xét ĐK bảo vệ cuối kỳ, Học vụ, Hội đồng, Lịch bảo vệ, Chấm điểm & Kết thúc (Giai đoạn 5)
+Quản lý học vụ & Xét điều kiện bảo vệ cuối kỳ:
+Vào trang "G05: Xét ĐK Bảo vệ Cuối" (/admin/final-eligibility).
+Tại thanh lọc phía trên, chọn "Đợt đồ án" cần xét duyệt.
+Trang bao gồm 3 tab chức năng:
+- Tab 1 "Xét điều kiện bảo vệ cuối kỳ": Nhập Mã đề tài hoặc Mã SV để kiểm tra tự động điều kiện hoàn thành task, xác nhận của GVHD và học vụ.
+- Tab 2 "Sinh viên trong đợt": Xem danh sách toàn bộ SV ghi danh kèm điểm GPA chính thức, trạng thái và nút "🔍 Xét ĐK bảo vệ" trực tiếp.
+- Tab 3 "Quản lý kết quả học vụ": Tải Excel mẫu học vụ, Thêm học vụ thủ công hoặc Import học vụ (Excel Contract 4) nạp tín chỉ tích lũy, môn tiên quyết, tình trạng học phí.
 Thử nghiệm nhánh Bảo lưu:
 SV có lý do cá nhân nộp đơn bảo lưu tại /student/reservation.
 Khoa vào /admin/reservations, bấm "Phê duyệt đơn bảo lưu".

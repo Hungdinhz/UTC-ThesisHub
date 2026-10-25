@@ -16,6 +16,7 @@ import com.example.thesis_hub_api.organization.repository.TrainingProgramReposit
 import com.example.thesis_hub_api.projectround.dto.request.CreateRoundStudentManualDTO;
 import com.example.thesis_hub_api.projectround.dto.request.StudentImportCommitRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.request.UpdateStudentRoundStatusRequestDTO;
+import com.example.thesis_hub_api.projectround.dto.response.StudentEligibilityCheckResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreviewResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportResultResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportRowDTO;
@@ -64,6 +65,118 @@ public class StudentProjectRoundService {
     }
 
     /**
+     * Kiểm tra tính hợp lệ khi sinh viên tham gia đợt đồ án mới:
+     * - Kiểm tra trùng lặp trong đợt hiện tại.
+     * - Không chấp nhận sinh viên đang trong đợt đồ án khác chưa kết thúc.
+     * - Không chấp nhận sinh viên đã hoàn thành và bảo vệ đồ án ở đợt trước.
+     */
+    private Optional<String> validateStudentRoundEligibility(Student student, ProjectRound targetRound) {
+        if (student == null || student.getId() == null) {
+            return Optional.empty();
+        }
+
+        if (studentProjectRoundRepository.existsByStudentIdAndProjectRoundId(student.getId(), targetRound.getId())) {
+            return Optional.of("Sinh viên (MSSV: " + student.getStudentCode() + ") đã có trong đợt đồ án này.");
+        }
+
+        List<StudentProjectRound> prevRounds = studentProjectRoundRepository.findByStudentId(student.getId());
+        for (StudentProjectRound prev : prevRounds) {
+            if (prev.getProjectRound() != null && !prev.getProjectRound().getId().equals(targetRound.getId())) {
+                String prevStatus = prev.getStatus() != null ? prev.getStatus().toUpperCase() : "";
+                String roundStatus = prev.getProjectRound().getStatus() != null ? prev.getProjectRound().getStatus().toUpperCase() : "";
+
+                // Đã bảo vệ thành công hoặc đã tốt nghiệp đợt trước -> Không được đăng ký đợt mới
+                if ("DEFENDED".equals(prevStatus)) {
+                    return Optional.of("Sinh viên (MSSV: " + student.getStudentCode() + ") đã hoàn thành và bảo vệ đồ án ở đợt trước (" + prev.getProjectRound().getName() + "), không thuộc diện đăng ký lại.");
+                }
+
+                // Không chấp nhận sinh viên đang trong đợt đồ án khác chưa kết thúc
+                // Một đợt được coi là chưa kết thúc nếu trạng thái không phải CLOSED và ARCHIVED
+                // Và trạng thái sinh viên không phải đã bị loại/trượt/bảo lưu
+                boolean isTerminatedInPrev = "DROPPED".equals(prevStatus) || "RESERVED".equals(prevStatus) || "FAILED".equals(prevStatus) || "CANCELLED".equals(prevStatus);
+                boolean isRoundClosed = "CLOSED".equals(roundStatus) || "ARCHIVED".equals(roundStatus);
+
+                if (!isRoundClosed && !isTerminatedInPrev) {
+                    String otherRoundName = prev.getProjectRound().getName() != null ? prev.getProjectRound().getName() : prev.getProjectRound().getRoundCode();
+                    return Optional.of("Sinh viên (MSSV: " + student.getStudentCode() + ") đang trong đợt đồ án khác chưa kết thúc: [" + otherRoundName + "]. Mỗi sinh viên chỉ được tham gia 1 đợt đồ án tại một thời điểm.");
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Kiểm tra tính hợp lệ và trùng lặp thời gian thực khi nhập MSSV:
+     * - Trùng lặp trong đợt hiện tại
+     * - Đang tham gia đợt đồ án khác chưa kết thúc
+     * - Đã tốt nghiệp / bảo vệ đợt trước
+     * - Trả về thông tin sinh viên có sẵn (Họ tên, lớp, ngành, email, phone) để tự động điền form
+     */
+    @Transactional(readOnly = true)
+    public StudentEligibilityCheckResponseDTO checkStudentEligibilityForRound(Long roundId, String studentCode) {
+        if (!StringUtils.hasText(studentCode)) {
+            return StudentEligibilityCheckResponseDTO.builder()
+                    .studentCode(studentCode)
+                    .eligible(false)
+                    .message("Mã sinh viên không được để trống")
+                    .build();
+        }
+
+        String cleanCode = studentCode.trim();
+        ProjectRound round = getAndValidateActiveRound(roundId);
+
+        Student student = studentRepository.findByStudentCode(cleanCode).orElse(null);
+        if (student == null) {
+            return StudentEligibilityCheckResponseDTO.builder()
+                    .studentCode(cleanCode)
+                    .eligible(true)
+                    .existsInSystem(false)
+                    .message("Mã sinh viên hợp lệ (sinh viên mới, chưa có hồ sơ trong hệ thống)")
+                    .build();
+        }
+
+        Optional<String> eligibilityError = validateStudentRoundEligibility(student, round);
+        User user = student.getUser();
+        String fullName = (user != null && StringUtils.hasText(user.getFullName())) ? user.getFullName() : "";
+        String email = (user != null && StringUtils.hasText(user.getEmail())) ? user.getEmail() : (cleanCode.toLowerCase() + "@lms.utc.edu.vn");
+        String phone = (user != null && StringUtils.hasText(user.getPhone())) ? user.getPhone() : "";
+        String majorName = "";
+        if (student.getMajorId() != null) {
+            majorName = majorRepository.findById(student.getMajorId()).map(Major::getName).orElse("");
+        }
+
+        if (eligibilityError.isPresent()) {
+            return StudentEligibilityCheckResponseDTO.builder()
+                    .studentCode(cleanCode)
+                    .eligible(false)
+                    .existsInSystem(true)
+                    .message(eligibilityError.get())
+                    .studentId(student.getId())
+                    .fullName(fullName)
+                    .className(student.getClassName())
+                    .majorId(student.getMajorId())
+                    .majorName(majorName)
+                    .email(email)
+                    .phone(phone)
+                    .build();
+        }
+
+        return StudentEligibilityCheckResponseDTO.builder()
+                .studentCode(cleanCode)
+                .eligible(true)
+                .existsInSystem(true)
+                .message("Sinh viên hợp lệ và đủ điều kiện tham gia đợt")
+                .studentId(student.getId())
+                .fullName(fullName)
+                .className(student.getClassName())
+                .majorId(student.getMajorId())
+                .majorName(majorName)
+                .email(email)
+                .phone(phone)
+                .build();
+    }
+
+    /**
      * Xem trước kết quả phân tích file Excel import sinh viên vào đợt đồ án
      */
     @Transactional(readOnly = true)
@@ -106,12 +219,10 @@ public class StudentProjectRoundService {
                 }
             }
 
-            // Kiểm tra xem sinh viên đã tham gia đợt này chưa
+            // Kiểm tra xem sinh viên đã tham gia đợt này chưa & điều kiện tham gia đợt mới (trượt ở trước mới được đăng ký)
             if (StringUtils.hasText(row.getStudentCode())) {
-                studentRepository.findByStudentCode(row.getStudentCode()).ifPresent(student -> {
-                    if (studentProjectRoundRepository.existsByStudentIdAndProjectRoundId(student.getId(), round.getId())) {
-                        errors.add("Sinh viên đã có trong đợt đồ án này");
-                    }
+                studentRepository.findByStudentCode(row.getStudentCode().trim()).ifPresent(student -> {
+                    validateStudentRoundEligibility(student, round).ifPresent(errors::add);
                 });
             }
 
@@ -228,6 +339,7 @@ public class StudentProjectRoundService {
                         .majorId(major != null ? major.getId() : null)
                         .trainingProgramId(roundTrainingProgramId)
                         .debtCredits(0)
+                        .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
                         .build();
                 student = studentRepository.save(student);
                 newStudentsCreated++;
@@ -241,10 +353,19 @@ public class StudentProjectRoundService {
                 if (student.getTrainingProgramId() == null) {
                     student.setTrainingProgramId(roundTrainingProgramId);
                 }
+                if (row.getGpa() != null) {
+                    student.setGpa(row.getGpa());
+                }
                 student = studentRepository.save(student);
             }
 
-            // 3. Ghi danh vào StudentProjectRound
+            // 3. Ghi danh vào StudentProjectRound nếu đủ điều kiện
+            Optional<String> eligibilityErr = validateStudentRoundEligibility(student, round);
+            if (eligibilityErr.isPresent()) {
+                skipped++;
+                continue;
+            }
+
             Optional<StudentProjectRound> existingSpr = studentProjectRoundRepository
                     .findByStudentIdAndProjectRoundId(student.getId(), round.getId());
 
@@ -253,11 +374,16 @@ public class StudentProjectRoundService {
                         .student(student)
                         .projectRound(round)
                         .status("ELIGIBLE")
+                        .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
                         .note("Import từ file Excel")
                         .build();
                 studentProjectRoundRepository.save(spr);
                 enrolledInRound++;
             } else {
+                if (row.getGpa() != null) {
+                    existingSpr.get().setGpa(row.getGpa());
+                    studentProjectRoundRepository.save(existingSpr.get());
+                }
                 // Đã có trong đợt, bỏ qua không ghi đè
                 skipped++;
             }
@@ -285,6 +411,15 @@ public class StudentProjectRoundService {
         String email = StringUtils.hasText(dto.getEmail())
                 ? dto.getEmail().trim()
                 : studentCode.toLowerCase() + "@lms.utc.edu.vn";
+
+        // Kiểm tra trùng lặp và tính hợp lệ trước khi thao tác CSDL nếu sinh viên đã tồn tại
+        Student existingCheckStudent = studentRepository.findByStudentCode(studentCode).orElse(null);
+        if (existingCheckStudent != null) {
+            Optional<String> eligibilityError = validateStudentRoundEligibility(existingCheckStudent, round);
+            if (eligibilityError.isPresent()) {
+                throw new AppException(ErrorCode.VALIDATION_FAILED, eligibilityError.get());
+            }
+        }
 
         Role studentRole = roleRepository.findByName("ROLE_STUDENT")
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
@@ -316,6 +451,7 @@ public class StudentProjectRoundService {
 
         // 2. Student
         Long roundTrainingProgramId = round.getTrainingProgram() != null ? round.getTrainingProgram().getId() : null;
+        Double manualGpa = dto.getGpa() != null ? dto.getGpa() : 3.20;
         Student student = studentRepository.findByStudentCode(studentCode).orElse(null);
         if (student == null) {
             student = Student.builder()
@@ -325,6 +461,7 @@ public class StudentProjectRoundService {
                     .majorId(dto.getMajorId())
                     .trainingProgramId(roundTrainingProgramId)
                     .debtCredits(0)
+                    .gpa(manualGpa)
                     .build();
             student = studentRepository.save(student);
         } else {
@@ -337,7 +474,14 @@ public class StudentProjectRoundService {
             if (student.getTrainingProgramId() == null) {
                 student.setTrainingProgramId(roundTrainingProgramId);
             }
+            student.setGpa(manualGpa);
             student = studentRepository.save(student);
+        }
+
+        // Kiểm tra điều kiện tham gia đợt (chỉ sinh viên chưa đạt/trượt ở đợt trước mới được đăng ký đợt sau)
+        Optional<String> eligibilityError = validateStudentRoundEligibility(student, round);
+        if (eligibilityError.isPresent()) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, eligibilityError.get());
         }
 
         // 3. StudentProjectRound
@@ -352,10 +496,12 @@ public class StudentProjectRoundService {
                     .student(student)
                     .projectRound(round)
                     .status(initialStatus)
+                    .gpa(manualGpa)
                     .note(dto.getNote() != null ? dto.getNote().trim() : "Thêm thủ công")
                     .build();
         } else {
             spr.setStatus(initialStatus);
+            spr.setGpa(manualGpa);
             if (dto.getNote() != null) {
                 spr.setNote(dto.getNote().trim());
             }
@@ -511,6 +657,7 @@ public class StudentProjectRoundService {
                 .trainingProgram(tp != null ? tp.getName() : null)
                 .status(spr.getStatus())
                 .debtCredits(student != null ? student.getDebtCredits() : 0)
+                .gpa(spr.getGpa() != null ? spr.getGpa() : (student != null && student.getGpa() != null ? student.getGpa() : 3.20))
                 .note(spr.getNote())
                 .enrolledAt(spr.getCreatedAt())
                 .build();

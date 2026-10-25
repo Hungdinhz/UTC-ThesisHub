@@ -51,10 +51,12 @@ import type {
   StudentImportResultResponse,
   StudentProjectRoundItem,
   CreateRoundStudentManualPayload,
+  StudentEligibilityCheckResponse,
   AcademicRecordImportPreviewResponse,
   AcademicRecordImportCommitPayload,
   AcademicRecordImportResultResponse,
   AcademicRecordItem,
+  CreateAcademicRecordManualPayload,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
@@ -1027,7 +1029,7 @@ class ApiService {
     await this.api.delete(ORGANIZATION.student(id));
   }
 
-  async getLecturers(params?: { departmentId?: number; degree?: string; search?: string }): Promise<LecturerItem[]> {
+  async getLecturers(params?: { departmentId?: number; degree?: string; search?: string; projectRoundId?: number }): Promise<LecturerItem[]> {
     const response = await this.api.get<LecturerItem[]>(ORGANIZATION.LECTURERS, { params });
     return response.data;
   }
@@ -1037,6 +1039,7 @@ class ApiService {
     programId?: number;
     className?: string;
     search?: string;
+    projectRoundId?: number;
     page?: number;
     size?: number;
   }): Promise<OrganizationPageResponse<StudentItem>> {
@@ -1160,6 +1163,19 @@ class ApiService {
     return response.data;
   }
 
+  async checkStudentEligibility(
+    roundId: number,
+    studentCode: string
+  ): Promise<StudentEligibilityCheckResponse> {
+    const response = await this.api.get<StudentEligibilityCheckResponse>(
+      PROJECT_ROUNDS.studentCheckEligibility(roundId),
+      {
+        params: { studentCode },
+      }
+    );
+    return response.data;
+  }
+
   // ─── Academic Records APIs (Phase 4 Ingestion & Contract 4) ─────
   async downloadAcademicTemplate(): Promise<Blob> {
     const response = await this.api.get(ACADEMIC_RECORDS.TEMPLATE, {
@@ -1211,6 +1227,17 @@ class ApiService {
   async getStudentAcademicRecord(roundId: number, studentId: number): Promise<AcademicRecordItem> {
     const response = await this.api.get<AcademicRecordItem>(
       ACADEMIC_RECORDS.studentInRound(roundId, studentId)
+    );
+    return response.data;
+  }
+
+  async saveManualAcademicRecord(
+    roundId: number,
+    payload: CreateAcademicRecordManualPayload
+  ): Promise<AcademicRecordItem> {
+    const response = await this.api.post<AcademicRecordItem>(
+      ACADEMIC_RECORDS.manual(roundId),
+      payload
     );
     return response.data;
   }

@@ -63,9 +63,9 @@ export const thesisService = {
     return res.data.data;
   },
 
-  async searchProposals(params?: { roundId?: number; lecturerId?: number; status?: string; search?: string }): Promise<Proposal[]> {
+  async searchProposals(params?: { roundId?: number; lecturerId?: number; studentId?: number; status?: string; search?: string }): Promise<Proposal[]> {
     const res = await apiClient.get('/proposals', { params });
-    return res.data.data.content || res.data.data;
+    return res.data?.data?.content || res.data?.content || res.data?.data || res.data || [];
   },
 
   // Review Group APIs

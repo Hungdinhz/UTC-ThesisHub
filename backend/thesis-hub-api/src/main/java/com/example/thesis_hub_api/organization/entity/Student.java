@@ -48,6 +48,10 @@ public class Student {
     @Builder.Default
     private Integer debtCredits = 0;
 
+    @Column(name = "gpa")
+    @Builder.Default
+    private Double gpa = 3.20;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

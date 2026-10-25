@@ -106,7 +106,7 @@ export const mockCapacities: LecturerCapacity[] = [
     academicDegree: 'TIEN_SI',
     departmentId: 1,
     departmentName: 'Công nghệ phần mềm',
-    projectRoundId: 10,
+    projectRoundId: 1,
     maxQuota: 5,
     capacityFactor: 1.0,
     effectiveCapacity: 5,
@@ -114,7 +114,9 @@ export const mockCapacities: LecturerCapacity[] = [
     remainingCapacity: 2,
     loadRatio: 0.6,
     isActive: true,
-    directionNames: ['HD_AI', 'HD_SE'],
+    directionIds: [1, 2],
+    directionCodes: ['HD_PM_APP', 'HD_DATA_AI'],
+    directionNames: ['HD_PM_APP', 'HD_DATA_AI'],
   },
   {
     id: 2,
@@ -126,7 +128,7 @@ export const mockCapacities: LecturerCapacity[] = [
     academicDegree: 'PGS',
     departmentId: 3,
     departmentName: 'Khoa học máy tính',
-    projectRoundId: 10,
+    projectRoundId: 1,
     maxQuota: 6,
     capacityFactor: 1.2,
     effectiveCapacity: 7,
@@ -134,7 +136,9 @@ export const mockCapacities: LecturerCapacity[] = [
     remainingCapacity: 1,
     loadRatio: 0.86,
     isActive: true,
-    directionNames: ['HD_AI', 'HD_DATA'],
+    directionIds: [2, 7],
+    directionCodes: ['HD_DATA_AI', 'HD_ALGO'],
+    directionNames: ['HD_DATA_AI', 'HD_ALGO'],
   },
   {
     id: 3,
@@ -146,7 +150,7 @@ export const mockCapacities: LecturerCapacity[] = [
     academicDegree: 'THAC_SI',
     departmentId: 1,
     departmentName: 'Công nghệ phần mềm',
-    projectRoundId: 10,
+    projectRoundId: 1,
     maxQuota: 4,
     capacityFactor: 1.0,
     effectiveCapacity: 4,
@@ -154,7 +158,9 @@ export const mockCapacities: LecturerCapacity[] = [
     remainingCapacity: 3,
     loadRatio: 0.25,
     isActive: true,
-    directionNames: ['HD_WEB_CLOUD', 'HD_SE'],
+    directionIds: [1, 3, 4],
+    directionCodes: ['HD_PM_APP', 'HD_GAME', 'HD_TESTING'],
+    directionNames: ['HD_PM_APP', 'HD_GAME', 'HD_TESTING'],
   },
   {
     id: 4,
@@ -166,7 +172,7 @@ export const mockCapacities: LecturerCapacity[] = [
     academicDegree: 'TIEN_SI',
     departmentId: 4,
     departmentName: 'Mạng máy tính & ATTT',
-    projectRoundId: 10,
+    projectRoundId: 1,
     maxQuota: 5,
     capacityFactor: 0.8,
     effectiveCapacity: 4,
@@ -174,7 +180,9 @@ export const mockCapacities: LecturerCapacity[] = [
     remainingCapacity: 2,
     loadRatio: 0.5,
     isActive: true,
-    directionNames: ['HD_SECURITY', 'HD_IOT'],
+    directionIds: [5, 6],
+    directionCodes: ['HD_NET_INFRA', 'HD_SECURITY'],
+    directionNames: ['HD_NET_INFRA', 'HD_SECURITY'],
   },
 ];
 
@@ -404,6 +412,83 @@ export const assignmentService = {
         headers: getAuthHeaders(),
       }
     );
+  },
+
+  async addLecturersToRound(
+    projectRoundId: number,
+    lecturerIds?: number[],
+    defaultQuota = 5,
+    lecturerQuotas?: Record<number, number>
+  ): Promise<void> {
+    try {
+      await axios.post(
+        `${API_BASE}/capacities/add-lecturers`,
+        {
+          lecturerIds: lecturerIds && lecturerIds.length > 0 ? lecturerIds : [],
+          defaultQuota,
+          lecturerQuotas: lecturerQuotas || {},
+        },
+        {
+          params: { projectRoundId, defaultQuota },
+          headers: getAuthHeaders(),
+        }
+      );
+    } catch {
+      // Fallback to initCapacities if endpoint is unavailable
+      await this.initCapacities(projectRoundId, defaultQuota);
+    }
+  },
+
+  async deleteCapacity(id: number, projectRoundId?: number, lecturerId?: number): Promise<void> {
+    const headers = getAuthHeaders();
+    let lastErr: any = null;
+
+    // 1. Try standard DELETE /assignments/capacities/{id}
+    try {
+      await axios.delete(`${API_BASE}/capacities/${id}`, { headers });
+      const idx = mockCapacities.findIndex((c) => c.id === id);
+      if (idx !== -1) mockCapacities.splice(idx, 1);
+      return;
+    } catch (err: any) {
+      lastErr = err;
+      console.warn('DELETE /capacities/:id failed, trying POST fallback...', err?.response?.status || err?.message);
+    }
+
+    // 2. Try POST fallback: /assignments/capacities/{id}/delete
+    try {
+      await axios.post(`${API_BASE}/capacities/${id}/delete`, {}, { headers });
+      const idx = mockCapacities.findIndex((c) => c.id === id);
+      if (idx !== -1) mockCapacities.splice(idx, 1);
+      return;
+    } catch (err: any) {
+      lastErr = err;
+      console.warn('POST /capacities/:id/delete fallback failed, trying round endpoint...', err?.response?.status || err?.message);
+    }
+
+    // 3. Try round-scoped endpoints if projectRoundId & lecturerId available
+    if (projectRoundId && lecturerId) {
+      try {
+        await axios.delete(`${BASE_URL}/project-rounds/${projectRoundId}/lecturers/${lecturerId}`, { headers });
+        const idx = mockCapacities.findIndex((c) => c.id === id);
+        if (idx !== -1) mockCapacities.splice(idx, 1);
+        return;
+      } catch (err: any) {
+        lastErr = err;
+      }
+
+      try {
+        await axios.post(`${BASE_URL}/project-rounds/${projectRoundId}/lecturers/${lecturerId}/delete`, {}, { headers });
+        const idx = mockCapacities.findIndex((c) => c.id === id);
+        if (idx !== -1) mockCapacities.splice(idx, 1);
+        return;
+      } catch (err: any) {
+        lastErr = err;
+      }
+    }
+
+    console.error('All delete capacity attempts failed:', lastErr);
+    const msg = lastErr?.response?.data?.message || lastErr?.message || 'Lỗi khi xóa giảng viên khỏi đợt';
+    throw new Error(msg);
   },
 
   // 6. Algorithm Execution & Result Management (Step C & E)

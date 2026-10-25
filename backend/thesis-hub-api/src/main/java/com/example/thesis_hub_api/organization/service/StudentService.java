@@ -22,10 +22,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.example.thesis_hub_api.projectround.entity.ProjectRound;
+import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
+import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -39,13 +45,26 @@ public class StudentService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Autowired(required = false)
+    private StudentProjectRoundRepository studentProjectRoundRepository;
+
+    @Autowired(required = false)
+    private ProjectRoundRepository projectRoundRepository;
+
     @Transactional(readOnly = true)
     public PageResponse<StudentResponseDTO> getStudents(Long majorId, Long trainingProgramId, String className, String search, Pageable pageable) {
+        return getStudents(majorId, trainingProgramId, className, search, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<StudentResponseDTO> getStudents(Long majorId, Long trainingProgramId, String className, String search, Long projectRoundId, Pageable pageable) {
         String cleanSearch = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
         String cleanClass = StringUtils.hasText(className) ? "%" + className.trim().toLowerCase() + "%" : null;
 
-        Page<Student> page = studentRepository.searchStudents(majorId, trainingProgramId, cleanClass, cleanSearch, pageable);
-        List<StudentResponseDTO> content = page.getContent().stream().map(this::toResponseDTO).toList();
+        Page<Student> page = (projectRoundId != null)
+                ? studentRepository.searchStudents(majorId, trainingProgramId, cleanClass, cleanSearch, projectRoundId, pageable)
+                : studentRepository.searchStudents(majorId, trainingProgramId, cleanClass, cleanSearch, pageable);
+        List<StudentResponseDTO> content = mapStudentsWithRounds(page.getContent());
         return PageResponse.from(page, content);
     }
 
@@ -188,7 +207,7 @@ public class StudentService {
         TrainingProgram tp = (student.getTrainingProgramId() != null)
                 ? trainingProgramRepository.findById(student.getTrainingProgramId()).orElse(null) : null;
 
-        return StudentResponseDTO.builder()
+        StudentResponseDTO dto = StudentResponseDTO.builder()
                 .studentId(student.getId())
                 .userId(user != null ? user.getId() : null)
                 .studentCode(student.getStudentCode())
@@ -206,5 +225,63 @@ public class StudentService {
                 .debtCredits(student.getDebtCredits())
                 .isActive(user != null ? user.getIsActive() : true)
                 .build();
+
+        if (studentProjectRoundRepository != null && projectRoundRepository != null && student.getId() != null) {
+            Map<Long, ProjectRound> roundMap = projectRoundRepository.findAll().stream()
+                    .collect(Collectors.toMap(ProjectRound::getId, r -> r, (a, b) -> a));
+            List<StudentProjectRound> sprs = studentProjectRoundRepository.findByStudentId(student.getId());
+            List<String> codes = new ArrayList<>();
+            List<String> names = new ArrayList<>();
+            for (StudentProjectRound spr : sprs) {
+                Long rId = spr.getProjectRound() != null ? spr.getProjectRound().getId() : null;
+                ProjectRound pr = rId != null ? roundMap.get(rId) : null;
+                if (pr != null) {
+                    String statusStr = spr.getStatus() != null ? (" (" + spr.getStatus() + ")") : "";
+                    codes.add(pr.getRoundCode() + statusStr);
+                    names.add(pr.getName() + statusStr);
+                }
+            }
+            dto.setProjectRoundCodes(codes);
+            dto.setProjectRoundNames(names);
+        }
+        return dto;
+    }
+
+    private List<StudentResponseDTO> mapStudentsWithRounds(List<Student> students) {
+        if (students == null || students.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<Long, List<String>> studentRoundCodeMap = new HashMap<>();
+        Map<Long, List<String>> studentRoundNameMap = new HashMap<>();
+
+        if (studentProjectRoundRepository != null && projectRoundRepository != null) {
+            Map<Long, ProjectRound> roundMap = projectRoundRepository.findAll().stream()
+                    .collect(Collectors.toMap(ProjectRound::getId, r -> r, (a, b) -> a));
+
+            for (Student s : students) {
+                List<StudentProjectRound> sprs = studentProjectRoundRepository.findByStudentId(s.getId());
+                List<String> codes = new ArrayList<>();
+                List<String> names = new ArrayList<>();
+                for (StudentProjectRound spr : sprs) {
+                    Long rId = spr.getProjectRound() != null ? spr.getProjectRound().getId() : null;
+                    ProjectRound pr = rId != null ? roundMap.get(rId) : null;
+                    if (pr != null) {
+                        String statusStr = spr.getStatus() != null ? (" (" + spr.getStatus() + ")") : "";
+                        codes.add(pr.getRoundCode() + statusStr);
+                        names.add(pr.getName() + statusStr);
+                    }
+                }
+                studentRoundCodeMap.put(s.getId(), codes);
+                studentRoundNameMap.put(s.getId(), names);
+            }
+        }
+
+        return students.stream().map(s -> {
+            StudentResponseDTO dto = toResponseDTO(s);
+            dto.setProjectRoundCodes(studentRoundCodeMap.getOrDefault(s.getId(), Collections.emptyList()));
+            dto.setProjectRoundNames(studentRoundNameMap.getOrDefault(s.getId(), Collections.emptyList()));
+            return dto;
+        }).toList();
     }
 }

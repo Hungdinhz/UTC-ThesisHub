@@ -197,7 +197,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
     }
 
     const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn CHỐT KẾT QUẢ PHÂN CÔNG cuối cùng cho đợt [${currentRound?.name || effectiveRoundId}]? Sau khi chốt, danh sách sẽ được khóa và gửi thông báo chính thức đến Giảng viên và Sinh viên.`
+      `Bạn có chắc chắn muốn CHỐT KẾT QUẢ PHÂN CÔNG cuối cùng cho đợt [${currentRound?.name || effectiveRoundId}]?\n\nLƯU Ý: Những sinh viên chưa đăng ký nguyện vọng đồ án trong đợt này sẽ tự động bị LOẠI KHỎI ĐỢT theo quy định.`
     );
     if (!confirmed) return;
 
@@ -209,9 +209,14 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       const updatedProps = await assignmentService.getProposals(effectiveRoundId);
       setProposals(updatedProps);
 
+      const droppedText =
+        finalStats?.droppedCount && finalStats.droppedCount > 0
+          ? ` Đã loại ${finalStats.droppedCount} sinh viên chưa đăng ký khỏi đợt đồ án.`
+          : '';
+
       setAlert({
         type: 'success',
-        message: `Khoa đã CHỐT thành công kết quả phân công Giảng viên hướng dẫn cho đợt ${currentRound?.name || effectiveRoundId}!`,
+        message: `Khoa đã CHỐT thành công kết quả phân công Giảng viên hướng dẫn cho đợt ${currentRound?.name || effectiveRoundId}!${droppedText}`,
       });
     } catch {
       setAlert({
@@ -447,6 +452,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       {activeTab === 'capacities' && (
         <LecturerCapacityManager
           capacities={capacities}
+          directions={directions}
           onUpdateCapacity={handleUpdateCapacity}
           loading={loading}
           roundName={currentRound?.name}

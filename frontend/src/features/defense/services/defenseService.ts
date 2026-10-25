@@ -63,7 +63,7 @@ let mockCouncils: DefenseCouncil[] = [
     name: 'Hội đồng đánh giá luận văn HD-10-02',
     status: 'ACTIVE',
     description: 'Hội đồng Hệ thống Thông tin & Trí tuệ nhân tạo',
-    studentIds: [103],
+    studentIds: [102, 103],
     members: [
       { id: 6, councilId: 2, lecturerId: 507, lecturerName: 'GS. TS. Nguyễn Đức Dũng', role: 'PRESIDENT', confirmed: true },
       { id: 7, councilId: 2, lecturerId: 502, lecturerName: 'TS. Lê Thị Mai', role: 'SECRETARY', confirmed: true },

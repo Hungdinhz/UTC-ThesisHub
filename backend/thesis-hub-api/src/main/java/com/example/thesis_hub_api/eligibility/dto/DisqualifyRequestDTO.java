@@ -12,6 +12,6 @@ import lombok.NoArgsConstructor;
 public class DisqualifyRequestDTO {
     private Long studentId;
     private Long projectRoundId;
-    private Long disqualifiedBy;
+    private String disqualifiedBy;
     private String reason;
 }

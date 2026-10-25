@@ -40,13 +40,14 @@ public class LecturerController {
     @GetMapping
     @Operation(
             summary = "Tra cứu danh sách Giảng viên (Contract 1)",
-            description = "Hỗ trợ lọc theo bộ môn, học vị và tìm kiếm theo tên hoặc mã CB. Trả về danh sách để phục vụ ghép chỉ tiêu và hội đồng."
+            description = "Hỗ trợ lọc theo bộ môn, học vị, đợt đồ án và tìm kiếm theo tên hoặc mã CB. Trả về danh sách để phục vụ ghép chỉ tiêu và hội đồng."
     )
     public ResponseEntity<ApiResponse<List<LecturerResponseDTO>>> getLecturers(
             @RequestParam(required = false) Long departmentId,
             @RequestParam(required = false) String degree,
-            @RequestParam(required = false) String search) {
-        List<LecturerResponseDTO> lecturers = lecturerService.getLecturers(departmentId, degree, search);
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long projectRoundId) {
+        List<LecturerResponseDTO> lecturers = lecturerService.getLecturers(departmentId, degree, search, projectRoundId);
         return ResponseEntity.ok(ApiResponse.success(lecturers));
     }
 
@@ -56,6 +57,7 @@ public class LecturerController {
             @RequestParam(required = false) Long departmentId,
             @RequestParam(required = false) String degree,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long projectRoundId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id,desc") String sort) {
@@ -66,7 +68,7 @@ public class LecturerController {
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-        PageResponse<LecturerResponseDTO> result = lecturerService.getLecturersPaged(departmentId, degree, search, pageable);
+        PageResponse<LecturerResponseDTO> result = lecturerService.getLecturersPaged(departmentId, degree, search, projectRoundId, pageable);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
@@ -95,6 +97,14 @@ public class LecturerController {
             @Valid @RequestBody UpdateLecturerRequestDTO dto) {
         LecturerResponseDTO updated = lecturerService.updateLecturer(id, dto);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin giảng viên thành công", updated));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @Operation(summary = "Xóa thông tin giảng viên (Admin)")
+    public ResponseEntity<ApiResponse<Void>> deleteLecturer(@PathVariable Long id) {
+        lecturerService.deleteLecturer(id);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giảng viên thành công", null));
     }
 
     @PutMapping("/me/research-interests")

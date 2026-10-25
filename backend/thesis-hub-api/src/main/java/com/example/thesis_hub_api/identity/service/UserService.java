@@ -11,8 +11,10 @@ import com.example.thesis_hub_api.identity.repository.RoleRepository;
 import com.example.thesis_hub_api.identity.repository.UserRepository;
 import com.example.thesis_hub_api.organization.entity.Lecturer;
 import com.example.thesis_hub_api.organization.entity.Student;
+import com.example.thesis_hub_api.organization.entity.TrainingProgram;
 import com.example.thesis_hub_api.organization.repository.LecturerRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
+import com.example.thesis_hub_api.organization.repository.TrainingProgramRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +38,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
+    private final TrainingProgramRepository trainingProgramRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
@@ -221,6 +224,13 @@ public class UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         Student student = studentRepository.findByUserId(userId).orElse(null);
 
+        String progCode = "CU_NHAN";
+        if (student != null && student.getTrainingProgramId() != null) {
+            progCode = trainingProgramRepository.findById(student.getTrainingProgramId())
+                    .map(TrainingProgram::getCode)
+                    .orElse("CU_NHAN");
+        }
+
         Map<String, Object> userMap = new HashMap<>();
         userMap.put("id", user.getId());
         userMap.put("username", user.getUsername());
@@ -228,6 +238,10 @@ public class UserService {
         userMap.put("user_type", "student");
         userMap.put("first_name", user.getFullName());
         userMap.put("last_name", "");
+        userMap.put("training_program", progCode);
+        userMap.put("trainingProgram", progCode);
+        userMap.put("program", progCode);
+        userMap.put("training_program_id", student != null ? student.getTrainingProgramId() : null);
 
         Map<String, Object> res = new HashMap<>();
         res.put("id", student != null ? student.getId() : user.getId());
@@ -236,6 +250,10 @@ public class UserService {
         res.put("department", "Khoa Công nghệ thông tin");
         res.put("semester", "Học kỳ 1");
         res.put("batch_no", student != null && student.getClassName() != null ? student.getClassName() : "K62");
+        res.put("training_program", progCode);
+        res.put("trainingProgram", progCode);
+        res.put("program", progCode);
+        res.put("training_program_id", student != null ? student.getTrainingProgramId() : null);
         return res;
     }
 

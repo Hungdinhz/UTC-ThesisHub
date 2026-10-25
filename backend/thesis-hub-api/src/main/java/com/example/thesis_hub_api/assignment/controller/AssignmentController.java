@@ -157,7 +157,7 @@ public class AssignmentController {
     }
 
     @PutMapping("/capacities/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
     @Operation(summary = "Cập nhật chỉ tiêu / hệ số capacity của giảng viên")
     public ResponseEntity<ApiResponse<LecturerCapacityResponseDTO>> updateCapacity(
             @PathVariable Long id,
@@ -166,14 +166,64 @@ public class AssignmentController {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật chỉ tiêu thành công", updated));
     }
 
+    @DeleteMapping("/capacities/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN') or hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Xóa giảng viên khỏi đợt đồ án")
+    public ResponseEntity<ApiResponse<Void>> deleteCapacity(@PathVariable Long id) {
+        assignmentService.deleteCapacity(id);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giảng viên khỏi đợt đồ án thành công", null));
+    }
+
+    @PostMapping("/capacities/{id}/delete")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN') or hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Xóa giảng viên khỏi đợt đồ án (POST fallback)")
+    public ResponseEntity<ApiResponse<Void>> deleteCapacityPost(@PathVariable Long id) {
+        assignmentService.deleteCapacity(id);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giảng viên khỏi đợt đồ án thành công", null));
+    }
+
+    @DeleteMapping("/capacities/by-round")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN') or hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Xóa giảng viên khỏi đợt đồ án theo ProjectRoundId và LecturerId")
+    public ResponseEntity<ApiResponse<Void>> deleteCapacityByRound(
+            @RequestParam Long projectRoundId,
+            @RequestParam Long lecturerId) {
+        assignmentService.deleteCapacityByRoundAndLecturer(projectRoundId, lecturerId);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giảng viên khỏi đợt đồ án thành công", null));
+    }
+
+    @PostMapping("/capacities/by-round/delete")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN') or hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Xóa giảng viên khỏi đợt đồ án theo ProjectRoundId và LecturerId (POST fallback)")
+    public ResponseEntity<ApiResponse<Void>> deleteCapacityByRoundPost(
+            @RequestParam Long projectRoundId,
+            @RequestParam Long lecturerId) {
+        assignmentService.deleteCapacityByRoundAndLecturer(projectRoundId, lecturerId);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giảng viên khỏi đợt đồ án thành công", null));
+    }
+
     @PostMapping("/capacities/init")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
     @Operation(summary = "Khởi tạo bảng chỉ tiêu cho toàn bộ giảng viên trong đợt")
     public ResponseEntity<ApiResponse<Void>> initCapacities(
             @RequestParam Long projectRoundId,
             @RequestParam(defaultValue = "5") int defaultQuota) {
         assignmentService.initializeCapacitiesForRound(projectRoundId, defaultQuota);
         return ResponseEntity.ok(ApiResponse.success("Khởi tạo chỉ tiêu thành công", null));
+    }
+
+    @PostMapping("/capacities/add-lecturers")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @Operation(summary = "Thêm danh sách giảng viên được chọn vào đợt đồ án")
+    public ResponseEntity<ApiResponse<Void>> addLecturersToRound(
+            @RequestParam Long projectRoundId,
+            @RequestBody(required = false) AddLecturersToRoundRequestDTO request,
+            @RequestParam(required = false, defaultValue = "5") int defaultQuota) {
+        List<Long> lecturerIds = request != null ? request.getLecturerIds() : null;
+        Integer quota = (request != null && request.getDefaultQuota() != null) ? request.getDefaultQuota() : defaultQuota;
+        java.util.Map<Long, Integer> quotas = request != null ? request.getLecturerQuotas() : null;
+        assignmentService.addLecturersToRound(projectRoundId, lecturerIds, quota, quotas);
+        return ResponseEntity.ok(ApiResponse.success("Thêm giảng viên vào đợt đồ án thành công", null));
     }
 
     // ==========================================

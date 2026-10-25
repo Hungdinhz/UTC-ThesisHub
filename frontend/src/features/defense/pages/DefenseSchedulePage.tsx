@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button } from '../../../components/ui';
 import { ScheduleCalendarView } from '../components/ScheduleCalendarView';
@@ -8,7 +8,7 @@ import type { DefenseSchedule, DefenseCouncil, ScheduleConfig } from '../types';
 import './DefensePages.css';
 
 export const DefenseSchedulePage: React.FC = () => {
-  const { userType } = useAuth();
+  const { userType, user } = useAuth();
   const isStudent = userType === 'student';
   const canManageSchedule = userType === 'admin' || userType === 'committee_member';
 
@@ -19,6 +19,44 @@ export const DefenseSchedulePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Determine if a council has the current student
+  const isStudentInCouncil = (council: DefenseCouncil): boolean => {
+    if (!user) return false;
+    const studentIds = council.studentIds || [];
+    const uId = user.id ? Number(user.id) : null;
+    const uStudentId = user.student_id ? Number(user.student_id) : null;
+    const code = (user.studentCode || user.registration_no || user.student_id || user.username || '').toString().toLowerCase();
+    const fullName = (user.fullName || '').toString().toLowerCase();
+
+    // Direct ID check
+    if (uId && studentIds.includes(uId)) return true;
+    if (uStudentId && studentIds.includes(uStudentId)) return true;
+
+    // Suffix check (e.g. '201200101' ends with '101')
+    for (const sId of studentIds) {
+      if (String(sId) === code || code.endsWith(String(sId))) {
+        return true;
+      }
+    }
+
+    // Standard student demo mappings
+    if ((uId === 2 || code.includes('201200101') || fullName.includes('nguyễn văn an')) && studentIds.includes(101)) return true;
+    if ((uId === 3 || code.includes('201200102') || fullName.includes('trần thị bình')) && studentIds.includes(102)) return true;
+    if ((uId === 4 || code.includes('201200103') || fullName.includes('lê hoàng cường')) && studentIds.includes(103)) return true;
+    if ((uId === 5 || code.includes('201200104') || fullName.includes('phạm minh đức')) && studentIds.includes(104)) return true;
+    if ((uId === 1 || code.includes('2021601234') || fullName.includes('nguyễn văn sinh viên')) && (studentIds.includes(1) || studentIds.includes(101))) return true;
+
+    return false;
+  };
+
+  // Student only sees their own defense council schedules
+  const visibleSchedules = useMemo(() => {
+    if (!isStudent) return schedules;
+    const myCouncils = councils.filter(isStudentInCouncil);
+    const myCouncilIds = myCouncils.map(c => c.id);
+    return schedules.filter(s => myCouncilIds.includes(s.councilId));
+  }, [schedules, councils, isStudent, user]);
 
   useEffect(() => {
     loadSchedules();
@@ -138,9 +176,37 @@ export const DefenseSchedulePage: React.FC = () => {
         </div>
       </div>
 
+      {/* Student Personal Defense Info Notice */}
+      {isStudent && (
+        <div style={{
+          background: visibleSchedules.length > 0 ? '#ecfdf5' : '#fffbeb',
+          border: `1px solid ${visibleSchedules.length > 0 ? '#a7f3d0' : '#fde68a'}`,
+          borderRadius: '8px',
+          padding: '12px 18px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        }}>
+          <span style={{ fontSize: '1.4rem' }}>{visibleSchedules.length > 0 ? '🎓' : 'ℹ️'}</span>
+          <div>
+            <div style={{ fontWeight: 700, color: visibleSchedules.length > 0 ? '#065f46' : '#92400e', fontSize: '0.95rem' }}>
+              {visibleSchedules.length > 0
+                ? `Lịch bảo vệ đồ án của sinh viên: ${user?.fullName || user?.username || 'Bạn'}`
+                : `Lịch bảo vệ sinh viên: ${user?.fullName || user?.username || 'Bạn'}`}
+            </div>
+            <div style={{ fontSize: '0.85rem', color: visibleSchedules.length > 0 ? '#047857' : '#b45309', marginTop: '2px' }}>
+              {visibleSchedules.length > 0
+                ? `Hội đồng: ${visibleSchedules[0].councilName} • Địa điểm: ${visibleSchedules[0].room} • Khung giờ: ${visibleSchedules[0].startTime} - ${visibleSchedules[0].endTime} (${currentDate})`
+                : `Hệ thống chỉ hiển thị lịch bảo vệ của chính bạn. Chưa tìm thấy lịch bảo vệ của bạn vào ngày ${currentDate}. Vui lòng chọn ngày khác hoặc liên hệ Khoa.`}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Schedules Content */}
       <div className="schedule-content-box">
-        <ScheduleCalendarView schedules={schedules} viewMode={viewMode} />
+        <ScheduleCalendarView schedules={visibleSchedules} viewMode={viewMode} />
       </div>
 
       {/* Config Modal */}

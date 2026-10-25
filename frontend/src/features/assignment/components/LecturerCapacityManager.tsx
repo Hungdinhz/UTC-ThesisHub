@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import type { LecturerCapacity } from '../types';
+import type { LecturerCapacity, ProjectDirection } from '../types';
 
 interface Props {
   capacities: LecturerCapacity[];
+  directions?: ProjectDirection[];
   onUpdateCapacity: (id: number, data: Partial<LecturerCapacity>) => Promise<void>;
   loading?: boolean;
   roundName?: string;
@@ -11,6 +12,7 @@ interface Props {
 
 export const LecturerCapacityManager: React.FC<Props> = ({
   capacities,
+  directions = [],
   onUpdateCapacity,
   loading,
   roundName,
@@ -21,6 +23,7 @@ export const LecturerCapacityManager: React.FC<Props> = ({
   const [quotaInput, setQuotaInput] = useState<number>(5);
   const [factorInput, setFactorInput] = useState<number>(1.0);
   const [noteInput, setNoteInput] = useState<string>('');
+  const [selectedDirectionIds, setSelectedDirectionIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
 
   const filtered = capacities.filter(
@@ -36,6 +39,27 @@ export const LecturerCapacityManager: React.FC<Props> = ({
     setQuotaInput(cap.maxQuota);
     setFactorInput(cap.capacityFactor);
     setNoteInput(cap.note || '');
+
+    // Resolve initial direction IDs
+    if (cap.directionIds && cap.directionIds.length > 0) {
+      setSelectedDirectionIds([...cap.directionIds]);
+    } else if (cap.directionNames && cap.directionNames.length > 0 && directions.length > 0) {
+      const ids: number[] = [];
+      cap.directionNames.forEach((dn) => {
+        const found = directions.find(
+          (d) =>
+            d.code.toLowerCase() === dn.toLowerCase() ||
+            d.name.toLowerCase() === dn.toLowerCase() ||
+            dn.toLowerCase().includes(d.code.toLowerCase())
+        );
+        if (found && !ids.includes(found.id)) {
+          ids.push(found.id);
+        }
+      });
+      setSelectedDirectionIds(ids);
+    } else {
+      setSelectedDirectionIds([]);
+    }
   };
 
   const handleSave = async () => {
@@ -46,6 +70,7 @@ export const LecturerCapacityManager: React.FC<Props> = ({
         maxQuota: quotaInput,
         capacityFactor: factorInput,
         note: noteInput,
+        directionIds: selectedDirectionIds,
       });
       setEditingCapacity(null);
     } finally {
@@ -131,8 +156,8 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                     <td>
                       <div className="direction-tags">
                         {cap.directionNames && cap.directionNames.length > 0 ? (
-                          cap.directionNames.map((d, i) => (
-                            <span key={i} className="direction-micro-tag">
+                          Array.from(new Set(cap.directionNames)).map((d, i) => (
+                            <span key={i} className="direction-micro-tag" title={d}>
                               {d}
                             </span>
                           ))
@@ -244,6 +269,86 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                 <strong className="text-indigo">
                   {Math.round(quotaInput * factorInput)} sinh viên
                 </strong>
+              </div>
+
+              <div className="form-group">
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span>🎯 Hướng đồ án đảm nhận trong đợt ({selectedDirectionIds.length} hướng):</span>
+                  {directions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedDirectionIds.length === directions.length) {
+                          setSelectedDirectionIds([]);
+                        } else {
+                          setSelectedDirectionIds(directions.map((d) => d.id));
+                        }
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, padding: 0 }}
+                    >
+                      {selectedDirectionIds.length === directions.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả hướng'}
+                    </button>
+                  )}
+                </label>
+                {directions.length === 0 ? (
+                  <p className="text-muted text-xs">Chưa có danh mục hướng đồ án</p>
+                ) : (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                      gap: '8px',
+                      maxHeight: '180px',
+                      overflowY: 'auto',
+                      padding: '10px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      background: '#f8fafc',
+                    }}
+                  >
+                    {directions.map((d) => {
+                      const isChecked = selectedDirectionIds.includes(d.id);
+                      return (
+                        <label
+                          key={d.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '8px',
+                            fontSize: '0.82rem',
+                            cursor: 'pointer',
+                            background: isChecked ? '#eff6ff' : '#fff',
+                            border: `1px solid ${isChecked ? '#93c5fd' : '#e2e8f0'}`,
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            style={{ marginTop: '2px', cursor: 'pointer' }}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedDirectionIds((prev) => [...prev, d.id]);
+                              } else {
+                                setSelectedDirectionIds((prev) => prev.filter((id) => id !== d.id));
+                              }
+                            }}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, color: isChecked ? '#1d4ed8' : '#334155' }}>
+                              {d.code}
+                            </div>
+                            <div style={{ color: '#475569', fontSize: '0.78rem', lineHeight: 1.25 }}>
+                              {d.name}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="form-group">

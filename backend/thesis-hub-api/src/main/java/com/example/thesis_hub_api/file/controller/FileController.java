@@ -60,9 +60,14 @@ public class FileController {
             contentType = "application/octet-stream";
         }
 
+        boolean isInline = "inline".equalsIgnoreCase(request.getParameter("disposition"))
+                || "application/pdf".equalsIgnoreCase(contentType)
+                || (contentType.startsWith("image/"));
+        String disposition = (isInline ? "inline" : "attachment") + "; filename=\"" + resource.getFilename() + "\"";
+
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
                 .body(resource);
     }
 }

@@ -41,6 +41,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
 
+        '/uploads': {
+          target: apiBaseUrl,
+          changeOrigin: true,
+        },
+
         '/doc_templates': {
           target: apiBaseUrl,
           changeOrigin: true,

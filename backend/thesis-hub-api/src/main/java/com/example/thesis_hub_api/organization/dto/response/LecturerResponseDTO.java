@@ -26,4 +26,6 @@ public class LecturerResponseDTO {
     private String researchInterests;
     private Integer maxThesisQuota;
     private Boolean isActive;
+    private java.util.List<String> projectRoundCodes;
+    private java.util.List<String> projectRoundNames;
 }

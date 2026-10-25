@@ -63,6 +63,18 @@ public class AcademicRecordController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(result));
     }
 
+    @PostMapping("/project-rounds/{roundId}/academic-records/manual")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Thêm hoặc cập nhật kết quả học vụ thủ công cho sinh viên (Admin)")
+    public ResponseEntity<ApiResponse<AcademicRecordResponseDTO>> saveManualRecord(
+            @PathVariable Long roundId,
+            @Valid @RequestBody com.example.thesis_hub_api.projectround.dto.request.CreateAcademicRecordManualRequestDTO dto) {
+
+        AcademicRecordResponseDTO record = academicRecordService.saveManualAcademicRecord(roundId, dto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Lưu kết quả học vụ thủ công thành công", record));
+    }
+
     @GetMapping("/project-rounds/{roundId}/academic-records")
     @Operation(summary = "Lấy danh sách dữ liệu học vụ trong đợt đồ án (phân trang và lọc)")
     public ResponseEntity<ApiResponse<PageResponse<AcademicRecordResponseDTO>>> getAcademicRecords(

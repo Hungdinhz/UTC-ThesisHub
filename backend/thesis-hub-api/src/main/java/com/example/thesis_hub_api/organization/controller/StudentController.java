@@ -31,13 +31,14 @@ public class StudentController {
     private final StudentService studentService;
 
     @GetMapping
-    @Operation(summary = "Danh sách sinh viên phân trang", description = "Lọc theo ngành, chương trình đào tạo, lớp và tìm kiếm theo tên hoặc mã sinh viên")
+    @Operation(summary = "Danh sách sinh viên phân trang", description = "Lọc theo ngành, chương trình đào tạo, đợt đồ án, lớp và tìm kiếm theo tên hoặc mã sinh viên")
     public ResponseEntity<ApiResponse<PageResponse<StudentResponseDTO>>> getStudents(
             @RequestParam(required = false) Long majorId,
             @RequestParam(required = false, name = "programId") Long programId,
             @RequestParam(required = false, name = "trainingProgramId") Long trainingProgramId,
             @RequestParam(required = false) String className,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long projectRoundId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id,desc") String sort) {
@@ -50,7 +51,7 @@ public class StudentController {
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-        PageResponse<StudentResponseDTO> result = studentService.getStudents(majorId, effectiveProgramId, className, search, pageable);
+        PageResponse<StudentResponseDTO> result = studentService.getStudents(majorId, effectiveProgramId, className, search, projectRoundId, pageable);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { ProjectDirection, LecturerCapacity } from '../types';
+import { isLecturerAssignedToDirection, type ProjectDirection, type LecturerCapacity } from '../types';
 
 interface Props {
   directions: ProjectDirection[];
@@ -84,17 +84,10 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   // Selected direction object
   const currentDirection = directions.find((d) => d.id === selectedDirectionId);
 
-  // Filter eligible lecturers based on direction and training program degree constraint
-  const matchingLecturers = capacities.filter((c) => {
-    if (currentDirection && c.directionNames && c.directionNames.length > 0) {
-      return c.directionNames.some(
-        (nameOrCode) =>
-          nameOrCode.toLowerCase() === currentDirection.code.toLowerCase() ||
-          nameOrCode.toLowerCase() === currentDirection.name.toLowerCase()
-      );
-    }
-    return false;
-  });
+  // Filter eligible lecturers based strictly on direction assigned to lecturer in this round
+  const matchingLecturers = currentDirection
+    ? capacities.filter((c) => isLecturerAssignedToDirection(c, currentDirection))
+    : [];
 
   // If matching lecturers found for this direction, show them. Otherwise fallback to all capacities in round
   const eligibleLecturers = matchingLecturers.length > 0 ? matchingLecturers : capacities;
@@ -273,7 +266,15 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                 <div className="card-content">
                   <div className="card-top">
                     <span className="direction-tag">{d.code}</span>
-                    <span className="lecturer-tag">{d.lecturerCount || 0} GV</span>
+                    <span className="lecturer-tag">
+                      {(() => {
+                        if (capacities && capacities.length > 0) {
+                          const count = capacities.filter((c) => isLecturerAssignedToDirection(c, d)).length;
+                          return `${count} GV`;
+                        }
+                        return `${d.lecturerCount !== undefined ? d.lecturerCount : 0} GV`;
+                      })()}
+                    </span>
                   </div>
                   <h5 className="direction-title">{d.name}</h5>
                   <p className="direction-desc">{d.description || 'Chuyên đề đào tạo chuyên sâu'}</p>
@@ -428,20 +429,26 @@ export const StudentPreferenceForm: React.FC<Props> = ({
 
           <div className="criteria-grid">
             <div className="form-group">
-              <label>Điểm GPA tích lũy (Hệ 4.0):</label>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Điểm GPA tích lũy (Hệ 4.0):</span>
+                <span style={{ fontSize: '0.78rem', color: '#b45309', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                  🔒 Đã khóa cứng theo hồ sơ đợt đồ án
+                </span>
+              </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 max="4.0"
                 className="form-input"
+                style={{ backgroundColor: '#f8fafc', color: '#0a3273', fontWeight: 700, cursor: 'not-allowed' }}
                 placeholder="VD: 3.45"
-                disabled={isFormDisabled}
+                disabled={true}
+                readOnly={true}
                 value={gpa}
-                onChange={(e) => setGpa(e.target.value)}
               />
               <span className="form-help-text">
-                Thuật toán sử dụng điểm GPA để xếp hạng ưu tiên khi có nhiều sinh viên cùng chọn 1 GV.
+                Điểm GPA được lấy trực tiếp từ danh sách sinh viên đợt đồ án và khóa cứng để đảm bảo tính minh bạch, công bằng cho thuật toán phân công.
               </span>
             </div>
 

@@ -108,9 +108,11 @@ public class StudentExcelParser {
         }
 
         // Cột B (1): Mã sinh viên (MSSV) *
-        String studentCode = getCellValue(row.getCell(1));
+        String studentCode = getCellValue(row.getCell(1)).trim();
         if (studentCode.isEmpty()) {
             errors.add("Mã sinh viên không được để trống");
+        } else if (!studentCode.matches("^\\d{9}$")) {
+            errors.add("MSSV không hợp lệ (phải đúng 9 chữ số: " + studentCode + ")");
         }
 
         String lastName;
@@ -174,19 +176,39 @@ public class StudentExcelParser {
 
         if (!phone.isEmpty()) {
             String cleanedPhone = phone.replaceAll("[\\s.-]", "");
-            if (cleanedPhone.length() < 8 || cleanedPhone.length() > 15) {
-                errors.add("Số điện thoại không hợp lệ");
+            if (!cleanedPhone.matches("^0\\d{9}$") && (cleanedPhone.length() < 9 || cleanedPhone.length() > 11)) {
+                errors.add("Số điện thoại không hợp lệ (phải là 10 chữ số bắt đầu bằng 0)");
             } else {
                 phone = cleanedPhone;
             }
         }
 
         if (email.isEmpty()) {
-            if (!studentCode.isEmpty()) {
+            if (!studentCode.isEmpty() && studentCode.matches("^\\d{9}$")) {
                 email = studentCode.toLowerCase() + "@lms.utc.edu.vn";
             }
-        } else if (!email.contains("@") || !email.contains(".")) {
-            errors.add("Email không đúng định dạng: " + email);
+        } else if (!email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
+            errors.add("Email không đúng định dạng chuẩn: " + email);
+        }
+
+        // Đọc điểm GPA tích lũy (Hệ 4.0)
+        String gpaStr = "";
+        int gpaColIdx = combinedFullNameMode ? 7 : 8;
+        if (row.getCell(gpaColIdx) != null) {
+            gpaStr = getCellValue(row.getCell(gpaColIdx)).trim();
+        }
+        Double gpa = 3.20;
+        if (!gpaStr.isEmpty()) {
+            try {
+                double parsedGpa = Double.parseDouble(gpaStr.replace(',', '.'));
+                if (parsedGpa >= 0.0 && parsedGpa <= 4.0) {
+                    gpa = Math.round(parsedGpa * 100.0) / 100.0;
+                } else {
+                    errors.add("Điểm GPA phải nằm trong khoảng từ 0.0 đến 4.0 (nhập: " + gpaStr + ")");
+                }
+            } catch (NumberFormatException e) {
+                errors.add("Điểm GPA không đúng định dạng số: " + gpaStr);
+            }
         }
 
         boolean isValid = errors.isEmpty();
@@ -202,6 +224,7 @@ public class StudentExcelParser {
                 .className(className)
                 .phone(phone)
                 .email(email)
+                .gpa(gpa)
                 .isValid(isValid)
                 .errors(errors)
                 .build();
@@ -261,7 +284,7 @@ public class StudentExcelParser {
             centerCellStyle.cloneStyleFrom(dataCellStyle);
             centerCellStyle.setAlignment(HorizontalAlignment.CENTER);
 
-            // Danh sách tiêu đề các cột đúng như ảnh mẫu của UTC
+            // Danh sách tiêu đề các cột chuẩn UTC gồm cột Điểm GPA
             String[] headers = {
                     "STT",
                     "Mã sinh viên (MSSV) *",
@@ -270,7 +293,8 @@ public class StudentExcelParser {
                     "Ngành (CNTT/KHMT) *",
                     "Lớp sinh hoạt *",
                     "Số điện thoại",
-                    "Email"
+                    "Email",
+                    "Điểm GPA (Hệ 4.0) *"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -282,13 +306,13 @@ public class StudentExcelParser {
                 cell.setCellStyle(headerCellStyle);
             }
 
-            // Dữ liệu mẫu chuẩn từ ảnh UTC của người dùng
+            // Dữ liệu mẫu chuẩn từ ảnh UTC của người dùng kèm điểm GPA
             Object[][] sampleData = {
-                    {1, "201200101", "Nguyễn Văn", "An", "CNTT", "CNTT 1 - K62", "0912345671", "201200101@lms.utc.edu.vn"},
-                    {2, "201200102", "Trần Thị", "Bình", "CNTT", "CNTT 2 - K62", "0912345672", "201200102@lms.utc.edu.vn"},
-                    {3, "201200103", "Lê Hoàng", "Cường", "KHMT", "KHMT 1 - K62", "0912345673", "201200103@lms.utc.edu.vn"},
-                    {4, "201200104", "Phạm Ngọc", "Dung", "CNTT", "CNTT Việt Anh - K62", "0912345674", "201200104@lms.utc.edu.vn"},
-                    {5, "201200105", "Hoàng Minh", "Đức", "KHMT", "KHMT 2 - K62", "0912345675", "201200105@lms.utc.edu.vn"}
+                    {1, "201200101", "Nguyễn Văn", "An", "CNTT", "CNTT 1 - K62", "0912345671", "201200101@lms.utc.edu.vn", 3.45},
+                    {2, "201200102", "Trần Thị", "Bình", "CNTT", "CNTT 2 - K62", "0912345672", "201200102@lms.utc.edu.vn", 3.20},
+                    {3, "201200103", "Lê Hoàng", "Cường", "KHMT", "KHMT 1 - K62", "0912345673", "201200103@lms.utc.edu.vn", 3.65},
+                    {4, "201200104", "Phạm Ngọc", "Dung", "CNTT", "CNTT Việt Anh - K62", "0912345674", "201200104@lms.utc.edu.vn", 3.10},
+                    {5, "201200105", "Hoàng Minh", "Đức", "KHMT", "KHMT 2 - K62", "0912345675", "201200105@lms.utc.edu.vn", 3.50}
             };
 
             int rowIdx = 1;
@@ -300,6 +324,9 @@ public class StudentExcelParser {
                     Cell cell = row.createCell(col);
                     if (student[col] instanceof Integer) {
                         cell.setCellValue((Integer) student[col]);
+                        cell.setCellStyle(centerCellStyle);
+                    } else if (student[col] instanceof Double) {
+                        cell.setCellValue((Double) student[col]);
                         cell.setCellStyle(centerCellStyle);
                     } else {
                         cell.setCellValue(String.valueOf(student[col]));
@@ -321,6 +348,7 @@ public class StudentExcelParser {
             sheet.setColumnWidth(5, 24 * 256);  // Lớp
             sheet.setColumnWidth(6, 18 * 256);  // SĐT
             sheet.setColumnWidth(7, 30 * 256);  // Email
+            sheet.setColumnWidth(8, 22 * 256);  // Điểm GPA
 
             workbook.write(out);
             return out.toByteArray();
