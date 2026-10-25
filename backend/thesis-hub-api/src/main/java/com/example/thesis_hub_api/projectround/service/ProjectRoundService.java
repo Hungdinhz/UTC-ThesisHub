@@ -18,7 +18,11 @@ import com.example.thesis_hub_api.projectround.entity.TimelineMilestone;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.TimelineMilestoneRepository;
 import com.example.thesis_hub_api.assignment.entity.LecturerCapacity;
+import com.example.thesis_hub_api.assignment.entity.LecturerDirection;
+import com.example.thesis_hub_api.assignment.entity.ProjectDirection;
 import com.example.thesis_hub_api.assignment.repository.LecturerCapacityRepository;
+import com.example.thesis_hub_api.assignment.repository.LecturerDirectionRepository;
+import com.example.thesis_hub_api.assignment.repository.ProjectDirectionRepository;
 import com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +36,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -59,6 +64,12 @@ public class ProjectRoundService {
 
     @Autowired(required = false)
     private SupervisorAssignmentRepository supervisorAssignmentRepository;
+
+    @Autowired(required = false)
+    private ProjectDirectionRepository projectDirectionRepository;
+
+    @Autowired(required = false)
+    private LecturerDirectionRepository lecturerDirectionRepository;
 
     /**
      * CONTRACT 2: API Tra cứu Đợt đồ án đang hoạt động & Mốc thời gian (Timeline).
@@ -213,6 +224,7 @@ public class ProjectRoundService {
 
         // 2. Đợt đồ án phải có ít nhất 1 giảng viên tham gia và tổng chỉ tiêu hướng dẫn
         int totalCapacity = 0;
+        List<Long> participatingLecturerIds = new ArrayList<>();
         if (lecturerCapacityRepository != null) {
             List<LecturerCapacity> capacities = lecturerCapacityRepository.findByProjectRoundId(roundId);
             long lecturerCount = capacities.size();
@@ -223,6 +235,12 @@ public class ProjectRoundService {
                         .filter(c -> c.getIsActive() == null || Boolean.TRUE.equals(c.getIsActive()))
                         .mapToInt(LecturerCapacity::getEffectiveCapacity)
                         .sum();
+
+                participatingLecturerIds = capacities.stream()
+                        .filter(c -> c.getIsActive() == null || Boolean.TRUE.equals(c.getIsActive()))
+                        .map(LecturerCapacity::getLecturerId)
+                        .distinct()
+                        .collect(Collectors.toList());
             }
         }
 
@@ -234,12 +252,35 @@ public class ProjectRoundService {
         // 4. Đã thiết lập mốc timeline "Đăng ký nguyện vọng & Hướng đề tài" (REGISTRATION)
         List<TimelineMilestone> milestones = timelineMilestoneRepository
                 .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId);
-        boolean hasRegistrationMilestone = milestones.stream().anyMatch(m ->
+        boolean hasRegistrationMilestone = milestones != null && milestones.stream().anyMatch(m ->
                 "REGISTRATION".equalsIgnoreCase(m.getPhaseType()) ||
                 (m.getName() != null && (m.getName().toLowerCase().contains("nguyện vọng") || m.getName().toLowerCase().contains("hướng đề tài") || m.getName().toLowerCase().contains("đăng ký")))
         );
         if (!hasRegistrationMilestone) {
             errors.add("Chưa thiết lập mốc timeline 'Đăng ký nguyện vọng & Hướng đề tài' (REGISTRATION).");
+        }
+
+        // 5. Mỗi hướng đồ án (ProjectDirection) đang hoạt động phải có ít nhất 1 giảng viên trong đợt đảm nhận
+        if (projectDirectionRepository != null && lecturerDirectionRepository != null) {
+            List<ProjectDirection> activeDirections = projectDirectionRepository.findByIsActiveTrue();
+            if (activeDirections != null && !activeDirections.isEmpty()) {
+                final Set<Long> coveredDirectionIds = participatingLecturerIds.isEmpty()
+                        ? Collections.emptySet()
+                        : lecturerDirectionRepository.findByLecturerIdIn(participatingLecturerIds).stream()
+                                .map(LecturerDirection::getDirectionId)
+                                .collect(Collectors.toSet());
+
+                List<ProjectDirection> uncoveredDirections = activeDirections.stream()
+                        .filter(d -> !coveredDirectionIds.contains(d.getId()))
+                        .collect(Collectors.toList());
+
+                if (!uncoveredDirections.isEmpty()) {
+                    String missingNames = uncoveredDirections.stream()
+                            .map(ProjectDirection::getName)
+                            .collect(Collectors.joining(", "));
+                    errors.add(String.format("Mỗi hướng đồ án phải có ít nhất 1 giảng viên đảm nhận trong đợt (tránh trường hợp sinh viên đăng ký hướng nhưng không có GV hướng dẫn). Hiện chưa có giảng viên nào phụ trách các hướng: %s.", missingNames));
+                }
+            }
         }
 
         if (!errors.isEmpty()) {

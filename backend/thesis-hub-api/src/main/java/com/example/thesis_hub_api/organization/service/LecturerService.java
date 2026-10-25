@@ -49,6 +49,9 @@ public class LecturerService {
     @Autowired(required = false)
     private ProjectRoundRepository projectRoundRepository;
 
+    @Autowired(required = false)
+    private com.example.thesis_hub_api.assignment.service.LecturerDirectionSyncHelper lecturerDirectionSyncHelper;
+
     /**
      * CONTRACT 1: Lấy danh sách Giảng viên theo Bộ môn, Học vị hoặc từ khóa tìm kiếm.
      * Cung cấp dữ liệu nền cho module phân công hướng dẫn và hội đồng bảo vệ.
@@ -138,6 +141,9 @@ public class LecturerService {
                 .maxThesisQuota(dto.getMaxThesisQuota() != null ? dto.getMaxThesisQuota() : 5)
                 .build();
         lecturer = lecturerRepository.save(lecturer);
+        if (lecturerDirectionSyncHelper != null) {
+            lecturerDirectionSyncHelper.syncLecturerDirections(lecturer);
+        }
 
         return toResponseDTO(lecturer);
     }
@@ -179,6 +185,9 @@ public class LecturerService {
         }
 
         lecturer = lecturerRepository.save(lecturer);
+        if (lecturerDirectionSyncHelper != null) {
+            lecturerDirectionSyncHelper.syncLecturerDirections(lecturer);
+        }
         return toResponseDTO(lecturer);
     }
 
@@ -189,6 +198,9 @@ public class LecturerService {
 
         lecturer.setResearchInterests(dto.getResearchInterests().trim());
         lecturer = lecturerRepository.save(lecturer);
+        if (lecturerDirectionSyncHelper != null) {
+            lecturerDirectionSyncHelper.syncLecturerDirections(lecturer);
+        }
         return toResponseDTO(lecturer);
     }
 

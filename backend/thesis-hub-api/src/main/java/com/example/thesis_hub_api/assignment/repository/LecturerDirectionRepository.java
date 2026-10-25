@@ -12,6 +12,8 @@ public interface LecturerDirectionRepository extends JpaRepository<LecturerDirec
 
     List<LecturerDirection> findByLecturerId(Long lecturerId);
 
+    List<LecturerDirection> findByLecturerIdIn(java.util.Collection<Long> lecturerIds);
+
     List<LecturerDirection> findByDirectionId(Long directionId);
 
     default List<LecturerDirection> findByProjectDirectionId(Long directionId) {

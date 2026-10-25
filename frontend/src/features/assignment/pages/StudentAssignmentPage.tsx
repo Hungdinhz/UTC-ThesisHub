@@ -38,6 +38,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [activeProgram, setActiveProgram] = useState<'CU_NHAN' | 'KY_SU'>(initialProgram);
   const [isRoundFinalized, setIsRoundFinalized] = useState(false);
+  const [studentRoundGpa, setStudentRoundGpa] = useState<number | undefined>(undefined);
 
   // 1. Load project rounds
   useEffect(() => {
@@ -115,6 +116,24 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
       const finalized = propsData?.some((p) => p.status === 'FINALIZED') || assigned?.status === 'FINALIZED';
       setIsRoundFinalized(!!finalized);
+
+      // Fetch student's round registration to obtain exact official GPA
+      if (userCode) {
+        try {
+          const roundStudentsRes = await apiService.getStudentsInRound(roundId, {
+            search: userCode,
+            size: 5,
+          });
+          const matchedStudent = roundStudentsRes?.content?.find(
+            (s) => s.studentCode === userCode || (effectiveStudentId && s.studentId === effectiveStudentId)
+          );
+          if (matchedStudent && matchedStudent.gpa !== undefined && matchedStudent.gpa !== null) {
+            setStudentRoundGpa(Number(matchedStudent.gpa));
+          }
+        } catch (e) {
+          console.warn('Could not fetch student round GPA', e);
+        }
+      }
     } catch (err) {
       console.error('Failed to load assignment data:', err);
     } finally {
@@ -148,7 +167,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
     nv1LecturerId: myPreferences.find((p) => p.priority === 1)?.lecturerId,
     nv2LecturerId: myPreferences.find((p) => p.priority === 2)?.lecturerId,
     nv3LecturerId: myPreferences.find((p) => p.priority === 3)?.lecturerId,
-    gpa: myPreferences[0]?.gpa,
+    gpa: studentRoundGpa ?? myPreferences[0]?.gpa ?? (user as any)?.gpa ?? (user as any)?.student?.gpa ?? 3.45,
     prioritizationCriteria: myPreferences[0]?.prioritizationCriteria,
   };
 

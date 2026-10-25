@@ -191,6 +191,26 @@ public class StudentExcelParser {
             errors.add("Email không đúng định dạng chuẩn: " + email);
         }
 
+        // Đọc điểm GPA tích lũy (Hệ 4.0)
+        String gpaStr = "";
+        int gpaColIdx = combinedFullNameMode ? 7 : 8;
+        if (row.getCell(gpaColIdx) != null) {
+            gpaStr = getCellValue(row.getCell(gpaColIdx)).trim();
+        }
+        Double gpa = 3.20;
+        if (!gpaStr.isEmpty()) {
+            try {
+                double parsedGpa = Double.parseDouble(gpaStr.replace(',', '.'));
+                if (parsedGpa >= 0.0 && parsedGpa <= 4.0) {
+                    gpa = Math.round(parsedGpa * 100.0) / 100.0;
+                } else {
+                    errors.add("Điểm GPA phải nằm trong khoảng từ 0.0 đến 4.0 (nhập: " + gpaStr + ")");
+                }
+            } catch (NumberFormatException e) {
+                errors.add("Điểm GPA không đúng định dạng số: " + gpaStr);
+            }
+        }
+
         boolean isValid = errors.isEmpty();
 
         return StudentImportRowDTO.builder()
@@ -204,6 +224,7 @@ public class StudentExcelParser {
                 .className(className)
                 .phone(phone)
                 .email(email)
+                .gpa(gpa)
                 .isValid(isValid)
                 .errors(errors)
                 .build();
@@ -263,7 +284,7 @@ public class StudentExcelParser {
             centerCellStyle.cloneStyleFrom(dataCellStyle);
             centerCellStyle.setAlignment(HorizontalAlignment.CENTER);
 
-            // Danh sách tiêu đề các cột đúng như ảnh mẫu của UTC
+            // Danh sách tiêu đề các cột chuẩn UTC gồm cột Điểm GPA
             String[] headers = {
                     "STT",
                     "Mã sinh viên (MSSV) *",
@@ -272,7 +293,8 @@ public class StudentExcelParser {
                     "Ngành (CNTT/KHMT) *",
                     "Lớp sinh hoạt *",
                     "Số điện thoại",
-                    "Email"
+                    "Email",
+                    "Điểm GPA (Hệ 4.0) *"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -284,13 +306,13 @@ public class StudentExcelParser {
                 cell.setCellStyle(headerCellStyle);
             }
 
-            // Dữ liệu mẫu chuẩn từ ảnh UTC của người dùng
+            // Dữ liệu mẫu chuẩn từ ảnh UTC của người dùng kèm điểm GPA
             Object[][] sampleData = {
-                    {1, "201200101", "Nguyễn Văn", "An", "CNTT", "CNTT 1 - K62", "0912345671", "201200101@lms.utc.edu.vn"},
-                    {2, "201200102", "Trần Thị", "Bình", "CNTT", "CNTT 2 - K62", "0912345672", "201200102@lms.utc.edu.vn"},
-                    {3, "201200103", "Lê Hoàng", "Cường", "KHMT", "KHMT 1 - K62", "0912345673", "201200103@lms.utc.edu.vn"},
-                    {4, "201200104", "Phạm Ngọc", "Dung", "CNTT", "CNTT Việt Anh - K62", "0912345674", "201200104@lms.utc.edu.vn"},
-                    {5, "201200105", "Hoàng Minh", "Đức", "KHMT", "KHMT 2 - K62", "0912345675", "201200105@lms.utc.edu.vn"}
+                    {1, "201200101", "Nguyễn Văn", "An", "CNTT", "CNTT 1 - K62", "0912345671", "201200101@lms.utc.edu.vn", 3.45},
+                    {2, "201200102", "Trần Thị", "Bình", "CNTT", "CNTT 2 - K62", "0912345672", "201200102@lms.utc.edu.vn", 3.20},
+                    {3, "201200103", "Lê Hoàng", "Cường", "KHMT", "KHMT 1 - K62", "0912345673", "201200103@lms.utc.edu.vn", 3.65},
+                    {4, "201200104", "Phạm Ngọc", "Dung", "CNTT", "CNTT Việt Anh - K62", "0912345674", "201200104@lms.utc.edu.vn", 3.10},
+                    {5, "201200105", "Hoàng Minh", "Đức", "KHMT", "KHMT 2 - K62", "0912345675", "201200105@lms.utc.edu.vn", 3.50}
             };
 
             int rowIdx = 1;
@@ -302,6 +324,9 @@ public class StudentExcelParser {
                     Cell cell = row.createCell(col);
                     if (student[col] instanceof Integer) {
                         cell.setCellValue((Integer) student[col]);
+                        cell.setCellStyle(centerCellStyle);
+                    } else if (student[col] instanceof Double) {
+                        cell.setCellValue((Double) student[col]);
                         cell.setCellStyle(centerCellStyle);
                     } else {
                         cell.setCellValue(String.valueOf(student[col]));
@@ -323,6 +348,7 @@ public class StudentExcelParser {
             sheet.setColumnWidth(5, 24 * 256);  // Lớp
             sheet.setColumnWidth(6, 18 * 256);  // SĐT
             sheet.setColumnWidth(7, 30 * 256);  // Email
+            sheet.setColumnWidth(8, 22 * 256);  // Điểm GPA
 
             workbook.write(out);
             return out.toByteArray();

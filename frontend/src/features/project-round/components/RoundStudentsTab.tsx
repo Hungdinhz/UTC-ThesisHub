@@ -53,6 +53,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     className: '',
     majorId: 0,
     phone: '',
+    gpa: 3.2,
     status: 'ELIGIBLE',
     note: '',
   });
@@ -215,6 +216,16 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         }
         return '';
       }
+      case 'gpa': {
+        if (value === undefined || value === null || value === '') {
+          return 'Điểm GPA không được để trống';
+        }
+        const num = Number(value);
+        if (isNaN(num) || num < 0 || num > 4.0) {
+          return 'Điểm GPA phải nằm trong khoảng từ 0.0 đến 4.0 (VD: 3.25)';
+        }
+        return '';
+      }
       default:
         return '';
     }
@@ -353,6 +364,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       'majorId',
       'email',
       'phone',
+      'gpa',
     ];
     const newErrors: Record<string, string> = {};
     const newTouched: Record<string, boolean> = {};
@@ -697,7 +709,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                 <th style={{ padding: '10px 12px' }}>Ngành</th>
                 <th style={{ padding: '10px 12px' }}>Lớp</th>
                 <th style={{ padding: '10px 12px' }}>Email & SĐT</th>
-                <th style={{ padding: '10px 12px' }}>Nợ TC</th>
+                <th style={{ padding: '10px 12px' }}>GPA</th>
                 <th style={{ padding: '10px 12px' }}>Trạng thái</th>
                 <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
               </tr>
@@ -721,8 +733,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                       {st.phone && <div style={{ fontSize: '0.75rem' }}>📞 {st.phone}</div>}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
-                      <span style={{ color: st.debtCredits > 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
-                        {st.debtCredits}
+                      <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
+                        {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
                       </span>
                     </td>
                     <td style={{ padding: '10px 12px' }}>
@@ -877,6 +889,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                         <th style={{ padding: '8px' }}>Lớp</th>
                         <th style={{ padding: '8px' }}>Email</th>
                         <th style={{ padding: '8px' }}>Số ĐT</th>
+                        <th style={{ padding: '8px' }}>GPA</th>
                         <th style={{ padding: '8px' }}>Trạng thái / Lỗi</th>
                       </tr>
                     </thead>
@@ -896,6 +909,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                           <td style={{ padding: '8px' }}>{row.className}</td>
                           <td style={{ padding: '8px' }}>{row.email}</td>
                           <td style={{ padding: '8px' }}>{row.phone || '—'}</td>
+                          <td style={{ padding: '8px', fontWeight: 700, color: '#0a3273' }}>
+                            {row.gpa !== undefined && row.gpa !== null ? Number(row.gpa).toFixed(2) : '3.20'}
+                          </td>
                           <td style={{ padding: '8px' }}>
                             {row.isValid ? (
                               <span style={{ color: '#16a34a', fontWeight: 600 }}>✔ Hợp lệ</span>
@@ -1276,20 +1292,61 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                 </div>
               </div>
 
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
-                  Trạng thái ban đầu trong đợt
-                </label>
-                <select
-                  value={manualForm.status}
-                  onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                >
-                  <option value="ELIGIBLE">Đủ điều kiện tham gia (ELIGIBLE)</option>
-                  <option value="REGISTERED">Đã có đề tài (REGISTERED)</option>
-                  <option value="ASSIGNED">Đã gán GVHD (ASSIGNED)</option>
-                  <option value="IN_PROGRESS">Đang làm đồ án (IN_PROGRESS)</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Trạng thái ban đầu trong đợt
+                  </label>
+                  <select
+                    value={manualForm.status}
+                    onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  >
+                    <option value="ELIGIBLE">Đủ điều kiện tham gia (ELIGIBLE)</option>
+                    <option value="REGISTERED">Đã có đề tài (REGISTERED)</option>
+                    <option value="ASSIGNED">Đã gán GVHD (ASSIGNED)</option>
+                    <option value="IN_PROGRESS">Đang làm đồ án (IN_PROGRESS)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Điểm GPA tích lũy (Hệ 4.0) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="4.0"
+                    value={manualForm.gpa !== undefined && manualForm.gpa !== null ? manualForm.gpa : ''}
+                    onChange={(e) => handleManualFieldChange('gpa', e.target.value !== '' ? Number(e.target.value) : undefined)}
+                    onBlur={() => handleManualFieldBlur('gpa')}
+                    placeholder="VD: 3.25"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: manualTouched.gpa
+                        ? manualErrors.gpa
+                          ? '1.5px solid #ef4444'
+                          : '1.5px solid #22c55e'
+                        : '1px solid #cbd5e1',
+                      backgroundColor: manualTouched.gpa && manualErrors.gpa ? '#fef2f2' : '#fff',
+                      outline: 'none',
+                    }}
+                  />
+                  {manualTouched.gpa && manualErrors.gpa && (
+                    <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ {manualErrors.gpa}
+                    </div>
+                  )}
+                  {manualTouched.gpa && !manualErrors.gpa && manualForm.gpa !== undefined && (
+                    <div style={{ color: '#16a34a', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
+                      ✓ GPA hợp lệ (Khóa cứng bên SV)
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div style={{ marginBottom: '20px' }}>

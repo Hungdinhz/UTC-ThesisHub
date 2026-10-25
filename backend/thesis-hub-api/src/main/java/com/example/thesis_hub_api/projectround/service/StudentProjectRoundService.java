@@ -339,6 +339,7 @@ public class StudentProjectRoundService {
                         .majorId(major != null ? major.getId() : null)
                         .trainingProgramId(roundTrainingProgramId)
                         .debtCredits(0)
+                        .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
                         .build();
                 student = studentRepository.save(student);
                 newStudentsCreated++;
@@ -351,6 +352,9 @@ public class StudentProjectRoundService {
                 }
                 if (student.getTrainingProgramId() == null) {
                     student.setTrainingProgramId(roundTrainingProgramId);
+                }
+                if (row.getGpa() != null) {
+                    student.setGpa(row.getGpa());
                 }
                 student = studentRepository.save(student);
             }
@@ -370,11 +374,16 @@ public class StudentProjectRoundService {
                         .student(student)
                         .projectRound(round)
                         .status("ELIGIBLE")
+                        .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
                         .note("Import từ file Excel")
                         .build();
                 studentProjectRoundRepository.save(spr);
                 enrolledInRound++;
             } else {
+                if (row.getGpa() != null) {
+                    existingSpr.get().setGpa(row.getGpa());
+                    studentProjectRoundRepository.save(existingSpr.get());
+                }
                 // Đã có trong đợt, bỏ qua không ghi đè
                 skipped++;
             }
@@ -442,6 +451,7 @@ public class StudentProjectRoundService {
 
         // 2. Student
         Long roundTrainingProgramId = round.getTrainingProgram() != null ? round.getTrainingProgram().getId() : null;
+        Double manualGpa = dto.getGpa() != null ? dto.getGpa() : 3.20;
         Student student = studentRepository.findByStudentCode(studentCode).orElse(null);
         if (student == null) {
             student = Student.builder()
@@ -451,6 +461,7 @@ public class StudentProjectRoundService {
                     .majorId(dto.getMajorId())
                     .trainingProgramId(roundTrainingProgramId)
                     .debtCredits(0)
+                    .gpa(manualGpa)
                     .build();
             student = studentRepository.save(student);
         } else {
@@ -463,6 +474,7 @@ public class StudentProjectRoundService {
             if (student.getTrainingProgramId() == null) {
                 student.setTrainingProgramId(roundTrainingProgramId);
             }
+            student.setGpa(manualGpa);
             student = studentRepository.save(student);
         }
 
@@ -484,10 +496,12 @@ public class StudentProjectRoundService {
                     .student(student)
                     .projectRound(round)
                     .status(initialStatus)
+                    .gpa(manualGpa)
                     .note(dto.getNote() != null ? dto.getNote().trim() : "Thêm thủ công")
                     .build();
         } else {
             spr.setStatus(initialStatus);
+            spr.setGpa(manualGpa);
             if (dto.getNote() != null) {
                 spr.setNote(dto.getNote().trim());
             }
@@ -643,6 +657,7 @@ public class StudentProjectRoundService {
                 .trainingProgram(tp != null ? tp.getName() : null)
                 .status(spr.getStatus())
                 .debtCredits(student != null ? student.getDebtCredits() : 0)
+                .gpa(spr.getGpa() != null ? spr.getGpa() : (student != null && student.getGpa() != null ? student.getGpa() : 3.20))
                 .note(spr.getNote())
                 .enrolledAt(spr.getCreatedAt())
                 .build();

@@ -803,6 +803,7 @@ export interface StudentImportRow {
   className: string;
   phone?: string;
   email?: string;
+  gpa?: number;
   isValid: boolean;
   errors: string[];
 }
@@ -845,6 +846,7 @@ export interface StudentProjectRoundItem {
   trainingProgram?: string;
   status: string;
   debtCredits: number;
+  gpa?: number;
   note?: string;
   enrolledAt?: string;
 }
@@ -989,6 +991,7 @@ export interface CreateRoundStudentManualPayload {
   className?: string;
   majorId: number;
   phone?: string;
+  gpa?: number;
   status?: string;
   note?: string;
 }

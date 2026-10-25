@@ -7,6 +7,8 @@ import type { Task, Comment, Submission } from '../types';
 import type { Thesis } from '../../thesis/types';
 import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
+import { apiService } from '../../../services/api';
+import type { ProjectRoundItem } from '../../../types';
 
 export const TaskBoardPage: React.FC = () => {
   const { userType, user } = useAuth();
@@ -15,6 +17,13 @@ export const TaskBoardPage: React.FC = () => {
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor';
   const canCreateTask = isSupervisor;
+
+  // Project Rounds state for separate filtering
+  const [projectRounds, setProjectRounds] = useState<ProjectRoundItem[]>([]);
+  const [selectedRoundId, setSelectedRoundId] = useState<number | 'ALL'>(() => {
+    const roundParam = searchParams.get('roundId');
+    return roundParam && roundParam !== 'ALL' ? Number(roundParam) : 'ALL';
+  });
 
   // Theses state
   const [theses, setTheses] = useState<Thesis[]>([]);
@@ -50,12 +59,38 @@ export const TaskBoardPage: React.FC = () => {
     return theses;
   }, [theses, isStudent, isSupervisor, user]);
 
+  // Combined project rounds from API + any rounds defined in theses
+  const combinedRounds = useMemo(() => {
+    const roundsMap = new Map<number, { id: number; name: string; code?: string }>();
+    projectRounds.forEach(r => {
+      roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
+    });
+    theses.forEach(t => {
+      if (t.projectRoundId && !roundsMap.has(t.projectRoundId)) {
+        roundsMap.set(t.projectRoundId, {
+          id: t.projectRoundId,
+          name: t.projectRoundName || `Đợt đồ án #${t.projectRoundId}`,
+          code: t.thesisCode?.split('_')?.[1] || undefined,
+        });
+      }
+    });
+    return Array.from(roundsMap.values());
+  }, [projectRounds, theses]);
+
+  // Filter visible theses by selected project round:
+  const roundFilteredTheses = useMemo(() => {
+    if (selectedRoundId === 'ALL' || !selectedRoundId) {
+      return visibleTheses;
+    }
+    return visibleTheses.filter(t => t.projectRoundId === Number(selectedRoundId));
+  }, [visibleTheses, selectedRoundId]);
+
   // Thesis search filter
   const [thesisSearchTerm, setThesisSearchTerm] = useState('');
   const searchedTheses = useMemo(() => {
-    if (!thesisSearchTerm.trim()) return visibleTheses;
+    if (!thesisSearchTerm.trim()) return roundFilteredTheses;
     const term = thesisSearchTerm.trim().toLowerCase();
-    return visibleTheses.filter(t =>
+    return roundFilteredTheses.filter(t =>
       (t.titleVn && t.titleVn.toLowerCase().includes(term)) ||
       (t.titleEn && t.titleEn.toLowerCase().includes(term)) ||
       (t.thesisCode && t.thesisCode.toLowerCase().includes(term)) ||
@@ -63,7 +98,17 @@ export const TaskBoardPage: React.FC = () => {
       (t.studentCode && t.studentCode.toLowerCase().includes(term)) ||
       (t.lecturerFullName && t.lecturerFullName.toLowerCase().includes(term))
     );
-  }, [visibleTheses, thesisSearchTerm]);
+  }, [roundFilteredTheses, thesisSearchTerm]);
+
+  // When round changes, if current thesis is not in that round, auto-select first thesis in round
+  useEffect(() => {
+    if (!isStudent && roundFilteredTheses.length > 0) {
+      const exists = roundFilteredTheses.some(t => t.id === selectedThesisId);
+      if (!exists) {
+        setSelectedThesisId(roundFilteredTheses[0].id);
+      }
+    }
+  }, [selectedRoundId, roundFilteredTheses, isStudent, selectedThesisId]);
 
   // Tasks & detail state
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -91,10 +136,22 @@ export const TaskBoardPage: React.FC = () => {
   const [newTaskPriority, setNewTaskPriority] = useState('MEDIUM');
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
 
-  // 1. Fetch available theses
+  // 1. Fetch available project rounds and theses
   useEffect(() => {
+    fetchRounds();
     fetchThesesList();
   }, []);
+
+  const fetchRounds = async () => {
+    try {
+      const list = await apiService.getProjectRounds();
+      if (list && list.length > 0) {
+        setProjectRounds(list);
+      }
+    } catch (err) {
+      console.error('Không thể tải danh sách đợt đồ án:', err);
+    }
+  };
 
   const fetchThesesList = async () => {
     try {
@@ -421,7 +478,7 @@ export const TaskBoardPage: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <span style={{ fontSize: '20px' }}>📌</span>
               <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: 0, color: '#0f172a' }}>
-                Giai đoạn 5: Thực hiện Đồ án & Quản lý Tiến độ (Task Kanban)
+                Giai đoạn 4: Thực hiện Đồ án & Quản lý Tiến độ (Task Kanban)
               </h1>
             </div>
             <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
@@ -454,8 +511,90 @@ export const TaskBoardPage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              /* Giảng viên hoặc Quản trị viên */
+              /* Giảng viên hoặc Quản trị viên: Tách riêng Đợt đồ án và Tên đề tài */
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {/* 1. Tách riêng bộ chọn ĐỢT ĐỒ ÁN */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label htmlFor="roundSelect" style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+                    📁 Đợt đồ án:
+                  </label>
+                  <select
+                    id="roundSelect"
+                    value={selectedRoundId}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const newRoundId = val === 'ALL' ? 'ALL' : Number(val);
+                      setSelectedRoundId(newRoundId);
+                      setSearchParams(prev => {
+                        const next = new URLSearchParams(prev);
+                        if (newRoundId === 'ALL') {
+                          next.delete('roundId');
+                        } else {
+                          next.set('roundId', String(newRoundId));
+                        }
+                        return next;
+                      }, { replace: true });
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px',
+                      maxWidth: '250px',
+                      minWidth: '170px',
+                      fontWeight: 600,
+                      color: '#0a3273',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="ALL">-- Tất cả các đợt đồ án --</option>
+                    {combinedRounds.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} {r.code ? `(${r.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Tách riêng bộ chọn TÊN ĐỀ TÀI */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label htmlFor="thesisSelect" style={{ fontSize: '13px', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+                    🎯 Tên đề tài:
+                  </label>
+                  <select
+                    id="thesisSelect"
+                    value={selectedThesisId}
+                    onChange={e => setSelectedThesisId(Number(e.target.value))}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px',
+                      maxWidth: '380px',
+                      minWidth: '240px',
+                      fontWeight: 600,
+                      color: '#0a3273',
+                      background: '#fff',
+                    }}
+                  >
+                    {searchedTheses.length === 0 ? (
+                      <option value="">Không tìm thấy đề tài trong đợt này</option>
+                    ) : (
+                      searchedTheses.map(t => (
+                        <option key={t.id} value={t.id} title={t.titleVn}>
+                          {t.titleVn} — [SV: {t.studentFullName || t.studentCode}]
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  {(thesisSearchTerm || selectedRoundId !== 'ALL') && (
+                    <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                      ({searchedTheses.length}/{visibleTheses.length})
+                    </span>
+                  )}
+                </div>
+
+                {/* 3. Ô tìm kiếm theo từ khóa */}
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
                     type="text"
@@ -468,7 +607,7 @@ export const TaskBoardPage: React.FC = () => {
                       borderRadius: '6px',
                       border: '1px solid #cbd5e1',
                       fontSize: '13px',
-                      width: '210px',
+                      width: '180px',
                       background: '#fff',
                       color: '#1e293b',
                     }}
@@ -493,43 +632,6 @@ export const TaskBoardPage: React.FC = () => {
                     </button>
                   )}
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label htmlFor="thesisSelect" style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
-                    {isSupervisor ? '👨‍🏫 Đề tài:' : '👁️ Chọn đề tài:'}
-                  </label>
-                  <select
-                    id="thesisSelect"
-                    value={selectedThesisId}
-                    onChange={e => setSelectedThesisId(Number(e.target.value))}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '13px',
-                      maxWidth: '380px',
-                      minWidth: '240px',
-                      fontWeight: 600,
-                      color: '#0a3273',
-                      background: '#fff',
-                    }}
-                  >
-                    {searchedTheses.length === 0 ? (
-                      <option value="">Không tìm thấy đề tài</option>
-                    ) : (
-                      searchedTheses.map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.thesisCode} — {t.titleVn} ({t.studentFullName || t.studentCode})
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  {thesisSearchTerm && (
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>
-                      ({searchedTheses.length}/{visibleTheses.length})
-                    </span>
-                  )}
-                </div>
               </div>
             )}
 
@@ -547,7 +649,8 @@ export const TaskBoardPage: React.FC = () => {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 <span>➕</span> Giao Việc Mới
@@ -560,19 +663,27 @@ export const TaskBoardPage: React.FC = () => {
         {currentThesis && (
           <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '16px', border: '1px solid #cbd5e1' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <span style={{ background: '#0a3273', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
-                    {currentThesis.thesisCode}
-                  </span>
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>
-                    {currentThesis.titleVn}
+              <div style={{ flex: 1, minWidth: '300px' }}>
+                {/* Tên đề tài to, rõ ràng */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '17px', fontWeight: 700, color: '#0a3273' }}>
+                    📖 {currentThesis.titleVn}
                   </span>
                 </div>
-                <div style={{ fontSize: '13px', color: '#475569', display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '6px' }}>
-                  <span>👨‍🎓 <strong>Sinh viên:</strong> {currentThesis.studentFullName} ({currentThesis.studentCode}) — Lớp: {currentThesis.studentClass || 'K62'}</span>
-                  <span>👨‍🏫 <strong>GVHD:</strong> {currentThesis.lecturerFullName || 'TS. Nguyễn Văn Hướng'}</span>
-                  <span>📁 <strong>Đợt:</strong> {currentThesis.projectRoundName || 'K62 CNTT - HK1'}</span>
+                {/* Các trường thông tin tách biệt: Đợt đồ án, Mã đề tài, Sinh viên, GVHD */}
+                <div style={{ fontSize: '13px', color: '#475569', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', padding: '3px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
+                    📁 Đợt đồ án: <strong>{currentThesis.projectRoundName || 'K62 CNTT - HK1'}</strong>
+                  </span>
+                  <span style={{ background: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', padding: '3px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
+                    🎯 Mã đề tài: <strong>{currentThesis.thesisCode}</strong>
+                  </span>
+                  <span style={{ background: '#fff', color: '#334155', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                    👨‍🎓 Sinh viên: <strong>{currentThesis.studentFullName}</strong> ({currentThesis.studentCode}) — Lớp: {currentThesis.studentClass || 'K62'}
+                  </span>
+                  <span style={{ background: '#fff', color: '#334155', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                    👨‍🏫 GVHD: <strong>{currentThesis.lecturerFullName || 'TS. Nguyễn Văn Hướng'}</strong>
+                  </span>
                 </div>
               </div>
 

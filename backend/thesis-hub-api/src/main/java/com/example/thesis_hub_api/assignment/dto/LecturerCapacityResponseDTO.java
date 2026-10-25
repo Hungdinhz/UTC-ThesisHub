@@ -34,4 +34,5 @@ public class LecturerCapacityResponseDTO {
     private List<String> directionNames;
     private List<Long> directionIds;
     private List<String> directionCodes;
+    private String researchInterests;
 }

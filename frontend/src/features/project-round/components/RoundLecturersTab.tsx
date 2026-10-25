@@ -36,14 +36,6 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
   const [directions, setDirections] = useState<ProjectDirection[]>([]);
   const [selectedDirectionId, setSelectedDirectionId] = useState<number | undefined>(undefined);
 
-  // Edit Capacity & Directions Modal
-  const [editingCapacity, setEditingCapacity] = useState<LecturerCapacity | null>(null);
-  const [editQuota, setEditQuota] = useState<number>(5);
-  const [editFactor, setEditFactor] = useState<number>(1.0);
-  const [editActive, setEditActive] = useState<boolean>(true);
-  const [editDirectionIds, setEditDirectionIds] = useState<number[]>([]);
-  const [editLoading, setEditLoading] = useState(false);
-
   // Add Lecturers Modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
@@ -77,46 +69,6 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
   useEffect(() => {
     loadData();
   }, [roundId]);
-
-  const handleOpenEditModal = (c: LecturerCapacity) => {
-    setEditingCapacity(c);
-    setEditQuota(c.maxQuota || 5);
-    setEditFactor(c.capacityFactor != null ? c.capacityFactor : 1.0);
-    setEditActive(c.isActive !== false);
-
-    // Resolve assigned direction IDs
-    let currentDirIds: number[] = [];
-    if (c.directionIds && c.directionIds.length > 0) {
-      currentDirIds = [...c.directionIds];
-    } else if (directions.length > 0) {
-      currentDirIds = directions
-        .filter((d) => isLecturerAssignedToDirection(c, d))
-        .map((d) => d.id);
-    }
-    setEditDirectionIds(currentDirIds);
-  };
-
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCapacity) return;
-    try {
-      setEditLoading(true);
-      await assignmentService.updateCapacity(editingCapacity.id, {
-        maxQuota: editQuota,
-        capacityFactor: editFactor,
-        isActive: editActive,
-        directionIds: editDirectionIds,
-      });
-      setSuccessMsg(`Đã cập nhật chỉ tiêu và hướng đảm nhận của giảng viên ${editingCapacity.fullName} thành công!`);
-      setEditingCapacity(null);
-      await loadData();
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi cập nhật giảng viên');
-    } finally {
-      setEditLoading(false);
-    }
-  };
 
   // Filter capacities
   const filteredCapacities = capacities.filter((c) => {
@@ -152,6 +104,16 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
   const totalAssigned = capacities.reduce((sum, c) => sum + (c.currentAssigned || 0), 0);
   const totalRemaining = Math.max(0, totalCapacity - totalAssigned);
   const avgLoad = totalCapacity > 0 ? Math.round((totalAssigned / totalCapacity) * 100) : 0;
+
+  // Direction coverage metrics (Rule: each direction must have >= 1 lecturer in round to transition DRAFT -> OPEN)
+  const activeCapacities = capacities.filter((c) => c.isActive !== false);
+  const coveredDirections = directions.filter((d) =>
+    activeCapacities.some((c) => isLecturerAssignedToDirection(c, d))
+  );
+  const uncoveredDirections = directions.filter(
+    (d) => !activeCapacities.some((c) => isLecturerAssignedToDirection(c, d))
+  );
+  const isFullDirectionCoverage = directions.length > 0 && uncoveredDirections.length === 0;
 
   // Open Add Modal
   const handleOpenAddModal = () => {
@@ -417,7 +379,65 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
             {totalRemaining} <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>SV ({100 - avgLoad}%)</span>
           </div>
         </div>
+
+        <div
+          style={{
+            backgroundColor: isFullDirectionCoverage ? '#f0fdf4' : '#fffbeb',
+            borderRadius: '8px',
+            padding: '14px',
+            border: `1px solid ${isFullDirectionCoverage ? '#bbf7d0' : '#fde68a'}`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: '0.8rem',
+              color: isFullDirectionCoverage ? '#15803d' : '#b45309',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+            }}
+          >
+            Độ phủ hướng đồ án
+          </div>
+          <div
+            style={{
+              fontSize: '1.6rem',
+              fontWeight: 800,
+              color: isFullDirectionCoverage ? '#14532d' : '#92400e',
+              marginTop: '4px',
+            }}
+          >
+            {coveredDirections.length} / {directions.length} <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>hướng</span>
+          </div>
+        </div>
       </div>
+
+      {/* Direction Coverage Warning Banner if missing lecturers */}
+      {uncoveredDirections.length > 0 && directions.length > 0 && (
+        <div
+          style={{
+            backgroundColor: '#fff7ed',
+            border: '1px solid #fed7aa',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            color: '#9a3412',
+            fontSize: '0.875rem',
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>⚠️</span>
+            <span>Chưa đủ điều kiện Mở đợt (OPEN): Còn {uncoveredDirections.length} hướng chưa có giảng viên phụ trách</span>
+          </div>
+          <div style={{ marginTop: '6px', color: '#7c2d12' }}>
+            Các hướng chưa có GV trong đợt:{' '}
+            <strong>{uncoveredDirections.map((d) => d.name).join(' • ')}</strong>
+          </div>
+          <div style={{ marginTop: '4px', fontSize: '0.8rem', color: '#c2410c' }}>
+            💡 Mỗi hướng đề tài phải có ít nhất 1 giảng viên phụ trách để khi sinh viên đăng ký nguyện vọng không bị thiệt thòi. Hệ thống tự động cập nhật độ phủ hướng chuyên môn theo các Giảng viên được thêm vào đợt. Vui lòng thêm Giảng viên phụ trách các hướng còn thiếu trước khi chuyển đợt sang trạng thái <strong>ĐANG MỞ (OPEN)</strong>.
+          </div>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div
@@ -644,28 +664,6 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
-                        <button
-                          type="button"
-                          disabled={isRoundClosed}
-                          onClick={() => handleOpenEditModal(c)}
-                          style={{
-                            backgroundColor: isRoundClosed ? '#f1f5f9' : '#eff6ff',
-                            color: isRoundClosed ? '#94a3b8' : '#1d4ed8',
-                            border: `1px solid ${isRoundClosed ? '#e2e8f0' : '#bfdbfe'}`,
-                            padding: '5px 10px',
-                            borderRadius: '6px',
-                            cursor: isRoundClosed ? 'not-allowed' : 'pointer',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}
-                          title="Chỉnh sửa chỉ tiêu và hướng đảm nhận trong đợt"
-                        >
-                          ✏️ Sửa Hướng
-                        </button>
-
                         <button
                           type="button"
                           onClick={() => handleRemoveCapacity(c)}
@@ -968,233 +966,6 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
         </div>
       )}
 
-      {/* MODAL: Chỉnh sửa Chỉ tiêu & Hướng đảm nhận của GV */}
-      {editingCapacity && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1050,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '650px',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, color: '#0a3273' }}>
-                ⚙️ Sửa Hướng Đảm Nhận & Chỉ Tiêu: {editingCapacity.fullName}
-              </h3>
-              <button
-                onClick={() => setEditingCapacity(null)}
-                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit}>
-              <div style={{ backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.88rem' }}>
-                <p style={{ margin: '0 0 6px 0' }}>
-                  <strong>Mã CB:</strong> {editingCapacity.lecturerCode} | <strong>Họ tên:</strong> {editingCapacity.fullName}
-                </p>
-                <p style={{ margin: 0, color: '#64748b' }}>
-                  <strong>Học vị:</strong> {editingCapacity.academicDegree} | <strong>Bộ môn:</strong> {editingCapacity.departmentName || '—'}
-                </p>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
-                    Chỉ tiêu hướng dẫn (SV) <span style={{ color: '#dc2626' }}>*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={editQuota}
-                    onChange={(e) => setEditQuota(Math.max(1, parseInt(e.target.value) || 1))}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
-                    Hệ số Capacity (0.5 - 2.0)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0.5"
-                    max="2.0"
-                    value={editFactor}
-                    onChange={(e) => setEditFactor(parseFloat(e.target.value) || 1.0)}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  />
-                </div>
-              </div>
-
-              {/* Hướng đảm nhận multi-checkbox */}
-              <div style={{ marginBottom: '18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
-                    🎯 Hướng đồ án đảm nhận trong đợt ({editDirectionIds.length} hướng đã chọn):
-                  </label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setEditDirectionIds(directions.map((d) => d.id))}
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '3px 8px',
-                        background: '#eff6ff',
-                        color: '#1d4ed8',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Chọn tất cả
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditDirectionIds([])}
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '3px 8px',
-                        background: '#f8fafc',
-                        color: '#64748b',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Bỏ chọn hết
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    maxHeight: '220px',
-                    overflowY: 'auto',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    display: 'grid',
-                    gridTemplateColumns: '1fr',
-                    gap: '6px',
-                    backgroundColor: '#fafafa',
-                  }}
-                >
-                  {directions.length === 0 ? (
-                    <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-                      Không có hướng đồ án nào trong hệ thống.
-                    </div>
-                  ) : (
-                    directions.map((d) => {
-                      const isChecked = editDirectionIds.includes(d.id);
-                      return (
-                        <label
-                          key={d.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '6px 10px',
-                            borderRadius: '6px',
-                            border: `1px solid ${isChecked ? '#93c5fd' : '#e2e8f0'}`,
-                            backgroundColor: isChecked ? '#eff6ff' : '#fff',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setEditDirectionIds((prev) => [...prev, d.id]);
-                              } else {
-                                setEditDirectionIds((prev) => prev.filter((id) => id !== d.id));
-                              }
-                            }}
-                          />
-                          <div>
-                            <strong>[{d.code}]</strong> {d.name}
-                          </div>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '6px' }}>
-                  ℹ️ Dữ liệu hướng đảm nhận này sẽ quyết định số lượng GV hiển thị trên thẻ hướng và danh sách gợi ý NV1-NV3 của sinh viên trong đợt.
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '18px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={editActive}
-                    onChange={(e) => setEditActive(e.target.checked)}
-                  />
-                  <span>
-                    <strong>Kích hoạt nhận sinh viên</strong> (Nếu bỏ chọn, GV sẽ tạm dừng nhận hướng dẫn trong đợt này)
-                  </span>
-                </label>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setEditingCapacity(null)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    background: '#fff',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={editLoading}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: editLoading ? '#94a3b8' : '#0a3273',
-                    color: '#fff',
-                    cursor: editLoading ? 'not-allowed' : 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  {editLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

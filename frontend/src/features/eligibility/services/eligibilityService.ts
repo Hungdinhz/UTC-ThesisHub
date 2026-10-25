@@ -167,7 +167,8 @@ class EligibilityService {
     } catch {
       // Fallback mock
     }
-    return mockStudents.filter((s) => !projectRoundId || s.projectRoundId === projectRoundId);
+    const filtered = mockStudents.filter((s) => !projectRoundId || s.projectRoundId === projectRoundId);
+    return filtered.length > 0 ? filtered : mockStudents;
   }
 
   async checkThesisEligibility(studentId: number, projectRoundId?: number): Promise<EligibilityCheckResponse> {

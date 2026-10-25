@@ -53,6 +53,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final AssignmentAlgorithm algorithm;
     private final CapacityCalculator capacityCalculator;
     private final AssignmentOverrideManager overrideManager;
+    private final LecturerDirectionSyncHelper syncHelper;
 
     private ProjectRound getAndValidateActiveRound(Long projectRoundId) {
         ProjectRound round = projectRoundRepository.findById(projectRoundId)
@@ -497,12 +498,21 @@ public class AssignmentServiceImpl implements AssignmentService {
     // ==========================================
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<LecturerCapacityResponseDTO> getCapacitiesByRound(Long projectRoundId) {
         List<LecturerCapacity> list = capacityRepository.findByProjectRoundId(projectRoundId);
 
         Map<Long, Lecturer> lecturerMap = lecturerRepository.findAll().stream()
                 .collect(Collectors.toMap(Lecturer::getId, l -> l));
+
+        // Auto-sync research directions for participating lecturers if not yet mapped
+        for (LecturerCapacity cap : list) {
+            Lecturer l = lecturerMap.get(cap.getLecturerId());
+            if (l != null && lecturerDirectionRepository.findByLecturerId(l.getId()).isEmpty()) {
+                syncHelper.syncLecturerDirections(l);
+            }
+        }
+
         Map<Long, Department> deptMap = departmentRepository.findAll().stream()
                 .collect(Collectors.toMap(Department::getId, d -> d));
         Map<Long, ProjectDirection> directionMap = directionRepository.findAll().stream()
@@ -518,6 +528,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             String degree = l != null ? l.getAcademicDegree() : "";
             Long deptId = l != null ? l.getDepartmentId() : null;
             String deptName = (deptId != null && deptMap.get(deptId) != null) ? deptMap.get(deptId).getName() : "";
+            String interests = l != null ? l.getResearchInterests() : null;
 
             List<ProjectDirection> matchingDirs = allLd.stream()
                     .filter(ld -> ld.getLecturerId().equals(cap.getLecturerId()))
@@ -529,7 +540,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             List<String> dCodes = matchingDirs.stream().map(ProjectDirection::getCode).collect(Collectors.toList());
             List<String> dNames = matchingDirs.stream().map(ProjectDirection::getName).collect(Collectors.toList());
 
-            return mapper.toCapacityResponse(cap, lCode, lName, email, phone, degree, deptId, deptName, dNames, dIds, dCodes);
+            return mapper.toCapacityResponse(cap, lCode, lName, email, phone, degree, deptId, deptName, dNames, dIds, dCodes, interests);
         }).collect(Collectors.toList());
     }
 
@@ -580,6 +591,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         getAndValidateActiveRound(projectRoundId);
         List<Lecturer> lecturers = lecturerRepository.findAll();
         for (Lecturer l : lecturers) {
+            syncHelper.syncLecturerDirections(l);
             if (capacityRepository.findByLecturerIdAndProjectRoundId(l.getId(), projectRoundId).isEmpty()) {
                 LecturerCapacity cap = LecturerCapacity.builder()
                         .lecturerId(l.getId())
@@ -610,6 +622,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                 : lecturerRepository.findAllById(lecturerIds);
 
         for (Lecturer l : lecturers) {
+            syncHelper.syncLecturerDirections(l);
             if (capacityRepository.findByLecturerIdAndProjectRoundId(l.getId(), projectRoundId).isEmpty()) {
                 int assignedQuota = fallbackQuota;
                 if (lecturerQuotas != null && lecturerQuotas.containsKey(l.getId())) {

@@ -429,20 +429,26 @@ export const StudentPreferenceForm: React.FC<Props> = ({
 
           <div className="criteria-grid">
             <div className="form-group">
-              <label>Điểm GPA tích lũy (Hệ 4.0):</label>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Điểm GPA tích lũy (Hệ 4.0):</span>
+                <span style={{ fontSize: '0.78rem', color: '#b45309', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                  🔒 Đã khóa cứng theo hồ sơ đợt đồ án
+                </span>
+              </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 max="4.0"
                 className="form-input"
+                style={{ backgroundColor: '#f8fafc', color: '#0a3273', fontWeight: 700, cursor: 'not-allowed' }}
                 placeholder="VD: 3.45"
-                disabled={isFormDisabled}
+                disabled={true}
+                readOnly={true}
                 value={gpa}
-                onChange={(e) => setGpa(e.target.value)}
               />
               <span className="form-help-text">
-                Thuật toán sử dụng điểm GPA để xếp hạng ưu tiên khi có nhiều sinh viên cùng chọn 1 GV.
+                Điểm GPA được lấy trực tiếp từ danh sách sinh viên đợt đồ án và khóa cứng để đảm bảo tính minh bạch, công bằng cho thuật toán phân công.
               </span>
             </div>
 

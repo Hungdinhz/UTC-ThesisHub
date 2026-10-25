@@ -30,7 +30,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.example.thesis_hub_api.assignment.entity.LecturerCapacity;
+import com.example.thesis_hub_api.assignment.entity.LecturerDirection;
+import com.example.thesis_hub_api.assignment.entity.ProjectDirection;
 import com.example.thesis_hub_api.assignment.repository.LecturerCapacityRepository;
+import com.example.thesis_hub_api.assignment.repository.LecturerDirectionRepository;
+import com.example.thesis_hub_api.assignment.repository.ProjectDirectionRepository;
+import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import java.util.Collections;
 
@@ -58,6 +64,12 @@ class ProjectRoundServiceTest {
 
     @Mock
     private LecturerCapacityRepository lecturerCapacityRepository;
+
+    @Mock
+    private ProjectDirectionRepository projectDirectionRepository;
+
+    @Mock
+    private LecturerDirectionRepository lecturerDirectionRepository;
 
     @InjectMocks
     private ProjectRoundService projectRoundService;
@@ -92,6 +104,8 @@ class ProjectRoundServiceTest {
 
         org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "studentProjectRoundRepository", studentProjectRoundRepository);
         org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "lecturerCapacityRepository", lecturerCapacityRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "projectDirectionRepository", projectDirectionRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "lecturerDirectionRepository", lecturerDirectionRepository);
 
         Instant now = Instant.now();
 
@@ -242,5 +256,90 @@ class ProjectRoundServiceTest {
 
         AppException ex = assertThrows(AppException.class, () -> projectRoundService.addMilestone(10L, req));
         assertEquals(ErrorCode.VALIDATION_FAILED, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("Mở đợt đồ án thất bại khi có hướng không có giảng viên nào phụ trách")
+    void updateRoundStatus_MissingLecturerForDirection_ThrowsException() {
+        sampleRound.setStatus("DRAFT");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        // 1 student with status ELIGIBLE
+        when(studentProjectRoundRepository.countByProjectRoundId(10L)).thenReturn(1L);
+        StudentProjectRound spr = StudentProjectRound.builder().status("ELIGIBLE").build();
+        when(studentProjectRoundRepository.findByProjectRoundId(10L)).thenReturn(List.of(spr));
+
+        // 1 Lecturer (id: 101L, capacity: 5)
+        LecturerCapacity cap = LecturerCapacity.builder()
+                .lecturerId(101L)
+                .projectRoundId(10L)
+                .maxQuota(5)
+                .isActive(true)
+                .build();
+        when(lecturerCapacityRepository.findByProjectRoundId(10L)).thenReturn(List.of(cap));
+
+        // Registration timeline milestone exists
+        when(timelineMilestoneRepository.findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(10L))
+                .thenReturn(List.of(milestoneActive));
+
+        // Active directions: PM_APP (id 1) and GAME (id 2)
+        ProjectDirection d1 = ProjectDirection.builder().id(1L).code("HD_PM_APP").name("Phát triển phần mềm").isActive(true).build();
+        ProjectDirection d2 = ProjectDirection.builder().id(2L).code("HD_GAME").name("Lập trình Game").isActive(true).build();
+        when(projectDirectionRepository.findByIsActiveTrue()).thenReturn(List.of(d1, d2));
+
+        // Lecturer 101 only covers Dir 1 (HD_PM_APP)
+        LecturerDirection ld1 = LecturerDirection.builder().lecturerId(101L).directionId(1L).build();
+        when(lecturerDirectionRepository.findByLecturerIdIn(List.of(101L))).thenReturn(List.of(ld1));
+
+        AppException ex = assertThrows(AppException.class, () -> projectRoundService.updateRoundStatus(10L, "OPEN"));
+        assertEquals(ErrorCode.INVALID_STATUS_TRANSITION, ex.getErrorCode());
+        assertTrue(ex.getMessage().contains("Lập trình Game"));
+        assertTrue(ex.getMessage().contains("Mỗi hướng đồ án phải có ít nhất 1 giảng viên"));
+    }
+
+    @Test
+    @DisplayName("Mở đợt đồ án thành công khi tất cả các hướng đều có ít nhất 1 giảng viên phụ trách")
+    void updateRoundStatus_AllDirectionsCovered_Success() {
+        sampleRound.setStatus("DRAFT");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+        when(projectRoundRepository.save(any(ProjectRound.class))).thenReturn(sampleRound);
+
+        // 1 student with status ELIGIBLE
+        when(studentProjectRoundRepository.countByProjectRoundId(10L)).thenReturn(1L);
+        StudentProjectRound spr = StudentProjectRound.builder().status("ELIGIBLE").build();
+        when(studentProjectRoundRepository.findByProjectRoundId(10L)).thenReturn(List.of(spr));
+
+        // 2 Lecturers (101L and 102L)
+        LecturerCapacity cap1 = LecturerCapacity.builder()
+                .lecturerId(101L)
+                .projectRoundId(10L)
+                .maxQuota(5)
+                .isActive(true)
+                .build();
+        LecturerCapacity cap2 = LecturerCapacity.builder()
+                .lecturerId(102L)
+                .projectRoundId(10L)
+                .maxQuota(5)
+                .isActive(true)
+                .build();
+        when(lecturerCapacityRepository.findByProjectRoundId(10L)).thenReturn(List.of(cap1, cap2));
+
+        // Registration timeline milestone exists
+        when(timelineMilestoneRepository.findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(10L))
+                .thenReturn(List.of(milestoneActive));
+
+        // Active directions: PM_APP (id 1) and GAME (id 2)
+        ProjectDirection d1 = ProjectDirection.builder().id(1L).code("HD_PM_APP").name("Phát triển phần mềm").isActive(true).build();
+        ProjectDirection d2 = ProjectDirection.builder().id(2L).code("HD_GAME").name("Lập trình Game").isActive(true).build();
+        when(projectDirectionRepository.findByIsActiveTrue()).thenReturn(List.of(d1, d2));
+
+        // Lecturer 101 covers Dir 1, Lecturer 102 covers Dir 2
+        LecturerDirection ld1 = LecturerDirection.builder().lecturerId(101L).directionId(1L).build();
+        LecturerDirection ld2 = LecturerDirection.builder().lecturerId(102L).directionId(2L).build();
+        when(lecturerDirectionRepository.findByLecturerIdIn(List.of(101L, 102L))).thenReturn(List.of(ld1, ld2));
+
+        ProjectRoundResponseDTO result = projectRoundService.updateRoundStatus(10L, "OPEN");
+        assertNotNull(result);
+        assertEquals("OPEN", sampleRound.getStatus());
     }
 }

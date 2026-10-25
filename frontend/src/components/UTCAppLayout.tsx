@@ -175,7 +175,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         </div>
 
         <nav className="utc-sidebar-nav">
-          {/* MENU DÀNH CHO ADMIN (ĐẦY ĐỦ 6 GIAI ĐOẠN) */}
+          {/* MENU DÀNH CHO ADMIN (ĐẦY ĐỦ 5 GIAI ĐOẠN) */}
           {currentRole === 'admin' && (
             <>
               <div
@@ -183,7 +183,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/dashboard', true)}
               >
                 <span className="utc-nav-icon">🏠</span>
-                <span className="utc-nav-label">Tổng quan 6 Giai đoạn</span>
+                <span className="utc-nav-label">Tổng quan 5 Giai đoạn</span>
               </div>
 
               <div
@@ -219,19 +219,11 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               </div>
 
               <div
-                className={`utc-nav-item ${activeTab === 'eligibility' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/admin/eligibility', true)}
-              >
-                <span className="utc-nav-icon">✅</span>
-                <span className="utc-nav-label">GĐ4: Xét ĐK & Force Approve</span>
-              </div>
-
-              <div
                 className={`utc-nav-item ${activeTab === 'tasks' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/progress/tasks', true)}
               >
                 <span className="utc-nav-icon">📋</span>
-                <span className="utc-nav-label">GĐ5: Giao Task & Tiến độ</span>
+                <span className="utc-nav-label">GĐ4: Giao Task & Tiến độ</span>
               </div>
 
               <div
@@ -239,7 +231,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/final-eligibility', true)}
               >
                 <span className="utc-nav-icon">🔍</span>
-                <span className="utc-nav-label">GĐ6: Xét ĐK Bảo vệ Cuối</span>
+                <span className="utc-nav-label">GĐ5: Xét ĐK Bảo vệ Cuối</span>
               </div>
 
               <div
@@ -247,7 +239,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/councils', true)}
               >
                 <span className="utc-nav-icon">⚖️</span>
-                <span className="utc-nav-label">GĐ6: Hội đồng (1CT-2TK-2UV)</span>
+                <span className="utc-nav-label">GĐ5: Hội đồng (1CT-2TK-2UV)</span>
               </div>
 
               <div
@@ -255,7 +247,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-schedules', true)}
               >
                 <span className="utc-nav-icon">📅</span>
-                <span className="utc-nav-label">GĐ6: Xếp lịch Bảo vệ</span>
+                <span className="utc-nav-label">GĐ5: Xếp lịch Bảo vệ</span>
               </div>
 
               <div
@@ -263,7 +255,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-scoring', true)}
               >
                 <span className="utc-nav-icon">🏆</span>
-                <span className="utc-nav-label">GĐ6: Chấm điểm & Biên bản PDF</span>
+                <span className="utc-nav-label">GĐ5: Chấm điểm & Biên bản PDF</span>
               </div>
 
               <div
@@ -271,7 +263,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/reservations', true)}
               >
                 <span className="utc-nav-icon">⏸️</span>
-                <span className="utc-nav-label">Nhánh Bảo lưu Đồ án</span>
+                <span className="utc-nav-label">GĐ5: Nhánh Bảo lưu Đồ án</span>
               </div>
             </>
           )}
@@ -308,7 +300,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/progress/tasks', true)}
               >
                 <span className="utc-nav-icon">📋</span>
-                <span className="utc-nav-label">GĐ5: Nhận Task & Nộp kết quả</span>
+                <span className="utc-nav-label">GĐ4: Nhận Task & Nộp kết quả</span>
               </div>
 
               <div
@@ -316,7 +308,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-schedules', true)}
               >
                 <span className="utc-nav-icon">📅</span>
-                <span className="utc-nav-label">GĐ6: Xem Lịch Bảo vệ</span>
+                <span className="utc-nav-label">GĐ5: Xem Lịch Bảo vệ</span>
               </div>
 
               <div
@@ -324,7 +316,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/student/reservation', true)}
               >
                 <span className="utc-nav-icon">⏸️</span>
-                <span className="utc-nav-label">GĐ6: Đơn Xin Bảo Lưu</span>
+                <span className="utc-nav-label">GĐ5: Đơn Xin Bảo Lưu</span>
               </div>
 
               <div
@@ -379,7 +371,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/progress/tasks', true)}
               >
                 <span className="utc-nav-icon">📋</span>
-                <span className="utc-nav-label">GĐ5: Giao Task & Review</span>
+                <span className="utc-nav-label">GĐ4: Giao Task & Review</span>
               </div>
 
               <div
@@ -387,7 +379,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/thesis/detail', true)}
               >
                 <span className="utc-nav-icon">✅</span>
-                <span className="utc-nav-label">GĐ6: Đủ điều kiện Bảo vệ</span>
+                <span className="utc-nav-label">GĐ5: Đủ điều kiện Bảo vệ</span>
               </div>
 
               <div
@@ -395,7 +387,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-scoring', true)}
               >
                 <span className="utc-nav-icon">🏆</span>
-                <span className="utc-nav-label">GĐ6: Chấm điểm GVHD & GVPB</span>
+                <span className="utc-nav-label">GĐ5: Chấm điểm GVHD & GVPB</span>
               </div>
 
               <div

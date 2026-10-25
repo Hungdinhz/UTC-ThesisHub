@@ -71,6 +71,22 @@ public class AssignmentMapper {
             java.util.List<String> directionNames,
             java.util.List<Long> directionIds,
             java.util.List<String> directionCodes) {
+        return toCapacityResponse(entity, lecturerCode, fullName, email, phone, degree, departmentId, departmentName, directionNames, directionIds, directionCodes, null);
+    }
+
+    public LecturerCapacityResponseDTO toCapacityResponse(
+            LecturerCapacity entity,
+            String lecturerCode,
+            String fullName,
+            String email,
+            String phone,
+            String degree,
+            Long departmentId,
+            String departmentName,
+            java.util.List<String> directionNames,
+            java.util.List<Long> directionIds,
+            java.util.List<String> directionCodes,
+            String researchInterests) {
         if (entity == null) return null;
 
         int effective = entity.getEffectiveCapacity();
@@ -99,6 +115,7 @@ public class AssignmentMapper {
                 .directionNames(directionNames)
                 .directionIds(directionIds)
                 .directionCodes(directionCodes)
+                .researchInterests(researchInterests)
                 .build();
     }
 

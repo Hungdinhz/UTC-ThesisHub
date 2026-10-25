@@ -27,6 +27,7 @@ public class StudentProjectRoundResponseDTO {
     private String trainingProgram;
     private String status;
     private Integer debtCredits;
+    private Double gpa;
     private String note;
     private Instant enrolledAt;
 }

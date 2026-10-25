@@ -47,6 +47,7 @@ export interface LecturerCapacity {
   directionNames?: string[];
   directionIds?: number[];
   directionCodes?: string[];
+  researchInterests?: string;
 }
 
 export interface DirectionRegistration {
@@ -175,7 +176,7 @@ export const isLecturerAssignedToDirection = (
   if (capacity.directionNames && Array.isArray(capacity.directionNames) && capacity.directionNames.length > 0) {
     const targetCode = direction.code.trim().toLowerCase();
     const targetName = direction.name.trim().toLowerCase();
-    return capacity.directionNames.some((dn) => {
+    const matched = capacity.directionNames.some((dn) => {
       const dnNorm = dn.trim().toLowerCase();
       return (
         dnNorm === targetCode ||
@@ -185,6 +186,37 @@ export const isLecturerAssignedToDirection = (
         dnNorm.includes(targetName)
       );
     });
+    if (matched) return true;
+  }
+
+  // 4. Fallback match by researchInterests string
+  if (capacity.researchInterests && typeof capacity.researchInterests === 'string') {
+    const interestsLower = capacity.researchInterests.toLowerCase();
+    const targetCode = direction.code.trim().toUpperCase();
+    const targetName = direction.name.trim().toLowerCase();
+
+    if (interestsLower.includes(targetCode.toLowerCase()) || interestsLower.includes(targetName)) {
+      return true;
+    }
+
+    switch (targetCode) {
+      case 'HD_PM_APP':
+        return interestsLower.includes('hd_pm') || interestsLower.includes('phần mềm') || interestsLower.includes('mobile') || interestsLower.includes('webapp') || interestsLower.includes('web/app') || interestsLower.includes('web nâng cao') || interestsLower.includes('công nghệ phần mềm');
+      case 'HD_DATA_AI':
+        return interestsLower.includes('hd_data_ai') || interestsLower.includes('hd_dl_ai') || interestsLower.includes('dữ liệu') || interestsLower.includes('trí tuệ nhân tạo') || interestsLower.includes('học máy') || interestsLower.includes('machine learning');
+      case 'HD_GAME':
+        return interestsLower.includes('hd_game') || interestsLower.includes('game') || interestsLower.includes('trò chơi');
+      case 'HD_TESTING':
+        return interestsLower.includes('hd_testing') || interestsLower.includes('hd_test') || interestsLower.includes('kiểm thử');
+      case 'HD_NET_INFRA':
+        return interestsLower.includes('hd_net') || interestsLower.includes('hạ tầng') || interestsLower.includes('mạng');
+      case 'HD_SECURITY':
+        return interestsLower.includes('hd_security') || interestsLower.includes('hd_attt') || interestsLower.includes('an toàn thông tin') || interestsLower.includes('an ninh mạng') || interestsLower.includes('bảo mật');
+      case 'HD_ALGO':
+        return interestsLower.includes('hd_algo') || interestsLower.includes('hd_thuat_toan') || interestsLower.includes('thuật toán') || interestsLower.includes('giải thuật');
+      default:
+        break;
+    }
   }
 
   return false;

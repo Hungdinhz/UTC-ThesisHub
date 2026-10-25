@@ -93,16 +93,6 @@ export const mockDirections: ProjectDirection[] = [
     isActive: true,
     lecturerCount: 2,
   },
-  {
-    id: 8,
-    code: 'HD_CNPM_WEB',
-    name: 'Công nghệ phần mềm & Web nâng cao',
-    description: 'Kiến trúc hướng dịch vụ, Microservices, công nghệ web hiện đại và triển khai hệ thống phân tán.',
-    departmentId: 1,
-    departmentName: 'Công nghệ phần mềm',
-    isActive: true,
-    lecturerCount: 2,
-  },
 ];
 
 export const mockCapacities: LecturerCapacity[] = [
@@ -124,9 +114,9 @@ export const mockCapacities: LecturerCapacity[] = [
     remainingCapacity: 2,
     loadRatio: 0.6,
     isActive: true,
-    directionIds: [1, 2, 8],
-    directionCodes: ['HD_PM_APP', 'HD_DATA_AI', 'HD_CNPM_WEB'],
-    directionNames: ['HD_PM_APP', 'HD_DATA_AI', 'HD_CNPM_WEB'],
+    directionIds: [1, 2],
+    directionCodes: ['HD_PM_APP', 'HD_DATA_AI'],
+    directionNames: ['HD_PM_APP', 'HD_DATA_AI'],
   },
   {
     id: 2,
