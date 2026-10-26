@@ -217,17 +217,17 @@ export const AssignmentProposalTable: React.FC<Props> = ({
                     </span>
                   </td>
                   <td>
-                    {!isFinalized && item.status !== 'FINALIZED' && !isRoundClosed ? (
+                    {!isRoundClosed ? (
                       <button
                         className="btn-action-override"
                         onClick={() => setSelectedForOverride(item)}
-                        title="Điều chuyển sang giảng viên khác"
+                        title="Điều chuyển / Chỉnh sửa giảng viên hướng dẫn"
                       >
-                        ✏️ Override
+                        ✏️ {isFinalized || item.status === 'FINALIZED' ? 'Sửa phân công' : 'Override'}
                       </button>
                     ) : (
                       <span className="text-muted text-xs">
-                        {isRoundClosed ? 'Đợt đã đóng' : 'Đã khóa'}
+                        Đợt đã đóng
                       </span>
                     )}
                   </td>

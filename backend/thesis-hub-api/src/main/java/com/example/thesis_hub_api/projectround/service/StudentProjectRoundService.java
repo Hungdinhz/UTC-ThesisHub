@@ -717,7 +717,16 @@ public class StudentProjectRoundService {
      */
     public byte[] generateTemplate() {
         try {
-            return studentExcelParser.generateTemplate();
+            Set<String> existingCodes = studentRepository != null
+                    ? studentRepository.findAll().stream()
+                            .map(Student::getStudentCode)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toSet())
+                    : Collections.emptySet();
+            if (existingCodes.isEmpty()) {
+                return studentExcelParser.generateTemplate();
+            }
+            return studentExcelParser.generateTemplate(existingCodes);
         } catch (IOException e) {
             log.error("Lỗi khi sinh file Excel mẫu: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.FILE_STORAGE_ERROR);

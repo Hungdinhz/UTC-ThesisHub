@@ -11,7 +11,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -391,6 +394,10 @@ public class StudentExcelParser {
      * Tạo file Excel mẫu chuẩn 8 cột theo yêu cầu thực tế của UTC
      */
     public byte[] generateTemplate() throws IOException {
+        return generateTemplate(Collections.emptySet());
+    }
+
+    public byte[] generateTemplate(Set<String> existingCodes) throws IOException {
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
@@ -446,13 +453,25 @@ public class StudentExcelParser {
                 cell.setCellStyle(headerCellStyle);
             }
 
+            // Sinh 5 mã sinh viên 9 chữ số chưa trùng lặp trong hệ thống
+            Set<String> used = existingCodes != null ? new HashSet<>(existingCodes) : new HashSet<>();
+            List<String> sampleCodes = new ArrayList<>();
+            long candidate = 201200101L;
+            while (sampleCodes.size() < 5) {
+                String codeStr = String.format("%09d", candidate++);
+                if (!used.contains(codeStr)) {
+                    sampleCodes.add(codeStr);
+                    used.add(codeStr);
+                }
+            }
+
             // Dữ liệu mẫu chuẩn từ ảnh UTC của người dùng kèm điểm GPA
             Object[][] sampleData = {
-                    {1, "201200101", "Nguyễn Văn", "An", "CNTT", "CNTT 1 - K62", "0912345671", "201200101@lms.utc.edu.vn", 3.45},
-                    {2, "201200102", "Trần Thị", "Bình", "CNTT", "CNTT 2 - K62", "0912345672", "201200102@lms.utc.edu.vn", 3.20},
-                    {3, "201200103", "Lê Hoàng", "Cường", "KHMT", "KHMT 1 - K62", "0912345673", "201200103@lms.utc.edu.vn", 3.65},
-                    {4, "201200104", "Phạm Ngọc", "Dung", "CNTT", "CNTT Việt Anh - K62", "0912345674", "201200104@lms.utc.edu.vn", 3.10},
-                    {5, "201200105", "Hoàng Minh", "Đức", "KHMT", "KHMT 2 - K62", "0912345675", "201200105@lms.utc.edu.vn", 3.50}
+                    {1, sampleCodes.get(0), "Nguyễn Văn", "An", "CNTT", "CNTT 1 - K62", "0912345671", sampleCodes.get(0) + "@lms.utc.edu.vn", 3.45},
+                    {2, sampleCodes.get(1), "Trần Thị", "Bình", "CNTT", "CNTT 2 - K62", "0912345672", sampleCodes.get(1) + "@lms.utc.edu.vn", 3.20},
+                    {3, sampleCodes.get(2), "Lê Hoàng", "Cường", "KHMT", "KHMT 1 - K62", "0912345673", sampleCodes.get(2) + "@lms.utc.edu.vn", 3.65},
+                    {4, sampleCodes.get(3), "Phạm Ngọc", "Dung", "CNTT", "CNTT Việt Anh - K62", "0912345674", sampleCodes.get(3) + "@lms.utc.edu.vn", 3.10},
+                    {5, sampleCodes.get(4), "Hoàng Minh", "Đức", "KHMT", "KHMT 2 - K62", "0912345675", sampleCodes.get(4) + "@lms.utc.edu.vn", 3.50}
             };
 
             int rowIdx = 1;

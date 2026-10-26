@@ -100,6 +100,20 @@ const ProjectRoundManagementPage: React.FC = () => {
     loadRounds();
   }, []);
 
+  useEffect(() => {
+    if (!error) return;
+    setSuccessMsg(null);
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    setError(null);
+    const timer = setTimeout(() => setSuccessMsg(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
+
   const handleCreateRound = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -140,7 +154,7 @@ const ProjectRoundManagementPage: React.FC = () => {
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái';
       setTransitionError(msg);
-      setError(msg);
+      setSuccessMsg(null);
     } finally {
       setTransitionLoading(false);
     }
@@ -195,12 +209,6 @@ const ProjectRoundManagementPage: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDoubleClickRound = (r: ProjectRoundItem) => {
-    // If round is OPEN or IN_PROGRESS (not ended yet)
-    if (r.status === 'OPEN' || r.status === 'IN_PROGRESS') {
-      const statusLabel = getStatusBadge(r.status).label;
-      setError(`⚠️ Đợt đồ án "${r.name}" (${r.roundCode}) chưa kết thúc (đang ở trạng thái ${statusLabel}). Chỉ có thể xóa các đợt đồ án đã kết thúc (CLOSED hoặc ARCHIVED). Vui lòng kết thúc đợt trước khi xóa!`);
-      return;
-    }
     setRoundToDelete(r);
     setDeleteError(null);
   };
@@ -262,16 +270,31 @@ const ProjectRoundManagementPage: React.FC = () => {
             ⏳ Đang tải dữ liệu hệ thống...
           </div>
         )}
-        {error && (
-          <div style={{ padding: '12px 16px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginBottom: '16px' }}>
-            ⚠️ {error}
+        {error ? (
+          <div style={{ padding: '12px 16px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <span>⚠️ {error}</span>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              style={{ background: 'none', border: 'none', color: '#991b1b', fontWeight: 700, cursor: 'pointer', fontSize: '1rem' }}
+              title="Đóng thông báo"
+            >
+              ✕
+            </button>
           </div>
-        )}
-        {successMsg && (
-          <div style={{ padding: '12px 16px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '8px', marginBottom: '16px' }}>
-            ✅ {successMsg}
+        ) : successMsg ? (
+          <div style={{ padding: '12px 16px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <span>✅ {successMsg}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessMsg(null)}
+              style={{ background: 'none', border: 'none', color: '#166534', fontWeight: 700, cursor: 'pointer', fontSize: '1rem' }}
+              title="Đóng thông báo"
+            >
+              ✕
+            </button>
           </div>
-        )}
+        ) : null}
 
         {/* Top Action Bar */}
         <div className="round-action-bar">
@@ -340,7 +363,7 @@ const ProjectRoundManagementPage: React.FC = () => {
               </h3>
             </div>
             <p style={{ margin: '0 0 14px 0', fontSize: '0.78rem', color: '#64748b' }}>
-              💡 <em>Click 2 lần vào đợt đã kết thúc để xóa</em>
+              💡 <em>Chọn đợt để xem chi tiết hoặc bấm nút 🗑️ Xóa để xóa đợt đồ án</em>
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '700px', overflowY: 'auto' }}>
               {rounds.map((r) => {
@@ -354,7 +377,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                       e.stopPropagation();
                       handleDoubleClickRound(r);
                     }}
-                    title="Click 1 lần để xem chi tiết • Click 2 lần vào đợt đã kết thúc để xóa"
+                    title="Click 1 lần để xem chi tiết • Bấm nút Xóa để xóa đợt đồ án"
                     style={{
                       padding: '14px 16px',
                       borderRadius: '8px',
@@ -365,18 +388,41 @@ const ProjectRoundManagementPage: React.FC = () => {
                       userSelect: 'none'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', gap: '6px' }}>
                       <span style={{ fontWeight: 700, color: '#0a3273', fontSize: '0.95rem' }}>{r.roundCode}</span>
-                      <span style={{
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        backgroundColor: badge.bg,
-                        color: badge.color
-                      }}>
-                        {badge.label}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          backgroundColor: badge.bg,
+                          color: badge.color
+                        }}>
+                          {badge.label}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRoundToDelete(r);
+                            setDeleteError(null);
+                          }}
+                          title={`Xóa đợt đồ án ${r.roundCode}`}
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #fecaca',
+                            backgroundColor: '#fef2f2',
+                            color: '#dc2626',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </div>
                     </div>
                     <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>{r.name}</div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
@@ -496,6 +542,29 @@ const ProjectRoundManagementPage: React.FC = () => {
                       title="Demo: Kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo"
                     >
                       ⚡ Demo: Kết thúc GĐ & Chuyển tiếp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoundToDelete(selectedRound);
+                        setDeleteError(null);
+                      }}
+                      style={{
+                        backgroundColor: '#fef2f2',
+                        color: '#dc2626',
+                        border: '1px solid #fecaca',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      title="Xóa đợt đồ án này"
+                    >
+                      🗑️ Xóa đợt
                     </button>
                   </div>
                 </div>

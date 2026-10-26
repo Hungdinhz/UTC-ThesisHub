@@ -36,9 +36,8 @@ public class AssignmentOverrideManager {
         SupervisorAssignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found with ID: " + assignmentId));
 
-        if ("FINALIZED".equalsIgnoreCase(assignment.getStatus()) || "FINAL".equalsIgnoreCase(assignment.getStatus())) {
-            throw new IllegalStateException("Cannot override an assignment that has already been finalized.");
-        }
+        boolean wasFinalized = "FINALIZED".equalsIgnoreCase(assignment.getStatus())
+                || "FINAL".equalsIgnoreCase(assignment.getStatus());
 
         // Validate that new lecturer belongs to the project direction
         if (assignment.getDirectionId() != null) {
@@ -76,7 +75,7 @@ public class AssignmentOverrideManager {
         assignment.setLecturerId(newLecturerId);
         assignment.setIsOverridden(true);
         assignment.setOverrideReason(reason);
-        assignment.setStatus("OVERRIDDEN");
+        assignment.setStatus(wasFinalized ? "FINALIZED" : "OVERRIDDEN");
         assignment.setAssignmentMethod("MANUAL_OVERRIDE");
         assignment.setOverriddenBy(overriddenBy);
         assignment.setOverriddenAt(Instant.now());

@@ -243,6 +243,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         final Long finalStudentId = studentId;
         Student student = studentRepository.findById(finalStudentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sinh viên với ID: " + finalStudentId));
+        validateStudentInRound(student, round, currentUserId);
         ProjectDirection direction = directionRepository.findById(request.getDirectionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hướng đồ án với ID: " + request.getDirectionId()));
 
@@ -370,6 +371,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         final Long finalStudentId = studentId;
         Student student = studentRepository.findById(finalStudentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sinh viên ID: " + finalStudentId));
+        validateStudentInRound(student, round, currentUserId);
 
         // Kiểm tra sinh viên đã đăng ký hướng đồ án chưa (Mục A.2)
         DirectionRegistration directionReg = registrationRepository.findByStudentIdAndProjectRoundId(studentId, request.getProjectRoundId())
@@ -1140,5 +1142,30 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .averageLoadRatio(Math.round(avgLoad * 100.0) / 100.0)
                 .droppedCount(dropped)
                 .build();
+    }
+
+    private void validateStudentInRound(Student student, ProjectRound round, Long currentUserId) {
+        if (student == null || round == null || studentProjectRoundRepository == null) {
+            return;
+        }
+        Optional<StudentProjectRound> sprOpt = studentProjectRoundRepository
+                .findByStudentIdAndProjectRoundId(student.getId(), round.getId());
+        if (sprOpt.isEmpty()) {
+            boolean enforceEnrollment = currentUserId != null
+                    || studentProjectRoundRepository.countByProjectRoundId(round.getId()) > 0
+                    || !studentProjectRoundRepository.findByStudentId(student.getId()).isEmpty();
+            if (enforceEnrollment) {
+                throw new AppException(ErrorCode.VALIDATION_FAILED,
+                        "Sinh viên (" + student.getStudentCode() + ") không thuộc danh sách tham gia đợt đồ án [" + round.getRoundCode()
+                                + "]. Sinh viên thuộc đợt đồ án nào thì chỉ được đăng ký và thực hiện ở đợt đó.");
+            }
+        } else {
+            String sprStatus = sprOpt.get().getStatus();
+            if ("DROPPED".equalsIgnoreCase(sprStatus) || "RESERVED".equalsIgnoreCase(sprStatus)) {
+                throw new AppException(ErrorCode.VALIDATION_FAILED,
+                        "Sinh viên (" + student.getStudentCode() + ") hiện ở trạng thái " + sprStatus
+                                + " trong đợt đồ án [" + round.getRoundCode() + "] nên không thể đăng ký nguyện vọng.");
+            }
+        }
     }
 }

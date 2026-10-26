@@ -37,6 +37,16 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
   const [proposals, setProposals] = useState<SupervisorAssignment[]>([]);
   const [stats, setStats] = useState<AssignmentStats | null>(null);
 
+  // Finalize Confirmation Form Modal states
+  const [showFinalizeModal, setShowFinalizeModal] = useState(false);
+  const [finalizeNote, setFinalizeNote] = useState('Chốt kết quả phân công giảng viên hướng dẫn chính thức');
+
+  useEffect(() => {
+    if (!alert) return;
+    const timer = setTimeout(() => setAlert(null), 5000);
+    return () => clearTimeout(timer);
+  }, [alert]);
+
   // 1. Fetch project rounds list
   useEffect(() => {
     const fetchRounds = async () => {
@@ -190,8 +200,8 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
     }
   };
 
-  // Finalize Assignments: POST /assignments/finalize
-  const handleFinalize = async () => {
+  // Open Finalize Confirmation Modal Form
+  const handleFinalize = () => {
     if (isRoundClosed) {
       setAlert({
         type: 'warning',
@@ -216,18 +226,21 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       return;
     }
 
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn CHỐT KẾT QUẢ PHÂN CÔNG cuối cùng cho đợt [${currentRound?.name || effectiveRoundId}]?\n\nLƯU Ý: Những sinh viên chưa đăng ký nguyện vọng đồ án trong đợt này sẽ tự động bị LOẠI KHỎI ĐỢT theo quy định.`
-    );
-    if (!confirmed) return;
+    setFinalizeNote(`Chốt kết quả phân công GVHD chính thức cho đợt ${currentRound?.roundCode || effectiveRoundId}`);
+    setShowFinalizeModal(true);
+  };
 
+  // Submit Finalize Form: POST /assignments/finalize
+  const handleConfirmFinalize = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
       setActionLoading(true);
       setAlert(null);
-      const finalStats = await assignmentService.finalizeAssignments(effectiveRoundId);
+      const finalStats = await assignmentService.finalizeAssignments(effectiveRoundId, finalizeNote);
       setStats(finalStats);
       const updatedProps = await assignmentService.getProposals(effectiveRoundId);
       setProposals(updatedProps);
+      setShowFinalizeModal(false);
 
       const droppedText =
         finalStats?.droppedCount && finalStats.droppedCount > 0
@@ -448,7 +461,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
               </span>
             </div>
             <p style={{ margin: '6px 0 0 0', color: '#15803d', fontSize: '0.9rem', lineHeight: 1.5 }}>
-              Kết quả phân công Giảng viên hướng dẫn cho đợt <strong>{currentRound?.name || effectiveRoundId}</strong> đã được chốt và lưu chính thức vào cơ sở dữ liệu. Toàn bộ {proposals.length} sinh viên đã được bàn giao cho các Giảng viên để chuẩn bị bước sang <strong>Giai đoạn 3 (Đề cương & Duyệt đề tài)</strong>. Nút chốt phân công và các thao tác chỉnh sửa đã được khóa để bảo toàn dữ liệu.
+              Kết quả phân công Giảng viên hướng dẫn cho đợt <strong>{currentRound?.name || effectiveRoundId}</strong> đã được chốt và lưu chính thức vào cơ sở dữ liệu. Toàn bộ {proposals.length} sinh viên đã được bàn giao cho các Giảng viên để chuẩn bị bước sang <strong>Giai đoạn 3 (Đề cương & Duyệt đề tài)</strong>. Nút chốt kết quả phân công đã được khóa, tuy nhiên Khoa vẫn có thể bấm nút <strong>"✏️ Sửa phân công"</strong> ở từng sinh viên bên dưới để điều chỉnh thủ công nếu cần.
               {stats?.droppedCount && stats.droppedCount > 0 ? (
                 <span style={{ display: 'block', marginTop: '4px', color: '#b91c1c', fontWeight: 600 }}>
                   ⚠️ Đã loại {stats.droppedCount} sinh viên không đăng ký nguyện vọng khỏi đợt đồ án theo quy chế.
@@ -549,6 +562,155 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
           loading={loading}
           roundName={currentRound?.name}
         />
+      )}
+
+      {/* Modal Form Xác nhận Chốt kết quả phân công */}
+      {showFinalizeModal && (
+        <div
+          className="modal-backdrop"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '560px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #0a3273 0%, #1e40af 100%)',
+                color: '#fff',
+                padding: '18px 24px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                🔒 Xác nhận Chốt Kết Quả Phân Công GVHD
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowFinalizeModal(false)}
+                disabled={actionLoading}
+                style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmFinalize} style={{ padding: '24px' }}>
+              <div
+                style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '14px 16px',
+                  marginBottom: '16px',
+                  fontSize: '0.9rem',
+                  color: '#1e293b',
+                }}
+              >
+                <div style={{ marginBottom: '6px' }}>
+                  📌 <strong>Đợt đồ án:</strong> {currentRound?.name || `Đợt #${effectiveRoundId}`} ({currentRound?.roundCode || `DA_${effectiveRoundId}`})
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  👥 <strong>Số sinh viên được phân công:</strong> <strong style={{ color: '#16a34a' }}>{proposals.length} sinh viên</strong>
+                </div>
+                <div>
+                  👨‍🏫 <strong>Số giảng viên tham gia hướng dẫn:</strong> {capacities.length} giảng viên
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  marginBottom: '16px',
+                  fontSize: '0.88rem',
+                  color: '#92400e',
+                  lineHeight: 1.5,
+                }}
+              >
+                <strong>⚠️ LƯU Ý QUY ĐỊNH:</strong>
+                <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px' }}>
+                  <li>Những sinh viên chưa đăng ký nguyện vọng đồ án trong đợt này sẽ tự động bị <strong>LOẠI KHỎI ĐỢT (DROPPED)</strong> theo quy định.</li>
+                  <li>Sau khi xác nhận chốt, nút <strong>"Chốt kết quả phân công"</strong> sẽ được khóa lại, nhưng Khoa vẫn có thể bấm <strong>"✏️ Sửa phân công"</strong> ở từng dòng để điều chỉnh giảng viên hướng dẫn khi cần.</li>
+                </ul>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Ghi chú quyết định chốt phân công
+                </label>
+                <textarea
+                  rows={3}
+                  value={finalizeNote}
+                  onChange={(e) => setFinalizeNote(e.target.value)}
+                  placeholder="Nhập ghi chú quyết định chốt kết quả phân công..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.9rem',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowFinalizeModal(false)}
+                  disabled={actionLoading}
+                  style={{
+                    padding: '9px 18px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#fff',
+                    color: '#475569',
+                    fontWeight: 600,
+                    cursor: actionLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  style={{
+                    padding: '9px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: '#16a34a',
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: actionLoading ? 'not-allowed' : 'pointer',
+                    opacity: actionLoading ? 0.7 : 1,
+                  }}
+                >
+                  {actionLoading ? '⏳ Đang chốt kết quả...' : '✅ Xác nhận Chốt phân công'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

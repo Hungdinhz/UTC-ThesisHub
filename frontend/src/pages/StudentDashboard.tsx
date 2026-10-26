@@ -103,15 +103,27 @@ const StudentDashboard: React.FC = () => {
       setProfile(profileData);
       setProjectCategories(categoriesData.results || []);
 
-      // Check assignment status in active round
+      // Check assignment status in student's enrolled round
       if (roundsData && roundsData.length > 0) {
-        const activeRound =
-          roundsData.find((r) => r.status === 'OPEN') ||
-          roundsData.find((r) => r.status === 'IN_PROGRESS') ||
-          roundsData[0];
-        if (activeRound?.roundId) {
+        let targetRoundId: number | undefined;
+        try {
+          const myStatus = await apiService.getMyRoundStatus();
+          if (myStatus && myStatus.inRound && myStatus.roundId) {
+            targetRoundId = myStatus.roundId;
+          }
+        } catch {
+          // ignore
+        }
+        if (!targetRoundId) {
+          const activeRound =
+            roundsData.find((r) => r.status === 'OPEN') ||
+            roundsData.find((r) => r.status === 'IN_PROGRESS') ||
+            roundsData[0];
+          targetRoundId = activeRound?.roundId;
+        }
+        if (targetRoundId) {
           try {
-            const proposals = await assignmentService.getProposals(activeRound.roundId);
+            const proposals = await assignmentService.getProposals(targetRoundId);
             const userCode = (user as any)?.registration_no || (user as any)?.studentCode || (user as any)?.student_code || user?.username;
             const studentId = (user as any)?.id || profileData?.id;
             const myAssign = proposals?.find((p) =>
