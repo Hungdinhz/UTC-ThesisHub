@@ -26,7 +26,8 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
            " LOWER(s.studentCode) LIKE :search OR " +
            " LOWER(u.fullName) LIKE :search OR " +
            " LOWER(u.email) LIKE :search OR " +
-           " LOWER(s.className) LIKE :search)")
+           " LOWER(s.className) LIKE :search) " +
+           "ORDER BY s.studentCode ASC")
     Page<Student> searchStudents(
             @Param("majorId") Long majorId,
             @Param("trainingProgramId") Long trainingProgramId,

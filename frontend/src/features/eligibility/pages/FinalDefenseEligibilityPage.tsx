@@ -61,7 +61,11 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         size: 100,
         search: studentSearch || undefined,
       });
-      setRoundStudents(res?.content || []);
+      const rawList = res?.content || [];
+      const sortedList = [...rawList].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setRoundStudents(sortedList);
     } catch (err) {
       console.error('Lỗi khi tải sinh viên trong đợt:', err);
     } finally {

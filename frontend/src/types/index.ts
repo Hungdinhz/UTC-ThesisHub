@@ -995,3 +995,21 @@ export interface CreateRoundStudentManualPayload {
   status?: string;
   note?: string;
 }
+
+export interface StudentRoundStatusResponse {
+  hasActiveRound: boolean;
+  inRound: boolean;
+  roundId?: number;
+  roundCode?: string;
+  roundName?: string;
+  roundStatus?: string;
+  roundCurrentStage?: number;
+  studentId?: number;
+  studentCode?: string;
+  fullName?: string;
+  status?: string;
+  note?: string;
+  isDropped?: boolean;
+  completedStage?: number;
+}
+

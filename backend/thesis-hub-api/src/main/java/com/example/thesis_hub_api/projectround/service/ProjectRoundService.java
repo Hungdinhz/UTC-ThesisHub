@@ -24,13 +24,23 @@ import com.example.thesis_hub_api.assignment.repository.LecturerCapacityReposito
 import com.example.thesis_hub_api.assignment.repository.LecturerDirectionRepository;
 import com.example.thesis_hub_api.assignment.repository.ProjectDirectionRepository;
 import com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository;
+import com.example.thesis_hub_api.assignment.repository.DirectionRegistrationRepository;
+import com.example.thesis_hub_api.assignment.repository.PreferenceRepository;
+import com.example.thesis_hub_api.thesis.repository.ProposalRepository;
+import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
+import com.example.thesis_hub_api.organization.entity.Student;
+import com.example.thesis_hub_api.organization.repository.StudentRepository;
+import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import com.example.thesis_hub_api.projectround.dto.response.StudentRoundStatusResponseDTO;
+import com.example.thesis_hub_api.identity.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -71,6 +81,24 @@ public class ProjectRoundService {
 
     @Autowired(required = false)
     private LecturerDirectionRepository lecturerDirectionRepository;
+
+    @Autowired(required = false)
+    private DirectionRegistrationRepository directionRegistrationRepository;
+
+    @Autowired(required = false)
+    private PreferenceRepository preferenceRepository;
+
+    @Autowired(required = false)
+    private ProposalRepository proposalRepository;
+
+    @Autowired(required = false)
+    private ThesisRepository thesisRepository;
+
+    @Autowired(required = false)
+    private StudentRepository studentRepository;
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
 
     /**
      * CONTRACT 2: API Tra cứu Đợt đồ án đang hoạt động & Mốc thời gian (Timeline).
@@ -579,7 +607,277 @@ public class ProjectRoundService {
         }
         round = projectRoundRepository.save(round);
 
+        // Đánh giá và cập nhật trạng thái đạt / không đạt của toàn bộ sinh viên trong đợt khi kết thúc giai đoạn
+        evaluateStudentsOnPhaseAdvance(roundId, targetIndex, milestones);
+
         return toResponseDTO(round, milestones);
+    }
+
+    private int getStageNumberFromPhase(String phaseType) {
+        if (!StringUtils.hasText(phaseType)) return 1;
+        String pt = phaseType.toUpperCase();
+        if (pt.contains("DRAFT")) return 1;
+        if (pt.contains("REGISTRATION")) return 2;
+        if (pt.contains("PROPOSAL")) return 3;
+        if (pt.contains("WEEKLY") || pt.contains("REPORT") || pt.contains("TASK")) return 4;
+        if (pt.contains("DEFENSE") || pt.contains("ELIGIB") || pt.contains("COMMITTEE")) return 5;
+        return 2;
+    }
+
+    /**
+     * Tự động đánh giá kết quả đạt / không đạt của toàn bộ sinh viên trong đợt khi kết thúc giai đoạn.
+     * Sinh viên chưa làm nhiệm vụ của giai đoạn trước sẽ bị loại (DROPPED - Không đạt).
+     */
+    private void evaluateStudentsOnPhaseAdvance(Long roundId, int targetIndex, List<TimelineMilestone> milestones) {
+        if (studentProjectRoundRepository == null || milestones == null || milestones.isEmpty()) {
+            return;
+        }
+
+        List<StudentProjectRound> roundStudents = studentProjectRoundRepository.findByProjectRoundId(roundId);
+        if (roundStudents.isEmpty()) {
+            return;
+        }
+
+        TimelineMilestone targetMilestone = milestones.get(Math.min(targetIndex, milestones.size() - 1));
+        int targetStage = getStageNumberFromPhase(targetMilestone.getPhaseType());
+
+        // Nếu admin quay lại GĐ1 (DRAFT): Khôi phục các sinh viên bị loại do deadline để demo lại từ đầu
+        if (targetStage <= 1) {
+            List<StudentProjectRound> restored = new ArrayList<>();
+            for (StudentProjectRound spr : roundStudents) {
+                if ("DROPPED".equalsIgnoreCase(spr.getStatus()) && spr.getNote() != null && spr.getNote().contains("Không hoàn thành")) {
+                    spr.setStatus("ELIGIBLE");
+                    spr.setNote("Khôi phục trạng thái ELIGIBLE khi quay lại GĐ1 (Demo)");
+                    restored.add(spr);
+                }
+            }
+            if (!restored.isEmpty()) {
+                studentProjectRoundRepository.saveAll(restored);
+                log.info("advanceRoundPhase [Round {}]: Đã khôi phục {} sinh viên về ELIGIBLE khi về GĐ1", roundId, restored.size());
+            }
+            return;
+        }
+
+        // 1. Kiểm tra GĐ2 (Chọn hướng & NV1-NV3): Có bản ghi đăng ký hướng, nguyện vọng hoặc đã được phân công GVHD
+        Set<Long> registeredG2StudentIds = Collections.emptySet();
+        if (targetStage >= 3) {
+            Set<Long> sIds = new java.util.HashSet<>();
+            if (directionRegistrationRepository != null) {
+                directionRegistrationRepository.findByProjectRoundId(roundId).forEach(r -> {
+                    if (r.getStudentId() != null) sIds.add(r.getStudentId());
+                });
+            }
+            if (preferenceRepository != null) {
+                preferenceRepository.findByProjectRoundIdOrderByStudentIdAscPriorityAsc(roundId).forEach(p -> {
+                    if (p.getStudentId() != null) sIds.add(p.getStudentId());
+                });
+            }
+            if (supervisorAssignmentRepository != null) {
+                supervisorAssignmentRepository.findByProjectRoundId(roundId).forEach(a -> {
+                    if (a.getStudentId() != null) sIds.add(a.getStudentId());
+                });
+            }
+            registeredG2StudentIds = sIds;
+        }
+
+        // 2. Kiểm tra GĐ3 (Nộp & Duyệt đề cương): Có đề cương được duyệt (APPROVED) hoặc có bản ghi đề tài
+        Set<Long> approvedG3StudentIds = Collections.emptySet();
+        if (targetStage >= 4) {
+            Set<Long> sIds = new java.util.HashSet<>();
+            if (proposalRepository != null) {
+                proposalRepository.findByProjectRoundId(roundId).forEach(p -> {
+                    if (p.getStudent() != null && p.getStudent().getId() != null) {
+                        if ("APPROVED".equalsIgnoreCase(p.getStatus())) {
+                            sIds.add(p.getStudent().getId());
+                        }
+                    }
+                });
+            }
+            if (thesisRepository != null) {
+                thesisRepository.findByProjectRoundId(roundId).forEach(t -> {
+                    if (t.getStudent() != null && t.getStudent().getId() != null) {
+                        sIds.add(t.getStudent().getId());
+                    }
+                });
+            }
+            approvedG3StudentIds = sIds;
+        }
+
+        // 3. Kiểm tra GĐ4 (Tiến độ & Đủ điều kiện bảo vệ): Có defenseEligible == true hoặc DEFENSE_READY
+        Set<Long> readyG4StudentIds = Collections.emptySet();
+        if (targetStage >= 5) {
+            Set<Long> sIds = new java.util.HashSet<>();
+            if (thesisRepository != null) {
+                thesisRepository.findByProjectRoundId(roundId).forEach(t -> {
+                    if (t.getStudent() != null && t.getStudent().getId() != null) {
+                        if (Boolean.TRUE.equals(t.getDefenseEligible()) || "DEFENSE_READY".equalsIgnoreCase(t.getStatus())) {
+                            sIds.add(t.getStudent().getId());
+                        }
+                    }
+                });
+            }
+            readyG4StudentIds = sIds;
+        }
+
+        List<StudentProjectRound> toSave = new ArrayList<>();
+        for (StudentProjectRound spr : roundStudents) {
+            if (spr.getStudent() == null || spr.getStudent().getId() == null) {
+                continue;
+            }
+            Long sId = spr.getStudent().getId();
+
+            if ("RESERVED".equalsIgnoreCase(spr.getStatus())) {
+                continue;
+            }
+
+            // Kiểm tra điều kiện GĐ2
+            if (targetStage >= 3 && !registeredG2StudentIds.contains(sId)) {
+                if (!"DROPPED".equalsIgnoreCase(spr.getStatus())) {
+                    spr.setStatus("DROPPED");
+                    spr.setNote("Không hoàn thành GĐ2: Chưa đăng ký nguyện vọng/hướng đồ án - Bị loại khỏi đợt đồ án (Không đạt)");
+                    toSave.add(spr);
+                }
+                continue;
+            }
+
+            // Kiểm tra điều kiện GĐ3
+            if (targetStage >= 4 && !approvedG3StudentIds.contains(sId)) {
+                if (!"DROPPED".equalsIgnoreCase(spr.getStatus())) {
+                    spr.setStatus("DROPPED");
+                    spr.setNote("Không hoàn thành GĐ3: Chưa nộp hoặc chưa được duyệt đề cương đồ án - Bị loại khỏi đợt đồ án (Không đạt)");
+                    toSave.add(spr);
+                }
+                continue;
+            }
+
+            // Kiểm tra điều kiện GĐ4
+            if (targetStage >= 5 && !readyG4StudentIds.contains(sId)) {
+                if (!"DROPPED".equalsIgnoreCase(spr.getStatus())) {
+                    spr.setStatus("DROPPED");
+                    spr.setNote("Không hoàn thành GĐ4: Chưa đủ điều kiện bảo vệ đồ án tốt nghiệp trước hội đồng - Bị loại khỏi đợt đồ án (Không đạt)");
+                    toSave.add(spr);
+                }
+                continue;
+            }
+
+            // Nếu đạt và chưa bị DROPPED: Cập nhật trạng thái tương ứng với giai đoạn mới
+            if (!"DROPPED".equalsIgnoreCase(spr.getStatus())) {
+                if (targetStage >= 5) {
+                    spr.setStatus("DEFENSE_READY");
+                } else if (targetStage >= 4) {
+                    spr.setStatus("IN_PROGRESS");
+                } else if (targetStage >= 3) {
+                    spr.setStatus("ASSIGNED");
+                }
+                toSave.add(spr);
+            }
+        }
+
+        if (!toSave.isEmpty()) {
+            studentProjectRoundRepository.saveAll(toSave);
+            log.info("advanceRoundPhase [Round {}]: Đã cập nhật trạng thái kết quả cho {} sinh viên (targetStage={})",
+                    roundId, toSave.size(), targetStage);
+        }
+    }
+
+    /**
+     * Tra cứu trạng thái đợt đồ án và kết quả cá nhân của sinh viên hiện tại
+     */
+    @Transactional(readOnly = true)
+    public StudentRoundStatusResponseDTO getMyRoundStatus(UserPrincipal currentUser) {
+        ProjectRound activeRound = projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("OPEN")
+                .or(() -> projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("IN_PROGRESS"))
+                .orElse(null);
+
+        if (activeRound == null || currentUser == null) {
+            return StudentRoundStatusResponseDTO.builder()
+                    .hasActiveRound(false)
+                    .build();
+        }
+
+        Long roundId = activeRound.getId();
+        Student student = studentRepository != null
+                ? studentRepository.findByUserId(currentUser.getId()).orElse(null)
+                : null;
+
+        if (student == null) {
+            return StudentRoundStatusResponseDTO.builder()
+                    .hasActiveRound(true)
+                    .roundId(roundId)
+                    .roundCode(activeRound.getRoundCode())
+                    .roundName(activeRound.getName())
+                    .inRound(false)
+                    .build();
+        }
+
+        StudentProjectRound spr = studentProjectRoundRepository != null
+                ? studentProjectRoundRepository.findByStudentIdAndProjectRoundId(student.getId(), roundId).orElse(null)
+                : null;
+
+        if (spr == null) {
+            return StudentRoundStatusResponseDTO.builder()
+                    .hasActiveRound(true)
+                    .roundId(roundId)
+                    .roundCode(activeRound.getRoundCode())
+                    .roundName(activeRound.getName())
+                    .studentId(student.getId())
+                    .studentCode(student.getStudentCode())
+                    .fullName(currentUser.getFullName())
+                    .inRound(false)
+                    .build();
+        }
+
+        boolean isDropped = "DROPPED".equalsIgnoreCase(spr.getStatus());
+        String status = spr.getStatus();
+        int completedStage = 1;
+
+        if (!isDropped) {
+            if ("DEFENSE_READY".equalsIgnoreCase(status) || "DEFENDED".equalsIgnoreCase(status)) {
+                completedStage = 4;
+            } else if ("IN_PROGRESS".equalsIgnoreCase(status)) {
+                completedStage = 3;
+            } else if ("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status)) {
+                completedStage = 2;
+            } else {
+                completedStage = 1;
+            }
+        } else {
+            if (spr.getNote() != null && spr.getNote().contains("GĐ4")) {
+                completedStage = 3;
+            } else if (spr.getNote() != null && spr.getNote().contains("GĐ3")) {
+                completedStage = 2;
+            } else {
+                completedStage = 1;
+            }
+        }
+
+        List<TimelineMilestone> milestones = timelineMilestoneRepository
+                .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId);
+        int currentRoundStage = 2;
+        Instant now = Instant.now();
+        for (TimelineMilestone m : milestones) {
+            if (!now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate())) {
+                currentRoundStage = getStageNumberFromPhase(m.getPhaseType());
+                break;
+            }
+        }
+
+        return StudentRoundStatusResponseDTO.builder()
+                .hasActiveRound(true)
+                .inRound(true)
+                .roundId(roundId)
+                .roundCode(activeRound.getRoundCode())
+                .roundName(activeRound.getName())
+                .roundStatus(activeRound.getStatus())
+                .roundCurrentStage(currentRoundStage)
+                .studentId(student.getId())
+                .studentCode(student.getStudentCode())
+                .fullName(currentUser.getFullName())
+                .status(status)
+                .note(spr.getNote())
+                .isDropped(isDropped)
+                .completedStage(completedStage)
+                .build();
     }
 
     private int findMilestoneIndex(List<TimelineMilestone> milestones, String phaseType, int defaultIdx) {
@@ -648,5 +946,33 @@ public class ProjectRoundService {
                 .orderIndex(milestone.getOrderIndex())
                 .isActive(isActive)
                 .build();
+    }
+
+    @Transactional
+    public void deleteRound(Long roundId) {
+        ProjectRound round = projectRoundRepository.findById(roundId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy đợt đồ án với ID: " + roundId));
+
+        String status = (round.getStatus() != null) ? round.getStatus().toUpperCase() : "";
+        // Only finished rounds (CLOSED or ARCHIVED) can be deleted, or DRAFT rounds that have not started.
+        // If the round is OPEN or IN_PROGRESS, forbid deletion.
+        if ("OPEN".equals(status) || "IN_PROGRESS".equals(status)) {
+            throw new AppException(ErrorCode.INVALID_STATUS_TRANSITION,
+                    "Không thể xóa đợt đồ án đang hoạt động (" + status + "). Chỉ có thể xóa các đợt đồ án đã kết thúc (CLOSED hoặc ARCHIVED). Vui lòng kết thúc đợt đồ án trước khi xóa.");
+        }
+
+        log.info("Deleting project round: id={}, code={}, status={}", round.getId(), round.getRoundCode(), status);
+
+        if (jdbcTemplate != null) {
+            // Module 4 cleanup for tables without explicit ON DELETE CASCADE
+            jdbcTemplate.update("DELETE FROM scores WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM reviewer_assignments WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM graduation_results WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM reservation_requests WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM defense_councils WHERE project_round_id = ?", roundId);
+        }
+
+        projectRoundRepository.delete(round);
+        log.info("Successfully deleted project round id={}", roundId);
     }
 }

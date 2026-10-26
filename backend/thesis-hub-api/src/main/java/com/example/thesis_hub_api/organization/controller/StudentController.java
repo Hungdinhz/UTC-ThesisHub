@@ -41,7 +41,7 @@ public class StudentController {
             @RequestParam(required = false) Long projectRoundId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id,desc") String sort) {
+            @RequestParam(defaultValue = "studentCode,asc") String sort) {
         
         Long effectiveProgramId = trainingProgramId != null ? trainingProgramId : programId;
 

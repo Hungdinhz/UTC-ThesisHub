@@ -8,6 +8,7 @@ import com.example.thesis_hub_api.projectround.dto.request.UpdateProjectRoundReq
 import com.example.thesis_hub_api.projectround.dto.request.UpdateRoundStatusRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.response.MilestoneResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.ProjectRoundResponseDTO;
+import com.example.thesis_hub_api.projectround.dto.response.StudentRoundStatusResponseDTO;
 import com.example.thesis_hub_api.projectround.service.ProjectRoundService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +42,17 @@ public class ProjectRoundController {
     public ResponseEntity<ApiResponse<ProjectRoundResponseDTO>> getActiveRound() {
         ProjectRoundResponseDTO activeRound = projectRoundService.getActiveRound();
         return ResponseEntity.ok(ApiResponse.success(activeRound));
+    }
+
+    @GetMapping("/active/my-status")
+    @Operation(
+            summary = "Tra cứu trạng thái đợt đồ án và kết quả cá nhân của sinh viên đang đăng nhập",
+            description = "Trả về trạng thái tham gia, đã hoàn thành đến giai đoạn nào, có bị loại (DROPPED) hay không và lý do cụ thể"
+    )
+    public ResponseEntity<ApiResponse<StudentRoundStatusResponseDTO>> getMyRoundStatus(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        StudentRoundStatusResponseDTO status = projectRoundService.getMyRoundStatus(currentUser);
+        return ResponseEntity.ok(ApiResponse.success(status));
     }
 
     @GetMapping
@@ -136,5 +148,13 @@ public class ProjectRoundController {
             @RequestParam(required = false) String targetPhaseType) {
         ProjectRoundResponseDTO round = projectRoundService.advanceRoundPhase(roundId, targetPhaseType);
         return ResponseEntity.ok(ApiResponse.success("Chuyển giai đoạn đợt đồ án thành công", round));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @Operation(summary = "Xóa đợt đồ án đã kết thúc (Admin)", description = "Chỉ cho phép xóa đợt đồ án đã kết thúc (CLOSED hoặc ARCHIVED) hoặc DRAFT")
+    public ResponseEntity<ApiResponse<Void>> deleteRound(@PathVariable Long id) {
+        projectRoundService.deleteRound(id);
+        return ResponseEntity.ok(ApiResponse.success("Xóa đợt đồ án thành công", null));
     }
 }

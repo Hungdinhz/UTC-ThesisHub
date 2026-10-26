@@ -56,7 +56,10 @@ export const ThesisEligibilityPage: React.FC = () => {
     try {
       setLoading(true);
       const data = await eligibilityService.getAllStudentsEligibility(roundId ?? selectedRoundId ?? undefined);
-      setStudents(data);
+      const sorted = (data || []).slice().sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setStudents(sorted);
     } catch (error: any) {
       setNotification({ type: 'error', message: error.message || 'Không thể tải danh sách sinh viên' });
     } finally {

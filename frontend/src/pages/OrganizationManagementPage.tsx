@@ -185,7 +185,11 @@ const OrganizationManagementPage: React.FC = () => {
         page: 0,
         size: 100,
       });
-      setStudents(res.content || []);
+      const rawStudents = res.content || [];
+      const sortedStudents = [...rawStudents].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setStudents(sortedStudents);
       setTotalStudents(res.totalElements || 0);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Lỗi tải danh sách sinh viên');

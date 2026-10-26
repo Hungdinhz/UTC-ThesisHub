@@ -236,6 +236,12 @@ public class StudentProjectRoundService {
             }
         }
 
+        parsedRows.sort((a, b) -> {
+            String ca = a.getStudentCode() != null ? a.getStudentCode().trim() : "";
+            String cb = b.getStudentCode() != null ? b.getStudentCode().trim() : "";
+            return ca.compareTo(cb);
+        });
+
         return StudentImportPreviewResponseDTO.builder()
                 .roundId(round.getId())
                 .roundCode(round.getRoundCode())
@@ -335,7 +341,7 @@ public class StudentProjectRoundService {
                             .fullName(fullName)
                             .email(targetEmail)
                             .phone(row.getPhone())
-                            .password(passwordEncoder.encode(studentCode))
+                            .password(passwordEncoder.encode("Password@123"))
                             .role(studentRole)
                             .isActive(true)
                             .build();
@@ -499,7 +505,7 @@ public class StudentProjectRoundService {
                     .fullName(fullName)
                     .email(targetEmail)
                     .phone(dto.getPhone() != null ? dto.getPhone().trim() : null)
-                    .password(passwordEncoder.encode(studentCode))
+                    .password(passwordEncoder.encode("Password@123"))
                     .role(studentRole)
                     .isActive(true)
                     .build();
@@ -515,7 +521,7 @@ public class StudentProjectRoundService {
                     user.setEmail(email);
                 }
             }
-            user.setPassword(passwordEncoder.encode(studentCode));
+            user.setPassword(passwordEncoder.encode("Password@123"));
             user = userRepository.save(user);
         }
 
@@ -620,12 +626,20 @@ public class StudentProjectRoundService {
         String normalizedSearch = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
         String normalizedStatus = StringUtils.hasText(status) ? status.trim().toUpperCase() : null;
 
+        Pageable effectivePageable = pageable;
+        if (effectivePageable == null || effectivePageable.getSort().isUnsorted()) {
+            int page = effectivePageable != null ? effectivePageable.getPageNumber() : 0;
+            int size = effectivePageable != null ? effectivePageable.getPageSize() : 20;
+            effectivePageable = org.springframework.data.domain.PageRequest.of(
+                    page, size, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "student.studentCode"));
+        }
+
         Page<StudentProjectRound> sprPage = studentProjectRoundRepository.searchStudentsInRound(
                 roundId,
                 majorId,
                 normalizedStatus,
                 normalizedSearch,
-                pageable);
+                effectivePageable);
 
         Map<Long, Major> majorMap = majorRepository.findAll().stream()
                 .collect(Collectors.toMap(Major::getId, m -> m, (a, b) -> a));

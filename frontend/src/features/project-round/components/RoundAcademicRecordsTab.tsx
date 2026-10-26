@@ -118,7 +118,11 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
     setShowManualModal(true);
     try {
       const res = await apiService.getStudentsInRound(roundId, { size: 100 });
-      setRoundStudents(res?.content || []);
+      const rawStudents = res?.content || [];
+      const sortedStudents = [...rawStudents].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setRoundStudents(sortedStudents);
     } catch {
       // ignore
     }
@@ -182,7 +186,11 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
         size: 15,
       });
 
-      setRecords(res?.content || []);
+      const rawRecords = res?.content || [];
+      const sortedRecords = [...rawRecords].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setRecords(sortedRecords);
       setTotalPages(res?.totalPages || 0);
       setTotalElements(res?.totalElements || 0);
     } catch (err: unknown) {

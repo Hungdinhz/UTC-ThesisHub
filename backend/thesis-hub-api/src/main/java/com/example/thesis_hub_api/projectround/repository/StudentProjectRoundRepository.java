@@ -34,7 +34,8 @@ public interface StudentProjectRoundRepository extends JpaRepository<StudentProj
            "     LOWER(s.studentCode) LIKE :search OR " +
            "     LOWER(u.fullName) LIKE :search OR " +
            "     LOWER(u.email) LIKE :search OR " +
-           "     LOWER(s.className) LIKE :search)")
+           "     LOWER(s.className) LIKE :search) " +
+           "ORDER BY s.studentCode ASC")
     Page<StudentProjectRound> searchStudentsInRound(
             @Param("roundId") Long roundId,
             @Param("majorId") Long majorId,

@@ -59,6 +59,12 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   const [userCompletedStageState, setUserCompletedStageState] = useState<number>(1);
   const [advancingPhase, setAdvancingPhase] = useState<boolean>(false);
   const [lockAlertMessage, setLockAlertMessage] = useState<string | null>(null);
+  const [studentStatusInfo, setStudentStatusInfo] = useState<{
+    isDropped?: boolean;
+    note?: string;
+    completedStage?: number;
+    status?: string;
+  } | null>(null);
 
   // Xác định role thực tế
   const currentRole = (
@@ -153,6 +159,29 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
         setRoundCurrentStage(st);
       }
+      if (currentRole === 'student') {
+        try {
+          const myStatus = await apiService.getMyRoundStatus();
+          if (myStatus && myStatus.inRound) {
+            setStudentStatusInfo({
+              isDropped: myStatus.isDropped,
+              note: myStatus.note,
+              completedStage: myStatus.completedStage,
+              status: myStatus.status,
+            });
+            if (myStatus.isDropped) {
+              setUserCompletedStageState(myStatus.completedStage || 1);
+            } else if (myStatus.completedStage) {
+              const localStage = getUserCompletedStage(currentUserId, currentRole);
+              const effectiveStage = Math.max(myStatus.completedStage, localStage);
+              setUserCompletedStageState(effectiveStage);
+              setUserCompletedStage(currentUserId, currentRole, effectiveStage);
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
     } catch {
       // Ignored if round not active
     }
@@ -199,14 +228,48 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const handleUserResetStage = () => {
     resetUserStage(currentUserId, currentRole);
+    setStudentStatusInfo(null);
     setUserCompletedStageState(currentRole === 'student' ? 1 : 2);
   };
 
   const isStageLocked = (stageNumber: number) => {
+    if (currentRole === 'student' && studentStatusInfo?.isDropped) {
+      const failedStage = (studentStatusInfo.completedStage || 1) + 1;
+      if (stageNumber >= failedStage) {
+        return true;
+      }
+    }
     return calculateStageStatus(stageNumber, roundCurrentStage, userCompletedStageState) === 'LOCKED';
   };
 
   const renderStageBadge = (stageNumber: number) => {
+    if (currentRole === 'student' && studentStatusInfo?.isDropped) {
+      const failedStage = (studentStatusInfo.completedStage || 1) + 1;
+      if (stageNumber < failedStage) {
+        return <span className="utc-stage-badge completed" title="Đã hoàn thành giai đoạn này">✓ Đã xong</span>;
+      }
+      if (stageNumber === failedStage) {
+        return (
+          <span
+            className="utc-stage-badge failed"
+            style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', fontWeight: 600 }}
+            title="Không đạt giai đoạn này do chưa hoàn thành nhiệm vụ theo quy chế"
+          >
+            ❌ Không đạt
+          </span>
+        );
+      }
+      return (
+        <span
+          className="utc-stage-badge locked"
+          style={{ background: '#f1f5f9', color: '#94a3b8' }}
+          title="Đã bị loại khỏi đợt đồ án"
+        >
+          🔒 Bị loại
+        </span>
+      );
+    }
+
     const status = calculateStageStatus(stageNumber, roundCurrentStage, userCompletedStageState);
     if (status === 'COMPLETED') {
       return <span className="utc-stage-badge completed" title="Đã hoàn thành giai đoạn này">✓ Đã xong</span>;
@@ -678,13 +741,19 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 Đợt đồ án chung: <strong>{currentStageDef?.name || `GĐ${roundCurrentStage}`}</strong>
               </span>
               <span>
-                Tiến độ của bạn: <strong className="user-progress-badge">
-                  {userWorkingStageDef ? `Đang làm ${userWorkingStageDef.code}` : 'Đã hoàn thành tất cả'}
-                </strong>
+                Tiến độ của bạn: {studentStatusInfo?.isDropped ? (
+                  <strong className="user-progress-badge" style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                    🚫 Không đạt / Bị loại
+                  </strong>
+                ) : (
+                  <strong className="user-progress-badge">
+                    {userWorkingStageDef ? `Đang làm ${userWorkingStageDef.code}` : 'Đã hoàn thành tất cả'}
+                  </strong>
+                )}
               </span>
             </div>
             <div className="utc-demo-actions">
-              {userWorkingStageDef && (
+              {!studentStatusInfo?.isDropped && userWorkingStageDef && (
                 <button
                   className="utc-demo-btn success"
                   onClick={handleUserCompleteCurrentStage}
@@ -701,6 +770,35 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 ↩ Đặt lại (Chưa làm xong)
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Cảnh báo khi sinh viên bị loại / không đạt */}
+        {currentRole === 'student' && studentStatusInfo?.isDropped && (
+          <div style={{
+            background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+            border: '1px solid #f87171',
+            borderRadius: '8px',
+            padding: '12px 18px',
+            margin: '12px 24px 0 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            color: '#991b1b',
+            fontWeight: 500,
+            boxShadow: '0 2px 6px rgba(220, 38, 38, 0.08)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>🚫</span>
+              <div>
+                <strong>BẠN KHÔNG ĐẠT / BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN:</strong>{' '}
+                <span>{studentStatusInfo.note || 'Chưa hoàn thành yêu cầu của giai đoạn khi kết thúc theo quy chế.'}</span>
+              </div>
+            </div>
+            <span style={{ fontSize: '12px', background: '#dc2626', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontWeight: 600 }}>
+              KẾT THÚC ĐỢT
+            </span>
           </div>
         )}
 

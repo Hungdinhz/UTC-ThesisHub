@@ -84,11 +84,21 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
         assignmentService.getStats(targetRoundId),
       ]);
 
+      const sortedRegs = (regsData || []).slice().sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      const sortedPrefs = (prefsData || []).slice().sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      const sortedProps = (propsData || []).slice().sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+
       setDirections(dirsData || []);
       setCapacities(capsData || []);
-      setRegistrations(regsData || []);
-      setPreferences(prefsData || []);
-      setProposals(propsData || []);
+      setRegistrations(sortedRegs);
+      setPreferences(sortedPrefs);
+      setProposals(sortedProps);
       setStats(statsData || null);
     } catch {
       setAlert({

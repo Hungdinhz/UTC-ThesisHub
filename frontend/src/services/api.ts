@@ -57,6 +57,7 @@ import type {
   AcademicRecordImportResultResponse,
   AcademicRecordItem,
   CreateAcademicRecordManualPayload,
+  StudentRoundStatusResponse,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
@@ -1073,6 +1074,10 @@ class ApiService {
     return response.data;
   }
 
+  async deleteProjectRound(id: number): Promise<void> {
+    await this.api.delete(PROJECT_ROUNDS.detail(id));
+  }
+
   async getRoundMilestones(roundId: number): Promise<MilestoneItem[]> {
     const response = await this.api.get<MilestoneItem[]>(PROJECT_ROUNDS.milestones(roundId));
     return response.data;
@@ -1103,6 +1108,11 @@ class ApiService {
       null,
       { params: targetPhaseType ? { targetPhaseType } : undefined }
     );
+    return response.data;
+  }
+
+  async getMyRoundStatus(): Promise<StudentRoundStatusResponse> {
+    const response = await this.api.get<StudentRoundStatusResponse>(PROJECT_ROUNDS.myRoundStatus);
     return response.data;
   }
 

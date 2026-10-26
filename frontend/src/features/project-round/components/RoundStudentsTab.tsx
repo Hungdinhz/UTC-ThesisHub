@@ -287,7 +287,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         size: 15,
       });
 
-      setStudents(res?.content || []);
+      const rawList = res?.content || [];
+      const sortedList = [...rawList].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setStudents(sortedList);
       setTotalPages(res?.totalPages || 0);
       setTotalElements(res?.totalElements || 0);
     } catch (err: unknown) {
@@ -346,6 +350,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setImportLoading(true);
       setError(null);
       const preview = await apiService.previewImportStudents(roundId, importFile);
+      if (preview && preview.rows) {
+        preview.rows.sort((a, b) =>
+          (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+        );
+      }
       setPreviewData(preview);
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Lỗi khi phân tích dữ liệu file Excel';
@@ -410,7 +419,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         email: emailVal,
       });
 
-      setSuccessMsg(`Thêm sinh viên ${code} thành công. Tài khoản hệ thống đã được cấp: Tên đăng nhập = ${code}, Mật khẩu = ${code}.`);
+      setSuccessMsg(`Thêm sinh viên ${code} thành công. Tài khoản hệ thống đã được cấp: Tên đăng nhập = ${code}, Mật khẩu mặc định = Password@123.`);
       setShowManualModal(false);
       setManualForm({
         studentCode: '',
@@ -458,7 +467,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       });
 
       setImportResultMsg(
-        `Xử lý thành công ${result.totalProcessed} dòng. Tạo mới ${result.newUsersCreated} User, ${result.newStudentsCreated} Sinh viên, ghi danh ${result.enrolledInRound} vào đợt (bỏ qua ${result.skipped}).`
+        `Xử lý thành công ${result.totalProcessed} dòng. Tự động tạo ${result.newUsersCreated} tài khoản sinh viên (Tên đăng nhập = MSSV, Mật khẩu mặc định = Password@123), ${result.newStudentsCreated} Sinh viên, ghi danh ${result.enrolledInRound} vào đợt (bỏ qua ${result.skipped}).`
       );
       setPreviewData(null);
       setImportFile(null);
@@ -871,6 +880,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                 💡 Nếu chưa có file đúng định dạng, hãy bấm <strong>"Tải Excel mẫu UTC"</strong> ở trang quản lý để lấy file mẫu chuẩn gồm 8 cột: STT, Mã sinh viên, Họ đệm, Tên, Ngành, Lớp, SĐT, Email.
                 <br />
                 <strong style={{ color: '#0a3273' }}>📌 Quy định dữ liệu:</strong> Kiểm tra đúng định dạng và số lượng của dữ liệu, Mã sinh viên (MSSV) <strong>chỉ có đúng 9 số</strong>.
+                <br />
+                <strong style={{ color: '#16a34a' }}>🔐 Tự động tạo tài khoản:</strong> Khi xác nhận import, hệ thống tự động tạo tài khoản sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu mặc định = Password@123</strong>.
               </div>
             </div>
 
@@ -1044,7 +1055,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             </h3>
             
             <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '0.85rem', color: '#1e40af' }}>
-              🔐 <strong>Cấp tài khoản đăng nhập tự động:</strong> Khi lưu, hệ thống tự động tạo tài khoản Sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu khởi tạo = Mã SV</strong>.
+              🔐 <strong>Cấp tài khoản đăng nhập tự động:</strong> Khi lưu, hệ thống tự động tạo tài khoản Sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu mặc định = Password@123</strong>.
             </div>
 
             {manualModalError && (

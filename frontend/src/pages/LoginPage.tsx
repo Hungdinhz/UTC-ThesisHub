@@ -283,47 +283,21 @@ const LoginPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Demo Accounts Quick-Fill Box */}
+          {/* Demo Accounts Quick-Fill Box (Chỉ giữ lại 1 tài khoản Quản trị viên) */}
           <div className="utc-demo-accounts-box">
             <div className="utc-demo-title">
               <span>⚡</span> <span>Tài khoản mẫu để test (Click điền nhanh):</span>
             </div>
-            <div className="utc-demo-grid">
+            <div className="utc-demo-grid" style={{ gridTemplateColumns: '1fr' }}>
               <button
                 type="button"
                 className="utc-demo-btn admin"
                 onClick={() => handleQuickFill('admin', 'admin', 'Admin@123')}
                 title="Click để điền tài khoản Quản trị viên"
+                style={{ width: '100%' }}
               >
                 <span className="demo-role">👑 Quản trị viên</span>
                 <span className="demo-cred">admin | Admin@123</span>
-              </button>
-              <button
-                type="button"
-                className="utc-demo-btn student"
-                onClick={() => handleQuickFill('student', 'sinhvien', 'Password@123')}
-                title="Click để điền tài khoản Sinh viên"
-              >
-                <span className="demo-role">🎓 Sinh viên</span>
-                <span className="demo-cred">sinhvien | Password@123</span>
-              </button>
-              <button
-                type="button"
-                className="utc-demo-btn supervisor"
-                onClick={() => handleQuickFill('supervisor', 'giangvien@utc.edu.vn', 'Password@123')}
-                title="Click để điền tài khoản Giảng viên hướng dẫn"
-              >
-                <span className="demo-role">👨‍🏫 Giảng viên HD</span>
-                <span className="demo-cred">giangvien | Password@123</span>
-              </button>
-              <button
-                type="button"
-                className="utc-demo-btn committee"
-                onClick={() => handleQuickFill('committee_member', 'hoidong@utc.edu.vn', 'Password@123')}
-                title="Click để điền tài khoản Hội đồng chấm thi"
-              >
-                <span className="demo-role">⚖️ Hội đồng</span>
-                <span className="demo-cred">hoidong | Password@123</span>
               </button>
             </div>
           </div>
