@@ -76,10 +76,31 @@ export const ProposalManagementPage: React.FC = () => {
     fetchRounds();
   }, []);
 
+  useEffect(() => {
+    if (!bannerMsg) return;
+    const timer = setTimeout(() => setBannerMsg(null), 5000);
+    return () => clearTimeout(timer);
+  }, [bannerMsg]);
+
   const fetchRounds = async () => {
     try {
       const roundList = await apiService.getProjectRounds();
       if (roundList && roundList.length > 0) {
+        if (isStudent) {
+          try {
+            const myStatus = await apiService.getMyRoundStatus();
+            if (myStatus && myStatus.inRound && myStatus.roundId) {
+              const matched = roundList.find((r) => r.roundId === myStatus.roundId);
+              if (matched) {
+                setRounds([matched]);
+                setSelectedRoundId(matched.roundId);
+                return;
+              }
+            }
+          } catch {
+            // fallback below
+          }
+        }
         setRounds(roundList);
         const activeRound =
           roundList.find((r) => r.status === 'OPEN') ||

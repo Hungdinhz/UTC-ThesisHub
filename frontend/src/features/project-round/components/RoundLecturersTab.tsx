@@ -70,6 +70,20 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
     loadData();
   }, [roundId]);
 
+  useEffect(() => {
+    if (!error) return;
+    setSuccessMsg(null);
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    setError(null);
+    const timer = setTimeout(() => setSuccessMsg(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
+
   // Filter capacities
   const filteredCapacities = capacities.filter((c) => {
     if (selectedDeptId && c.departmentId !== selectedDeptId) return false;
@@ -216,7 +230,7 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
   return (
     <div>
       {/* Alert Messages */}
-      {error && (
+      {error ? (
         <div
           style={{
             backgroundColor: '#fee2e2',
@@ -238,9 +252,7 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
             ✕
           </button>
         </div>
-      )}
-
-      {successMsg && (
+      ) : successMsg ? (
         <div
           style={{
             backgroundColor: '#dcfce7',
@@ -262,7 +274,7 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
             ✕
           </button>
         </div>
-      )}
+      ) : null}
 
       {/* Header and Action Buttons */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>

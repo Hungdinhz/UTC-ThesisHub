@@ -305,6 +305,20 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     loadStudents();
   }, [roundId, selectedMajorId, selectedStatus, currentPage]);
 
+  useEffect(() => {
+    if (!error) return;
+    setSuccessMsg(null);
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    setError(null);
+    const timer = setTimeout(() => setSuccessMsg(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(0);
@@ -323,10 +337,15 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      setSuccessMsg('Đã tải xuống file Excel mẫu chuẩn UTC thành công.');
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (e: unknown) {
-      setError('Lỗi khi tải file template: ' + (e instanceof Error ? e.message : 'Unknown error'));
+      setSuccessMsg('Đã tải xuống file mẫu Excel chuẩn UTC thành công.');
+    } catch {
+      const a = document.createElement('a');
+      a.href = '/mau_import_sinh_vien_utc.xlsx';
+      a.download = 'mau_import_sinh_vien_utc.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setSuccessMsg('Đã tải xuống file mẫu Excel chuẩn UTC thành công.');
     }
   };
 
@@ -563,16 +582,17 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       )}
 
       {/* Alert Messages */}
-      {error && (
-        <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
-          ⚠️ {error}
+      {error ? (
+        <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <span>⚠️ {error}</span>
+          <button type="button" onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer' }}>✕</button>
         </div>
-      )}
-      {successMsg && (
-        <div style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
-          ✅ {successMsg}
+      ) : successMsg ? (
+        <div style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <span>✅ {successMsg}</span>
+          <button type="button" onClick={() => setSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#16a34a', fontWeight: 700, cursor: 'pointer' }}>✕</button>
         </div>
-      )}
+      ) : null}
 
       {/* Action Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
@@ -587,6 +607,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
+            type="button"
             onClick={handleDownloadTemplate}
             style={{
               backgroundColor: '#f8fafc',
@@ -602,7 +623,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               gap: '6px',
             }}
           >
-            📥 Tải Excel mẫu UTC
+            📥 Tải file mẫu Excel UTC
           </button>
           <button
             disabled={isRoundClosed}
@@ -877,8 +898,28 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                 </button>
               </div>
               <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
-                💡 Nếu chưa có file đúng định dạng, hãy bấm <strong>"Tải Excel mẫu UTC"</strong> ở trang quản lý để lấy file mẫu chuẩn gồm 8 cột: STT, Mã sinh viên, Họ đệm, Tên, Ngành, Lớp, SĐT, Email.
-                <br />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+                  <span>
+                    💡 Nếu chưa có file đúng định dạng, hãy bấm <strong>"📥 Tải file mẫu Excel UTC"</strong> để lấy file mẫu chuẩn gồm các cột: STT, Mã sinh viên, Họ đệm, Tên, Ngành, Lớp, SĐT, Email, Điểm GPA.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    style={{
+                      backgroundColor: '#eff6ff',
+                      color: '#0a3273',
+                      border: '1px solid #93c5fd',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontWeight: 600,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    📥 Tải file mẫu Excel UTC
+                  </button>
+                </div>
                 <strong style={{ color: '#0a3273' }}>📌 Quy định dữ liệu:</strong> Kiểm tra đúng định dạng và số lượng của dữ liệu, Mã sinh viên (MSSV) <strong>chỉ có đúng 9 số</strong>.
                 <br />
                 <strong style={{ color: '#16a34a' }}>🔐 Tự động tạo tài khoản:</strong> Khi xác nhận import, hệ thống tự động tạo tài khoản sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu mặc định = Password@123</strong>.

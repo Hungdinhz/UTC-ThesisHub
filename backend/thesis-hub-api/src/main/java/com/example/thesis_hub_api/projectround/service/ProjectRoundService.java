@@ -785,47 +785,86 @@ public class ProjectRoundService {
      */
     @Transactional(readOnly = true)
     public StudentRoundStatusResponseDTO getMyRoundStatus(UserPrincipal currentUser) {
-        ProjectRound activeRound = projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("OPEN")
-                .or(() -> projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("IN_PROGRESS"))
-                .orElse(null);
-
-        if (activeRound == null || currentUser == null) {
+        if (currentUser == null) {
             return StudentRoundStatusResponseDTO.builder()
                     .hasActiveRound(false)
+                    .inRound(false)
                     .build();
         }
 
-        Long roundId = activeRound.getId();
+        ProjectRound systemActiveRound = projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("OPEN")
+                .or(() -> projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("IN_PROGRESS"))
+                .orElse(null);
+
         Student student = studentRepository != null
                 ? studentRepository.findByUserId(currentUser.getId()).orElse(null)
                 : null;
 
         if (student == null) {
+            if (systemActiveRound == null) {
+                return StudentRoundStatusResponseDTO.builder()
+                        .hasActiveRound(false)
+                        .inRound(false)
+                        .build();
+            }
             return StudentRoundStatusResponseDTO.builder()
                     .hasActiveRound(true)
-                    .roundId(roundId)
-                    .roundCode(activeRound.getRoundCode())
-                    .roundName(activeRound.getName())
+                    .roundId(systemActiveRound.getId())
+                    .roundCode(systemActiveRound.getRoundCode())
+                    .roundName(systemActiveRound.getName())
+                    .roundStatus(systemActiveRound.getStatus())
                     .inRound(false)
                     .build();
         }
 
-        StudentProjectRound spr = studentProjectRoundRepository != null
-                ? studentProjectRoundRepository.findByStudentIdAndProjectRoundId(student.getId(), roundId).orElse(null)
-                : null;
+        StudentProjectRound spr = null;
+        if (studentProjectRoundRepository != null) {
+            List<StudentProjectRound> enrollments = studentProjectRoundRepository.findByStudentId(student.getId());
+            if (enrollments != null && !enrollments.isEmpty()) {
+                spr = enrollments.stream()
+                        .filter(e -> e.getProjectRound() != null)
+                        .min(Comparator.comparingInt((StudentProjectRound e) -> {
+                            String rStatus = e.getProjectRound().getStatus() != null
+                                    ? e.getProjectRound().getStatus().toUpperCase()
+                                    : "";
+                            boolean isReserved = "RESERVED".equalsIgnoreCase(e.getStatus());
+                            if (!isReserved && ("OPEN".equals(rStatus) || "IN_PROGRESS".equals(rStatus))) {
+                                return 0;
+                            }
+                            if (!isReserved && "DRAFT".equals(rStatus)) {
+                                return 1;
+                            }
+                            if ("OPEN".equals(rStatus) || "IN_PROGRESS".equals(rStatus)) {
+                                return 2;
+                            }
+                            return 3;
+                        }).thenComparing((StudentProjectRound e) ->
+                                e.getProjectRound().getId() != null ? -e.getProjectRound().getId() : 0L))
+                        .orElse(null);
+            }
+            if (spr == null && systemActiveRound != null) {
+                spr = studentProjectRoundRepository
+                        .findByStudentIdAndProjectRoundId(student.getId(), systemActiveRound.getId())
+                        .orElse(null);
+            }
+        }
 
-        if (spr == null) {
+        if (spr == null || spr.getProjectRound() == null) {
             return StudentRoundStatusResponseDTO.builder()
-                    .hasActiveRound(true)
-                    .roundId(roundId)
-                    .roundCode(activeRound.getRoundCode())
-                    .roundName(activeRound.getName())
+                    .hasActiveRound(systemActiveRound != null)
+                    .roundId(systemActiveRound != null ? systemActiveRound.getId() : null)
+                    .roundCode(systemActiveRound != null ? systemActiveRound.getRoundCode() : null)
+                    .roundName(systemActiveRound != null ? systemActiveRound.getName() : null)
+                    .roundStatus(systemActiveRound != null ? systemActiveRound.getStatus() : null)
                     .studentId(student.getId())
                     .studentCode(student.getStudentCode())
                     .fullName(currentUser.getFullName())
                     .inRound(false)
                     .build();
         }
+
+        ProjectRound activeRound = spr.getProjectRound();
+        Long roundId = activeRound.getId();
 
         boolean isDropped = "DROPPED".equalsIgnoreCase(spr.getStatus());
         String status = spr.getStatus();
@@ -954,22 +993,18 @@ public class ProjectRoundService {
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy đợt đồ án với ID: " + roundId));
 
         String status = (round.getStatus() != null) ? round.getStatus().toUpperCase() : "";
-        // Only finished rounds (CLOSED or ARCHIVED) can be deleted, or DRAFT rounds that have not started.
-        // If the round is OPEN or IN_PROGRESS, forbid deletion.
-        if ("OPEN".equals(status) || "IN_PROGRESS".equals(status)) {
-            throw new AppException(ErrorCode.INVALID_STATUS_TRANSITION,
-                    "Không thể xóa đợt đồ án đang hoạt động (" + status + "). Chỉ có thể xóa các đợt đồ án đã kết thúc (CLOSED hoặc ARCHIVED). Vui lòng kết thúc đợt đồ án trước khi xóa.");
-        }
-
         log.info("Deleting project round: id={}, code={}, status={}", round.getId(), round.getRoundCode(), status);
 
         if (jdbcTemplate != null) {
-            // Module 4 cleanup for tables without explicit ON DELETE CASCADE
+            // Cleanup dependent tables without explicit ON DELETE CASCADE
             jdbcTemplate.update("DELETE FROM scores WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM reviewer_assignments WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM graduation_results WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM reservation_requests WHERE project_round_id = ?", roundId);
             jdbcTemplate.update("DELETE FROM defense_councils WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM progress_feedbacks WHERE progress_report_id IN (SELECT id FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            jdbcTemplate.update("DELETE FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM progress_reports WHERE milestone_id IN (SELECT id FROM timeline_milestones WHERE project_round_id = ?)", roundId);
         }
 
         projectRoundRepository.delete(round);
