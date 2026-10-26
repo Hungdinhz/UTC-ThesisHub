@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -89,6 +92,34 @@ public class GlobalExceptionHandler {
         log.warn("Method not supported: {}", ex.getMessage());
         ApiResponse<Object> response = ApiResponse.error(405, ex.getMessage());
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Database integrity violation: {}", ex.getMessage());
+        String detailMessage = "Dữ liệu bị trùng lặp hoặc vi phạm ràng buộc cơ sở dữ liệu";
+        if (ex.getMostSpecificCause() != null && ex.getMostSpecificCause().getMessage() != null) {
+            String cause = ex.getMostSpecificCause().getMessage();
+            if (cause.contains("violates unique constraint") || cause.contains("duplicate key")) {
+                detailMessage = "Dữ liệu bị trùng lặp trong hệ thống (đã tồn tại mã số hoặc email này)";
+            }
+        }
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.DUPLICATE_RESOURCE.getCode(), detailMessage);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Object>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        log.warn("Malformed JSON request: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.VALIDATION_FAILED.getCode(), "Dữ liệu gửi lên không đúng định dạng JSON hoặc thiếu trường bắt buộc");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        log.warn("Illegal argument: {}", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(ErrorCode.VALIDATION_FAILED.getCode(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     @ExceptionHandler(Exception.class)

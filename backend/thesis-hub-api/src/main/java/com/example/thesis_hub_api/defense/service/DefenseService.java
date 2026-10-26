@@ -197,11 +197,13 @@ public class DefenseService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public List<CouncilResponseDTO> getCouncilsByRound(Long projectRoundId) {
         List<DefenseCouncil> councils = councilRepository.findByProjectRoundId(projectRoundId);
         return councils.stream().map(this::mapToCouncilResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public CouncilResponseDTO getCouncilById(Long id) {
         DefenseCouncil council = councilRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));

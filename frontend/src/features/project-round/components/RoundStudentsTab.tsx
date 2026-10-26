@@ -347,8 +347,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setError(null);
       const preview = await apiService.previewImportStudents(roundId, importFile);
       setPreviewData(preview);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi phân tích dữ liệu file Excel');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi phân tích dữ liệu file Excel';
+      setError(msg);
     } finally {
       setImportLoading(false);
     }
@@ -426,8 +427,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setManualModalError(null);
       loadStudents();
       setTimeout(() => setSuccessMsg(null), 5000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Lỗi khi thêm sinh viên thủ công vào đợt';
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi thêm sinh viên thủ công vào đợt';
       setError(msg);
       setManualModalError(msg);
     } finally {
@@ -443,11 +444,17 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     }
     if (!previewData || !previewData.rows) return;
 
+    const validRows = previewData.rows.filter((r) => r.isValid);
+    if (validRows.length === 0) {
+      setError('Không có sinh viên hợp lệ nào để nạp vào hệ thống.');
+      return;
+    }
+
     try {
       setImportLoading(true);
       setError(null);
       const result = await apiService.commitImportStudents(roundId, {
-        rows: previewData.rows,
+        rows: validRows,
       });
 
       setImportResultMsg(
@@ -456,8 +463,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setPreviewData(null);
       setImportFile(null);
       loadStudents();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi lưu dữ liệu sinh viên vào hệ thống');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi lưu dữ liệu sinh viên vào hệ thống';
+      setError(msg);
     } finally {
       setImportLoading(false);
     }

@@ -1,6 +1,7 @@
 package com.example.thesis_hub_api.projectround.util;
 
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportRowDTO;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
@@ -12,10 +13,25 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Component
 public class StudentExcelParser {
 
     private final DataFormatter dataFormatter = new DataFormatter();
+
+    public static class ColumnMapping {
+        public int colStt = 0;
+        public int colStudentCode = 1;
+        public int colLastName = 2;
+        public int colFirstName = 3;
+        public int colFullName = -1;
+        public int colMajor = 4;
+        public int colClass = 5;
+        public int colPhone = 6;
+        public int colEmail = 7;
+        public int colGpa = 8;
+        public boolean combinedFullNameMode = false;
+    }
 
     /**
      * Phân tích file Excel tải lên thành danh sách StudentImportRowDTO
@@ -32,8 +48,9 @@ public class StudentExcelParser {
             }
 
             int lastRowNum = sheet.getLastRowNum();
-            int headerRowIdx = detectHeaderRowIndex(sheet, Math.min(lastRowNum, 6));
-            boolean combinedFullNameMode = isCombinedFullNameHeader(sheet.getRow(headerRowIdx));
+            int headerRowIdx = detectHeaderRowIndex(sheet, Math.min(lastRowNum, 25));
+            Row headerRow = sheet.getRow(headerRowIdx);
+            ColumnMapping mapping = detectColumnMapping(headerRow);
 
             for (int r = headerRowIdx + 1; r <= lastRowNum; r++) {
                 Row row = sheet.getRow(r);
@@ -41,8 +58,22 @@ public class StudentExcelParser {
                     continue;
                 }
 
-                StudentImportRowDTO rowDto = parseRow(row, r, combinedFullNameMode);
-                rows.add(rowDto);
+                try {
+                    StudentImportRowDTO rowDto = parseRowWithMapping(row, r, mapping);
+                    rows.add(rowDto);
+                } catch (Exception rowEx) {
+                    log.warn("Lỗi khi đọc dòng {}: {}", r, rowEx.getMessage());
+                    List<String> rowErrors = new ArrayList<>();
+                    rowErrors.add("Lỗi cấu trúc dữ liệu dòng " + (r + 1) + ": " + rowEx.getMessage());
+                    rows.add(StudentImportRowDTO.builder()
+                            .rowIndex(r + 1)
+                            .stt(r)
+                            .studentCode("")
+                            .fullName("")
+                            .isValid(false)
+                            .errors(rowErrors)
+                            .build());
+                }
             }
         }
 
@@ -55,7 +86,8 @@ public class StudentExcelParser {
             if (row == null) continue;
             for (int c = 0; c < row.getLastCellNum(); c++) {
                 String val = getCellValue(row.getCell(c)).toLowerCase();
-                if (val.contains("mssv") || val.contains("mã sinh viên") || val.contains("ma sinh vien") || val.contains("mã sv") || val.contains("student code")) {
+                if (val.contains("mssv") || val.contains("mã sinh viên") || val.contains("ma sinh vien")
+                        || val.contains("mã sv") || val.contains("student code") || val.contains("mã số sv")) {
                     return r;
                 }
             }
@@ -63,13 +95,65 @@ public class StudentExcelParser {
         return 0;
     }
 
-    private boolean isCombinedFullNameHeader(Row headerRow) {
-        if (headerRow == null) return false;
-        String col2 = getCellValue(headerRow.getCell(2)).toLowerCase();
-        String col3 = getCellValue(headerRow.getCell(3)).toLowerCase();
-        // If column C is "Họ và tên" / "Họ tên" and column D is "Ngành" / "Lớp" (not "Tên")
-        return (col2.contains("họ và tên") || col2.contains("họ tên") || col2.contains("full name"))
-                && !col3.equals("tên") && !col3.equals("tên *");
+    private ColumnMapping detectColumnMapping(Row headerRow) {
+        ColumnMapping mapping = new ColumnMapping();
+        if (headerRow == null) {
+            return mapping;
+        }
+
+        boolean foundStudentCode = false;
+        int lastCell = headerRow.getLastCellNum();
+
+        for (int c = 0; c < lastCell; c++) {
+            String val = getCellValue(headerRow.getCell(c)).toLowerCase().trim();
+            if (val.isEmpty()) continue;
+
+            if (val.contains("mssv") || val.contains("mã sinh viên") || val.contains("ma sinh vien")
+                    || val.contains("mã sv") || val.contains("ma sv") || val.contains("student code") || val.contains("mã số sv")) {
+                mapping.colStudentCode = c;
+                foundStudentCode = true;
+            } else if (val.contains("họ và tên") || val.contains("họ tên") || val.contains("ho va ten") || val.contains("ho ten") || val.contains("full name")) {
+                mapping.colFullName = c;
+            } else if (val.contains("họ đệm") || val.contains("ho dem") || val.contains("họ và tên đệm") || (val.contains("họ") && !val.contains("tên"))) {
+                mapping.colLastName = c;
+            } else if (val.equals("tên") || val.equals("ten") || val.equals("tên *") || val.equals("ten *") || val.contains("first name")) {
+                mapping.colFirstName = c;
+            } else if (val.contains("ngành") || val.contains("nganh") || val.contains("chuyên ngành") || val.contains("major")) {
+                mapping.colMajor = c;
+            } else if (val.contains("lớp") || val.contains("lop") || val.contains("class")) {
+                mapping.colClass = c;
+            } else if (val.contains("điện thoại") || val.contains("dien thoai") || val.contains("sđt") || val.contains("sdt") || val.contains("phone") || val.contains("mobile")) {
+                mapping.colPhone = c;
+            } else if (val.contains("email") || val.contains("thư điện tử") || val.contains("mail")) {
+                mapping.colEmail = c;
+            } else if (val.contains("gpa") || val.contains("điểm") || val.contains("diem") || val.contains("tbc")) {
+                mapping.colGpa = c;
+            } else if (val.equals("stt") || val.contains("thứ tự") || val.contains("thu tu") || val.equals("no")) {
+                mapping.colStt = c;
+            }
+        }
+
+        if (mapping.colFullName >= 0 && mapping.colLastName < 0) {
+            mapping.combinedFullNameMode = true;
+        } else if (mapping.colFullName >= 0 && mapping.colFirstName < 0) {
+            mapping.combinedFullNameMode = true;
+        }
+
+        // Nếu không phát hiện được cột MSSV từ header, giữ fallback theo chuẩn 8 cột
+        if (!foundStudentCode) {
+            mapping.colStt = 0;
+            mapping.colStudentCode = 1;
+            mapping.colLastName = 2;
+            mapping.colFirstName = 3;
+            mapping.colMajor = 4;
+            mapping.colClass = 5;
+            mapping.colPhone = 6;
+            mapping.colEmail = 7;
+            mapping.colGpa = 8;
+            mapping.combinedFullNameMode = false;
+        }
+
+        return mapping;
     }
 
     public String normalizeMajorCode(String rawMajor) {
@@ -94,41 +178,49 @@ public class StudentExcelParser {
         return upper;
     }
 
-    private StudentImportRowDTO parseRow(Row row, int rowIndex, boolean combinedFullNameMode) {
+    private StudentImportRowDTO parseRowWithMapping(Row row, int rowIndex, ColumnMapping mapping) {
         List<String> errors = new ArrayList<>();
 
-        // Cột A (0): STT
-        String sttStr = getCellValue(row.getCell(0));
+        // STT
         Integer stt = null;
-        if (!sttStr.isEmpty()) {
-            try {
-                stt = (int) Double.parseDouble(sttStr);
-            } catch (NumberFormatException ignored) {
+        if (mapping.colStt >= 0 && mapping.colStt < row.getLastCellNum()) {
+            String sttStr = getCellValue(row.getCell(mapping.colStt));
+            if (!sttStr.isEmpty()) {
+                try {
+                    stt = (int) Double.parseDouble(sttStr);
+                } catch (NumberFormatException ignored) {
+                }
             }
         }
 
-        // Cột B (1): Mã sinh viên (MSSV) *
-        String studentCode = getCellValue(row.getCell(1)).trim();
+        // Mã sinh viên (MSSV) *
+        String rawStudentCode = "";
+        if (mapping.colStudentCode >= 0 && mapping.colStudentCode < row.getLastCellNum()) {
+            rawStudentCode = getCellValue(row.getCell(mapping.colStudentCode));
+        }
+        // Loại bỏ ký tự tàng hình zero-width hoặc khoảng trắng
+        String studentCode = rawStudentCode.replaceAll("[\\u200B-\\u200D\\uFEFF\\s]", "").trim();
+
         if (studentCode.isEmpty()) {
             errors.add("Mã sinh viên không được để trống");
         } else if (!studentCode.matches("^\\d{9}$")) {
             errors.add("MSSV không hợp lệ (phải đúng 9 chữ số: " + studentCode + ")");
         }
 
-        String lastName;
-        String firstName;
-        String fullName;
-        String rawMajor;
-        String className;
-        String phone;
-        String email;
+        String lastName = "";
+        String firstName = "";
+        String fullName = "";
+        String rawMajor = "";
+        String className = "";
+        String phone = "";
+        String email = "";
 
-        if (combinedFullNameMode) {
-            fullName = getCellValue(row.getCell(2));
+        if (mapping.combinedFullNameMode && mapping.colFullName >= 0) {
+            if (mapping.colFullName < row.getLastCellNum()) {
+                fullName = getCellValue(row.getCell(mapping.colFullName));
+            }
             if (fullName.isEmpty()) {
                 errors.add("Họ và tên không được để trống");
-                lastName = "";
-                firstName = "";
             } else {
                 int lastSpace = fullName.lastIndexOf(' ');
                 if (lastSpace > 0) {
@@ -139,35 +231,41 @@ public class StudentExcelParser {
                     firstName = fullName;
                 }
             }
-            rawMajor = getCellValue(row.getCell(3));
-            className = getCellValue(row.getCell(4));
-            phone = getCellValue(row.getCell(5));
-            email = getCellValue(row.getCell(6));
         } else {
-            // Cột C (2): Họ đệm *
-            lastName = getCellValue(row.getCell(2));
-            // Cột D (3): Tên *
-            firstName = getCellValue(row.getCell(3));
+            if (mapping.colLastName >= 0 && mapping.colLastName < row.getLastCellNum()) {
+                lastName = getCellValue(row.getCell(mapping.colLastName));
+            }
+            if (mapping.colFirstName >= 0 && mapping.colFirstName < row.getLastCellNum()) {
+                firstName = getCellValue(row.getCell(mapping.colFirstName));
+            }
 
             if (lastName.isEmpty() && firstName.isEmpty()) {
                 errors.add("Họ và tên sinh viên không được để trống");
             } else if (firstName.isEmpty() && lastName.contains(" ")) {
-                // Trường hợp người dùng nhập cả họ và tên vào cột Họ đệm
                 int lastSpace = lastName.lastIndexOf(' ');
                 firstName = lastName.substring(lastSpace + 1).trim();
                 lastName = lastName.substring(0, lastSpace).trim();
             }
 
             fullName = (lastName + " " + firstName).trim();
-            rawMajor = getCellValue(row.getCell(4));
-            className = getCellValue(row.getCell(5));
-            phone = getCellValue(row.getCell(6));
-            email = getCellValue(row.getCell(7));
+        }
+
+        if (mapping.colMajor >= 0 && mapping.colMajor < row.getLastCellNum()) {
+            rawMajor = getCellValue(row.getCell(mapping.colMajor));
+        }
+        if (mapping.colClass >= 0 && mapping.colClass < row.getLastCellNum()) {
+            className = getCellValue(row.getCell(mapping.colClass));
+        }
+        if (mapping.colPhone >= 0 && mapping.colPhone < row.getLastCellNum()) {
+            phone = getCellValue(row.getCell(mapping.colPhone));
+        }
+        if (mapping.colEmail >= 0 && mapping.colEmail < row.getLastCellNum()) {
+            email = getCellValue(row.getCell(mapping.colEmail));
         }
 
         String majorCode = normalizeMajorCode(rawMajor);
         if (majorCode.isEmpty()) {
-            majorCode = "CNTT"; // Mặc định ngành CNTT nếu để trống
+            majorCode = "CNTT";
         }
 
         if (className.isEmpty()) {
@@ -176,8 +274,11 @@ public class StudentExcelParser {
 
         if (!phone.isEmpty()) {
             String cleanedPhone = phone.replaceAll("[\\s.-]", "");
+            if (cleanedPhone.length() == 9 && !cleanedPhone.startsWith("0")) {
+                cleanedPhone = "0" + cleanedPhone;
+            }
             if (!cleanedPhone.matches("^0\\d{9}$") && (cleanedPhone.length() < 9 || cleanedPhone.length() > 11)) {
-                errors.add("Số điện thoại không hợp lệ (phải là 10 chữ số bắt đầu bằng 0)");
+                errors.add("Số điện thoại không hợp lệ (phải là 10 chữ số bắt đầu bằng 0: " + phone + ")");
             } else {
                 phone = cleanedPhone;
             }
@@ -191,30 +292,40 @@ public class StudentExcelParser {
             errors.add("Email không đúng định dạng chuẩn: " + email);
         }
 
-        // Đọc điểm GPA tích lũy (Hệ 4.0)
-        String gpaStr = "";
-        int gpaColIdx = combinedFullNameMode ? 7 : 8;
-        if (row.getCell(gpaColIdx) != null) {
-            gpaStr = getCellValue(row.getCell(gpaColIdx)).trim();
-        }
+        // Đọc điểm GPA tích lũy
         Double gpa = 3.20;
-        if (!gpaStr.isEmpty()) {
-            try {
-                double parsedGpa = Double.parseDouble(gpaStr.replace(',', '.'));
-                if (parsedGpa >= 0.0 && parsedGpa <= 4.0) {
-                    gpa = Math.round(parsedGpa * 100.0) / 100.0;
+        if (mapping.colGpa >= 0 && mapping.colGpa < row.getLastCellNum()) {
+            Cell gpaCell = row.getCell(mapping.colGpa);
+            if (gpaCell != null) {
+                if (gpaCell.getCellType() == CellType.NUMERIC) {
+                    double val = gpaCell.getNumericCellValue();
+                    if (val >= 0.0 && val <= 4.0) {
+                        gpa = Math.round(val * 100.0) / 100.0;
+                    } else {
+                        errors.add("Điểm GPA phải nằm trong khoảng từ 0.0 đến 4.0 (nhập: " + val + ")");
+                    }
                 } else {
-                    errors.add("Điểm GPA phải nằm trong khoảng từ 0.0 đến 4.0 (nhập: " + gpaStr + ")");
+                    String gpaStr = getCellValue(gpaCell).trim();
+                    if (!gpaStr.isEmpty()) {
+                        try {
+                            double parsedGpa = Double.parseDouble(gpaStr.replace(',', '.'));
+                            if (parsedGpa >= 0.0 && parsedGpa <= 4.0) {
+                                gpa = Math.round(parsedGpa * 100.0) / 100.0;
+                            } else {
+                                errors.add("Điểm GPA phải nằm trong khoảng từ 0.0 đến 4.0 (nhập: " + gpaStr + ")");
+                            }
+                        } catch (NumberFormatException e) {
+                            errors.add("Điểm GPA không đúng định dạng số: " + gpaStr);
+                        }
+                    }
                 }
-            } catch (NumberFormatException e) {
-                errors.add("Điểm GPA không đúng định dạng số: " + gpaStr);
             }
         }
 
         boolean isValid = errors.isEmpty();
 
         return StudentImportRowDTO.builder()
-                .rowIndex(rowIndex + 1) // 1-based index hiển thị cho user
+                .rowIndex(rowIndex + 1)
                 .stt(stt != null ? stt : rowIndex)
                 .studentCode(studentCode)
                 .lastName(lastName)
@@ -234,10 +345,39 @@ public class StudentExcelParser {
         if (cell == null) {
             return "";
         }
-        return dataFormatter.formatCellValue(cell).trim();
+        try {
+            if (cell.getCellType() == CellType.NUMERIC && !DateUtil.isCellDateFormatted(cell)) {
+                double val = cell.getNumericCellValue();
+                if (val == (long) val) {
+                    return String.valueOf((long) val);
+                }
+            } else if (cell.getCellType() == CellType.FORMULA) {
+                try {
+                    FormulaEvaluator evaluator = cell.getSheet().getWorkbook().getCreationHelper().createFormulaEvaluator();
+                    CellValue cellValue = evaluator.evaluate(cell);
+                    if (cellValue != null) {
+                        if (cellValue.getCellType() == CellType.NUMERIC) {
+                            double num = cellValue.getNumberValue();
+                            return (num == (long) num) ? String.valueOf((long) num) : String.valueOf(num);
+                        } else if (cellValue.getCellType() == CellType.STRING) {
+                            return cellValue.getStringValue() != null ? cellValue.getStringValue().trim() : "";
+                        } else if (cellValue.getCellType() == CellType.BOOLEAN) {
+                            return String.valueOf(cellValue.getBooleanValue());
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            return dataFormatter.formatCellValue(cell).trim();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private boolean isRowEmpty(Row row) {
+        if (row == null || row.getFirstCellNum() < 0) {
+            return true;
+        }
         for (int c = row.getFirstCellNum(); c < row.getLastCellNum(); c++) {
             Cell cell = row.getCell(c);
             if (cell != null && cell.getCellType() != CellType.BLANK && !getCellValue(cell).isEmpty()) {
