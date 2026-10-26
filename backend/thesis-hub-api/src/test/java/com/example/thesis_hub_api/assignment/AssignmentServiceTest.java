@@ -13,8 +13,11 @@ import com.example.thesis_hub_api.organization.entity.Lecturer;
 import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.entity.TrainingProgram;
 import com.example.thesis_hub_api.organization.repository.*;
+import com.example.thesis_hub_api.assignment.service.LecturerDirectionSyncHelper;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
+import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,8 +47,10 @@ class AssignmentServiceTest {
     @Mock private StudentRepository studentRepository;
     @Mock private LecturerRepository lecturerRepository;
     @Mock private ProjectRoundRepository projectRoundRepository;
+    @Mock private StudentProjectRoundRepository studentProjectRoundRepository;
     @Mock private DepartmentRepository departmentRepository;
     @Mock private TrainingProgramRepository trainingProgramRepository;
+    @Mock private LecturerDirectionSyncHelper syncHelper;
 
     @Spy private AssignmentMapper mapper = new AssignmentMapper();
     @Spy private AssignmentConstraints constraints = new AssignmentConstraints();
@@ -316,5 +321,42 @@ class AssignmentServiceTest {
 
         AppException ex = assertThrows(AppException.class, () -> assignmentService.finalizeAssignments(req, 10L));
         assertEquals(ErrorCode.PROJECT_ROUND_CLOSED, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("Initialize capacities: throws VALIDATION_FAILED when round has no students")
+    void testInitializeCapacities_WhenNoStudents_ThrowsException() {
+        when(projectRoundRepository.findById(50L)).thenReturn(Optional.of(mockRound));
+        when(studentProjectRoundRepository.findByProjectRoundId(50L)).thenReturn(Collections.emptyList());
+
+        AppException ex = assertThrows(AppException.class, () -> assignmentService.initializeCapacitiesForRound(50L, 5));
+        assertEquals(ErrorCode.VALIDATION_FAILED, ex.getErrorCode());
+        assertTrue(ex.getMessage().contains("chưa có sinh viên"));
+    }
+
+    @Test
+    @DisplayName("Initialize capacities: 5 students round selects 1 lecturer with quota covering all students")
+    void testInitializeCapacities_FiveStudents_SelectsSingleLecturer() {
+        when(projectRoundRepository.findById(50L)).thenReturn(Optional.of(mockRound));
+
+        // 5 active students in round
+        List<StudentProjectRound> sprs = new ArrayList<>();
+        for (long i = 1; i <= 5; i++) {
+            sprs.add(StudentProjectRound.builder().id(i).status("ELIGIBLE").build());
+        }
+        when(studentProjectRoundRepository.findByProjectRoundId(50L)).thenReturn(sprs);
+
+        // 2 available lecturers: TS (GV001, id 101) and ThS (GV002, id 102)
+        when(lecturerRepository.findAll()).thenReturn(Arrays.asList(mockLecturer1, mockLecturer2));
+        when(capacityRepository.findByProjectRoundId(50L)).thenReturn(Collections.emptyList());
+
+        assignmentService.initializeCapacitiesForRound(50L, 5);
+
+        // Target count = max(1, 5 / 4) = 1 lecturer (TS has higher priority than ThS)
+        verify(capacityRepository, times(1)).save(argThat(cap -> {
+            return cap.getLecturerId().equals(101L)
+                    && cap.getCapacityFactor() == 1.5
+                    && cap.getEffectiveCapacity() >= 5;
+        }));
     }
 }

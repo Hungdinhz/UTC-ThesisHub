@@ -65,7 +65,9 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
   const currentRound = rounds.find((r) => r.roundId === effectiveRoundId);
   const isRoundClosed = currentRound?.status === 'CLOSED' || currentRound?.status === 'ARCHIVED';
 
-  const isFinalized = proposals.length > 0 && proposals.every((p) => p.status === 'FINALIZED');
+  const isFinalized =
+    (proposals.length > 0 && proposals.every((p) => p.status === 'FINALIZED')) ||
+    Boolean(stats?.finalizedCount && proposals.length > 0 && stats.finalizedCount === proposals.length);
 
   const loadAllData = useCallback(async (roundIdToLoad?: number) => {
     const targetRoundId = roundIdToLoad || effectiveRoundId;
@@ -188,6 +190,14 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       return;
     }
 
+    if (isFinalized) {
+      setAlert({
+        type: 'warning',
+        message: 'Đợt đồ án này đã được chốt phân công chính thức rồi.',
+      });
+      return;
+    }
+
     if (proposals.length === 0) {
       setAlert({
         type: 'warning',
@@ -288,10 +298,17 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
           <button
             className="btn-finalize-action"
             onClick={handleFinalize}
-            disabled={actionLoading || loading || proposals.length === 0 || isRoundClosed}
-            title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể chốt kết quả' : undefined}
+            disabled={actionLoading || loading || proposals.length === 0 || isRoundClosed || isFinalized}
+            style={isFinalized ? { opacity: 0.7, cursor: 'not-allowed', background: '#059669' } : undefined}
+            title={
+              isFinalized
+                ? 'Đã chốt phân công chính thức - Nút đã bị khóa'
+                : isRoundClosed
+                ? 'Đợt đồ án đã đóng - Không thể chốt kết quả'
+                : undefined
+            }
           >
-            🔒 {isFinalized ? 'Đã chốt danh sách' : 'Chốt kết quả phân công'}
+            {isFinalized ? '✅ Đã chốt chính thức (Đã khóa)' : '🔒 Chốt kết quả phân công'}
           </button>
         </div>
       </div>
@@ -381,6 +398,53 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
           <span style={{ fontSize: '1.4rem' }}>🔒</span>
           <div>
             <strong>Đợt đồ án đã đóng hoặc đã lưu trữ (Chế độ chỉ xem):</strong> Mọi thao tác ghi danh, phân công thuật toán, chốt kết quả, override và chỉnh sửa chỉ tiêu capacity đã bị khóa đối với đợt này.
+          </div>
+        </div>
+      )}
+
+      {/* Persistent Finalized Success Banner (Hiển thị cố định trên màn hình, không phải toast) */}
+      {isFinalized && (
+        <div
+          className="assignment-finalized-banner"
+          style={{
+            backgroundColor: '#f0fdf4',
+            border: '2px solid #86efac',
+            borderRadius: '10px',
+            padding: '16px 20px',
+            marginBottom: '16px',
+            boxShadow: '0 2px 8px rgba(22, 163, 74, 0.08)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '14px',
+          }}
+        >
+          <div style={{ fontSize: '1.8rem', lineHeight: 1 }}>✅</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h4 style={{ margin: 0, color: '#166534', fontSize: '1.05rem', fontWeight: 700 }}>
+                ĐÃ CHỐT PHÂN CÔNG GIẢNG VIÊN HƯỚNG DẪN THÀNH CÔNG (FINALIZED)
+              </h4>
+              <span
+                style={{
+                  background: '#22c55e',
+                  color: '#fff',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                }}
+              >
+                CHÍNH THỨC
+              </span>
+            </div>
+            <p style={{ margin: '6px 0 0 0', color: '#15803d', fontSize: '0.9rem', lineHeight: 1.5 }}>
+              Kết quả phân công Giảng viên hướng dẫn cho đợt <strong>{currentRound?.name || effectiveRoundId}</strong> đã được chốt và lưu chính thức vào cơ sở dữ liệu. Toàn bộ {proposals.length} sinh viên đã được bàn giao cho các Giảng viên để chuẩn bị bước sang <strong>Giai đoạn 3 (Đề cương & Duyệt đề tài)</strong>. Nút chốt phân công và các thao tác chỉnh sửa đã được khóa để bảo toàn dữ liệu.
+              {stats?.droppedCount && stats.droppedCount > 0 ? (
+                <span style={{ display: 'block', marginTop: '4px', color: '#b91c1c', fontWeight: 600 }}>
+                  ⚠️ Đã loại {stats.droppedCount} sinh viên không đăng ký nguyện vọng khỏi đợt đồ án theo quy chế.
+                </span>
+              ) : null}
+            </p>
           </div>
         </div>
       )}

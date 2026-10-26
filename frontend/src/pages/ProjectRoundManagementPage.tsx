@@ -411,6 +411,37 @@ const ProjectRoundManagementPage: React.FC = () => {
                         🔒 Đóng đợt
                       </button>
                     )}
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoading(true);
+                          const updated = await apiService.advanceRoundPhase(selectedRound.roundId);
+                          setSelectedRound(updated);
+                          setSuccessMsg('⚡ Demo: Đã kết thúc giai đoạn và chuyển sang giai đoạn tiếp theo thành công!');
+                          window.dispatchEvent(new CustomEvent('utc-phase-change'));
+                        } catch (err: unknown) {
+                          setError(err instanceof Error ? err.message : 'Lỗi khi chuyển giai đoạn');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      style={{
+                        backgroundColor: '#f59e0b',
+                        color: '#0f172a',
+                        border: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      title="Demo: Kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo"
+                    >
+                      ⚡ Demo: Kết thúc GĐ & Chuyển tiếp
+                    </button>
                   </div>
                 </div>
 

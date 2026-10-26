@@ -116,6 +116,7 @@ export const TaskBoardPage: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [defenseReadyLoading, setDefenseReadyLoading] = useState<boolean>(false);
+  const [activeKanbanTab, setActiveKanbanTab] = useState<'ALL' | Task['status']>('ALL');
 
   // Detail modal state
   const [comments, setComments] = useState<Comment[]>([]);
@@ -466,6 +467,29 @@ export const TaskBoardPage: React.FC = () => {
     { status: 'COMPLETED', title: '✅ Hoàn Thành', color: '#16a34a', bg: '#f0fdf4', badgeBg: '#bbf7d0' }
   ];
 
+  const taskCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      ALL: tasks.length,
+      TODO: 0,
+      IN_PROGRESS: 0,
+      SUBMITTED: 0,
+      REVISE: 0,
+      COMPLETED: 0,
+    };
+    tasks.forEach(t => {
+      if (counts[t.status] !== undefined) {
+        counts[t.status]++;
+      }
+    });
+    return counts;
+  }, [tasks]);
+
+  const displayedColumns = useMemo(() => {
+    return activeKanbanTab === 'ALL'
+      ? columns
+      : columns.filter(c => c.status === activeKanbanTab);
+  }, [activeKanbanTab, columns]);
+
   const completedTasksCount = tasks.filter(t => t.status === 'COMPLETED').length;
   const computedProgressPercent = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : (currentThesis?.completionRate || 0);
 
@@ -815,107 +839,332 @@ export const TaskBoardPage: React.FC = () => {
           </div>
         </div>
       ) : (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px', minHeight: '650px' }}>
-        {columns.map(col => {
-          const colTasks = tasks.filter(t => t.status === col.status);
-          return (
-            <div
-              key={col.status}
-              style={{
-                background: col.bg,
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                padding: '14px',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: col.color }}>
-                  {col.title}
-                </h3>
-                <span style={{
-                  background: col.badgeBg,
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  color: col.color
-                }}>
-                  {colTasks.length}
-                </span>
-              </div>
+      <div>
+        {/* Responsive Kanban Navigation Buttons with Count Badges */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            marginBottom: '16px',
+            background: '#ffffff',
+            padding: '12px 16px',
+            borderRadius: '10px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#334155', marginRight: '4px' }}>
+              🎯 Chọn phần việc:
+            </span>
+            {columns.map((col) => {
+              const count = taskCounts[col.status] || 0;
+              const isActive = activeKanbanTab === col.status;
+              const shortName =
+                col.status === 'TODO'
+                  ? 'Cần làm'
+                  : col.status === 'IN_PROGRESS'
+                  ? 'Đang làm'
+                  : col.status === 'SUBMITTED'
+                  ? 'Đã nộp bài'
+                  : col.status === 'REVISE'
+                  ? 'Cần sửa'
+                  : 'Hoàn thành';
+              const icon = col.title.split(' ')[0];
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                {colTasks.map(t => (
-                  <div
-                    key={t.id}
-                    onClick={() => handleOpenDetail(t)}
+              return (
+                <button
+                  key={col.status}
+                  type="button"
+                  onClick={() => setActiveKanbanTab(col.status)}
+                  style={{
+                    background: isActive ? col.color : col.bg,
+                    color: isActive ? '#ffffff' : col.color,
+                    border: `1.5px solid ${isActive ? col.color : '#cbd5e1'}`,
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isActive ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
+                  }}
+                >
+                  <span>{icon} {shortName}</span>
+                  <span
                     style={{
-                      background: '#fff',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                      border: t.status === 'REVISE' ? '1px solid #f87171' : '1px solid #cbd5e1',
-                      cursor: 'pointer',
-                      transition: 'transform 0.15s, box-shadow 0.15s',
+                      background: isActive ? 'rgba(255,255,255,0.28)' : col.badgeBg,
+                      color: isActive ? '#ffffff' : col.color,
+                      padding: '1px 8px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: 800,
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: t.priority === 'URGENT' ? '#fee2e2' : t.priority === 'HIGH' ? '#ffedd5' : '#e0f2fe',
-                        color: t.priority === 'URGENT' ? '#b91c1c' : t.priority === 'HIGH' ? '#c2410c' : '#0369a1'
-                      }}>
-                        {t.priority}
-                      </span>
-                      {t.dueDate && (
-                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
-                          Hạn: {new Date(t.dueDate).toLocaleDateString('vi-VN')}
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Nút Xem tất cả các cột */}
+            <button
+              type="button"
+              onClick={() => setActiveKanbanTab('ALL')}
+              style={{
+                background: activeKanbanTab === 'ALL' ? '#0a3273' : '#f8fafc',
+                color: activeKanbanTab === 'ALL' ? '#ffffff' : '#334155',
+                border: `1.5px solid ${activeKanbanTab === 'ALL' ? '#0a3273' : '#cbd5e1'}`,
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+                boxShadow: activeKanbanTab === 'ALL' ? '0 2px 6px rgba(10,50,115,0.2)' : 'none',
+              }}
+            >
+              <span>📑 Xem tất cả các cột</span>
+              <span
+                style={{
+                  background: activeKanbanTab === 'ALL' ? 'rgba(255,255,255,0.28)' : '#e2e8f0',
+                  color: activeKanbanTab === 'ALL' ? '#ffffff' : '#1e293b',
+                  padding: '1px 8px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                }}
+              >
+                {taskCounts.ALL}
+              </span>
+            </button>
+          </div>
+
+          <div style={{ fontSize: '12px', color: '#64748b' }}>
+            {activeKanbanTab === 'ALL'
+              ? 'Đang hiển thị toàn cảnh 5 cột'
+              : `Đang lọc hiển thị: ${columns.find((c) => c.status === activeKanbanTab)?.title}`}
+          </div>
+        </div>
+
+        {/* Kanban Columns Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              displayedColumns.length === 1
+                ? '1fr'
+                : 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '14px',
+            minHeight: '650px',
+          }}
+        >
+          {displayedColumns.map((col) => {
+            const colTasks = tasks.filter((t) => t.status === col.status);
+            const isSingleView = displayedColumns.length === 1;
+
+            return (
+              <div
+                key={col.status}
+                style={{
+                  background: col.bg,
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: isSingleView ? '16px' : '14px', fontWeight: 'bold', margin: 0, color: col.color }}>
+                    {col.title}
+                  </h3>
+                  <span
+                    style={{
+                      background: col.badgeBg,
+                      padding: isSingleView ? '3px 10px' : '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: isSingleView ? '13px' : '12px',
+                      fontWeight: '700',
+                      color: col.color,
+                    }}
+                  >
+                    {colTasks.length} {isSingleView ? 'nhiệm vụ' : ''}
+                  </span>
+                </div>
+
+                <div
+                  style={
+                    isSingleView
+                      ? {
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                          gap: '12px',
+                          flex: 1,
+                          alignContent: 'start',
+                        }
+                      : {
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          flex: 1,
+                        }
+                  }
+                >
+                  {colTasks.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => handleOpenDetail(t)}
+                      style={{
+                        background: '#fff',
+                        padding: '12px',
+                        borderRadius: '6px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                        border: t.status === 'REVISE' ? '1px solid #f87171' : '1px solid #cbd5e1',
+                        cursor: 'pointer',
+                        transition: 'transform 0.15s, box-shadow 0.15s',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background:
+                              t.priority === 'URGENT'
+                                ? '#fee2e2'
+                                : t.priority === 'HIGH'
+                                ? '#ffedd5'
+                                : '#e0f2fe',
+                            color:
+                              t.priority === 'URGENT'
+                                ? '#b91c1c'
+                                : t.priority === 'HIGH'
+                                ? '#c2410c'
+                                : '#0369a1',
+                          }}
+                        >
+                          {t.priority}
                         </span>
+                        {t.dueDate && (
+                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                            Hạn: {new Date(t.dueDate).toLocaleDateString('vi-VN')}
+                          </span>
+                        )}
+                      </div>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
+                        {t.title}
+                      </h4>
+                      <p
+                        style={{
+                          margin: '0 0 8px 0',
+                          fontSize: '12px',
+                          color: '#475569',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {t.description}
+                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                        <span>💬 {t.commentCount || 0}</span>
+                        <span>📦 {t.submissionCount || 0} bài nộp</span>
+                      </div>
+
+                      {t.status === 'SUBMITTED' && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#92400e',
+                            background: '#fffbeb',
+                            border: '1px solid #fde68a',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          📥 ĐÃ NỘP BÀI (Chờ GV nghiệm thu)
+                        </div>
+                      )}
+                      {t.status === 'REVISE' && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#b91c1c',
+                            background: '#fee2e2',
+                            border: '1px solid #fecaca',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          ⚠️ CẦN SỬA CHỮA LẠI (Revise)
+                        </div>
+                      )}
+                      {t.status === 'COMPLETED' && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#15803d',
+                            background: '#dcfce7',
+                            border: '1px solid #bbf7d0',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          ✓ HOÀN THÀNH (Đã nghiệm thu)
+                        </div>
                       )}
                     </div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
-                      {t.title}
-                    </h4>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {t.description}
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
-                      <span>💬 {t.commentCount || 0}</span>
-                      <span>📦 {t.submissionCount || 0} bài nộp</span>
+                  ))}
+
+                  {colTasks.length === 0 && (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: isSingleView ? '40px 16px' : '24px 8px',
+                        color: '#94a3b8',
+                        fontSize: isSingleView ? '13px' : '12px',
+                        fontStyle: 'italic',
+                        border: '1px dashed #cbd5e1',
+                        borderRadius: '6px',
+                        gridColumn: isSingleView ? '1 / -1' : undefined,
+                      }}
+                    >
+                      Chưa có công việc nào ở phần này
                     </div>
-
-                    {t.status === 'SUBMITTED' && (
-                      <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 700, color: '#92400e', background: '#fef3c7', border: '1px solid #fde68a', padding: '3px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        📥 ĐÃ NỘP BÀI (Chờ GV nghiệm thu)
-                      </div>
-                    )}
-                    {t.status === 'REVISE' && (
-                      <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 700, color: '#b91c1c', background: '#fee2e2', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        ⚠️ CẦN SỬA CHỮA LẠI (Revise)
-                      </div>
-                    )}
-                    {t.status === 'COMPLETED' && (
-                      <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 700, color: '#15803d', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        ✓ HOÀN THÀNH (Đã nghiệm thu)
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {colTasks.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '24px 8px', color: '#94a3b8', fontSize: '12px', fontStyle: 'italic', border: '1px dashed #cbd5e1', borderRadius: '6px' }}>
-                    Chưa có công việc
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
       )}
 

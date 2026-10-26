@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -434,10 +435,171 @@ public class ProjectRoundService {
         timelineMilestoneRepository.deleteById(milestoneId);
     }
 
+    /**
+     * DEMO API: Kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo (hoặc giai đoạn chỉ định).
+     * Điều chỉnh các mốc thời gian trong timeline_milestones để mốc đích trở thành ACTIVE (đang làm),
+     * các mốc trước đó thành COMPLETED (quá khứ), và các mốc sau thành LOCKED (tương lai).
+     */
+    @Transactional
+    public ProjectRoundResponseDTO advanceRoundPhase(Long roundId, String targetPhaseType) {
+        ProjectRound round = projectRoundRepository.findById(roundId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        List<TimelineMilestone> milestones = new ArrayList<>(timelineMilestoneRepository
+                .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId));
+
+        Set<String> existingPhases = milestones.stream()
+                .map(m -> m.getPhaseType() != null ? m.getPhaseType().toUpperCase() : "")
+                .collect(Collectors.toSet());
+
+        Instant baseNow = Instant.now();
+        boolean added = false;
+        if (!existingPhases.contains("REGISTRATION")) {
+            milestones.add(TimelineMilestone.builder()
+                    .projectRound(round)
+                    .name("GĐ2: Đăng ký nguyện vọng & Hướng đề tài")
+                    .phaseType("REGISTRATION")
+                    .startDate(baseNow.minus(Duration.ofDays(1)))
+                    .endDate(baseNow.plus(Duration.ofDays(7)))
+                    .description("Sinh viên đăng ký nguyện vọng và hướng đề tài")
+                    .orderIndex(1)
+                    .build());
+            added = true;
+        }
+        if (!existingPhases.contains("PROPOSAL_SUBMISSION")) {
+            milestones.add(TimelineMilestone.builder()
+                    .projectRound(round)
+                    .name("GĐ3: Nộp đề cương đồ án tốt nghiệp")
+                    .phaseType("PROPOSAL_SUBMISSION")
+                    .startDate(baseNow.plus(Duration.ofDays(8)))
+                    .endDate(baseNow.plus(Duration.ofDays(20)))
+                    .description("Sinh viên hoàn thiện đề cương và nộp phê duyệt")
+                    .orderIndex(2)
+                    .build());
+            added = true;
+        }
+        if (!existingPhases.contains("WEEKLY_REPORT")) {
+            milestones.add(TimelineMilestone.builder()
+                    .projectRound(round)
+                    .name("GĐ4: Thực hiện đồ án & Báo cáo tiến độ tuần")
+                    .phaseType("WEEKLY_REPORT")
+                    .startDate(baseNow.plus(Duration.ofDays(21)))
+                    .endDate(baseNow.plus(Duration.ofDays(60)))
+                    .description("Sinh viên làm việc với GVHD và báo cáo tiến độ tuần")
+                    .orderIndex(3)
+                    .build());
+            added = true;
+        }
+        if (!existingPhases.contains("DEFENSE") && !existingPhases.contains("ELIGIBILITY_REVIEW")) {
+            milestones.add(TimelineMilestone.builder()
+                    .projectRound(round)
+                    .name("GĐ5: Bảo vệ đồ án tốt nghiệp trước Hội đồng")
+                    .phaseType("DEFENSE")
+                    .startDate(baseNow.plus(Duration.ofDays(61)))
+                    .endDate(baseNow.plus(Duration.ofDays(80)))
+                    .description("Bảo vệ trước hội đồng và chấm điểm biên bản")
+                    .orderIndex(5)
+                    .build());
+            added = true;
+        }
+        if (added) {
+            milestones = new ArrayList<>(timelineMilestoneRepository.saveAll(milestones));
+            milestones.sort(Comparator.comparing(TimelineMilestone::getOrderIndex)
+                    .thenComparing(TimelineMilestone::getStartDate));
+        }
+
+        Instant now = Instant.now();
+
+        // Xác định mốc mục tiêu
+        int targetIndex = 0;
+        if (StringUtils.hasText(targetPhaseType)) {
+            String target = targetPhaseType.trim().toUpperCase();
+            boolean found = false;
+            for (int i = 0; i < milestones.size(); i++) {
+                TimelineMilestone m = milestones.get(i);
+                if (m.getPhaseType() != null && m.getPhaseType().equalsIgnoreCase(target)) {
+                    targetIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                if (target.contains("1") || target.contains("DRAFT")) {
+                    targetIndex = 0;
+                } else if (target.contains("2") || target.contains("REG")) {
+                    targetIndex = findMilestoneIndex(milestones, "REGISTRATION", 0);
+                } else if (target.contains("3") || target.contains("PROP")) {
+                    targetIndex = findMilestoneIndex(milestones, "PROPOSAL_SUBMISSION", 1);
+                } else if (target.contains("4") || target.contains("TASK") || target.contains("WEEK")) {
+                    targetIndex = findMilestoneIndex(milestones, "WEEKLY_REPORT", 2);
+                } else if (target.contains("5") || target.contains("DEFENSE") || target.contains("ELIG")) {
+                    targetIndex = findMilestoneIndex(milestones, "DEFENSE", milestones.size() - 1);
+                }
+            }
+        } else {
+            // Tự động tìm mốc đang active và chuyển sang mốc kế tiếp
+            int currentActiveIndex = -1;
+            for (int i = 0; i < milestones.size(); i++) {
+                TimelineMilestone m = milestones.get(i);
+                if (!now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate())) {
+                    currentActiveIndex = i;
+                    break;
+                }
+            }
+            if (currentActiveIndex >= 0) {
+                targetIndex = (currentActiveIndex + 1 < milestones.size()) ? currentActiveIndex + 1 : currentActiveIndex;
+            } else {
+                targetIndex = 0;
+            }
+        }
+
+        // Cập nhật lại ngày bắt đầu/kết thúc cho toàn bộ mốc theo mốc mục tiêu
+        for (int i = 0; i < milestones.size(); i++) {
+            TimelineMilestone m = milestones.get(i);
+            if (i < targetIndex) {
+                m.setStartDate(now.minus(Duration.ofDays(14 * (targetIndex - i + 1))));
+                m.setEndDate(now.minusSeconds(60));
+            } else if (i == targetIndex) {
+                m.setStartDate(now.minusSeconds(60));
+                m.setEndDate(now.plus(Duration.ofDays(14)));
+            } else {
+                m.setStartDate(now.plus(Duration.ofDays(14 * (i - targetIndex))));
+                m.setEndDate(now.plus(Duration.ofDays(14 * (i - targetIndex + 1))));
+            }
+        }
+        timelineMilestoneRepository.saveAll(milestones);
+
+        // Cập nhật trạng thái vòng đời đợt đồ án
+        TimelineMilestone activeMilestone = milestones.get(targetIndex);
+        String phase = activeMilestone.getPhaseType() != null ? activeMilestone.getPhaseType().toUpperCase() : "";
+        if ("REGISTRATION".equalsIgnoreCase(phase)) {
+            round.setStatus("OPEN");
+        } else {
+            round.setStatus("IN_PROGRESS");
+        }
+        round = projectRoundRepository.save(round);
+
+        return toResponseDTO(round, milestones);
+    }
+
+    private int findMilestoneIndex(List<TimelineMilestone> milestones, String phaseType, int defaultIdx) {
+        for (int i = 0; i < milestones.size(); i++) {
+            if (phaseType.equalsIgnoreCase(milestones.get(i).getPhaseType())) {
+                return i;
+            }
+        }
+        return Math.min(defaultIdx, milestones.size() - 1);
+    }
+
     // ─── MAPPER HELPERS ────────────────────────────────────────────────────────
     private ProjectRoundResponseDTO toResponseDTO(ProjectRound round) {
+        return toResponseDTO(round, null);
+    }
+
+    private ProjectRoundResponseDTO toResponseDTO(ProjectRound round, List<TimelineMilestone> explicitMilestones) {
         Instant now = Instant.now();
-        List<TimelineMilestone> rawMilestones = (round.getMilestones() != null) ? round.getMilestones() : List.of();
+        List<TimelineMilestone> rawMilestones = (explicitMilestones != null) ? explicitMilestones :
+                ((round.getMilestones() != null) ? round.getMilestones() : List.of());
 
         List<MilestoneResponseDTO> milestoneDTOs = rawMilestones.stream()
                 .sorted(Comparator.comparing(TimelineMilestone::getOrderIndex)

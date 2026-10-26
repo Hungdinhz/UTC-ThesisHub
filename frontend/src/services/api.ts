@@ -1087,6 +1087,25 @@ class ApiService {
     await this.api.delete(PROJECT_ROUNDS.milestoneDetail(milestoneId));
   }
 
+  // ─── Demo Phase Transition Controls ─────────────────────────────
+  async advanceRoundPhase(roundId: number, targetPhaseType?: string): Promise<ProjectRoundItem> {
+    const response = await this.api.post<ProjectRoundItem>(
+      PROJECT_ROUNDS.advancePhase(roundId),
+      null,
+      { params: targetPhaseType ? { targetPhaseType } : undefined }
+    );
+    return response.data;
+  }
+
+  async advanceActivePhase(targetPhaseType?: string): Promise<ProjectRoundItem> {
+    const response = await this.api.post<ProjectRoundItem>(
+      PROJECT_ROUNDS.advanceActivePhase,
+      null,
+      { params: targetPhaseType ? { targetPhaseType } : undefined }
+    );
+    return response.data;
+  }
+
   // ─── Student Project Round & Ingestion APIs (Contract 3) ────────
   async downloadStudentTemplate(): Promise<Blob> {
     const response = await this.api.get(PROJECT_ROUNDS.STUDENT_TEMPLATE, {

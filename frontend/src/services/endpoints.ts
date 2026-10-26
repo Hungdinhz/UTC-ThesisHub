@@ -186,6 +186,8 @@ export const PROJECT_ROUNDS = {
   studentImportCommit:  (roundId: number) => `/project-rounds/${roundId}/students/import-commit` as const,
   studentManual:        (roundId: number) => `/project-rounds/${roundId}/students/manual` as const,
   studentCheckEligibility: (roundId: number) => `/project-rounds/${roundId}/students/check-eligibility` as const,
+  advancePhase:         (roundId: number) => `/project-rounds/${roundId}/advance-phase` as const,
+  advanceActivePhase:   '/project-rounds/active/advance-phase',
 } as const;
 
 // ─── Academic Records (Contract 4) ────────────────────────────────

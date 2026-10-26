@@ -342,4 +342,42 @@ class ProjectRoundServiceTest {
         assertNotNull(result);
         assertEquals("OPEN", sampleRound.getStatus());
     }
+
+    @Test
+    @DisplayName("Demo advanceRoundPhase chuyển mốc tiếp theo và cập nhật trạng thái đợt")
+    void advanceRoundPhase_Success() {
+        sampleRound.setStatus("OPEN");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+        when(projectRoundRepository.save(any(ProjectRound.class))).thenReturn(sampleRound);
+
+        TimelineMilestone m1 = TimelineMilestone.builder()
+                .id(1L)
+                .name("GĐ2: Đăng ký")
+                .phaseType("REGISTRATION")
+                .startDate(Instant.now().minus(java.time.Duration.ofDays(1)))
+                .endDate(Instant.now().plus(java.time.Duration.ofDays(5)))
+                .orderIndex(1)
+                .build();
+        TimelineMilestone m2 = TimelineMilestone.builder()
+                .id(2L)
+                .name("GĐ3: Nộp đề cương")
+                .phaseType("PROPOSAL_SUBMISSION")
+                .startDate(Instant.now().plus(java.time.Duration.ofDays(6)))
+                .endDate(Instant.now().plus(java.time.Duration.ofDays(20)))
+                .orderIndex(2)
+                .build();
+
+        List<TimelineMilestone> list = new ArrayList<>(List.of(m1, m2));
+        when(timelineMilestoneRepository.findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(10L))
+                .thenReturn(list);
+        when(timelineMilestoneRepository.saveAll(any())).thenReturn(list);
+
+        // Advance without target: moves from active m1 to next m2 (PROPOSAL_SUBMISSION)
+        ProjectRoundResponseDTO response = projectRoundService.advanceRoundPhase(10L, null);
+        assertNotNull(response);
+        assertEquals("IN_PROGRESS", sampleRound.getStatus());
+        assertTrue(m1.getEndDate().isBefore(Instant.now()));
+        assertTrue(m2.getStartDate().isBefore(Instant.now()));
+        assertTrue(m2.getEndDate().isAfter(Instant.now()));
+    }
 }

@@ -116,4 +116,25 @@ public class ProjectRoundController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Thêm mốc thời gian thành công", created));
     }
+
+    // ─── DEMO PHASE TRANSITION CONTROLS ─────────────────────────────────────────
+    @PostMapping(value = {"/active/advance-phase", "/advance-active-phase"})
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @Operation(summary = "Demo: Kết thúc giai đoạn của đợt đồ án đang mở và chuyển sang giai đoạn tiếp theo (Admin)")
+    public ResponseEntity<ApiResponse<ProjectRoundResponseDTO>> advanceActivePhase(
+            @RequestParam(required = false) String targetPhaseType) {
+        ProjectRoundResponseDTO activeRound = projectRoundService.getActiveRound();
+        ProjectRoundResponseDTO round = projectRoundService.advanceRoundPhase(activeRound.getRoundId(), targetPhaseType);
+        return ResponseEntity.ok(ApiResponse.success("Chuyển giai đoạn đợt đồ án thành công", round));
+    }
+
+    @PostMapping("/{roundId}/advance-phase")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @Operation(summary = "Demo: Kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo (Admin)")
+    public ResponseEntity<ApiResponse<ProjectRoundResponseDTO>> advancePhase(
+            @PathVariable Long roundId,
+            @RequestParam(required = false) String targetPhaseType) {
+        ProjectRoundResponseDTO round = projectRoundService.advanceRoundPhase(roundId, targetPhaseType);
+        return ResponseEntity.ok(ApiResponse.success("Chuyển giai đoạn đợt đồ án thành công", round));
+    }
 }

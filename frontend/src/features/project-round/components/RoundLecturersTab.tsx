@@ -153,17 +153,19 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
   // Init all lecturers
   const handleInitAll = async () => {
     if (isRoundClosed) return;
-    if (!window.confirm(`Bạn có chắc chắn muốn khởi tạo chỉ tiêu cho TOÀN BỘ giảng viên khoa vào đợt [${roundCode}]?`)) {
+    if (!window.confirm(`Bạn có chắc chắn muốn khởi tạo danh sách giảng viên và phân bổ chỉ tiêu tự động theo số lượng sinh viên trong đợt [${roundCode}]?`)) {
       return;
     }
     try {
       setLoading(true);
+      setError(null);
       await assignmentService.initCapacities(roundId, 5);
-      setSuccessMsg('Đã khởi tạo bảng chỉ tiêu cho toàn bộ giảng viên trong khoa thành công!');
+      setSuccessMsg('Đã khởi tạo danh sách giảng viên và phân bổ chỉ tiêu thành công theo số lượng sinh viên trong đợt!');
       await loadData();
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi khởi tạo chỉ tiêu');
+      setTimeout(() => setSuccessMsg(null), 5000);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi khởi tạo chỉ tiêu';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -297,6 +299,7 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
           <button
             disabled={isRoundClosed}
             onClick={handleInitAll}
+            title="Tự động phân bổ số lượng giảng viên và chỉ tiêu theo số sinh viên trong đợt (Tiến sĩ x1.5, PGS x2.0, tối thiểu 4 SV/GV)"
             style={{
               backgroundColor: isRoundClosed ? '#94a3b8' : '#16a34a',
               color: '#fff',

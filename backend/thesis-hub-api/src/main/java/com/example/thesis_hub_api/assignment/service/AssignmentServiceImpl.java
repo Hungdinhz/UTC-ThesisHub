@@ -588,21 +588,160 @@ public class AssignmentServiceImpl implements AssignmentService {
     @Override
     @Transactional
     public void initializeCapacitiesForRound(Long projectRoundId, int defaultQuota) {
-        getAndValidateActiveRound(projectRoundId);
-        List<Lecturer> lecturers = lecturerRepository.findAll();
-        for (Lecturer l : lecturers) {
+        ProjectRound round = getAndValidateActiveRound(projectRoundId);
+
+        // 1. Kiểm tra số lượng sinh viên hợp lệ trong đợt
+        List<StudentProjectRound> enrolledStudents = studentProjectRoundRepository.findByProjectRoundId(projectRoundId);
+        long activeStudentCount = enrolledStudents.stream()
+                .filter(spr -> !"DROPPED".equalsIgnoreCase(spr.getStatus()) && !"RESERVED".equalsIgnoreCase(spr.getStatus()))
+                .count();
+
+        if (activeStudentCount <= 0) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED,
+                    "Đợt đồ án hiện chưa có sinh viên nào. Vui lòng import hoặc thêm sinh viên vào đợt (GĐ1: Sinh viên trong đợt) trước khi khởi tạo danh sách giảng viên.");
+        }
+
+        // 2. Lấy danh sách toàn bộ giảng viên trong khoa
+        List<Lecturer> allLecturers = lecturerRepository.findAll();
+        if (allLecturers.isEmpty()) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Không tìm thấy giảng viên nào trong hệ thống.");
+        }
+
+        for (Lecturer l : allLecturers) {
             syncHelper.syncLecturerDirections(l);
-            if (capacityRepository.findByLecturerIdAndProjectRoundId(l.getId(), projectRoundId).isEmpty()) {
-                LecturerCapacity cap = LecturerCapacity.builder()
+        }
+
+        // 3. Kiểm tra các chỉ tiêu hiện có trong đợt
+        List<LecturerCapacity> existingCapacities = capacityRepository.findByProjectRoundId(projectRoundId);
+        Map<Long, LecturerCapacity> existingCapMap = existingCapacities.stream()
+                .collect(Collectors.toMap(LecturerCapacity::getLecturerId, c -> c, (c1, c2) -> c1));
+
+        // Các giảng viên đã được phân công sinh viên (currentAssigned > 0) bắt buộc phải giữ lại
+        Set<Long> mustKeepLecturerIds = existingCapacities.stream()
+                .filter(c -> c.getCurrentAssigned() != null && c.getCurrentAssigned() > 0)
+                .map(LecturerCapacity::getLecturerId)
+                .collect(Collectors.toSet());
+
+        // 4. Xác định số lượng giảng viên cần phân công (K)
+        // Quy tắc: Mỗi giảng viên tối thiểu hướng dẫn 4 sinh viên
+        // => Số lượng giảng viên tối đa = floor(activeStudentCount / 4)
+        int maxLecturersByStudents = (int) Math.max(1, activeStudentCount / 4);
+        int targetLecturerCount = Math.max(mustKeepLecturerIds.size(), maxLecturersByStudents);
+        targetLecturerCount = Math.min(allLecturers.size(), targetLecturerCount);
+
+        // 5. Ưu tiên chọn giảng viên theo học vị: PGS > Tiến sĩ (TIEN_SI) > Thạc sĩ (THAC_SI)
+        List<Lecturer> sortedLecturers = new ArrayList<>(allLecturers);
+        sortedLecturers.sort((l1, l2) -> {
+            boolean keep1 = mustKeepLecturerIds.contains(l1.getId());
+            boolean keep2 = mustKeepLecturerIds.contains(l2.getId());
+            if (keep1 != keep2) {
+                return keep1 ? -1 : 1;
+            }
+            double w1 = getDegreeWeight(l1.getAcademicDegree());
+            double w2 = getDegreeWeight(l2.getAcademicDegree());
+            if (Double.compare(w2, w1) != 0) {
+                return Double.compare(w2, w1);
+            }
+            return Long.compare(l1.getId(), l2.getId());
+        });
+
+        List<Lecturer> selectedLecturers = new ArrayList<>(sortedLecturers.subList(0, targetLecturerCount));
+        Set<Long> selectedLecturerIds = selectedLecturers.stream().map(Lecturer::getId).collect(Collectors.toSet());
+
+        // 6. Phân bổ chỉ tiêu cho từng giảng viên theo hệ số học vị:
+        // Tiến sĩ = 1.5 lần Thạc sĩ, PGS = 2.0 lần Thạc sĩ, GS = 2.5 lần Thạc sĩ
+        // Mỗi giảng viên tối thiểu 4 sinh viên (hoặc toàn bộ SV nếu SV < 4)
+        int minStudentsPerLecturer = (int) Math.min(4, activeStudentCount);
+        double totalWeight = selectedLecturers.stream()
+                .mapToDouble(l -> getDegreeWeight(l.getAcademicDegree()))
+                .sum();
+        double baseRatio = (double) activeStudentCount / Math.max(1.0, totalWeight);
+
+        Map<Long, Integer> assignedBaseQuotas = new LinkedHashMap<>();
+        int totalEffectiveAllocated = 0;
+
+        for (Lecturer l : selectedLecturers) {
+            double weight = getDegreeWeight(l.getAcademicDegree());
+            // Chỉ tiêu mục tiêu thực tế theo trọng số học vị
+            int targetEffective = (int) Math.max(minStudentsPerLecturer, Math.round(weight * baseRatio));
+
+            // Chỉ tiêu gốc baseQuota (sao cho Math.round(baseQuota * weight) >= targetEffective)
+            int baseQuota = (int) Math.max(1, Math.round((double) targetEffective / weight));
+            while ((int) Math.round(baseQuota * weight) < targetEffective) {
+                baseQuota++;
+            }
+
+            // Nếu giảng viên đã có sinh viên được gán, chỉ tiêu thực không được nhỏ hơn số đã gán
+            LecturerCapacity existingCap = existingCapMap.get(l.getId());
+            if (existingCap != null && existingCap.getCurrentAssigned() != null && existingCap.getCurrentAssigned() > 0) {
+                while ((int) Math.round(baseQuota * weight) < existingCap.getCurrentAssigned()) {
+                    baseQuota++;
+                }
+            }
+
+            assignedBaseQuotas.put(l.getId(), baseQuota);
+            totalEffectiveAllocated += (int) Math.round(baseQuota * weight);
+        }
+
+        // Đảm bảo tổng chỉ tiêu thực tế >= số lượng sinh viên
+        if (totalEffectiveAllocated < activeStudentCount) {
+            int shortage = (int) (activeStudentCount - totalEffectiveAllocated);
+            for (int i = 0; i < shortage; i++) {
+                Lecturer target = selectedLecturers.get(i % selectedLecturers.size());
+                assignedBaseQuotas.put(target.getId(), assignedBaseQuotas.get(target.getId()) + 1);
+            }
+        }
+
+        // 7. Cập nhật hoặc lưu mới bảng LecturerCapacity cho các giảng viên được chọn
+        for (Lecturer l : selectedLecturers) {
+            int baseQuota = assignedBaseQuotas.get(l.getId());
+            double weight = getDegreeWeight(l.getAcademicDegree());
+            LecturerCapacity cap = existingCapMap.get(l.getId());
+            if (cap != null) {
+                cap.setMaxQuota(baseQuota);
+                cap.setCapacityFactor(weight);
+                cap.setIsActive(true);
+                capacityRepository.save(cap);
+            } else {
+                cap = LecturerCapacity.builder()
                         .lecturerId(l.getId())
                         .projectRoundId(projectRoundId)
-                        .maxQuota(l.getMaxThesisQuota() != null ? l.getMaxThesisQuota() : defaultQuota)
-                        .capacityFactor(1.0)
+                        .maxQuota(baseQuota)
+                        .capacityFactor(weight)
                         .currentAssigned(0)
                         .isActive(true)
                         .build();
                 capacityRepository.save(cap);
             }
+        }
+
+        // 8. Dọn dẹp các giảng viên không thuộc danh sách được chọn (nếu chưa gán sinh viên nào)
+        for (LecturerCapacity existingCap : existingCapacities) {
+            if (!selectedLecturerIds.contains(existingCap.getLecturerId())) {
+                if (existingCap.getCurrentAssigned() != null && existingCap.getCurrentAssigned() > 0) {
+                    existingCap.setIsActive(true);
+                    capacityRepository.save(existingCap);
+                } else {
+                    capacityRepository.delete(existingCap);
+                }
+            }
+        }
+
+        log.info("Initialized capacities for round {} with {} students: selected {} lecturers (min 4 SV/GV, degree multipliers applied)",
+                round.getRoundCode(), activeStudentCount, selectedLecturers.size());
+    }
+
+    private double getDegreeWeight(String degree) {
+        if (degree == null) return 1.0;
+        String d = degree.toUpperCase().trim();
+        if (d.contains("GS") && !d.contains("PGS")) {
+            return 2.5;
+        } else if (d.contains("PGS")) {
+            return 2.0;
+        } else if (d.contains("TIEN_SI") || d.contains("TS") || d.contains("DOCTOR")) {
+            return 1.5;
+        } else {
+            return 1.0;
         }
     }
 
@@ -638,7 +777,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                         .lecturerId(l.getId())
                         .projectRoundId(projectRoundId)
                         .maxQuota(assignedQuota)
-                        .capacityFactor(1.0)
+                        .capacityFactor(getDegreeWeight(l.getAcademicDegree()))
                         .currentAssigned(0)
                         .isActive(true)
                         .build();
@@ -690,8 +829,11 @@ public class AssignmentServiceImpl implements AssignmentService {
             assignmentRepository.deleteByProjectRoundIdAndStatus(roundId, "PROPOSED");
         }
 
-        // Đảm bảo các giảng viên đã có bản ghi capacity trong đợt
-        initializeCapacitiesForRound(roundId, 5);
+        // Đảm bảo các giảng viên đã có bản ghi capacity trong đợt nếu chưa khởi tạo
+        List<LecturerCapacity> existingRoundCaps = capacityRepository.findByProjectRoundIdAndIsActiveTrue(roundId);
+        if (existingRoundCaps.isEmpty()) {
+            initializeCapacitiesForRound(roundId, 5);
+        }
 
         // Chuẩn bị dữ liệu đầu vào cho Thuật toán
         List<DirectionRegistration> registrations = registrationRepository.findByProjectRoundId(roundId);

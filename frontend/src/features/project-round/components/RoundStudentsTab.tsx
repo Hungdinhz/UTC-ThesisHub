@@ -652,17 +652,17 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
       {/* Filter Bar */}
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '240px' }}>
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flex: '1 1 240px' }}>
           <input
             type="text"
             placeholder="Tìm MSSV, họ tên, email, lớp..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ flex: 1, padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+            style={{ flex: 1, minWidth: '150px', padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
           />
           <button
             type="submit"
-            style={{ backgroundColor: '#0a3273', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+            style={{ backgroundColor: '#0a3273', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Tìm
           </button>
@@ -674,7 +674,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             setSelectedMajorId(e.target.value ? Number(e.target.value) : undefined);
             setCurrentPage(0);
           }}
-          style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+          style={{ flex: '1 1 180px', minWidth: '150px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
         >
           <option value="">Tất cả ngành</option>
           {majors.map((m) => (
@@ -690,7 +690,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             setSelectedStatus(e.target.value);
             setCurrentPage(0);
           }}
-          style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+          style={{ flex: '1 1 180px', minWidth: '150px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
         >
           <option value="">Tất cả trạng thái</option>
           <option value="ELIGIBLE">Đủ điều kiện (ELIGIBLE)</option>
@@ -707,79 +707,84 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       {loading ? (
         <div style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>Đang tải danh sách sinh viên...</div>
       ) : students.length > 0 ? (
-        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                <th style={{ padding: '10px 12px' }}>STT</th>
-                <th style={{ padding: '10px 12px' }}>MSSV</th>
-                <th style={{ padding: '10px 12px' }}>Họ và tên</th>
-                <th style={{ padding: '10px 12px' }}>Ngành</th>
-                <th style={{ padding: '10px 12px' }}>Lớp</th>
-                <th style={{ padding: '10px 12px' }}>Email & SĐT</th>
-                <th style={{ padding: '10px 12px' }}>GPA</th>
-                <th style={{ padding: '10px 12px' }}>Trạng thái</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((st, idx) => {
-                const badge = getStatusBadge(st.status);
-                return (
-                  <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 12px' }}>{currentPage * 15 + idx + 1}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{st.fullName}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontWeight: 600 }}>
-                        {st.majorCode || 'N/A'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>{st.className || '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>
-                      <div>{st.email}</div>
-                      {st.phone && <div style={{ fontSize: '0.75rem' }}>📞 {st.phone}</div>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
-                        {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
-                        {badge.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      {!isRoundClosed ? (
-                        <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          <button
-                            onClick={() => handleOpenStatusModal(st)}
-                            title="Đổi trạng thái"
-                            style={{ backgroundColor: '#eff6ff', color: '#0a3273', border: '1px solid #bfdbfe', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
-                            title="Xóa khỏi đợt"
-                            style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                          >
-                            Xóa
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Đã khóa</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ width: '100%', minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>💡 Vuốt hoặc cuộn ngang để xem đầy đủ cột thông tin</span>
+          </div>
+          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+            <table style={{ width: '100%', minWidth: '880px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569', whiteSpace: 'nowrap' }}>
+                  <th style={{ padding: '10px 12px', width: '50px' }}>STT</th>
+                  <th style={{ padding: '10px 12px', width: '110px' }}>MSSV</th>
+                  <th style={{ padding: '10px 12px', minWidth: '160px' }}>Họ và tên</th>
+                  <th style={{ padding: '10px 12px', width: '90px' }}>Ngành</th>
+                  <th style={{ padding: '10px 12px', width: '110px' }}>Lớp</th>
+                  <th style={{ padding: '10px 12px', minWidth: '180px' }}>Email & SĐT</th>
+                  <th style={{ padding: '10px 12px', width: '70px' }}>GPA</th>
+                  <th style={{ padding: '10px 12px', width: '130px' }}>Trạng thái</th>
+                  <th style={{ padding: '10px 12px', width: '110px', textAlign: 'center' }}>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((st, idx) => {
+                  const badge = getStatusBadge(st.status);
+                  return (
+                    <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 12px' }}>{currentPage * 15 + idx + 1}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{st.fullName}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontWeight: 600 }}>
+                          {st.majorCode || 'N/A'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>{st.className || '—'}</td>
+                      <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                        <div>{st.email}</div>
+                        {st.phone && <div style={{ fontSize: '0.75rem' }}>📞 {st.phone}</div>}
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
+                          {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        {!isRoundClosed ? (
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            <button
+                              onClick={() => handleOpenStatusModal(st)}
+                              title="Đổi trạng thái"
+                              style={{ backgroundColor: '#eff6ff', color: '#0a3273', border: '1px solid #bfdbfe', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
+                              title="Xóa khỏi đợt"
+                              style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Đã khóa</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
           {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', padding: '12px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
             <div>
               Trang <strong>{currentPage + 1}</strong> / {totalPages || 1} (Tổng {totalElements} sinh viên)
             </div>
@@ -809,7 +814,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
       {/* Modal Import Excel */}
       {showImportModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
           <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px 32px', width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <div>
