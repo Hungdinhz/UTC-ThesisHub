@@ -12,7 +12,7 @@ export const ThesisDetailPage: React.FC = () => {
   const targetId = Number(searchParams.get('id') || searchParams.get('thesisId')) || 1;
 
   const isStudent = userType === 'student';
-  const isLecturerOrAdmin = userType === 'supervisor' || userType === 'admin';
+  const isLecturerOrAdmin = userType === 'supervisor' || userType === 'committee_member' || userType === 'admin';
 
   const [thesis, setThesis] = useState<Thesis | null>(null);
   const [documents, setDocuments] = useState<ThesisDocument[]>([]);

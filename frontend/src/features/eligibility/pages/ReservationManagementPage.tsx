@@ -11,7 +11,7 @@ import './EligibilityPages.css';
 export const ReservationManagementPage: React.FC = () => {
   const { user, userType } = useAuth();
   const isStudent = userType === 'student';
-  const canReview = userType === 'admin' || userType === 'supervisor';
+  const canReview = userType === 'admin' || userType === 'supervisor' || userType === 'committee_member';
 
   const [reservations, setReservations] = useState<ReservationRequestItem[]>([]);
   const [loading, setLoading] = useState(false);

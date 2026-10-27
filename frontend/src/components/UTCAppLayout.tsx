@@ -193,7 +193,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         setActiveRound(round);
         const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
         setRoundCurrentStage(st);
-        if (currentRole === 'supervisor' || currentRole === 'lecturer') {
+        if (currentRole === 'supervisor' || currentRole === 'lecturer' || currentRole === 'committee_member' || currentRole === 'committee') {
           setUserCompletedStageState(Math.max(st - 1, 1));
         }
       }
@@ -545,6 +545,15 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               </div>
 
               <div
+                className={`utc-nav-item ${activeTab === 'assignments' ? 'active' : ''} ${isStageLocked(2) ? 'utc-nav-locked' : ''}`}
+                onClick={() => handleNavClick('/admin/assignments', true, 2)}
+              >
+                <span className="utc-nav-icon">👥</span>
+                <span className="utc-nav-label">GĐ2: Phân công & Duyệt NV</span>
+                {renderStageBadge(2)}
+              </div>
+
+              <div
                 className={`utc-nav-item ${activeTab === 'proposals' ? 'active' : ''} ${isStageLocked(3) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/thesis/proposals', true, 3)}
               >
@@ -603,11 +612,47 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               </div>
 
               <div
+                className={`utc-nav-item ${activeTab === 'assignments' ? 'active' : ''} ${isStageLocked(2) ? 'utc-nav-locked' : ''}`}
+                onClick={() => handleNavClick('/admin/assignments', true, 2)}
+              >
+                <span className="utc-nav-icon">👥</span>
+                <span className="utc-nav-label">GĐ2: Phân công & Duyệt NV</span>
+                {renderStageBadge(2)}
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'proposals' ? 'active' : ''} ${isStageLocked(3) ? 'utc-nav-locked' : ''}`}
+                onClick={() => handleNavClick('/thesis/proposals', true, 3)}
+              >
+                <span className="utc-nav-icon">📑</span>
+                <span className="utc-nav-label">GĐ3: Xác nhận Đề cương</span>
+                {renderStageBadge(3)}
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'tasks' ? 'active' : ''} ${isStageLocked(4) ? 'utc-nav-locked' : ''}`}
+                onClick={() => handleNavClick('/progress/tasks', true, 4)}
+              >
+                <span className="utc-nav-icon">📋</span>
+                <span className="utc-nav-label">GĐ4: Giao Task & Review</span>
+                {renderStageBadge(4)}
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'thesis-detail' ? 'active' : ''} ${isStageLocked(5) ? 'utc-nav-locked' : ''}`}
+                onClick={() => handleNavClick('/thesis/detail', true, 5)}
+              >
+                <span className="utc-nav-icon">✅</span>
+                <span className="utc-nav-label">GĐ5: Đủ điều kiện Bảo vệ</span>
+                {renderStageBadge(5)}
+              </div>
+
+              <div
                 className={`utc-nav-item ${activeTab === 'councils' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/admin/councils', true)}
               >
                 <span className="utc-nav-icon">⚖️</span>
-                <span className="utc-nav-label">Hội đồng chấm (1CT-2TK-2UV)</span>
+                <span className="utc-nav-label">GĐ5: Hội đồng chấm (1CT-2TK-2UV)</span>
               </div>
 
               <div
@@ -615,15 +660,15 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-schedules', true)}
               >
                 <span className="utc-nav-icon">📅</span>
-                <span className="utc-nav-label">Lịch chấm hội đồng</span>
+                <span className="utc-nav-label">GĐ5: Lịch chấm hội đồng</span>
               </div>
 
               <div
                 className={`utc-nav-item ${activeTab === 'defense-scoring' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/admin/defense-scoring', true)}
               >
-                <span className="utc-nav-icon">📝</span>
-                <span className="utc-nav-label">Chấm điểm & Biên bản PDF</span>
+                <span className="utc-nav-icon">🏆</span>
+                <span className="utc-nav-label">GĐ5: Chấm điểm & Biên bản PDF</span>
               </div>
             </>
           )}

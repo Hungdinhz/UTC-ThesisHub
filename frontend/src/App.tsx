@@ -162,7 +162,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin/assignments"
         element={
-          <ProtectedRoute allowedTypes={['admin', 'supervisor']}>
+          <ProtectedRoute allowedTypes={['admin', 'supervisor', 'committee_member']}>
             <LayoutPageWrapper activeTab="assignments" pageTitle="Giai đoạn 2: Phân công Giảng viên Hướng dẫn & Duyệt Nguyện vọng">
               <AssignmentManagementPage />
             </LayoutPageWrapper>
@@ -206,7 +206,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin/eligibility"
         element={
-          <ProtectedRoute allowedTypes={['admin', 'supervisor']}>
+          <ProtectedRoute allowedTypes={['admin', 'supervisor', 'committee_member']}>
             <LayoutPageWrapper activeTab="eligibility" pageTitle="Giai đoạn 4: Xét Điều kiện Làm Đồ án & Duyệt Đặc cách (Force Approve)">
               <ThesisEligibilityPage />
             </LayoutPageWrapper>
@@ -250,7 +250,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin/reservations"
         element={
-          <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor']}>
+          <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor', 'committee_member']}>
             <LayoutPageWrapper activeTab="reservations" pageTitle="Giai đoạn 5 (Nhánh Bảo lưu): Quản lý & Duyệt Đơn Bảo lưu Đồ án">
               <ReservationManagementPage />
             </LayoutPageWrapper>

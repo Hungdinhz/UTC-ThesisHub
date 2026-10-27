@@ -15,7 +15,7 @@ export const TaskBoardPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const isStudent = userType === 'student';
-  const isSupervisor = userType === 'supervisor';
+  const isSupervisor = userType === 'supervisor' || userType === 'committee_member';
   const canCreateTask = isSupervisor;
 
   // Project Rounds state for separate filtering

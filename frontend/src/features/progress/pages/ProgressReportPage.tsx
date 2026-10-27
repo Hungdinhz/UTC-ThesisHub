@@ -13,7 +13,7 @@ export const ProgressReportPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const isStudent = userType === 'student';
-  const isSupervisor = userType === 'supervisor';
+  const isSupervisor = userType === 'supervisor' || userType === 'committee_member';
   const isAdmin = userType === 'admin';
   const canFeedback = isSupervisor || isAdmin;
   const canSubmitReport = isStudent || isAdmin;
