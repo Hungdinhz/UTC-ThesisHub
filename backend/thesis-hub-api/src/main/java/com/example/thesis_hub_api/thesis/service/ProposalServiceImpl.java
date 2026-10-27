@@ -101,6 +101,7 @@ public class ProposalServiceImpl implements ProposalService {
                 if (request.getResearchContent() != null) existing.setResearchContent(request.getResearchContent());
                 if (request.getFileUrl() != null) existing.setFileUrl(request.getFileUrl());
                 Proposal updated = proposalRepository.save(existing);
+                ensureThesisCreatedForProposal(updated);
                 log.info("Updated existing proposal with ID: {} for student: {}", updated.getId(), updated.getStudent().getStudentCode());
                 return mapToResponse(updated);
             }
@@ -124,6 +125,7 @@ public class ProposalServiceImpl implements ProposalService {
                 .build();
 
         Proposal saved = proposalRepository.save(proposal);
+        ensureThesisCreatedForProposal(saved);
         log.info("Created proposal with ID: {} for student: {}", saved.getId(), student.getStudentCode());
         return mapToResponse(saved);
     }
@@ -150,7 +152,9 @@ public class ProposalServiceImpl implements ProposalService {
             proposal.setVersion(proposal.getVersion() + 1);
         }
 
-        return mapToResponse(proposalRepository.save(proposal));
+        Proposal saved = proposalRepository.save(proposal);
+        ensureThesisCreatedForProposal(saved);
+        return mapToResponse(saved);
     }
 
     @Override
@@ -161,7 +165,9 @@ public class ProposalServiceImpl implements ProposalService {
 
         proposal.setStatus("SUBMITTED");
         proposal.setSubmittedAt(Instant.now());
-        return mapToResponse(proposalRepository.save(proposal));
+        Proposal saved = proposalRepository.save(proposal);
+        ensureThesisCreatedForProposal(saved);
+        return mapToResponse(saved);
     }
 
     @Override
@@ -328,27 +334,23 @@ public class ProposalServiceImpl implements ProposalService {
         String studentCode = proposal.getStudent().getStudentCode();
         String thesisCode = "DT_" + roundCode + "_" + studentCode;
 
-                Thesis thesis = Thesis.builder()
-                        .proposal(proposal)
-                        .projectRound(proposal.getProjectRound())
-                        .student(proposal.getStudent())
-                        .lecturer(proposal.getLecturer())
-                        .thesisCode(thesisCode)
-                        .titleVn(proposal.getTitleVn())
-                        .titleEn(proposal.getTitleEn())
-                        .description(proposal.getDescription())
-                        .objectives(proposal.getObjectives())
-                        .status("IN_PROGRESS")
-                        .completionRate(BigDecimal.ZERO)
-                        .defenseEligible(false)
-                        .build();
+        Thesis thesis = Thesis.builder()
+                .proposal(proposal)
+                .projectRound(proposal.getProjectRound())
+                .student(proposal.getStudent())
+                .lecturer(proposal.getLecturer())
+                .thesisCode(thesisCode)
+                .titleVn(proposal.getTitleVn())
+                .titleEn(proposal.getTitleEn())
+                .description(proposal.getDescription())
+                .objectives(proposal.getObjectives())
+                .status("IN_PROGRESS")
+                .completionRate(BigDecimal.ZERO)
+                .defenseEligible(false)
+                .build();
 
-                thesisRepository.save(thesis);
-                log.info("Auto-created official thesis {} for approved proposal {}", thesisCode, proposalId);
-            }
-        }
-
-        return mapToResponse(savedProposal);
+        thesisRepository.save(thesis);
+        log.info("Auto-created official thesis {} for proposal {}", thesisCode, proposal.getId());
     }
 
     @Override
@@ -362,7 +364,8 @@ public class ProposalServiceImpl implements ProposalService {
     @Override
     @Transactional(readOnly = true)
     public ProposalResponse getProposalByStudentAndRound(Long studentId, Long roundId) {
-        Proposal proposal = proposalRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+        Long resolvedStudentId = resolveStudentId(studentId);
+        Proposal proposal = proposalRepository.findByStudentIdAndProjectRoundId(resolvedStudentId, roundId)
                 .orElseThrow(() -> new ResourceNotFoundException("Đề cương không tồn tại cho sinh viên và đợt này"));
         return mapToResponse(proposal);
     }
@@ -376,11 +379,25 @@ public class ProposalServiceImpl implements ProposalService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, Long studentId, String status, String search, Pageable pageable) {
+        Long resolvedStudentId = resolveStudentId(studentId);
+        Long resolvedLecturerId = resolveLecturerId(lecturerId);
         String searchPattern = (search != null && !search.trim().isEmpty())
                 ? "%" + search.trim().toLowerCase() + "%"
                 : null;
-        return proposalRepository.searchProposals(roundId, lecturerId, studentId, status, searchPattern, pageable)
+        return proposalRepository.searchProposals(roundId, resolvedLecturerId, resolvedStudentId, status, searchPattern, pageable)
                 .map(this::mapToResponse);
+    }
+
+    private Long resolveStudentId(Long studentId) {
+        if (studentId == null || studentRepository == null) return studentId;
+        if (studentRepository.existsById(studentId)) return studentId;
+        return studentRepository.findByUserId(studentId).map(Student::getId).orElse(studentId);
+    }
+
+    private Long resolveLecturerId(Long lecturerId) {
+        if (lecturerId == null || lecturerRepository == null) return lecturerId;
+        if (lecturerRepository.existsById(lecturerId)) return lecturerId;
+        return lecturerRepository.findByUserId(lecturerId).map(Lecturer::getId).orElse(lecturerId);
     }
 
     private ProposalResponse mapToResponse(Proposal proposal) {

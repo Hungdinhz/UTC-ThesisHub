@@ -150,12 +150,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const loadActiveRound = async () => {
     try {
-      const round = await apiService.getActiveProjectRound().catch(() => null);
-      if (round) {
-        setActiveRound(round);
-        const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
-        setRoundCurrentStage(st);
-      }
       if (currentRole === 'student') {
         try {
           const myStatus = await apiService.getMyRoundStatus();
@@ -187,9 +181,10 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
             } else {
               setUserCompletedStageState(1);
             }
+            return;
           }
         } catch {
-          // ignore
+          // fallback to getActiveProjectRound below
         }
       }
 

@@ -5,7 +5,9 @@ import type { Column } from '../../../components/ui';
 import { ScoreEntryForm } from '../components/ScoreEntryForm';
 import { ResultSynthesisModal } from '../components/ResultSynthesisModal';
 import { defenseService } from '../services/defenseService';
+import { thesisService } from '../../thesis/services/thesisService';
 import type { ScoreItem, LecturerOption, GraduationResult, SynthesizeResultRequest } from '../types';
+import type { Thesis } from '../../thesis/types';
 import './DefensePages.css';
 
 export const DefenseScoringPage: React.FC = () => {
@@ -186,9 +188,20 @@ export const DefenseScoringPage: React.FC = () => {
           value={selectedThesisId}
           onChange={(e) => setSelectedThesisId(Number(e.target.value))}
         >
-          <option value={101}>Đề tài #101: Nghiên cứu ứng dụng Deep Learning trong nhận diện cử chỉ tay (SV: Nguyễn Văn An)</option>
-          <option value={103}>Đề tài #103: Xây dựng hệ thống IoT giám sát chất lượng không khí thông minh (SV: Lê Hoàng Cường)</option>
-          <option value={104}>Đề tài #104: Tối ưu hóa thuật toán xếp lịch và điều phối vi dịch vụ (SV: Phạm Minh Đức)</option>
+          {theses.map((t) => (
+            <option key={t.id} value={t.id}>
+              Đề tài #{t.id} ({t.thesisCode}): {t.titleVn} (SV: {t.studentFullName} - {t.studentCode})
+            </option>
+          ))}
+          {!theses.some((t) => t.id === 101) && (
+            <option value={101}>Đề tài #101: Nghiên cứu ứng dụng Deep Learning trong nhận diện cử chỉ tay (SV: Nguyễn Văn An)</option>
+          )}
+          {!theses.some((t) => t.id === 103) && (
+            <option value={103}>Đề tài #103: Xây dựng hệ thống IoT giám sát chất lượng không khí thông minh (SV: Lê Hoàng Cường)</option>
+          )}
+          {!theses.some((t) => t.id === 104) && (
+            <option value={104}>Đề tài #104: Tối ưu hóa thuật toán xếp lịch và điều phối vi dịch vụ (SV: Phạm Minh Đức)</option>
+          )}
         </select>
       </div>
 

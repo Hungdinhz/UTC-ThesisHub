@@ -18,13 +18,33 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
 
     boolean existsByStudentIdAndProjectRoundId(Long studentId, Long projectRoundId);
 
-    List<Proposal> findByProjectRoundId(Long projectRoundId);
+    @Query("SELECT p FROM Proposal p " +
+           "LEFT JOIN FETCH p.projectRound " +
+           "LEFT JOIN FETCH p.student s " +
+           "LEFT JOIN FETCH s.user " +
+           "LEFT JOIN FETCH p.lecturer l " +
+           "LEFT JOIN FETCH l.user " +
+           "WHERE p.projectRound.id = :projectRoundId")
+    List<Proposal> findByProjectRoundId(@Param("projectRoundId") Long projectRoundId);
 
     List<Proposal> findByLecturerId(Long lecturerId);
 
     List<Proposal> findByProjectRoundIdAndStatus(Long projectRoundId, String status);
 
-    @Query("SELECT p FROM Proposal p WHERE " +
+    @Query(value = "SELECT p FROM Proposal p " +
+           "LEFT JOIN FETCH p.projectRound " +
+           "LEFT JOIN FETCH p.student s " +
+           "LEFT JOIN FETCH s.user " +
+           "LEFT JOIN FETCH p.lecturer l " +
+           "LEFT JOIN FETCH l.user " +
+           "WHERE (:roundId IS NULL OR p.projectRound.id = :roundId) AND " +
+           "(:lecturerId IS NULL OR p.lecturer.id = :lecturerId) AND " +
+           "(:studentId IS NULL OR p.student.id = :studentId) AND " +
+           "(:status IS NULL OR p.status = :status) AND " +
+           "(:search IS NULL OR " +
+           "LOWER(p.titleVn) LIKE :search OR " +
+           "LOWER(p.student.studentCode) LIKE :search)",
+           countQuery = "SELECT COUNT(p) FROM Proposal p WHERE " +
            "(:roundId IS NULL OR p.projectRound.id = :roundId) AND " +
            "(:lecturerId IS NULL OR p.lecturer.id = :lecturerId) AND " +
            "(:studentId IS NULL OR p.student.id = :studentId) AND " +
