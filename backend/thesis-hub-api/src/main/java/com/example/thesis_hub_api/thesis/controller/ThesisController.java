@@ -38,7 +38,7 @@ public class ThesisController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ThesisResponse> updateThesis(
             @PathVariable Long id,
             @Valid @RequestBody UpdateThesisRequest request) {
@@ -46,7 +46,7 @@ public class ThesisController {
     }
 
     @PatchMapping("/{id}/completion-rate")
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ThesisResponse> updateCompletionRate(
             @PathVariable Long id,
             @RequestParam BigDecimal rate) {
@@ -55,7 +55,7 @@ public class ThesisController {
     }
 
     @PatchMapping("/{id}/defense-eligible")
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ThesisResponse> setDefenseEligible(
             @PathVariable Long id,
             @RequestParam boolean eligible) {

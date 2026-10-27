@@ -102,6 +102,8 @@ public class GlobalExceptionHandler {
             String cause = ex.getMostSpecificCause().getMessage();
             if (cause.contains("violates unique constraint") || cause.contains("duplicate key")) {
                 detailMessage = "Dữ liệu bị trùng lặp trong hệ thống (đã tồn tại mã số hoặc email này)";
+            } else if (cause.contains("violates check constraint")) {
+                detailMessage = "Vi phạm ràng buộc dữ liệu: " + cause;
             }
         }
         ApiResponse<Object> response = ApiResponse.error(ErrorCode.DUPLICATE_RESOURCE.getCode(), detailMessage);
