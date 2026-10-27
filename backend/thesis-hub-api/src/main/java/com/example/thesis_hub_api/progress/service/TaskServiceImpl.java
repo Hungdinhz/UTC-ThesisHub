@@ -36,14 +36,22 @@ public class TaskServiceImpl implements TaskService {
         Thesis thesis = thesisRepository.findById(request.getThesisId())
                 .orElseThrow(() -> new ResourceNotFoundException("Thesis", request.getThesisId()));
 
-        User createdBy = userRepository.findById(request.getCreatedById())
-                .orElse(thesis.getLecturer() != null ? thesis.getLecturer().getUser() : null);
+        User createdBy = (thesis.getLecturer() != null && thesis.getLecturer().getUser() != null)
+                ? thesis.getLecturer().getUser()
+                : (request.getCreatedById() != null ? userRepository.findById(request.getCreatedById()).orElse(null) : null);
+        if (createdBy == null && request.getCreatedById() != null) {
+            createdBy = userRepository.findById(request.getCreatedById()).orElse(null);
+        }
         if (createdBy == null) {
             throw new ResourceNotFoundException("User", request.getCreatedById());
         }
 
-        User assignedTo = userRepository.findById(request.getAssignedToId())
-                .orElse(thesis.getStudent() != null ? thesis.getStudent().getUser() : null);
+        User assignedTo = (thesis.getStudent() != null && thesis.getStudent().getUser() != null)
+                ? thesis.getStudent().getUser()
+                : (request.getAssignedToId() != null ? userRepository.findById(request.getAssignedToId()).orElse(null) : null);
+        if (assignedTo == null && request.getAssignedToId() != null) {
+            assignedTo = userRepository.findById(request.getAssignedToId()).orElse(null);
+        }
         if (assignedTo == null) {
             throw new ResourceNotFoundException("User", request.getAssignedToId());
         }

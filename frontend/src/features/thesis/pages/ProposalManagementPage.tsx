@@ -73,7 +73,7 @@ export const ProposalManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchRounds();
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (selectedRoundId) {
@@ -106,16 +106,65 @@ export const ProposalManagementPage: React.FC = () => {
             // fallback below
           }
         }
-        setRounds(roundList);
+
+        let visibleRoundList = roundList;
+        // Với Giảng viên hướng dẫn: Chỉ hiển thị các đợt mà giảng viên đã được phân công hướng dẫn
+        if (isSupervisor && !isAdmin && user) {
+          const lecturerId = (user as any).lecturer?.id || user.lecturer_id || user.id;
+          const lecturerCode = (user as any).lecturer?.lecturer_code || (user as any).lecturerCode || (user as any).registration_no || user.username;
+          const lecturerFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
+
+          try {
+            const allProposals = await thesisService.searchProposals();
+            const myProposals = (Array.isArray(allProposals) ? allProposals : []).filter((p) =>
+              (lecturerId && (p.lecturerId === lecturerId || String(p.lecturerId) === String(lecturerId))) ||
+              (lecturerCode && p.lecturerCode === lecturerCode) ||
+              (lecturerFullName && p.lecturerFullName && p.lecturerFullName.trim().toLowerCase() === lecturerFullName)
+            );
+            const assignedRoundIds = new Set<number>(myProposals.map((p) => p.projectRoundId).filter(Boolean));
+
+            // Kiểm tra thêm trong bảng phân công GVHD của các đợt đang mở / đang thực hiện
+            const activeRoundsToCheck = roundList.filter((r) => r.status !== 'DRAFT');
+            const assignChecks = await Promise.all(
+              activeRoundsToCheck.map(async (r) => {
+                try {
+                  const assigns = await assignmentService.getProposals(r.roundId);
+                  const hasAssign = (assigns || []).some(
+                    (a) =>
+                      (lecturerId && (a.lecturerId === lecturerId || String(a.lecturerId) === String(lecturerId))) ||
+                      (lecturerCode && a.lecturerCode === lecturerCode) ||
+                      (lecturerFullName && a.lecturerName && a.lecturerName.trim().toLowerCase() === lecturerFullName)
+                  );
+                  return hasAssign ? r.roundId : null;
+                } catch {
+                  return null;
+                }
+              })
+            );
+            assignChecks.forEach((id) => {
+              if (id !== null) assignedRoundIds.add(id);
+            });
+
+            if (assignedRoundIds.size > 0) {
+              visibleRoundList = roundList.filter((r) => assignedRoundIds.has(r.roundId));
+            } else {
+              visibleRoundList = roundList.filter((r) => r.status === 'IN_PROGRESS' || r.status === 'OPEN');
+            }
+          } catch {
+            visibleRoundList = roundList.filter((r) => r.status === 'IN_PROGRESS' || r.status === 'OPEN');
+          }
+        }
+
+        setRounds(visibleRoundList);
 
         // Ưu tiên chọn đợt đang có đề cương thực tế hoặc đợt IN_PROGRESS / OPEN
         try {
           const allProposals = await thesisService.searchProposals();
           if (Array.isArray(allProposals) && allProposals.length > 0) {
-            const roundWithProposals = roundList.find((r) =>
+            const roundWithProposals = visibleRoundList.find((r) =>
               (r.status === 'IN_PROGRESS' || r.status === 'OPEN') &&
               allProposals.some((p) => p.projectRoundId === r.roundId)
-            ) || roundList.find((r) => allProposals.some((p) => p.projectRoundId === r.roundId));
+            ) || visibleRoundList.find((r) => allProposals.some((p) => p.projectRoundId === r.roundId));
             if (roundWithProposals?.roundId) {
               setSelectedRoundId(roundWithProposals.roundId);
               setProposals(allProposals.filter((p) => p.projectRoundId === roundWithProposals.roundId));
@@ -128,9 +177,9 @@ export const ProposalManagementPage: React.FC = () => {
         }
 
         const activeRound =
-          roundList.find((r) => r.status === 'IN_PROGRESS') ||
-          roundList.find((r) => r.status === 'OPEN') ||
-          roundList[0];
+          visibleRoundList.find((r) => r.status === 'IN_PROGRESS') ||
+          visibleRoundList.find((r) => r.status === 'OPEN') ||
+          visibleRoundList[0];
         if (activeRound?.roundId) {
           setSelectedRoundId(activeRound.roundId);
         }
@@ -599,7 +648,7 @@ export const ProposalManagementPage: React.FC = () => {
             </span>
           </div>
         ) : (
-          /* Quản trị viên: Có quyền chuyển đợt để tra cứu và giám sát các đợt khác */
+          /* Giảng viên chỉ xem các đợt được phân công; Quản trị viên xem toàn bộ các đợt */
           <select
             value={selectedRoundId}
             onChange={(e) => setSelectedRoundId(Number(e.target.value))}
@@ -615,11 +664,14 @@ export const ProposalManagementPage: React.FC = () => {
               cursor: 'pointer',
             }}
           >
-            {(rounds.length > 0 ? rounds : availableRounds).map((r: any) => (
+            {(rounds.length > 0 ? rounds : isAdmin ? availableRounds : []).map((r: any) => (
               <option key={r.roundId || r.id} value={r.roundId || r.id}>
                 {r.name} {r.status ? `(${r.status})` : ''}
               </option>
             ))}
+            {rounds.length === 0 && !isAdmin && (
+              <option value={0}>-- Chưa có đợt đồ án được phân công --</option>
+            )}
           </select>
         )}
         {isStudent && (

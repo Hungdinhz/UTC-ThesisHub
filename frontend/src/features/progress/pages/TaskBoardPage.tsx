@@ -38,32 +38,54 @@ export const TaskBoardPage: React.FC = () => {
   // - Quản trị viên: xem tất cả các đề tài của khoa
   const visibleTheses = useMemo(() => {
     if (isStudent && user) {
-      const userCode = user.student_id || user.studentCode || user.username;
-      const userFullName = (user.fullName || '').trim().toLowerCase();
+      const studentId = (user as any).student?.id || user.student_id || user.id;
+      const userCode = (user as any).student?.student_code || user.studentCode || user.student_id || user.username;
+      const userFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
       const myTheses = theses.filter(t =>
-        (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
-        (userCode && t.studentCode === userCode) ||
+        (studentId && (t.studentId === studentId || String(t.studentId) === String(studentId))) ||
+        (userCode && t.studentCode === String(userCode)) ||
         (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
       );
       return myTheses;
     }
     if (isSupervisor && user) {
-      const lecturerId = (user as any).lecturer_id || user.id;
-      const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
-      const lecturerFullName = (user.fullName || '').trim().toLowerCase();
+      const lecturerId = (user as any).lecturer?.id || (user as any).lecturer_id || user.id;
+      const lecturerCode = (user as any).lecturer?.lecturer_code || (user as any).lecturerCode || (user as any).registration_no || user.username;
+      const lecturerFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
       const myTheses = theses.filter(t =>
         (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
-        (lecturerCode && t.lecturerCode === lecturerCode) ||
+        (lecturerCode && t.lecturerCode === String(lecturerCode)) ||
         (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
       );
-      return myTheses.length > 0 ? myTheses : theses;
+      return myTheses;
     }
     return theses;
   }, [theses, isStudent, isSupervisor, user]);
 
-  // Combined project rounds from API + any rounds defined in theses
+  // Combined project rounds:
+  // - Với Giảng viên hướng dẫn / Sinh viên: Chỉ hiển thị các đợt mà mình đã được phân công
+  // - Với Quản trị viên: Hiển thị tất cả các đợt
   const combinedRounds = useMemo(() => {
     const roundsMap = new Map<number, { id: number; name: string; code?: string }>();
+    if (isSupervisor || isStudent) {
+      visibleTheses.forEach(t => {
+        if (t.projectRoundId && !roundsMap.has(t.projectRoundId)) {
+          const matchedRound = projectRounds.find(r => r.roundId === t.projectRoundId);
+          roundsMap.set(t.projectRoundId, {
+            id: t.projectRoundId,
+            name: matchedRound?.name || t.projectRoundName || `Đợt đồ án #${t.projectRoundId}`,
+            code: matchedRound?.roundCode || t.thesisCode?.split('_')?.[1] || undefined,
+          });
+        }
+      });
+      if (roundsMap.size === 0) {
+        projectRounds.forEach(r => {
+          roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
+        });
+      }
+      return Array.from(roundsMap.values());
+    }
+
     projectRounds.forEach(r => {
       roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
     });
@@ -77,7 +99,7 @@ export const TaskBoardPage: React.FC = () => {
       }
     });
     return Array.from(roundsMap.values());
-  }, [projectRounds, theses]);
+  }, [projectRounds, theses, visibleTheses, isSupervisor, isStudent]);
 
   // Filter visible theses by selected project round:
   const roundFilteredTheses = useMemo(() => {
@@ -147,7 +169,7 @@ export const TaskBoardPage: React.FC = () => {
   useEffect(() => {
     fetchRounds();
     fetchThesesList();
-  }, []);
+  }, [user?.id]);
 
   const fetchRounds = async () => {
     try {
@@ -165,14 +187,16 @@ export const TaskBoardPage: React.FC = () => {
       const list = await thesisService.searchTheses();
       if (list && list.length > 0) {
         setTheses(list);
+        const paramId = Number(searchParams.get('thesisId') || searchParams.get('id'));
 
         // Sinh viên: Tự động khóa và gán duy nhất đề tài của sinh viên này
         if (isStudent && user) {
-          const userCode = user.student_id || user.studentCode || user.username;
-          const userFullName = (user.fullName || '').trim().toLowerCase();
+          const studentId = (user as any).student?.id || user.student_id || user.id;
+          const userCode = (user as any).student?.student_code || user.studentCode || user.student_id || user.username;
+          const userFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
           const myThesis = list.find(t =>
-            (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
-            (userCode && t.studentCode === userCode) ||
+            (studentId && (t.studentId === studentId || String(t.studentId) === String(studentId))) ||
+            (userCode && t.studentCode === String(userCode)) ||
             (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
           );
           if (myThesis) {
@@ -191,36 +215,45 @@ export const TaskBoardPage: React.FC = () => {
           return;
         }
 
-        // Giảng viên hướng dẫn: Tự động chọn đề tài đầu tiên mà GV hướng dẫn
+        // Giảng viên hướng dẫn: Tự động chọn đề tài mà GV hướng dẫn (ưu tiên thesisId trên URL nếu thuộc GV này)
         if (isSupervisor && user) {
-          const lecturerId = (user as any).lecturer_id || user.id;
-          const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
-          const lecturerFullName = (user.fullName || '').trim().toLowerCase();
-          const myThesis = list.find(t =>
+          const lecturerId = (user as any).lecturer?.id || (user as any).lecturer_id || user.id;
+          const lecturerCode = (user as any).lecturer?.lecturer_code || (user as any).lecturerCode || (user as any).registration_no || user.username;
+          const lecturerFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
+          const myTheses = list.filter(t =>
             (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
-            (lecturerCode && t.lecturerCode === lecturerCode) ||
+            (lecturerCode && t.lecturerCode === String(lecturerCode)) ||
             (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
           );
+          const myThesis = (paramId && myTheses.find(t => t.id === paramId)) || myTheses[0];
           if (myThesis) {
             setSelectedThesisId(myThesis.id);
             setCurrentThesis(myThesis);
-            if (selectedRoundId !== 'ALL' && myThesis.projectRoundId && myThesis.projectRoundId !== Number(selectedRoundId)) {
+            if (myThesis.projectRoundId) {
               setSelectedRoundId(myThesis.projectRoundId);
             }
+            return;
+          } else {
+            setSelectedThesisId(0);
+            setCurrentThesis(null);
+            setTasks([]);
+            setLoading(false);
             return;
           }
         }
 
-        const paramId = Number(searchParams.get('thesisId') || searchParams.get('id'));
         if (paramId && list.some(t => t.id === paramId)) {
           const matched = list.find(t => t.id === paramId)!;
           setSelectedThesisId(matched.id);
           setCurrentThesis(matched);
+          if (matched.projectRoundId && selectedRoundId === 'ALL') {
+            setSelectedRoundId(matched.projectRoundId);
+          }
           return;
         }
 
-        // Default to first thesis or thesis 8
-        const preferred = list.find(t => t.id === 8) || list[0];
+        // Default to first thesis
+        const preferred = list[0];
         setSelectedThesisId(preferred.id);
         setCurrentThesis(preferred);
       } else {
@@ -449,6 +482,10 @@ export const TaskBoardPage: React.FC = () => {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedThesisId || selectedThesisId <= 0) {
+      alert('Vui lòng chọn một đề tài hợp lệ trước khi giao việc!');
+      return;
+    }
     const effectiveCreatedById = user?.id || 2;
     const effectiveAssignedToId = currentThesis?.studentId || (tasks.length > 0 && tasks[0].assignedToId) || 1;
     try {
@@ -462,30 +499,12 @@ export const TaskBoardPage: React.FC = () => {
         dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined
       });
       setTasks(prev => [...prev, created]);
+      await loadTasks(selectedThesisId);
       alert(`🎉 Đã giao nhiệm vụ mới "${newTaskTitle}" thành công!`);
-    } catch {
-      setTasks(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          thesisId: selectedThesisId,
-          thesisTitle: currentThesis?.titleVn || 'Đề tài đồ án',
-          createdById: effectiveCreatedById,
-          createdByFullName: user?.fullName || 'GVHD',
-          assignedToId: effectiveAssignedToId,
-          assignedToFullName: currentThesis?.studentFullName || 'Sinh viên',
-          title: newTaskTitle,
-          description: newTaskDesc,
-          priority: newTaskPriority as any,
-          status: 'TODO',
-          dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined,
-          submissionCount: 0,
-          commentCount: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]);
-      alert(`🎉 Đã giao việc mới "${newTaskTitle}"!`);
+    } catch (err: any) {
+      console.error('Lỗi khi tạo công việc:', err);
+      alert('Không thể lưu công việc vào hệ thống: ' + (err?.response?.data?.message || err?.message || 'Lỗi kết nối'));
+      return;
     }
     setShowCreateModal(false);
     setNewTaskTitle('');
@@ -605,7 +624,9 @@ export const TaskBoardPage: React.FC = () => {
                       background: '#fff',
                     }}
                   >
-                    <option value="ALL">-- Tất cả các đợt đồ án --</option>
+                    {(!isSupervisor || combinedRounds.length > 1) && (
+                      <option value="ALL">-- Tất cả các đợt đồ án --</option>
+                    )}
                     {combinedRounds.map(r => (
                       <option key={r.id} value={r.id}>
                         {r.name} {r.code ? `(${r.code})` : ''}

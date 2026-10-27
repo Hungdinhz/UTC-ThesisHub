@@ -98,6 +98,9 @@ public class ProjectRoundService {
     private StudentRepository studentRepository;
 
     @Autowired(required = false)
+    private com.example.thesis_hub_api.organization.repository.LecturerRepository lecturerRepository;
+
+    @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
 
     /**
@@ -115,10 +118,88 @@ public class ProjectRoundService {
 
     @Transactional(readOnly = true)
     public List<ProjectRoundResponseDTO> getRounds(String status, String academicYear) {
+        return getRounds(status, academicYear, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectRoundResponseDTO> getRounds(String status, String academicYear, UserPrincipal currentUser) {
         String cleanStatus = StringUtils.hasText(status) ? status.trim().toUpperCase() : null;
         String cleanYear = StringUtils.hasText(academicYear) ? academicYear.trim() : null;
 
         List<ProjectRound> list = projectRoundRepository.findRoundsFiltered(cleanStatus, cleanYear);
+
+        if (currentUser != null && currentUser.getAuthorities() != null) {
+            boolean isAdmin = currentUser.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()) || "ROLE_COMMITTEE".equalsIgnoreCase(a.getAuthority()));
+            if (!isAdmin) {
+                boolean isStudent = currentUser.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_STUDENT".equalsIgnoreCase(a.getAuthority()));
+                boolean isLecturer = currentUser.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_LECTURER".equalsIgnoreCase(a.getAuthority()));
+
+                if (isStudent && studentRepository != null && studentProjectRoundRepository != null) {
+                    Student student = studentRepository.findByUserId(currentUser.getId()).orElse(null);
+                    if (student != null) {
+                        Set<Long> studentRoundIds = studentProjectRoundRepository.findByStudentId(student.getId()).stream()
+                                .filter(spr -> spr.getProjectRound() != null && !"RESERVED".equalsIgnoreCase(spr.getStatus()))
+                                .map(spr -> spr.getProjectRound().getId())
+                                .collect(Collectors.toSet());
+                        list = list.stream()
+                                .filter(r -> studentRoundIds.contains(r.getId()))
+                                .toList();
+                    } else {
+                        list = List.of();
+                    }
+                } else if (isLecturer && lecturerRepository != null) {
+                    com.example.thesis_hub_api.organization.entity.Lecturer lecturer =
+                            lecturerRepository.findByUserId(currentUser.getId()).orElse(null);
+                    if (lecturer != null) {
+                        Long lecId = lecturer.getId();
+                        Set<Long> assignedRoundIds = new java.util.HashSet<>();
+                        if (supervisorAssignmentRepository != null) {
+                            supervisorAssignmentRepository.findByLecturerId(lecId).forEach(sa -> {
+                                if (sa.getProjectRoundId() != null) assignedRoundIds.add(sa.getProjectRoundId());
+                            });
+                        }
+                        if (proposalRepository != null) {
+                            proposalRepository.findByLecturerId(lecId).forEach(p -> {
+                                if (p.getProjectRound() != null && p.getProjectRound().getId() != null) {
+                                    assignedRoundIds.add(p.getProjectRound().getId());
+                                }
+                            });
+                        }
+                        if (thesisRepository != null) {
+                            thesisRepository.findByLecturerId(lecId).forEach(t -> {
+                                if (t.getProjectRound() != null && t.getProjectRound().getId() != null) {
+                                    assignedRoundIds.add(t.getProjectRound().getId());
+                                }
+                            });
+                        }
+                        if (lecturerCapacityRepository != null) {
+                            lecturerCapacityRepository.findByLecturerId(lecId).forEach(cap -> {
+                                if (cap.getProjectRoundId() != null && cap.getCurrentAssigned() != null && cap.getCurrentAssigned() > 0) {
+                                    assignedRoundIds.add(cap.getProjectRoundId());
+                                }
+                            });
+                            // Fallback nếu GV chưa có SV nào được chốt nhưng có trong danh sách giảng viên tham gia đợt đang mở
+                            if (assignedRoundIds.isEmpty()) {
+                                lecturerCapacityRepository.findByLecturerId(lecId).forEach(cap -> {
+                                    if (cap.getProjectRoundId() != null && !Boolean.FALSE.equals(cap.getIsActive())) {
+                                        assignedRoundIds.add(cap.getProjectRoundId());
+                                    }
+                                });
+                            }
+                        }
+                        list = list.stream()
+                                .filter(r -> assignedRoundIds.contains(r.getId()) && !"DRAFT".equalsIgnoreCase(r.getStatus()))
+                                .toList();
+                    } else {
+                        list = List.of();
+                    }
+                }
+            }
+        }
+
         return list.stream().map(this::toResponseDTO).toList();
     }
 
