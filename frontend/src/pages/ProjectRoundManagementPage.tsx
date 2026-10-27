@@ -208,7 +208,11 @@ const ProjectRoundManagementPage: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const canDeleteRound = (status?: string) =>
+    status === 'DRAFT' || status === 'CLOSED' || status === 'ARCHIVED';
+
   const handleDoubleClickRound = (r: ProjectRoundItem) => {
+    if (!canDeleteRound(r.status)) return;
     setRoundToDelete(r);
     setDeleteError(null);
   };
@@ -363,12 +367,13 @@ const ProjectRoundManagementPage: React.FC = () => {
               </h3>
             </div>
             <p style={{ margin: '0 0 14px 0', fontSize: '0.78rem', color: '#64748b' }}>
-              💡 <em>Chọn đợt để xem chi tiết hoặc bấm nút 🗑️ Xóa để xóa đợt đồ án</em>
+              💡 <em>Chọn đợt để xem chi tiết (chỉ các đợt Bản nháp hoặc Đã đóng mới có thể xóa)</em>
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '700px', overflowY: 'auto' }}>
               {rounds.map((r) => {
                 const badge = getStatusBadge(r.status);
                 const isSelected = selectedRound?.roundId === r.roundId;
+                const isDeletable = canDeleteRound(r.status);
                 return (
                   <div
                     key={r.roundId}
@@ -377,7 +382,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                       e.stopPropagation();
                       handleDoubleClickRound(r);
                     }}
-                    title="Click 1 lần để xem chi tiết • Bấm nút Xóa để xóa đợt đồ án"
+                    title={isDeletable ? 'Click 1 lần để xem chi tiết • Bấm nút Xóa để xóa đợt đồ án' : 'Click để xem chi tiết đợt đồ án'}
                     style={{
                       padding: '14px 16px',
                       borderRadius: '8px',
@@ -401,27 +406,29 @@ const ProjectRoundManagementPage: React.FC = () => {
                         }}>
                           {badge.label}
                         </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setRoundToDelete(r);
-                            setDeleteError(null);
-                          }}
-                          title={`Xóa đợt đồ án ${r.roundCode}`}
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                            border: '1px solid #fecaca',
-                            backgroundColor: '#fef2f2',
-                            color: '#dc2626',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          🗑️ Xóa
-                        </button>
+                        {isDeletable && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRoundToDelete(r);
+                              setDeleteError(null);
+                            }}
+                            title={`Xóa đợt đồ án ${r.roundCode}`}
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid #fecaca',
+                              backgroundColor: '#fef2f2',
+                              color: '#dc2626',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🗑️ Xóa
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>{r.name}</div>
@@ -543,29 +550,31 @@ const ProjectRoundManagementPage: React.FC = () => {
                     >
                       ⚡ Demo: Kết thúc GĐ & Chuyển tiếp
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRoundToDelete(selectedRound);
-                        setDeleteError(null);
-                      }}
-                      style={{
-                        backgroundColor: '#fef2f2',
-                        color: '#dc2626',
-                        border: '1px solid #fecaca',
-                        padding: '6px 14px',
-                        borderRadius: '6px',
-                        fontWeight: 700,
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      title="Xóa đợt đồ án này"
-                    >
-                      🗑️ Xóa đợt
-                    </button>
+                    {canDeleteRound(selectedRound.status) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRoundToDelete(selectedRound);
+                          setDeleteError(null);
+                        }}
+                        style={{
+                          backgroundColor: '#fef2f2',
+                          color: '#dc2626',
+                          border: '1px solid #fecaca',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        title="Xóa đợt đồ án này"
+                      >
+                        🗑️ Xóa đợt
+                      </button>
+                    )}
                   </div>
                 </div>
 

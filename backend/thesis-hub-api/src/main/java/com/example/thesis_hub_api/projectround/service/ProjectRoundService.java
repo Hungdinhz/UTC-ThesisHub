@@ -680,15 +680,41 @@ public class ProjectRoundService {
             registeredG2StudentIds = sIds;
         }
 
-        // 2. Kiểm tra GĐ3 (Nộp & Duyệt đề cương): Có đề cương được duyệt (APPROVED) hoặc có bản ghi đề tài
+        // 2. Kiểm tra GĐ3 (Nộp & Duyệt đề cương): Có đề cương hoặc có bản ghi đề tài
         Set<Long> approvedG3StudentIds = Collections.emptySet();
         if (targetStage >= 4) {
             Set<Long> sIds = new java.util.HashSet<>();
+            ProjectRound roundObj = projectRoundRepository.findById(roundId).orElse(null);
             if (proposalRepository != null) {
                 proposalRepository.findByProjectRoundId(roundId).forEach(p -> {
                     if (p.getStudent() != null && p.getStudent().getId() != null) {
-                        if ("APPROVED".equalsIgnoreCase(p.getStatus())) {
+                        String st = p.getStatus() != null ? p.getStatus().toUpperCase() : "";
+                        if (!"REJECTED".equals(st)) {
+                            if (!"APPROVED".equals(st)) {
+                                p.setStatus("APPROVED");
+                                p.setSupervisorApproved(true);
+                                proposalRepository.save(p);
+                            }
                             sIds.add(p.getStudent().getId());
+                            if (thesisRepository != null && roundObj != null && p.getLecturer() != null
+                                    && !thesisRepository.existsByStudentIdAndProjectRoundId(p.getStudent().getId(), roundId)) {
+                                String thesisCode = "DT_" + roundObj.getRoundCode() + "_" + p.getStudent().getStudentCode();
+                                com.example.thesis_hub_api.thesis.entity.Thesis thesis = com.example.thesis_hub_api.thesis.entity.Thesis.builder()
+                                        .proposal(p)
+                                        .projectRound(roundObj)
+                                        .student(p.getStudent())
+                                        .lecturer(p.getLecturer())
+                                        .thesisCode(thesisCode)
+                                        .titleVn(p.getTitleVn())
+                                        .titleEn(p.getTitleEn())
+                                        .description(p.getDescription())
+                                        .objectives(p.getObjectives())
+                                        .status("IN_PROGRESS")
+                                        .completionRate(java.math.BigDecimal.ZERO)
+                                        .defenseEligible(false)
+                                        .build();
+                                thesisRepository.save(thesis);
+                            }
                         }
                     }
                 });
@@ -993,6 +1019,10 @@ public class ProjectRoundService {
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy đợt đồ án với ID: " + roundId));
 
         String status = (round.getStatus() != null) ? round.getStatus().toUpperCase() : "";
+        if ("OPEN".equals(status) || "IN_PROGRESS".equals(status)) {
+            throw new AppException(ErrorCode.INVALID_STATUS_TRANSITION,
+                    "Không thể xóa đợt đồ án đang hoạt động (" + status + "). Chỉ có thể xóa các đợt đồ án ở trạng thái Bản nháp (DRAFT) hoặc Đã đóng (CLOSED/ARCHIVED).");
+        }
         log.info("Deleting project round: id={}, code={}, status={}", round.getId(), round.getRoundCode(), status);
 
         if (jdbcTemplate != null) {

@@ -39,20 +39,22 @@ export const TaskBoardPage: React.FC = () => {
   const visibleTheses = useMemo(() => {
     if (isStudent && user) {
       const userCode = user.student_id || user.studentCode || user.username;
+      const userFullName = (user.fullName || '').trim().toLowerCase();
       const myTheses = theses.filter(t =>
         (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
-        (userCode && t.studentCode === userCode)
+        (userCode && t.studentCode === userCode) ||
+        (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
       );
       return myTheses;
     }
     if (isSupervisor && user) {
       const lecturerId = (user as any).lecturer_id || user.id;
       const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
-      const lecturerFullName = user.fullName;
+      const lecturerFullName = (user.fullName || '').trim().toLowerCase();
       const myTheses = theses.filter(t =>
         (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
         (lecturerCode && t.lecturerCode === lecturerCode) ||
-        (lecturerFullName && t.lecturerFullName && t.lecturerFullName.toLowerCase() === lecturerFullName.toLowerCase())
+        (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
       );
       return myTheses.length > 0 ? myTheses : theses;
     }
@@ -107,6 +109,10 @@ export const TaskBoardPage: React.FC = () => {
       if (!exists) {
         setSelectedThesisId(roundFilteredTheses[0].id);
       }
+    } else if (!isStudent && roundFilteredTheses.length === 0) {
+      setCurrentThesis(null);
+      setTasks([]);
+      setLoading(false);
     }
   }, [selectedRoundId, roundFilteredTheses, isStudent, selectedThesisId]);
 
@@ -163,17 +169,24 @@ export const TaskBoardPage: React.FC = () => {
         // Sinh viên: Tự động khóa và gán duy nhất đề tài của sinh viên này
         if (isStudent && user) {
           const userCode = user.student_id || user.studentCode || user.username;
+          const userFullName = (user.fullName || '').trim().toLowerCase();
           const myThesis = list.find(t =>
             (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
-            (userCode && t.studentCode === userCode)
+            (userCode && t.studentCode === userCode) ||
+            (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
           );
           if (myThesis) {
             setSelectedThesisId(myThesis.id);
+            setCurrentThesis(myThesis);
+            if (myThesis.projectRoundId) {
+              setSelectedRoundId(myThesis.projectRoundId);
+            }
           } else {
             // Sinh viên mới được nạp vào đợt, chưa có đề tài được duyệt: không tự ý gán đề tài người khác
             setSelectedThesisId(0);
             setCurrentThesis(null);
             setTasks([]);
+            setLoading(false);
           }
           return;
         }
@@ -182,39 +195,60 @@ export const TaskBoardPage: React.FC = () => {
         if (isSupervisor && user) {
           const lecturerId = (user as any).lecturer_id || user.id;
           const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
-          const lecturerFullName = user.fullName;
+          const lecturerFullName = (user.fullName || '').trim().toLowerCase();
           const myThesis = list.find(t =>
             (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
             (lecturerCode && t.lecturerCode === lecturerCode) ||
-            (lecturerFullName && t.lecturerFullName && t.lecturerFullName.toLowerCase() === lecturerFullName.toLowerCase())
+            (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
           );
           if (myThesis) {
             setSelectedThesisId(myThesis.id);
+            setCurrentThesis(myThesis);
+            if (selectedRoundId !== 'ALL' && myThesis.projectRoundId && myThesis.projectRoundId !== Number(selectedRoundId)) {
+              setSelectedRoundId(myThesis.projectRoundId);
+            }
             return;
           }
         }
 
         const paramId = Number(searchParams.get('thesisId') || searchParams.get('id'));
         if (paramId && list.some(t => t.id === paramId)) {
-          setSelectedThesisId(paramId);
+          const matched = list.find(t => t.id === paramId)!;
+          setSelectedThesisId(matched.id);
+          setCurrentThesis(matched);
           return;
         }
 
         // Default to first thesis or thesis 8
         const preferred = list.find(t => t.id === 8) || list[0];
         setSelectedThesisId(preferred.id);
+        setCurrentThesis(preferred);
+      } else {
+        setTheses([]);
+        setSelectedThesisId(0);
+        setCurrentThesis(null);
+        setTasks([]);
+        setLoading(false);
       }
     } catch (err) {
       console.error('Không thể tải danh sách đề tài:', err);
+      setLoading(false);
     }
   };
 
   // 2. Load thesis details and tasks when selectedThesisId changes
   useEffect(() => {
     if (selectedThesisId > 0) {
-      loadThesisDetails(selectedThesisId);
+      const cached = theses.find(t => t.id === selectedThesisId);
+      if (cached) {
+        setCurrentThesis(cached);
+      } else {
+        loadThesisDetails(selectedThesisId);
+      }
       loadTasks(selectedThesisId);
       setSearchParams({ thesisId: String(selectedThesisId) }, { replace: true });
+    } else {
+      setLoading(false);
     }
   }, [selectedThesisId]);
 

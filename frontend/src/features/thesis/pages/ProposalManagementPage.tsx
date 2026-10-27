@@ -72,9 +72,14 @@ export const ProposalManagementPage: React.FC = () => {
   ];
 
   useEffect(() => {
-    loadProposals();
     fetchRounds();
   }, []);
+
+  useEffect(() => {
+    if (selectedRoundId) {
+      loadProposals(selectedRoundId);
+    }
+  }, [selectedRoundId, user?.id]);
 
   useEffect(() => {
     if (!bannerMsg) return;
@@ -102,16 +107,39 @@ export const ProposalManagementPage: React.FC = () => {
           }
         }
         setRounds(roundList);
+
+        // Ưu tiên chọn đợt đang có đề cương thực tế hoặc đợt IN_PROGRESS / OPEN
+        try {
+          const allProposals = await thesisService.searchProposals();
+          if (Array.isArray(allProposals) && allProposals.length > 0) {
+            const roundWithProposals = roundList.find((r) =>
+              (r.status === 'IN_PROGRESS' || r.status === 'OPEN') &&
+              allProposals.some((p) => p.projectRoundId === r.roundId)
+            ) || roundList.find((r) => allProposals.some((p) => p.projectRoundId === r.roundId));
+            if (roundWithProposals?.roundId) {
+              setSelectedRoundId(roundWithProposals.roundId);
+              setProposals(allProposals.filter((p) => p.projectRoundId === roundWithProposals.roundId));
+              setLoading(false);
+              return;
+            }
+          }
+        } catch {
+          // ignore and fallback to status priority
+        }
+
         const activeRound =
-          roundList.find((r) => r.status === 'OPEN') ||
           roundList.find((r) => r.status === 'IN_PROGRESS') ||
+          roundList.find((r) => r.status === 'OPEN') ||
           roundList[0];
         if (activeRound?.roundId) {
           setSelectedRoundId(activeRound.roundId);
         }
+      } else {
+        loadProposals(selectedRoundId);
       }
     } catch (err) {
       console.error('Không thể tải danh sách đợt đồ án:', err);
+      loadProposals(selectedRoundId);
     }
   };
 
@@ -124,16 +152,20 @@ export const ProposalManagementPage: React.FC = () => {
         // Sinh viên: tìm giảng viên hướng dẫn đã phân công chính thức
         if (isStudent) {
           const userCode = user?.student_id || user?.studentCode || user?.username;
+          const userFullName = (user?.fullName || '').trim().toLowerCase();
           const myAssign = (assignments || []).find(
             (p) =>
               (user?.id && (p.studentId === user.id || String(p.studentId) === String(user?.id))) ||
-              (userCode && p.studentCode === userCode)
+              (userCode && p.studentCode === userCode) ||
+              (userFullName && p.studentName && p.studentName.trim().toLowerCase() === userFullName)
           );
           if (myAssign) {
             setMySupervisorAssignment(myAssign);
             if (myAssign.lecturerId) {
               setSelectedLecturerId(myAssign.lecturerId);
             }
+          } else {
+            setMySupervisorAssignment(null);
           }
         }
 
@@ -141,10 +173,12 @@ export const ProposalManagementPage: React.FC = () => {
         if (isSupervisor) {
           const lecturerId = user?.lecturer_id || user?.id;
           const lecturerCode = (user as any)?.lecturerCode || (user as any)?.registration_no || user?.username;
+          const lecturerFullName = (user?.fullName || '').trim().toLowerCase();
           const myStudents = (assignments || []).filter(
             (p) =>
               (lecturerId && (p.lecturerId === lecturerId || String(p.lecturerId) === String(lecturerId))) ||
-              (lecturerCode && p.lecturerCode === lecturerCode)
+              (lecturerCode && p.lecturerCode === lecturerCode) ||
+              (lecturerFullName && p.lecturerName && p.lecturerName.trim().toLowerCase() === lecturerFullName)
           );
           setLecturerAssignedStudents(myStudents);
           if (myStudents.length > 0) {
@@ -158,13 +192,12 @@ export const ProposalManagementPage: React.FC = () => {
     fetchRoundAssignments();
   }, [selectedRoundId, isStudent, isSupervisor, user]);
 
-  const loadProposals = async () => {
+  const loadProposals = async (roundIdParam?: number) => {
+    const targetRoundId = roundIdParam ?? selectedRoundId;
     setLoading(true);
     try {
-      const studentId = isStudent ? (user?.id || user?.student_id) : undefined;
       const data = await thesisService.searchProposals({
-        roundId: selectedRoundId,
-        studentId: studentId ? Number(studentId) : undefined,
+        roundId: targetRoundId,
       });
       if (Array.isArray(data)) {
         setProposals(data);
@@ -407,9 +440,12 @@ export const ProposalManagementPage: React.FC = () => {
     if (isSupervisor && !isAdmin) {
       const myLecturerId = user?.lecturer_id || user?.id;
       const myLecturerCode = (user as any)?.lecturerCode || (user as any)?.registration_no || user?.username;
+      const myLecturerFullName = (user?.fullName || '').trim().toLowerCase();
       const matchLecturer =
         (myLecturerId && (p.lecturerId === myLecturerId || String(p.lecturerId) === String(myLecturerId))) ||
-        (myLecturerCode && p.lecturerCode === myLecturerCode);
+        (myLecturerCode && p.lecturerCode === myLecturerCode) ||
+        (myLecturerFullName && p.lecturerFullName && p.lecturerFullName.trim().toLowerCase() === myLecturerFullName) ||
+        lecturerAssignedStudents.some((s) => s.studentId === p.studentId);
       if (!matchLecturer) {
         return false;
       }
@@ -533,8 +569,8 @@ export const ProposalManagementPage: React.FC = () => {
         <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           📅 <strong>Đợt đồ án:</strong>
         </span>
-        {/* Với Sinh viên và Giảng viên: Cố định vào đợt đồ án đang mở của học kỳ, không cho chọn đợt khác */}
-        {!isAdmin ? (
+        {/* Với Sinh viên: Cố định vào đợt đồ án của sinh viên; với Admin & Giảng viên: Cho phép chọn đợt */}
+        {isStudent ? (
           <div
             style={{
               display: 'inline-flex',
