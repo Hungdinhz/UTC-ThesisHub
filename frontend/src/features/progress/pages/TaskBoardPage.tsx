@@ -714,7 +714,7 @@ export const TaskBoardPage: React.FC = () => {
               </div>
             )}
 
-            {canCreateTask && (
+            {canCreateTask && currentThesis && (
               <button
                 onClick={() => setShowCreateModal(true)}
                 style={{
@@ -891,6 +891,95 @@ export const TaskBoardPage: React.FC = () => {
             >
               📄 Giai đoạn 3: Đề cương đồ án
             </a>
+          </div>
+        </div>
+      ) : (!currentThesis || selectedThesisId === 0) ? (
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: '12px',
+            padding: '48px 24px',
+            textAlign: 'center',
+            border: '1px solid #e2e8f0',
+            maxWidth: '720px',
+            margin: '30px auto',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          }}
+        >
+          <div style={{ fontSize: '52px', marginBottom: '16px' }}>📁</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', marginBottom: '12px' }}>
+            {selectedRoundId !== 'ALL'
+              ? 'Chưa có đề tài nào trong đợt đồ án được chọn'
+              : 'Hiện chưa có đề tài đồ án chính thức nào'}
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.7, marginBottom: '24px' }}>
+            {isSupervisor ? (
+              <>
+                Bạn chưa có sinh viên nào được phân công hướng dẫn trong đợt này, hoặc các sinh viên được phân công <strong>chưa nộp / chưa được duyệt đề cương ở Giai đoạn 3</strong>.
+                <br />
+                Đề tài chỉ xuất hiện tại bảng Task Kanban sau khi Đề cương đề tài được Khoa/Bộ môn <strong>Phê duyệt chính thức</strong>.
+              </>
+            ) : (
+              <>
+                Đợt đồ án này hiện chưa có đề cương nào được phê duyệt thành Đề tài chính thức (hoặc các sinh viên chưa qua Giai đoạn 2 & 3).
+              </>
+            )}
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a
+              href="/thesis/proposals"
+              style={{
+                background: '#2563eb',
+                color: '#fff',
+                padding: '10px 18px',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
+              }}
+            >
+              👉 Đến Giai đoạn 3: Xét duyệt Đề cương
+            </a>
+            <a
+              href="/admin/assignment"
+              style={{
+                background: '#f8fafc',
+                color: '#0f172a',
+                border: '1px solid #cbd5e1',
+                padding: '10px 18px',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
+              }}
+            >
+              👥 Giai đoạn 2: Phân công GVHD
+            </a>
+            {selectedRoundId !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRoundId('ALL');
+                  setSearchParams(prev => {
+                    const next = new URLSearchParams(prev);
+                    next.delete('roundId');
+                    return next;
+                  }, { replace: true });
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#0369a1',
+                  border: '1px solid #bae6fd',
+                  padding: '10px 18px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                }}
+              >
+                🔄 Xem tất cả các đợt đồ án
+              </button>
+            )}
           </div>
         </div>
       ) : (
