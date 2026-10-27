@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.example.thesis_hub_api.identity.security.UserPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -48,6 +50,28 @@ public class DefenseController {
     public ResponseEntity<ApiResponse<CouncilResponseDTO>> getCouncilById(@PathVariable Long id) {
         CouncilResponseDTO result = defenseService.getCouncilById(id);
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    /**
+     * Chốt Hội đồng bảo vệ (Khóa hội đồng)
+     */
+    @PostMapping("/councils/{id}/finalize")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CouncilResponseDTO>> finalizeCouncil(@PathVariable Long id) {
+        CouncilResponseDTO result = defenseService.finalizeCouncil(id);
+        return ResponseEntity.ok(ApiResponse.success("Chốt Hội đồng bảo vệ thành công", result));
+    }
+
+    /**
+     * Cập nhật danh sách 5 thành viên Hội đồng (1CT - 2TK - 2UV)
+     */
+    @PutMapping("/councils/{id}/members")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CouncilResponseDTO>> updateCouncilMembers(
+            @PathVariable Long id,
+            @RequestBody List<CouncilMemberDTO> members) {
+        CouncilResponseDTO result = defenseService.updateCouncilMembers(id, members);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật thành viên Hội đồng thành công", result));
     }
 
     /**
@@ -95,14 +119,16 @@ public class DefenseController {
     }
 
     /**
-     * Tra cứu lịch bảo vệ theo ngày
+     * Tra cứu lịch bảo vệ theo ngày hoặc theo đợt
      */
     @GetMapping("/schedules")
     public ResponseEntity<ApiResponse<List<DefenseScheduleResponseDTO>>> getSchedules(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        List<DefenseScheduleResponseDTO> result = defenseService.getSchedulesByDate(date);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) Long projectRoundId) {
+        List<DefenseScheduleResponseDTO> result = defenseService.getSchedules(date, projectRoundId);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
+
 
     /**
      * 4. API Chấm điểm và nhập nhận xét của Hội đồng / GVHD / GVPB
@@ -110,8 +136,10 @@ public class DefenseController {
     @PostMapping("/scores")
     @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ResponseEntity<ApiResponse<ScoreResponseDTO>> submitScore(
-            @RequestBody ScoreSubmitRequestDTO request) {
-        ScoreResponseDTO result = defenseService.submitScore(request);
+            @RequestBody ScoreSubmitRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        Long userId = (currentUser != null) ? currentUser.getId() : null;
+        ScoreResponseDTO result = defenseService.submitScore(request, userId);
         return ResponseEntity.ok(ApiResponse.success("Lưu điểm đánh giá thành công", result));
     }
 

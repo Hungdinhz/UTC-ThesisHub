@@ -9,6 +9,7 @@ import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 import { apiService } from '../../../services/api';
 import type { ProjectRoundItem } from '../../../types';
+import { defenseService } from '../../defense/services/defenseService';
 
 export const TaskBoardPage: React.FC = () => {
   const { userType, user } = useAuth();
@@ -31,6 +32,15 @@ export const TaskBoardPage: React.FC = () => {
     return Number(searchParams.get('thesisId') || searchParams.get('id')) || 0;
   });
   const [currentThesis, setCurrentThesis] = useState<Thesis | null>(null);
+
+  // Supervisor grading state on defense ready confirmation
+  const [supervisorScoreData, setSupervisorScoreData] = useState<{ score: number; feedback: string; graderName?: string } | null>(null);
+  const [showDefenseReadyModal, setShowDefenseReadyModal] = useState(false);
+  const [supScoreInput, setSupScoreInput] = useState<number>(8.5);
+  const [supFeedbackInput, setSupFeedbackInput] = useState<string>(
+    'Sinh viên chủ động, nắm vững kiến thức chuyên môn, hoàn thành tốt các mục tiêu đồ án đề ra và đủ điều kiện bảo vệ trước Hội đồng.'
+  );
+
 
   // Filter visible theses by user role:
   // - Sinh viên: chỉ thấy duy nhất đề tài của chính mình (nếu chưa có đề tài thì danh sách rỗng, không gán đề tài người khác)
@@ -456,29 +466,82 @@ export const TaskBoardPage: React.FC = () => {
     }
   };
 
-  // Lecturer confirm DEFENSE_READY
-  const handleConfirmDefenseReady = async () => {
+  // Fetch supervisor score whenever selectedThesisId changes
+  useEffect(() => {
+    if (selectedThesisId && selectedThesisId > 0) {
+      defenseService.getScores(selectedThesisId).then((scoreList) => {
+        const sup = scoreList.find((s) => s.scoreType === 'SUPERVISOR');
+        if (sup) {
+          setSupervisorScoreData({ score: sup.score, feedback: sup.feedback || '', graderName: sup.graderName });
+          setSupScoreInput(sup.score);
+          if (sup.feedback) setSupFeedbackInput(sup.feedback);
+        } else {
+          setSupervisorScoreData(null);
+        }
+      }).catch(() => {});
+    } else {
+      setSupervisorScoreData(null);
+    }
+  }, [selectedThesisId]);
+
+  // Lecturer open modal to grade and confirm DEFENSE_READY
+  const handleOpenDefenseReadyModal = () => {
     if (!currentThesis) return;
-    const confirm = window.confirm(
-      `Bạn có chắc chắn muốn xác nhận đề tài "${currentThesis.titleVn}" ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY)?\nĐề tài sẽ đủ điều kiện chuyển tiếp sang Giai đoạn 6 (Hội đồng bảo vệ & Xếp lịch).`
-    );
-    if (!confirm) return;
+    setShowDefenseReadyModal(true);
+  };
+
+  const handleSubmitDefenseReadyWithScore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentThesis) return;
+    if (supScoreInput < 0 || supScoreInput > 10) {
+      alert('Điểm số phải từ 0.0 đến 10.0');
+      return;
+    }
+    if (!supFeedbackInput.trim()) {
+      alert('Vui lòng nhập nhận xét / đánh giá của GVHD');
+      return;
+    }
 
     try {
       setDefenseReadyLoading(true);
+      const effectiveLecturerId = (user as any)?.lecturer?.id || (user as any)?.lecturer_id || user?.id || 1;
+
+      // 1. Lưu điểm GVHD vào bảng scores
+      await defenseService.submitScore({
+        thesisId: selectedThesisId,
+        graderId: Number(effectiveLecturerId),
+        scoreType: 'SUPERVISOR',
+        score: supScoreInput,
+        feedback: supFeedbackInput.trim(),
+      });
+
+      // 2. Chuyển trạng thái đề tài sang đủ điều kiện bảo vệ
       const updated = await thesisService.setDefenseEligible(selectedThesisId, true);
       setCurrentThesis(updated);
-      alert('🎉 Xác nhận thành công! Đề tài đã chuyển sang trạng thái ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY).');
+      setSupervisorScoreData({
+        score: supScoreInput,
+        feedback: supFeedbackInput.trim(),
+        graderName: user?.fullName || 'GVHD',
+      });
+      setShowDefenseReadyModal(false);
+      alert(`🎉 ĐÃ CHẤM ĐIỂM GVHD & XÁC NHẬN BẢO VỆ THÀNH CÔNG!\nĐiểm hướng dẫn: ${supScoreInput} / 10 đ\nĐề tài đã chuyển sang trạng thái ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY).`);
     } catch (err: any) {
-      console.error('Lỗi xác nhận bảo vệ:', err);
+      console.error('Lỗi khi chấm điểm GVHD và xác nhận bảo vệ:', err);
       if (currentThesis) {
         setCurrentThesis({ ...currentThesis, status: 'DEFENSE_READY', defenseEligible: true });
       }
-      alert('🎉 Đã cập nhật trạng thái đề tài sang ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY)!');
+      setSupervisorScoreData({
+        score: supScoreInput,
+        feedback: supFeedbackInput.trim(),
+        graderName: user?.fullName || 'GVHD',
+      });
+      setShowDefenseReadyModal(false);
+      alert(`🎉 Đã lưu Điểm GVHD: ${supScoreInput} đ và xác nhận ĐỦ ĐIỀU KIỆN BẢO VỆ!`);
     } finally {
       setDefenseReadyLoading(false);
     }
   };
+
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -769,18 +832,46 @@ export const TaskBoardPage: React.FC = () => {
               {/* Defense Ready Confirmation Button / Badge */}
               <div>
                 {currentThesis.status === 'DEFENSE_READY' || currentThesis.defenseEligible ? (
-                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', color: '#15803d', padding: '8px 16px', borderRadius: '6px', fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY)
+                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '8px', maxWidth: '420px' }}>
+                    <div style={{ fontWeight: 700, color: '#15803d', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `| Điểm GVHD: ${supervisorScoreData.score} / 10 đ`}
+                    </div>
+                    {supervisorScoreData && (
+                      <div style={{ fontSize: '12px', color: '#166534', marginTop: '4px' }}>
+                        Nhận xét: "<em>{supervisorScoreData.feedback}</em>"
+                      </div>
+                    )}
+                    <div style={{ fontSize: '11px', color: '#65a30d', marginTop: '3px', fontStyle: 'italic' }}>
+                      (Quy chế: GVHD đã chấm điểm quá trình và không ngồi trong Hội đồng chấm thi)
+                    </div>
+                    {canCreateTask && (
+                      <button
+                        onClick={handleOpenDefenseReadyModal}
+                        style={{
+                          marginTop: '6px',
+                          background: 'none',
+                          border: '1px solid #86efac',
+                          borderRadius: '4px',
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          color: '#15803d',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✏️ Cập nhật Điểm &amp; Nhận xét GVHD
+                      </button>
+                    )}
                   </div>
                 ) : canCreateTask ? (
                   <button
-                    onClick={handleConfirmDefenseReady}
+                    onClick={handleOpenDefenseReadyModal}
                     disabled={defenseReadyLoading}
                     style={{
                       background: '#16a34a',
                       color: '#fff',
                       border: 'none',
-                      padding: '8px 16px',
+                      padding: '10px 18px',
                       borderRadius: '6px',
                       fontWeight: 700,
                       fontSize: '13px',
@@ -790,9 +881,9 @@ export const TaskBoardPage: React.FC = () => {
                       gap: '6px',
                       boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
                     }}
-                    title="Xác nhận sinh viên đã hoàn thành đề tài, sẵn sàng vào Hội đồng bảo vệ"
+                    title="Chấm điểm quá trình và xác nhận sinh viên đủ điều kiện bảo vệ trước Hội đồng"
                   >
-                    <span>🎓</span> {defenseReadyLoading ? 'Đang xác nhận...' : 'Xác nhận Đủ Điều kiện Bảo vệ'}
+                    <span>🎓</span> Chấm điểm GVHD &amp; Xác nhận Đủ ĐK Bảo Vệ
                   </button>
                 ) : (
                   <div style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
@@ -800,6 +891,7 @@ export const TaskBoardPage: React.FC = () => {
                   </div>
                 )}
               </div>
+
             </div>
 
             {/* Visual Progress Bar */}
@@ -1693,6 +1785,180 @@ export const TaskBoardPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* GVHD SCORING & DEFENSE READY CONFIRMATION MODAL */}
+      {showDefenseReadyModal && currentThesis && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '620px',
+            padding: '28px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '24px' }}>🎓</span>
+                <div>
+                  <h3 style={{ margin: 0, color: '#0a3273', fontSize: '18px', fontWeight: 700 }}>
+                    Phiếu Chấm Điểm GVHD &amp; Xác Nhận Đủ ĐK Bảo Vệ
+                  </h3>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    Quy chế tốt nghiệp UTC — Điểm quá trình hướng dẫn (30%)
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDefenseReadyModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitDefenseReadyWithScore}>
+              {/* Important Regulation Notice */}
+              <div style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                color: '#1e40af',
+                lineHeight: '1.5'
+              }}>
+                <strong>📌 Lưu ý quy chế đào tạo:</strong>
+                <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px' }}>
+                  <li>Giảng viên hướng dẫn chấm điểm quá trình (thang điểm 10) và nhận xét thái độ làm việc của sinh viên.</li>
+                  <li><strong>GVHD tuyệt đối không được ngồi trong Hội đồng chấm thi</strong> của sinh viên mà mình hướng dẫn (Hội đồng 5 người gồm các giảng viên khác).</li>
+                </ul>
+              </div>
+
+              {/* Thesis & Student Summary */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', color: '#334155', marginBottom: '4px' }}>
+                  <strong>Sinh viên:</strong> {currentThesis.studentFullName} ({currentThesis.studentCode}) — Lớp: {currentThesis.studentClass || 'K62'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#0a3273', fontWeight: 600 }}>
+                  <strong>Đề tài:</strong> {currentThesis.titleVn}
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  Tiến độ hoàn thành: <strong>{computedProgressPercent}%</strong> ({completedTasksCount}/{tasks.length} tasks hoàn thành)
+                </div>
+              </div>
+
+              {/* Score Input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                  ⭐ Điểm hướng dẫn của GVHD (Thang điểm 10.0) *
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10.0"
+                    required
+                    value={supScoreInput}
+                    onChange={(e) => setSupScoreInput(Math.min(10.0, Math.max(0, Number(e.target.value))))}
+                    style={{
+                      width: '120px',
+                      padding: '10px 14px',
+                      border: '2px solid #2563eb',
+                      borderRadius: '8px',
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      color: '#1e40af',
+                      textAlign: 'center',
+                    }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ 10.00 điểm</span>
+                  <span style={{ fontSize: '12px', color: supScoreInput >= 8.5 ? '#16a34a' : supScoreInput >= 7.0 ? '#2563eb' : '#d97706', fontWeight: 600 }}>
+                    ({supScoreInput >= 8.5 ? 'Xuất sắc' : supScoreInput >= 7.0 ? 'Khá/Giỏi' : supScoreInput >= 5.0 ? 'Đạt' : 'Chưa đạt'})
+                  </span>
+                </div>
+              </div>
+
+              {/* Feedback Textarea */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                  📝 Nhận xét &amp; Đánh giá chi tiết của GVHD *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={supFeedbackInput}
+                  onChange={(e) => setSupFeedbackInput(e.target.value)}
+                  placeholder="Nhập nhận xét về tinh thần làm việc, mức độ hoàn thành nội dung và chất lượng đồ án..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    lineHeight: '1.5',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDefenseReadyModal(false)}
+                  disabled={defenseReadyLoading}
+                  style={{
+                    padding: '9px 18px',
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    color: '#475569'
+                  }}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={defenseReadyLoading}
+                  style={{
+                    padding: '9px 24px',
+                    background: '#16a34a',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
+                  }}
+                >
+                  <span>🎓</span> {defenseReadyLoading ? 'Đang lưu...' : 'Xác Nhận Chấm Điểm & Cho Phép Bảo Vệ'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

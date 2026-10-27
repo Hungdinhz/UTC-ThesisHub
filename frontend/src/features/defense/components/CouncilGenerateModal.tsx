@@ -6,17 +6,27 @@ interface CouncilGenerateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGenerate: (req: CouncilGenerationRequest) => Promise<void>;
+  rounds?: Array<{ id: number; name: string; roundCode?: string }>;
+  currentRoundId?: number;
 }
 
 export const CouncilGenerateModal: React.FC<CouncilGenerateModalProps> = ({
   isOpen,
   onClose,
   onGenerate,
+  rounds = [],
+  currentRoundId = 16,
 }) => {
-  const [projectRoundId, setProjectRoundId] = useState(10);
-  const [maxStudents, setMaxStudents] = useState(5);
+  const [projectRoundId, setProjectRoundId] = useState(currentRoundId || 16);
+  const [maxStudents, setMaxStudents] = useState(50);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    if (currentRoundId) {
+      setProjectRoundId(currentRoundId);
+    }
+  }, [currentRoundId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +44,7 @@ export const CouncilGenerateModal: React.FC<CouncilGenerateModalProps> = ({
       setLoading(false);
     }
   };
+
 
   return (
     <Modal
@@ -60,25 +71,37 @@ export const CouncilGenerateModal: React.FC<CouncilGenerateModalProps> = ({
             value={projectRoundId}
             onChange={(e) => setProjectRoundId(Number(e.target.value))}
           >
-            <option value={10}>Đợt 1 - Học kỳ 2 Năm học 2025-2026 (ID: 10)</option>
-            <option value={11}>Đợt 2 - Học kỳ Hè Năm học 2025-2026 (ID: 11)</option>
+            {rounds && rounds.length > 0 ? (
+              rounds.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({r.roundCode || `ID: ${r.id}`})
+                </option>
+              ))
+            ) : (
+              <>
+                <option value={16}>Đợt đồ án hiện tại (ID: 16)</option>
+                <option value={7}>Đợt Hùng (ID: 7)</option>
+                <option value={10}>Đợt 1 - Học kỳ 2 Năm học 2025-2026 (ID: 10)</option>
+              </>
+            )}
           </select>
         </div>
 
         <div className="form-group">
-          <label htmlFor="maxStudents">Số lượng sinh viên tối đa / Hội đồng:</label>
-          <input
+          <label htmlFor="maxStudents">Quy mô phân công:</label>
+          <select
             id="maxStudents"
-            type="number"
-            min={1}
-            max={15}
             className="form-control"
             value={maxStudents}
             onChange={(e) => setMaxStudents(Number(e.target.value))}
-            required
-          />
-          <small className="form-hint">Mặc định: 5 sinh viên mỗi phiên bảo vệ</small>
+          >
+            <option value={50}>Chỉ 1 Hội đồng duy nhất cho toàn đợt (Khuyên dùng)</option>
+            <option value={5}>Chia nhiều hội đồng (Tối đa 5 SV / Hội đồng)</option>
+            <option value={10}>Chia nhiều hội đồng (Tối đa 10 SV / Hội đồng)</option>
+          </select>
+          <small className="form-hint">Theo quy chế, mỗi đợt phân công 1 Hội đồng chuẩn (1CT - 2TK - 2UV) để chấm tất cả SV đủ điều kiện</small>
         </div>
+
 
         {error && <div className="form-error-msg">{error}</div>}
 

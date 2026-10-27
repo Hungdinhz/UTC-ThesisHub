@@ -27,4 +27,7 @@ public interface CouncilMemberRepository extends JpaRepository<CouncilMember, Lo
     long countByCouncilId(Long councilId);
 
     long countByLecturerId(Long lecturerId);
+
+    void deleteByCouncilId(Long councilId);
 }
+
