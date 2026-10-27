@@ -70,4 +70,38 @@ public class NotificationService {
     public int markAllAsRead(Long userId) {
         return notificationRepository.markAllAsReadByUserId(userId);
     }
+
+    @Transactional
+    public int markMultipleAsRead(List<Long> notificationIds, Long userId) {
+        if (notificationIds == null || notificationIds.isEmpty()) {
+            return notificationRepository.markAllAsReadByUserId(userId);
+        }
+        List<Notification> notifications = notificationRepository.findAllById(notificationIds);
+        int updatedCount = 0;
+        for (Notification n : notifications) {
+            if (n.getUserId().equals(userId) && Boolean.FALSE.equals(n.getIsRead())) {
+                n.setIsRead(true);
+                updatedCount++;
+            }
+        }
+        notificationRepository.saveAll(notifications);
+        return updatedCount;
+    }
+
+    @Transactional
+    public void deleteNotification(Long notificationId, Long currentUserId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Thông báo", notificationId));
+
+        if (!notification.getUserId().equals(currentUserId)) {
+            throw new UnauthorizedException("Bạn không có quyền xoá thông báo này");
+        }
+
+        notificationRepository.delete(notification);
+    }
+
+    @Transactional
+    public int deleteAllNotifications(Long userId) {
+        return notificationRepository.deleteAllByUserId(userId);
+    }
 }

@@ -55,6 +55,9 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final AssignmentOverrideManager overrideManager;
     private final LecturerDirectionSyncHelper syncHelper;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.notification.service.NotificationService notificationService;
+
     private ProjectRound getAndValidateActiveRound(Long projectRoundId) {
         ProjectRound round = projectRoundRepository.findById(projectRoundId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đợt đồ án với ID: " + projectRoundId));
@@ -1055,6 +1058,25 @@ public class AssignmentServiceImpl implements AssignmentService {
                             }
                             studentProjectRoundRepository.save(spr);
                         });
+            }
+
+            // Gửi thông báo nội bộ cho sinh viên
+            if (notificationService != null && sa.getStudentId() != null) {
+                studentRepository.findById(sa.getStudentId()).ifPresent(student -> {
+                    if (student.getUser() != null && student.getUser().getId() != null) {
+                        try {
+                            notificationService.createNotification(
+                                    student.getUser().getId(),
+                                    "Kết quả phân công GVHD",
+                                    "Khoa đã chốt kết quả phân công GVHD cho bạn trong đợt đồ án.",
+                                    "ASSIGNMENT",
+                                    "/student/dashboard"
+                            );
+                        } catch (Exception e) {
+                            log.warn("Không thể gửi thông báo phân công cho sinh viên ID={}: {}", student.getId(), e.getMessage());
+                        }
+                    }
+                });
             }
         }
 

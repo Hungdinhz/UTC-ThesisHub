@@ -11,9 +11,6 @@ import type { ProjectRoundItem } from '../types';
 import {
   STAGES,
   getRoundStageNumber,
-  getUserCompletedStage,
-  setUserCompletedStage,
-  resetUserStage,
   calculateStageStatus,
 } from '../utils/phaseTracking';
 import './UTCAppLayout.css';
@@ -180,10 +177,9 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
             if (myStatus.isDropped) {
               setUserCompletedStageState(myStatus.completedStage || 1);
             } else if (myStatus.completedStage) {
-              const localStage = getUserCompletedStage(currentUserId, currentRole);
-              const effectiveStage = Math.max(myStatus.completedStage, localStage);
-              setUserCompletedStageState(effectiveStage);
-              setUserCompletedStage(currentUserId, currentRole, effectiveStage, true);
+              setUserCompletedStageState(myStatus.completedStage);
+            } else {
+              setUserCompletedStageState(1);
             }
             return;
           }
@@ -197,6 +193,9 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         setActiveRound(round);
         const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
         setRoundCurrentStage(st);
+        if (currentRole === 'supervisor' || currentRole === 'lecturer') {
+          setUserCompletedStageState(Math.max(st - 1, 1));
+        }
       }
     } catch {
       // Ignored if round not active
@@ -205,22 +204,14 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   useEffect(() => {
     loadActiveRound();
-    setUserCompletedStageState(getUserCompletedStage(currentUserId, currentRole));
 
-    const handlePhaseEvent = (e?: Event) => {
-      const customEvent = e as CustomEvent | undefined;
-      setUserCompletedStageState(getUserCompletedStage(currentUserId, currentRole));
-      // Chỉ gọi lại API loadActiveRound khi Admin chuyển giai đoạn đợt đồ án (không có detail.completedStage)
-      if (!customEvent?.detail?.completedStage) {
-        loadActiveRound();
-      }
+    const handlePhaseEvent = () => {
+      loadActiveRound();
     };
 
     window.addEventListener('utc-phase-change', handlePhaseEvent);
-    window.addEventListener('storage', handlePhaseEvent);
     return () => {
       window.removeEventListener('utc-phase-change', handlePhaseEvent);
-      window.removeEventListener('storage', handlePhaseEvent);
     };
   }, [currentUserId, currentRole]);
 
@@ -240,26 +231,20 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     }
   };
 
-  const handleUserCompleteCurrentStage = () => {
-    const next = userCompletedStageState + 1;
-    setUserCompletedStage(currentUserId, currentRole, next);
-    setUserCompletedStageState(next);
-  };
-
-  const handleUserResetStage = () => {
-    resetUserStage(currentUserId, currentRole);
-    setStudentStatusInfo(null);
-    setUserCompletedStageState(currentRole === 'student' ? 1 : 2);
-  };
-
   const isStageLocked = (stageNumber: number) => {
-    if (currentRole === 'student' && studentStatusInfo?.isDropped) {
-      const failedStage = (studentStatusInfo.completedStage || 1) + 1;
-      if (stageNumber >= failedStage) {
-        return true;
+    if (currentRole === 'student') {
+      if (studentStatusInfo?.isDropped) {
+        const failedStage = (studentStatusInfo.completedStage || 1) + 1;
+        if (stageNumber >= failedStage) {
+          return true;
+        }
       }
+      return calculateStageStatus(stageNumber, roundCurrentStage, userCompletedStageState) === 'LOCKED';
     }
-    return calculateStageStatus(stageNumber, roundCurrentStage, userCompletedStageState) === 'LOCKED';
+    if (currentRole === 'supervisor' || currentRole === 'lecturer') {
+      return roundCurrentStage < stageNumber;
+    }
+    return false;
   };
 
   const renderStageBadge = (stageNumber: number) => {
@@ -288,6 +273,16 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           🔒 Bị loại
         </span>
       );
+    }
+
+    if (currentRole === 'supervisor' || currentRole === 'lecturer') {
+      if (roundCurrentStage > stageNumber) {
+        return <span className="utc-stage-badge completed" title="Đợt đã hoàn thành giai đoạn này">✓ Đã xong</span>;
+      }
+      if (roundCurrentStage === stageNumber) {
+        return <span className="utc-stage-badge in-progress" title="Đợt đang thực hiện giai đoạn này">● Đang làm</span>;
+      }
+      return <span className="utc-stage-badge locked" title="Giai đoạn chưa mở trong đợt này">🔒 Chưa mở</span>;
     }
 
     const status = calculateStageStatus(stageNumber, roundCurrentStage, userCompletedStageState);
@@ -327,8 +322,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   };
 
   const currentStageDef = STAGES.find((s) => s.stageNumber === roundCurrentStage) || STAGES[1];
-  const userWorkingStageNum = userCompletedStageState + 1;
-  const userWorkingStageDef = STAGES.find((s) => s.stageNumber === userWorkingStageNum);
 
   return (
     <div className={`utc-dashboard-wrapper ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>
@@ -753,45 +746,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           </div>
         )}
 
-        {(currentRole === 'student' || currentRole === 'supervisor' || currentRole === 'lecturer') && (
-          <div className="utc-demo-control-bar user-bar">
-            <div className="utc-demo-info">
-              <span className="utc-demo-tag">⚡ DEMO {currentRole === 'student' ? 'SINH VIÊN' : 'GIẢNG VIÊN'}</span>
-              <span>
-                Đợt đồ án chung: <strong>{currentStageDef?.name || `GĐ${roundCurrentStage}`}</strong>
-              </span>
-              <span>
-                Tiến độ của bạn: {studentStatusInfo?.isDropped ? (
-                  <strong className="user-progress-badge" style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
-                    🚫 Không đạt / Bị loại
-                  </strong>
-                ) : (
-                  <strong className="user-progress-badge">
-                    {userWorkingStageDef ? `Đang làm ${userWorkingStageDef.code}` : 'Đã hoàn thành tất cả'}
-                  </strong>
-                )}
-              </span>
-            </div>
-            <div className="utc-demo-actions">
-              {!studentStatusInfo?.isDropped && userWorkingStageDef && (
-                <button
-                  className="utc-demo-btn success"
-                  onClick={handleUserCompleteCurrentStage}
-                  title="Đánh dấu hoàn thành giai đoạn này để được mở sang giai đoạn tiếp theo"
-                >
-                  ✓ Hoàn thành {userWorkingStageDef.code} (Demo)
-                </button>
-              )}
-              <button
-                className="utc-demo-btn secondary"
-                onClick={handleUserResetStage}
-                title="Đặt lại trạng thái chưa hoàn thành (các giai đoạn sau sẽ bị khóa lại)"
-              >
-                ↩ Đặt lại (Chưa làm xong)
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {/* Cảnh báo khi sinh viên bị loại / không đạt */}
         {currentRole === 'student' && studentStatusInfo?.isDropped && (

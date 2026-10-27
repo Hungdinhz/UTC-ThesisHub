@@ -44,6 +44,7 @@ public class ProposalServiceImpl implements ProposalService {
     private final StudentRepository studentRepository;
     private final LecturerRepository lecturerRepository;
     private final UserRepository userRepository;
+    private final com.example.thesis_hub_api.notification.service.NotificationService notificationService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository supervisorAssignmentRepository;
 
@@ -187,6 +188,24 @@ public class ProposalServiceImpl implements ProposalService {
         if (approved) {
             ensureThesisCreatedForProposal(saved);
         }
+
+        // Gửi thông báo cho Sinh viên khi GVHD duyệt hoặc yêu cầu sửa
+        if (saved.getStudent() != null && saved.getStudent().getUser() != null && saved.getStudent().getUser().getId() != null) {
+            try {
+                String actionText = approved ? "GVHD ĐÃ XÁC NHẬN" : "GVHD YÊU CẦU CHỈNH SỬA";
+                String note = (comment != null && !comment.isBlank()) ? (": " + comment) : ".";
+                notificationService.createNotification(
+                        saved.getStudent().getUser().getId(),
+                        "Đề cương: " + actionText,
+                        "Giảng viên hướng dẫn đã phản hồi đề cương \"" + (saved.getTitleVn() != null ? saved.getTitleVn() : "Đồ án") + "\": " + actionText + note,
+                        "PROPOSAL",
+                        "/thesis/proposals"
+                );
+            } catch (Exception e) {
+                log.warn("Không thể gửi thông báo GVHD duyệt đề cương: {}", e.getMessage());
+            }
+        }
+
         return mapToResponse(saved);
     }
 
@@ -264,6 +283,25 @@ public class ProposalServiceImpl implements ProposalService {
         // Auto-generate official Thesis when Proposal is APPROVED
         if ("APPROVED".equalsIgnoreCase(request.getStatus())) {
             ensureThesisCreatedForProposal(savedProposal);
+        }
+
+        // Gửi thông báo kết quả xét duyệt đề cương cho Sinh viên
+        if (savedProposal.getStudent() != null && savedProposal.getStudent().getUser() != null && savedProposal.getStudent().getUser().getId() != null) {
+            try {
+                String decisionText = "APPROVED".equalsIgnoreCase(request.getStatus()) ? "ĐÃ ĐƯỢC PHÊ DUYỆT" : "YÊU CẦU CHỈNH SỬA";
+                String note = (request.getEvaluationNotes() != null && !request.getEvaluationNotes().isBlank())
+                        ? (": " + request.getEvaluationNotes())
+                        : ".";
+                notificationService.createNotification(
+                        savedProposal.getStudent().getUser().getId(),
+                        "Kết quả duyệt đề cương: " + decisionText,
+                        "Đề cương đề tài \"" + (savedProposal.getTitleVn() != null ? savedProposal.getTitleVn() : "Đồ án") + "\" của bạn: " + decisionText + note,
+                        "PROPOSAL",
+                        "/thesis/proposals"
+                );
+            } catch (Exception e) {
+                log.warn("Không thể gửi thông báo duyệt đề cương {}: {}", proposalId, e.getMessage());
+            }
         }
 
         return mapToResponse(savedProposal);

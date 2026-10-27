@@ -108,4 +108,45 @@ class NotificationServiceTest {
 
         assertThrows(UnauthorizedException.class, () -> notificationService.markAsRead(1L, 999L));
     }
+
+    @Test
+    void testDeleteNotification_Success() {
+        Notification n = Notification.builder()
+                .id(1L)
+                .userId(100L)
+                .build();
+
+        when(notificationRepository.findById(1L)).thenReturn(Optional.of(n));
+
+        assertDoesNotThrow(() -> notificationService.deleteNotification(1L, 100L));
+        verify(notificationRepository).delete(n);
+    }
+
+    @Test
+    void testDeleteNotification_WrongUser_ThrowsUnauthorized() {
+        Notification n = Notification.builder()
+                .id(1L)
+                .userId(100L)
+                .build();
+
+        when(notificationRepository.findById(1L)).thenReturn(Optional.of(n));
+
+        assertThrows(UnauthorizedException.class, () -> notificationService.deleteNotification(1L, 999L));
+        verify(notificationRepository, never()).delete(any());
+    }
+
+    @Test
+    void testMarkMultipleAsRead_Success() {
+        Notification n1 = Notification.builder().id(1L).userId(100L).isRead(false).build();
+        Notification n2 = Notification.builder().id(2L).userId(100L).isRead(false).build();
+
+        when(notificationRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(n1, n2));
+
+        int updated = notificationService.markMultipleAsRead(List.of(1L, 2L), 100L);
+
+        assertEquals(2, updated);
+        assertTrue(n1.getIsRead());
+        assertTrue(n2.getIsRead());
+        verify(notificationRepository).saveAll(any());
+    }
 }

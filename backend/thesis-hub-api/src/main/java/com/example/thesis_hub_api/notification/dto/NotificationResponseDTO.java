@@ -1,6 +1,7 @@
 package com.example.thesis_hub_api.notification.dto;
 
 import com.example.thesis_hub_api.notification.entity.Notification;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,5 +34,31 @@ public class NotificationResponseDTO {
                 .isRead(notification.getIsRead())
                 .createdAt(notification.getCreatedAt())
                 .build();
+    }
+
+    // Aliases to seamlessly support frontend legacy expectations
+    @JsonProperty("message")
+    public String getMessage() {
+        return content;
+    }
+
+    @JsonProperty("notification_type")
+    public String getNotificationType() {
+        return type;
+    }
+
+    @JsonProperty("action_url")
+    public String getActionUrl() {
+        return referenceUrl;
+    }
+
+    @JsonProperty("is_read")
+    public Boolean getIsReadSnake() {
+        return isRead;
+    }
+
+    @JsonProperty("created_at")
+    public Instant getCreatedAtSnake() {
+        return createdAt;
     }
 }

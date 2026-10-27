@@ -10,6 +10,7 @@ import com.example.thesis_hub_api.progress.entity.Task;
 import com.example.thesis_hub_api.progress.repository.TaskRepository;
 import com.example.thesis_hub_api.thesis.entity.Thesis;
 import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
+import com.example.thesis_hub_api.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +30,7 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
     private final ThesisRepository thesisRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -67,7 +69,25 @@ public class TaskServiceImpl implements TaskService {
                 .dueDate(request.getDueDate())
                 .build();
 
-        return mapToResponse(taskRepository.save(task));
+        Task savedTask = taskRepository.save(task);
+
+        // Gửi thông báo nội bộ cho người được giao nhiệm vụ
+        if (assignedTo.getId() != null) {
+            try {
+                String thesisTitle = (thesis.getTitleVn() != null) ? thesis.getTitleVn() : (thesis.getTitleEn() != null ? thesis.getTitleEn() : "Đồ án");
+                notificationService.createNotification(
+                        assignedTo.getId(),
+                        "Nhiệm vụ mới: " + savedTask.getTitle(),
+                        "GVHD đã giao nhiệm vụ mới cho bạn trên đề tài: \"" + thesisTitle + "\".",
+                        "TASK",
+                        "/progress/tasks"
+                );
+            } catch (Exception e) {
+                log.warn("Không thể tạo thông báo cho Task {}: {}", savedTask.getId(), e.getMessage());
+            }
+        }
+
+        return mapToResponse(savedTask);
     }
 
     @Override

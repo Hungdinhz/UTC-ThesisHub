@@ -10,6 +10,7 @@ import com.example.thesis_hub_api.progress.entity.Submission;
 import com.example.thesis_hub_api.progress.entity.Task;
 import com.example.thesis_hub_api.progress.repository.SubmissionRepository;
 import com.example.thesis_hub_api.progress.repository.TaskRepository;
+import com.example.thesis_hub_api.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final SubmissionRepository submissionRepository;
     private final TaskRepository taskRepository;
     private final StudentRepository studentRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -54,6 +56,24 @@ public class SubmissionServiceImpl implements SubmissionService {
         task.setStatus("SUBMITTED");
         taskRepository.save(task);
 
+        // Gửi thông báo cho GVHD người tạo task
+        if (task.getCreatedBy() != null && task.getCreatedBy().getId() != null) {
+            try {
+                String studentName = (student.getUser() != null && student.getUser().getFullName() != null)
+                        ? student.getUser().getFullName()
+                        : ("Sinh viên mã " + student.getStudentCode());
+                notificationService.createNotification(
+                        task.getCreatedBy().getId(),
+                        "Sinh viên nộp bài: " + task.getTitle(),
+                        studentName + " vừa nộp báo cáo cho nhiệm vụ \"" + task.getTitle() + "\".",
+                        "TASK_SUBMISSION",
+                        "/progress/tasks"
+                );
+            } catch (Exception e) {
+                log.warn("Không thể gửi thông báo nộp bài cho Task {}: {}", taskId, e.getMessage());
+            }
+        }
+
         return mapToResponse(saved);
     }
 
@@ -76,7 +96,28 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
         taskRepository.save(task);
 
-        return mapToResponse(submissionRepository.save(submission));
+        Submission updatedSubmission = submissionRepository.save(submission);
+
+        // Gửi thông báo kết quả review cho Sinh viên
+        if (submission.getStudent() != null && submission.getStudent().getUser() != null && submission.getStudent().getUser().getId() != null) {
+            try {
+                String decision = "ACCEPTED".equalsIgnoreCase(request.getStatus()) ? "ĐẠT" : "CẦN CHỈNH SỬA";
+                String feedback = (request.getReviewFeedback() != null && !request.getReviewFeedback().isBlank())
+                        ? (": " + request.getReviewFeedback())
+                        : ".";
+                notificationService.createNotification(
+                        submission.getStudent().getUser().getId(),
+                        "Đánh giá nhiệm vụ: " + task.getTitle() + " [" + decision + "]",
+                        "GVHD đã đánh giá kết quả nhiệm vụ \"" + task.getTitle() + "\": " + decision + feedback,
+                        "TASK_REVIEW",
+                        "/progress/tasks"
+                );
+            } catch (Exception e) {
+                log.warn("Không thể gửi thông báo đánh giá bài nộp {}: {}", submissionId, e.getMessage());
+            }
+        }
+
+        return mapToResponse(updatedSubmission);
     }
 
     @Override

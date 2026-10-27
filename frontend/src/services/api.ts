@@ -704,6 +704,7 @@ class ApiService {
 
   async getNotifications(params?: {
     page?: number;
+    size?: number;
     is_read?: boolean;
     type?: string;
   }): Promise<PaginatedResponse<Notification>> {
