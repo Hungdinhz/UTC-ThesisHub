@@ -95,20 +95,16 @@ export function getUserCompletedStage(userId: string | number, role: string): nu
 }
 
 /**
- * Updates the user's completed stage and triggers a phase change event if changed.
+ * Updates the user's completed stage and triggers a phase change event.
  */
-export function setUserCompletedStage(userId: string | number, role: string, completedStage: number, silent = false): void {
+export function setUserCompletedStage(userId: string | number, role: string, completedStage: number): void {
   const key = `${STORAGE_PREFIX}${userId}_${role}`;
-  const prev = localStorage.getItem(key);
-  const nextStr = completedStage.toString();
-  localStorage.setItem(key, nextStr);
-  if (!silent && prev !== nextStr) {
-    window.dispatchEvent(
-      new CustomEvent('utc-phase-change', {
-        detail: { userId, role, completedStage },
-      })
-    );
-  }
+  localStorage.setItem(key, completedStage.toString());
+  window.dispatchEvent(
+    new CustomEvent('utc-phase-change', {
+      detail: { userId, role, completedStage },
+    })
+  );
 }
 
 /**

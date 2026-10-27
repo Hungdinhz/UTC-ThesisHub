@@ -61,60 +61,49 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         }
 
         // 1. Prioritize backend getMyRoundStatus() which resolves student's enrolled round
-        if (myStatus) {
-          if (myStatus.inRound && myStatus.roundId) {
-            const matchedRound = allRounds.find((r) => r.roundId === myStatus.roundId);
-            if (matchedRound) {
-              setRounds([matchedRound]);
-              setSelectedRoundId(matchedRound.roundId);
-              setIsStudentInRound(true);
-              if (matchedRound.trainingProgram === 'KY_SU' || matchedRound.trainingProgram === 'CU_NHAN') {
-                setActiveProgram(matchedRound.trainingProgram);
-              }
-              return;
+        if (myStatus && myStatus.inRound && myStatus.roundId) {
+          const matchedRound = allRounds.find((r) => r.roundId === myStatus.roundId);
+          if (matchedRound) {
+            setRounds([matchedRound]);
+            setSelectedRoundId(matchedRound.roundId);
+            setIsStudentInRound(true);
+            if (matchedRound.trainingProgram === 'KY_SU' || matchedRound.trainingProgram === 'CU_NHAN') {
+              setActiveProgram(matchedRound.trainingProgram);
             }
-          } else if (myStatus.inRound === false) {
-            setRounds([]);
-            setSelectedRoundId(null);
-            setIsStudentInRound(false);
             return;
           }
         }
 
-        // 2. Fallback (only if getMyRoundStatus API failed): verify student membership in parallel
+        // 2. Fallback: verify student membership across rounds via getStudentsInRound
         const userCode =
           (user as any)?.registration_no ||
           (user as any)?.studentCode ||
           (user as any)?.student_code ||
           user?.username;
         if (userCode && allRounds.length > 0) {
-          const checks = await Promise.all(
-            allRounds.map(async (r) => {
-              try {
-                const res = await apiService.getStudentsInRound(r.roundId, { search: userCode, size: 10 });
-                const found = res?.content?.find(
-                  (s) =>
-                    s.studentCode?.toLowerCase() === String(userCode).toLowerCase() ||
-                    (effectiveStudentId && s.studentId === effectiveStudentId)
-                );
-                return found ? { round: r, found } : null;
-              } catch {
-                return null;
+          for (const r of allRounds) {
+            try {
+              const res = await apiService.getStudentsInRound(r.roundId, { search: userCode, size: 10 });
+              const found = res?.content?.find(
+                (s) =>
+                  s.studentCode?.toLowerCase() === String(userCode).toLowerCase() ||
+                  (effectiveStudentId && s.studentId === effectiveStudentId)
+              );
+              if (found) {
+                setRounds([r]);
+                setSelectedRoundId(r.roundId);
+                setIsStudentInRound(true);
+                if (found.gpa !== undefined && found.gpa !== null) {
+                  setStudentRoundGpa(Number(found.gpa));
+                }
+                if (r.trainingProgram === 'KY_SU' || r.trainingProgram === 'CU_NHAN') {
+                  setActiveProgram(r.trainingProgram);
+                }
+                return;
               }
-            })
-          );
-          const match = checks.find((c) => c !== null);
-          if (match) {
-            setRounds([match.round]);
-            setSelectedRoundId(match.round.roundId);
-            setIsStudentInRound(true);
-            if (match.found.gpa !== undefined && match.found.gpa !== null) {
-              setStudentRoundGpa(Number(match.found.gpa));
+            } catch {
+              // ignore individual round check error
             }
-            if (match.round.trainingProgram === 'KY_SU' || match.round.trainingProgram === 'CU_NHAN') {
-              setActiveProgram(match.round.trainingProgram);
-            }
-            return;
           }
         }
 

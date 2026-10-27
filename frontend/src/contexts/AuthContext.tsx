@@ -64,22 +64,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           throw new Error('Invalid user type');
       }
 
-      if (userData && typeof userData === 'object') {
-        userData.fullName = userData.fullName || userData.full_name || userData.user?.fullName || userData.user?.full_name;
-        if (userData.student) {
-          userData.studentId = userData.student.id;
-          userData.student_id = userData.student.id;
-          userData.studentCode = userData.student.student_code || userData.student.registration_no;
-          userData.registration_no = userData.student.registration_no || userData.student.student_code;
-        }
-        if (userData.lecturer) {
-          userData.lecturerId = userData.lecturer.id;
-          userData.lecturer_id = userData.lecturer.id;
-          userData.lecturerCode = userData.lecturer.lecturer_code || userData.lecturer.supervisor_id;
-          userData.supervisor_id = userData.lecturer.supervisor_id || userData.lecturer.lecturer_code;
-        }
-      }
-
       setUser(userData);
     } catch (error) {
       console.error('Failed to fetch user:', error);

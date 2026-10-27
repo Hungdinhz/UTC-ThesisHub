@@ -98,9 +98,6 @@ public class ProjectRoundService {
     private StudentRepository studentRepository;
 
     @Autowired(required = false)
-    private com.example.thesis_hub_api.organization.repository.LecturerRepository lecturerRepository;
-
-    @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
 
     /**
@@ -118,88 +115,10 @@ public class ProjectRoundService {
 
     @Transactional(readOnly = true)
     public List<ProjectRoundResponseDTO> getRounds(String status, String academicYear) {
-        return getRounds(status, academicYear, null);
-    }
-
-    @Transactional(readOnly = true)
-    public List<ProjectRoundResponseDTO> getRounds(String status, String academicYear, UserPrincipal currentUser) {
         String cleanStatus = StringUtils.hasText(status) ? status.trim().toUpperCase() : null;
         String cleanYear = StringUtils.hasText(academicYear) ? academicYear.trim() : null;
 
         List<ProjectRound> list = projectRoundRepository.findRoundsFiltered(cleanStatus, cleanYear);
-
-        if (currentUser != null && currentUser.getAuthorities() != null) {
-            boolean isAdmin = currentUser.getAuthorities().stream()
-                    .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()) || "ROLE_COMMITTEE".equalsIgnoreCase(a.getAuthority()));
-            if (!isAdmin) {
-                boolean isStudent = currentUser.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_STUDENT".equalsIgnoreCase(a.getAuthority()));
-                boolean isLecturer = currentUser.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_LECTURER".equalsIgnoreCase(a.getAuthority()));
-
-                if (isStudent && studentRepository != null && studentProjectRoundRepository != null) {
-                    Student student = studentRepository.findByUserId(currentUser.getId()).orElse(null);
-                    if (student != null) {
-                        Set<Long> studentRoundIds = studentProjectRoundRepository.findByStudentId(student.getId()).stream()
-                                .filter(spr -> spr.getProjectRound() != null && !"RESERVED".equalsIgnoreCase(spr.getStatus()))
-                                .map(spr -> spr.getProjectRound().getId())
-                                .collect(Collectors.toSet());
-                        list = list.stream()
-                                .filter(r -> studentRoundIds.contains(r.getId()))
-                                .toList();
-                    } else {
-                        list = List.of();
-                    }
-                } else if (isLecturer && lecturerRepository != null) {
-                    com.example.thesis_hub_api.organization.entity.Lecturer lecturer =
-                            lecturerRepository.findByUserId(currentUser.getId()).orElse(null);
-                    if (lecturer != null) {
-                        Long lecId = lecturer.getId();
-                        Set<Long> assignedRoundIds = new java.util.HashSet<>();
-                        if (supervisorAssignmentRepository != null) {
-                            supervisorAssignmentRepository.findByLecturerId(lecId).forEach(sa -> {
-                                if (sa.getProjectRoundId() != null) assignedRoundIds.add(sa.getProjectRoundId());
-                            });
-                        }
-                        if (proposalRepository != null) {
-                            proposalRepository.findByLecturerId(lecId).forEach(p -> {
-                                if (p.getProjectRound() != null && p.getProjectRound().getId() != null) {
-                                    assignedRoundIds.add(p.getProjectRound().getId());
-                                }
-                            });
-                        }
-                        if (thesisRepository != null) {
-                            thesisRepository.findByLecturerId(lecId).forEach(t -> {
-                                if (t.getProjectRound() != null && t.getProjectRound().getId() != null) {
-                                    assignedRoundIds.add(t.getProjectRound().getId());
-                                }
-                            });
-                        }
-                        if (lecturerCapacityRepository != null) {
-                            lecturerCapacityRepository.findByLecturerId(lecId).forEach(cap -> {
-                                if (cap.getProjectRoundId() != null && cap.getCurrentAssigned() != null && cap.getCurrentAssigned() > 0) {
-                                    assignedRoundIds.add(cap.getProjectRoundId());
-                                }
-                            });
-                            // Fallback nếu GV chưa có SV nào được chốt nhưng có trong danh sách giảng viên tham gia đợt đang mở
-                            if (assignedRoundIds.isEmpty()) {
-                                lecturerCapacityRepository.findByLecturerId(lecId).forEach(cap -> {
-                                    if (cap.getProjectRoundId() != null && !Boolean.FALSE.equals(cap.getIsActive())) {
-                                        assignedRoundIds.add(cap.getProjectRoundId());
-                                    }
-                                });
-                            }
-                        }
-                        list = list.stream()
-                                .filter(r -> assignedRoundIds.contains(r.getId()) && !"DRAFT".equalsIgnoreCase(r.getStatus()))
-                                .toList();
-                    } else {
-                        list = List.of();
-                    }
-                }
-            }
-        }
-
         return list.stream().map(this::toResponseDTO).toList();
     }
 
@@ -761,41 +680,15 @@ public class ProjectRoundService {
             registeredG2StudentIds = sIds;
         }
 
-        // 2. Kiểm tra GĐ3 (Nộp & Duyệt đề cương): Có đề cương hoặc có bản ghi đề tài
+        // 2. Kiểm tra GĐ3 (Nộp & Duyệt đề cương): Có đề cương được duyệt (APPROVED) hoặc có bản ghi đề tài
         Set<Long> approvedG3StudentIds = Collections.emptySet();
         if (targetStage >= 4) {
             Set<Long> sIds = new java.util.HashSet<>();
-            ProjectRound roundObj = projectRoundRepository.findById(roundId).orElse(null);
             if (proposalRepository != null) {
                 proposalRepository.findByProjectRoundId(roundId).forEach(p -> {
                     if (p.getStudent() != null && p.getStudent().getId() != null) {
-                        String st = p.getStatus() != null ? p.getStatus().toUpperCase() : "";
-                        if (!"REJECTED".equals(st)) {
-                            if (!"APPROVED".equals(st)) {
-                                p.setStatus("APPROVED");
-                                p.setSupervisorApproved(true);
-                                proposalRepository.save(p);
-                            }
+                        if ("APPROVED".equalsIgnoreCase(p.getStatus())) {
                             sIds.add(p.getStudent().getId());
-                            if (thesisRepository != null && roundObj != null && p.getLecturer() != null
-                                    && !thesisRepository.existsByStudentIdAndProjectRoundId(p.getStudent().getId(), roundId)) {
-                                String thesisCode = "DT_" + roundObj.getRoundCode() + "_" + p.getStudent().getStudentCode();
-                                com.example.thesis_hub_api.thesis.entity.Thesis thesis = com.example.thesis_hub_api.thesis.entity.Thesis.builder()
-                                        .proposal(p)
-                                        .projectRound(roundObj)
-                                        .student(p.getStudent())
-                                        .lecturer(p.getLecturer())
-                                        .thesisCode(thesisCode)
-                                        .titleVn(p.getTitleVn())
-                                        .titleEn(p.getTitleEn())
-                                        .description(p.getDescription())
-                                        .objectives(p.getObjectives())
-                                        .status("IN_PROGRESS")
-                                        .completionRate(java.math.BigDecimal.ZERO)
-                                        .defenseEligible(false)
-                                        .build();
-                                thesisRepository.save(thesis);
-                            }
                         }
                     }
                 });
@@ -1100,10 +993,6 @@ public class ProjectRoundService {
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy đợt đồ án với ID: " + roundId));
 
         String status = (round.getStatus() != null) ? round.getStatus().toUpperCase() : "";
-        if ("OPEN".equals(status) || "IN_PROGRESS".equals(status)) {
-            throw new AppException(ErrorCode.INVALID_STATUS_TRANSITION,
-                    "Không thể xóa đợt đồ án đang hoạt động (" + status + "). Chỉ có thể xóa các đợt đồ án ở trạng thái Bản nháp (DRAFT) hoặc Đã đóng (CLOSED/ARCHIVED).");
-        }
         log.info("Deleting project round: id={}, code={}, status={}", round.getId(), round.getRoundCode(), status);
 
         if (jdbcTemplate != null) {

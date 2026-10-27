@@ -37,8 +37,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         setRounds(data || []);
         if (data && data.length > 0) {
           const active =
-            data.find((r) => r.status === 'IN_PROGRESS') ||
             data.find((r) => r.status === 'OPEN') ||
+            data.find((r) => r.status === 'IN_PROGRESS') ||
             data[0];
           setSelectedRoundId(active.roundId);
         }

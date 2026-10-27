@@ -153,6 +153,12 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const loadActiveRound = async () => {
     try {
+      const round = await apiService.getActiveProjectRound().catch(() => null);
+      if (round) {
+        setActiveRound(round);
+        const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
+        setRoundCurrentStage(st);
+      }
       if (currentRole === 'student') {
         try {
           const myStatus = await apiService.getMyRoundStatus();
@@ -183,20 +189,12 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               const localStage = getUserCompletedStage(currentUserId, currentRole);
               const effectiveStage = Math.max(myStatus.completedStage, localStage);
               setUserCompletedStageState(effectiveStage);
-              setUserCompletedStage(currentUserId, currentRole, effectiveStage, true);
+              setUserCompletedStage(currentUserId, currentRole, effectiveStage);
             }
-            return;
           }
         } catch {
-          // fallback to getActiveProjectRound below
+          // ignore
         }
-      }
-
-      const round = await apiService.getActiveProjectRound().catch(() => null);
-      if (round) {
-        setActiveRound(round);
-        const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
-        setRoundCurrentStage(st);
       }
     } catch {
       // Ignored if round not active
@@ -207,13 +205,9 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     loadActiveRound();
     setUserCompletedStageState(getUserCompletedStage(currentUserId, currentRole));
 
-    const handlePhaseEvent = (e?: Event) => {
-      const customEvent = e as CustomEvent | undefined;
+    const handlePhaseEvent = () => {
+      loadActiveRound();
       setUserCompletedStageState(getUserCompletedStage(currentUserId, currentRole));
-      // Chỉ gọi lại API loadActiveRound khi Admin chuyển giai đoạn đợt đồ án (không có detail.completedStage)
-      if (!customEvent?.detail?.completedStage) {
-        loadActiveRound();
-      }
     };
 
     window.addEventListener('utc-phase-change', handlePhaseEvent);

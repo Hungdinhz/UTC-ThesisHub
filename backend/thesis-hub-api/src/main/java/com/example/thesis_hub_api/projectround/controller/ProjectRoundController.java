@@ -59,9 +59,8 @@ public class ProjectRoundController {
     @Operation(summary = "Lấy danh sách các đợt đồ án", description = "Lọc theo trạng thái và năm học")
     public ResponseEntity<ApiResponse<List<ProjectRoundResponseDTO>>> getRounds(
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String academicYear,
-            @AuthenticationPrincipal UserPrincipal currentUser) {
-        List<ProjectRoundResponseDTO> rounds = projectRoundService.getRounds(status, academicYear, currentUser);
+            @RequestParam(required = false) String academicYear) {
+        List<ProjectRoundResponseDTO> rounds = projectRoundService.getRounds(status, academicYear);
         return ResponseEntity.ok(ApiResponse.success(rounds));
     }
 

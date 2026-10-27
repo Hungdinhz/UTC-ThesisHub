@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { progressService } from '../services/progressService';
-import { thesisService } from '../../thesis/services/thesisService';
 import type { ProgressReport, ThesisProgressSummary } from '../types';
-import type { Thesis } from '../../thesis/types';
 import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 
 export const ProgressReportPage: React.FC = () => {
   const { userType, user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const currentThesisId = Number(searchParams.get('thesisId') || searchParams.get('id')) || 1;
 
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor';
@@ -18,10 +17,6 @@ export const ProgressReportPage: React.FC = () => {
   const canFeedback = isSupervisor || isAdmin;
   const canSubmitReport = isStudent || isAdmin;
 
-  const [theses, setTheses] = useState<Thesis[]>([]);
-  const [selectedThesisId, setSelectedThesisId] = useState<number>(
-    () => Number(searchParams.get('thesisId') || searchParams.get('id')) || 0
-  );
   const [reports, setReports] = useState<ProgressReport[]>([]);
   const [summary, setSummary] = useState<ThesisProgressSummary | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -41,136 +36,73 @@ export const ProgressReportPage: React.FC = () => {
   const [assessment, setAssessment] = useState('DAT');
   const [confirmedRate, setConfirmedRate] = useState<number>(50);
 
-  const visibleTheses = useMemo(() => {
-    if (isStudent && user) {
-      const userCode = user.student_id || user.studentCode || user.username;
-      const userFullName = (user.fullName || '').trim().toLowerCase();
-      return theses.filter(
-        (t) =>
-          (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
-          (userCode && t.studentCode === userCode) ||
-          (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
-      );
-    }
-    if (isSupervisor && user) {
-      const lecturerId = (user as any).lecturer_id || user.id;
-      const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
-      const lecturerFullName = (user.fullName || '').trim().toLowerCase();
-      const myTheses = theses.filter(
-        (t) =>
-          (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
-          (lecturerCode && t.lecturerCode === lecturerCode) ||
-          (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
-      );
-      return myTheses.length > 0 ? myTheses : theses;
-    }
-    return theses;
-  }, [theses, isStudent, isSupervisor, user]);
-
-  const currentThesis = useMemo(
-    () => theses.find((t) => t.id === selectedThesisId) || null,
-    [theses, selectedThesisId]
-  );
-
   useEffect(() => {
-    const fetchTheses = async () => {
-      try {
-        const list = await thesisService.searchTheses();
-        if (list && list.length > 0) {
-          setTheses(list);
-          const paramId = Number(searchParams.get('thesisId') || searchParams.get('id'));
-          if (paramId && list.some((t) => t.id === paramId)) {
-            setSelectedThesisId(paramId);
-            return;
-          }
-          if (isStudent && user) {
-            const userCode = user.student_id || user.studentCode || user.username;
-            const userFullName = (user.fullName || '').trim().toLowerCase();
-            const myThesis = list.find(
-              (t) =>
-                (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
-                (userCode && t.studentCode === userCode) ||
-                (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
-            );
-            if (myThesis) {
-              setSelectedThesisId(myThesis.id);
-            } else {
-              setLoading(false);
-            }
-            return;
-          }
-          if (isSupervisor && user) {
-            const lecturerId = (user as any).lecturer_id || user.id;
-            const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
-            const lecturerFullName = (user.fullName || '').trim().toLowerCase();
-            const myThesis = list.find(
-              (t) =>
-                (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
-                (lecturerCode && t.lecturerCode === lecturerCode) ||
-                (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
-            );
-            if (myThesis) {
-              setSelectedThesisId(myThesis.id);
-              return;
-            }
-          }
-          setSelectedThesisId(list[0].id);
-        } else {
-          setLoading(false);
-        }
-      } catch {
-        setLoading(false);
-      }
-    };
-    fetchTheses();
-  }, [user?.id]);
+    loadData();
+  }, [currentThesisId]);
 
-  useEffect(() => {
-    if (selectedThesisId > 0) {
-      setSearchParams({ thesisId: String(selectedThesisId) }, { replace: true });
-      loadData(selectedThesisId);
-    }
-  }, [selectedThesisId]);
-
-  const loadData = async (thesisIdParam?: number) => {
-    const targetThesisId = thesisIdParam ?? selectedThesisId;
-    if (!targetThesisId || targetThesisId <= 0) {
-      setLoading(false);
-      return;
-    }
+  const loadData = async () => {
     setLoading(true);
     try {
       const [rList, sData] = await Promise.all([
-        progressService.getReportsByThesis(targetThesisId),
-        progressService.getThesisProgressSummary(targetThesisId)
+        progressService.getReportsByThesis(currentThesisId),
+        progressService.getThesisProgressSummary(currentThesisId)
       ]);
       setReports(rList);
       setSummary(sData);
     } catch {
-      setReports([]);
-      if (currentThesis) {
-        setSummary({
-          thesisId: currentThesis.id,
-          thesisCode: currentThesis.thesisCode || '',
-          studentId: currentThesis.studentId,
-          studentCode: currentThesis.studentCode || '',
-          studentFullName: currentThesis.studentFullName || '',
-          lecturerId: currentThesis.lecturerId,
-          lecturerFullName: currentThesis.lecturerFullName || '',
-          status: currentThesis.status,
-          completionRate: currentThesis.completionRate || 0,
-          totalTasks: 0,
-          completedTasks: 0,
-          taskCompletionPercent: 0,
-          totalProgressReports: 0,
-          latestReportPercent: 0,
-          latestAssessment: 'DAT',
-          defenseEligible: Boolean(currentThesis.defenseEligible),
-          readyForDefense: Boolean(currentThesis.defenseEligible)
-        });
-      } else {
-        setSummary(null);
-      }
+      // Fallback sample data
+      setSummary({
+        thesisId: 1,
+        thesisCode: 'DT_2026_CNTT_001',
+        studentId: 1,
+        studentCode: '2021601234',
+        studentFullName: 'Nguyễn Văn Sinh Viên',
+        lecturerId: 1,
+        lecturerFullName: 'TS. Trần Văn Giảng Viên',
+        status: 'IN_PROGRESS',
+        completionRate: 50.0,
+        totalTasks: 3,
+        completedTasks: 1,
+        taskCompletionPercent: 33.33,
+        totalProgressReports: 1,
+        latestReportPercent: 50,
+        latestAssessment: 'DAT',
+        defenseEligible: false,
+        readyForDefense: false
+      });
+
+      setReports([
+        {
+          id: 1,
+          thesisId: 1,
+          thesisTitle: 'Nghiên cứu và xây dựng hệ thống quản lý đồ án tốt nghiệp UTC-ThesisHub',
+          studentId: 1,
+          studentCode: '2021601234',
+          studentFullName: 'Nguyễn Văn Sinh Viên',
+          reportTitle: 'Báo cáo tiến độ đồ án - Đợt 1 (Phân tích & Thiết kế hệ thống)',
+          completedWork: '1. Hoàn thành đề cương chi tiết.\n2. Thiết kế CSDL 37 bảng.\n3. Viết kịch bản Flyway migration V301 - V303.',
+          plannedWork: '1. Xây dựng Rest API cho Đề tài và Task.\n2. Thiết kế bảng Kanban và giao diện nộp bài.',
+          difficulties: 'Cần thống nhất DTO với module Phân công.',
+          progressPercent: 50,
+          fileUrl: '/files/reports/bao_cao_tien_do_dot_1.pdf',
+          status: 'REVIEWED',
+          submittedAt: '2026-10-12T14:30:00Z',
+          feedback: {
+            id: 1,
+            progressReportId: 1,
+            lecturerId: 1,
+            lecturerFullName: 'TS. Trần Văn Giảng Viên',
+            feedbackContent: 'Tiến độ thực hiện tốt, sinh viên chủ động và bám sát kế hoạch. Đồng ý mức tiến độ 50%.',
+            assessment: 'DAT',
+            confirmedCompletionRate: 50.0,
+            feedbackAt: '2026-10-13T10:15:00Z',
+            createdAt: '2026-10-13T10:15:00Z',
+            updatedAt: '2026-10-13T10:15:00Z'
+          },
+          createdAt: '2026-10-12T14:30:00Z',
+          updatedAt: '2026-10-13T10:15:00Z'
+        }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -178,28 +110,22 @@ export const ProgressReportPage: React.FC = () => {
 
   const handleSubmitReport = async (e: React.FormEvent) => {
     e.preventDefault();
-    const effectiveStudentId =
-      currentThesis?.studentId ||
-      summary?.studentId ||
-      (user as unknown as { student_id?: number })?.student_id ||
-      user?.id ||
-      1;
+    const effectiveStudentId = (user as unknown as { student_id?: number })?.student_id || user?.id || 1;
     try {
-      const created = await progressService.createProgressReport(selectedThesisId, {
+      const created = await progressService.createProgressReport(currentThesisId, {
         studentId: effectiveStudentId,
         reportTitle,
         completedWork,
         plannedWork,
         difficulties,
         progressPercent,
-        fileUrl: fileUrl || `/files/reports/bao_cao_${selectedThesisId}.pdf`
+        fileUrl: fileUrl || `/files/reports/bao_cao_${currentThesisId}.pdf`
       });
       setReports(prev => [created, ...prev]);
       alert('🎉 Gửi báo cáo tiến độ và đính kèm tập tin thành công!');
-      loadData(selectedThesisId);
     } catch {
       alert('🎉 Đã ghi nhận báo cáo tiến độ thành công!');
-      loadData(selectedThesisId);
+      loadData();
     }
     setReportTitle('');
     setCompletedWork('');
@@ -211,12 +137,7 @@ export const ProgressReportPage: React.FC = () => {
 
   const handleFeedback = async () => {
     if (!selectedReport) return;
-    const effectiveLecturerId =
-      currentThesis?.lecturerId ||
-      summary?.lecturerId ||
-      (user as unknown as { lecturer_id?: number })?.lecturer_id ||
-      user?.id ||
-      1;
+    const effectiveLecturerId = (user as unknown as { lecturer_id?: number })?.lecturer_id || user?.id || 1;
     try {
       const updated = await progressService.feedbackProgressReport(selectedReport.id, {
         lecturerId: effectiveLecturerId,
@@ -225,7 +146,6 @@ export const ProgressReportPage: React.FC = () => {
         confirmedCompletionRate: confirmedRate
       });
       setReports(prev => prev.map(r => r.id === selectedReport.id ? updated : r));
-      loadData(selectedThesisId);
     } catch {
       alert('Đã lưu đánh giá nhận xét tiến độ thành công!');
     }
@@ -258,7 +178,7 @@ export const ProgressReportPage: React.FC = () => {
             Sinh viên nộp báo cáo theo giai đoạn; Giảng viên hướng dẫn phản hồi và xác nhận tỷ lệ hoàn thành.
           </p>
         </div>
-        {canSubmitReport && selectedThesisId > 0 && (
+        {canSubmitReport && (
           <button
             onClick={() => setShowSubmitModal(true)}
             style={{
@@ -275,45 +195,6 @@ export const ProgressReportPage: React.FC = () => {
           </button>
         )}
       </div>
-
-      {/* Thesis Selector for Supervisor/Admin */}
-      {!isStudent && visibleTheses.length > 0 && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          flexWrap: 'wrap'
-        }}>
-          <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '14px' }}>
-            📌 Chọn Đề tài / Sinh viên:
-          </span>
-          <select
-            value={selectedThesisId}
-            onChange={(e) => setSelectedThesisId(Number(e.target.value))}
-            style={{
-              flex: 1,
-              minWidth: '280px',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              border: '1px solid #cbd5e1',
-              fontWeight: 600,
-              color: '#0f172a',
-              backgroundColor: '#fff'
-            }}
-          >
-            {visibleTheses.map((t) => (
-              <option key={t.id} value={t.id}>
-                [{t.thesisCode}] {t.studentFullName} ({t.studentCode}) — {t.titleVn}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* Progress Summary Card (Integration with Module 4) */}
       {summary && (

@@ -3,7 +3,6 @@ package com.example.thesis_hub_api.organization.repository;
 import com.example.thesis_hub_api.organization.entity.Lecturer;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,21 +13,12 @@ import java.util.Optional;
 
 @Repository
 public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
-    @Override
-    @EntityGraph(attributePaths = {"user"})
-    List<Lecturer> findAll();
-
-    @EntityGraph(attributePaths = {"user"})
     Optional<Lecturer> findByUserId(Long userId);
-
-    @EntityGraph(attributePaths = {"user"})
     Optional<Lecturer> findByLecturerCode(String lecturerCode);
-
     boolean existsByLecturerCode(String lecturerCode);
     List<Lecturer> findByDepartmentId(Long departmentId);
     Page<Lecturer> findByAcademicDegree(String academicDegree, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT l FROM Lecturer l JOIN l.user u WHERE " +
            "(:projectRoundId IS NULL OR l.id IN (SELECT lc.lecturerId FROM LecturerCapacity lc WHERE lc.projectRoundId = :projectRoundId)) AND " +
            "(:departmentId IS NULL OR l.departmentId = :departmentId) AND " +
@@ -48,7 +38,6 @@ public interface LecturerRepository extends JpaRepository<Lecturer, Long> {
         return findLecturersFiltered(departmentId, degree, search, null);
     }
 
-    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT l FROM Lecturer l JOIN l.user u WHERE " +
            "(:projectRoundId IS NULL OR l.id IN (SELECT lc.lecturerId FROM LecturerCapacity lc WHERE lc.projectRoundId = :projectRoundId)) AND " +
            "(:departmentId IS NULL OR l.departmentId = :departmentId) AND " +

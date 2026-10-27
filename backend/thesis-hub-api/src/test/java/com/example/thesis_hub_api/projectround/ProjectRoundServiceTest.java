@@ -481,9 +481,9 @@ class ProjectRoundServiceTest {
     }
 
     @Test
-    @DisplayName("deleteRound - Thành công khi đợt ở trạng thái DRAFT")
-    void deleteRound_success_whenDraft() {
-        sampleRound.setStatus("DRAFT");
+    @DisplayName("deleteRound - Thành công khi đợt ở trạng thái OPEN")
+    void deleteRound_success_whenOpen() {
+        sampleRound.setStatus("OPEN");
         when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
 
         assertDoesNotThrow(() -> projectRoundService.deleteRound(10L));
@@ -491,25 +491,13 @@ class ProjectRoundServiceTest {
     }
 
     @Test
-    @DisplayName("deleteRound - Từ chối xóa khi đợt đang ở trạng thái OPEN")
-    void deleteRound_failed_whenOpen() {
-        sampleRound.setStatus("OPEN");
-        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
-
-        AppException ex = assertThrows(AppException.class, () -> projectRoundService.deleteRound(10L));
-        assertEquals(ErrorCode.INVALID_STATUS_TRANSITION, ex.getErrorCode());
-        verify(projectRoundRepository, never()).delete(any());
-    }
-
-    @Test
-    @DisplayName("deleteRound - Từ chối xóa khi đợt đang ở trạng thái IN_PROGRESS")
-    void deleteRound_failed_whenInProgress() {
+    @DisplayName("deleteRound - Thành công khi đợt ở trạng thái IN_PROGRESS")
+    void deleteRound_success_whenInProgress() {
         sampleRound.setStatus("IN_PROGRESS");
         when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
 
-        AppException ex = assertThrows(AppException.class, () -> projectRoundService.deleteRound(10L));
-        assertEquals(ErrorCode.INVALID_STATUS_TRANSITION, ex.getErrorCode());
-        verify(projectRoundRepository, never()).delete(any());
+        assertDoesNotThrow(() -> projectRoundService.deleteRound(10L));
+        verify(projectRoundRepository, times(1)).delete(sampleRound);
     }
 
     @Test

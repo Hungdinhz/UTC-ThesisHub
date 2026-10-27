@@ -18,8 +18,10 @@ public class CreateTaskRequest {
     @NotNull(message = "thesisId không được để trống")
     private Long thesisId;
 
+    @NotNull(message = "createdById không được để trống")
     private Long createdById;
 
+    @NotNull(message = "assignedToId không được để trống")
     private Long assignedToId;
 
     @NotBlank(message = "Tiêu đề công việc không được để trống")
