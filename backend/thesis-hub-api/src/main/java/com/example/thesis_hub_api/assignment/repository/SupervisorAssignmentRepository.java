@@ -14,6 +14,8 @@ public interface SupervisorAssignmentRepository extends JpaRepository<Supervisor
 
     List<SupervisorAssignment> findByProjectRoundId(Long projectRoundId);
 
+    List<SupervisorAssignment> findByLecturerId(Long lecturerId);
+
     List<SupervisorAssignment> findByProjectRoundIdAndLecturerId(Long projectRoundId, Long lecturerId);
 
     List<SupervisorAssignment> findByProjectRoundIdAndStatus(Long projectRoundId, String status);
