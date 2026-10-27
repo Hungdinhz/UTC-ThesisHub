@@ -260,11 +260,7 @@ export const ProposalManagementPage: React.FC = () => {
   };
 
   const handleOpenCreateModal = () => {
-    if (!isStudent) {
-      alert('Chức năng tạo mới đề cương chỉ dành cho sinh viên.');
-      return;
-    }
-    if (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId) {
+    if (isStudent && (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId)) {
       alert('Sinh viên chưa được phân công giảng viên hướng dẫn thì không thể tạo đề cương mới.');
       return;
     }

@@ -1111,11 +1111,25 @@ public class ProjectRoundService {
             jdbcTemplate.update("DELETE FROM scores WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM reviewer_assignments WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM graduation_results WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM reservation_requests WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM defense_councils WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM submissions WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            jdbcTemplate.update("DELETE FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM documents WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM progress_feedbacks WHERE progress_report_id IN (SELECT id FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
             jdbcTemplate.update("DELETE FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM progress_reports WHERE milestone_id IN (SELECT id FROM timeline_milestones WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM theses WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM proposal_review_assignments WHERE proposal_id IN (SELECT id FROM proposals WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM proposals WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM council_members WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM defense_schedules WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
+            jdbcTemplate.update("DELETE FROM defense_councils WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM reservation_requests WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM supervisor_assignments WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM preferences WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM direction_registrations WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM lecturer_capacities WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM student_project_rounds WHERE project_round_id = ?", roundId);
+            jdbcTemplate.update("DELETE FROM timeline_milestones WHERE project_round_id = ?", roundId);
         }
 
         projectRoundRepository.delete(round);

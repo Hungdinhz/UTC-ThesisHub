@@ -146,22 +146,22 @@ public class ThesisServiceImpl implements ThesisService {
     }
 
     private ThesisResponse mapToResponse(Thesis thesis) {
-        String studentName = thesis.getStudent().getUser() != null ? thesis.getStudent().getUser().getFullName() : null;
-        String lecturerName = thesis.getLecturer().getUser() != null ? thesis.getLecturer().getUser().getFullName() : null;
+        String studentName = (thesis.getStudent() != null && thesis.getStudent().getUser() != null) ? thesis.getStudent().getUser().getFullName() : null;
+        String lecturerName = (thesis.getLecturer() != null && thesis.getLecturer().getUser() != null) ? thesis.getLecturer().getUser().getFullName() : null;
 
         return ThesisResponse.builder()
                 .id(thesis.getId())
                 .proposalId(thesis.getProposal() != null ? thesis.getProposal().getId() : null)
-                .projectRoundId(thesis.getProjectRound().getId())
-                .projectRoundName(thesis.getProjectRound().getName())
-                .studentId(thesis.getStudent().getId())
-                .studentCode(thesis.getStudent().getStudentCode())
+                .projectRoundId(thesis.getProjectRound() != null ? thesis.getProjectRound().getId() : null)
+                .projectRoundName(thesis.getProjectRound() != null ? thesis.getProjectRound().getName() : null)
+                .studentId(thesis.getStudent() != null ? thesis.getStudent().getId() : null)
+                .studentCode(thesis.getStudent() != null ? thesis.getStudent().getStudentCode() : null)
                 .studentFullName(studentName)
-                .studentClass(thesis.getStudent().getClassName())
-                .lecturerId(thesis.getLecturer().getId())
-                .lecturerCode(thesis.getLecturer().getLecturerCode())
+                .studentClass(thesis.getStudent() != null ? thesis.getStudent().getClassName() : null)
+                .lecturerId(thesis.getLecturer() != null ? thesis.getLecturer().getId() : null)
+                .lecturerCode(thesis.getLecturer() != null ? thesis.getLecturer().getLecturerCode() : null)
                 .lecturerFullName(lecturerName)
-                .lecturerDegree(thesis.getLecturer().getAcademicDegree())
+                .lecturerDegree(thesis.getLecturer() != null ? thesis.getLecturer().getAcademicDegree() : null)
                 .thesisCode(thesis.getThesisCode())
                 .titleVn(thesis.getTitleVn())
                 .titleEn(thesis.getTitleEn())
