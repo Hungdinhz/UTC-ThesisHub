@@ -29,7 +29,7 @@ public class ProgressReportController {
     }
 
     @PostMapping("/{id}/feedback")
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ProgressReportResponse> feedbackReport(
             @PathVariable Long id,
             @Valid @RequestBody CreateProgressFeedbackRequest request) {

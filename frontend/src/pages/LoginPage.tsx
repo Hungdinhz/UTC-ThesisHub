@@ -90,6 +90,10 @@ const LoginPage: React.FC = () => {
 
   const handleUserTypeChange = (newRole: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin') => {
     setUserType(newRole);
+    // Keep username in sync across tab changes
+    const currentIdent = registrationNo || email;
+    setRegistrationNo(currentIdent);
+    setEmail(currentIdent);
     setError('');
     setFieldErrors({});
     setTouched({});
@@ -101,13 +105,8 @@ const LoginPage: React.FC = () => {
     pass: string
   ) => {
     setUserType(role);
-    if (role === 'student') {
-      setRegistrationNo(account);
-      setEmail('');
-    } else {
-      setEmail(account);
-      setRegistrationNo(account);
-    }
+    setRegistrationNo(account);
+    setEmail(account);
     setPassword(pass);
     setError('');
     setFieldErrors({});
@@ -132,23 +131,40 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      let response;
+      const identifier = (registrationNo || email).trim();
+      let response: any;
       if (userType === 'student') {
-        response = await apiService.studentLogin(registrationNo.trim(), password);
+        response = await apiService.studentLogin(identifier, password);
       } else if (userType === 'supervisor') {
-        response = await apiService.supervisorLogin(email.trim(), password);
+        response = await apiService.supervisorLogin(identifier, password);
       } else if (userType === 'committee_member') {
-        response = await apiService.committeeMemberLogin(email.trim(), password);
+        response = await apiService.committeeMemberLogin(identifier, password);
       } else if (userType === 'admin') {
-        response = await apiService.adminLogin(email.trim() || registrationNo.trim(), password);
+        response = await apiService.adminLogin(identifier, password);
       } else {
-        response = await apiService.externalExaminerLogin(email.trim(), password);
+        response = await apiService.externalExaminerLogin(identifier, password);
       }
 
       const accessToken = response?.access || (response as any)?.token || (response as any)?.data?.access || (response as any)?.data?.token;
       const refreshToken = response?.refresh || (response as any)?.refreshToken || '';
-      login(accessToken, refreshToken, userType);
-      navigate(`/${userType}/dashboard`);
+
+      // Tự động nhận diện role thực tế từ token / response của backend
+      const backendRole = response?.role || (response as any)?.data?.role;
+      let resolvedUserType: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' = userType;
+      if (backendRole === 'ROLE_ADMIN') {
+        resolvedUserType = 'admin';
+      } else if (backendRole === 'ROLE_LECTURER') {
+        resolvedUserType = 'supervisor';
+      } else if (backendRole === 'ROLE_COMMITTEE') {
+        resolvedUserType = 'committee_member';
+      } else if (backendRole === 'ROLE_STUDENT') {
+        resolvedUserType = 'student';
+      } else if (backendRole === 'ROLE_EXTERNAL') {
+        resolvedUserType = 'external_examiner';
+      }
+
+      login(accessToken, refreshToken, resolvedUserType);
+      navigate(`/${resolvedUserType}/dashboard`);
     } catch (err: any) {
       if (err.response?.status === 429) {
         const detail = err.response?.data?.detail || '';
@@ -292,12 +308,12 @@ const LoginPage: React.FC = () => {
               <button
                 type="button"
                 className="utc-demo-btn admin"
-                onClick={() => handleQuickFill('admin', 'admin', 'Admin@123')}
+                onClick={() => handleQuickFill('admin', 'admin', 'Password@123')}
                 title="Click để điền tài khoản Quản trị viên"
                 style={{ width: '100%' }}
               >
                 <span className="demo-role">👑 Quản trị viên</span>
-                <span className="demo-cred">admin | Admin@123</span>
+                <span className="demo-cred">admin | Password@123</span>
               </button>
             </div>
           </div>
@@ -349,8 +365,9 @@ const LoginPage: React.FC = () => {
                   value={registrationNo}
                   onChange={(e) => {
                     setRegistrationNo(e.target.value);
+                    setEmail(e.target.value);
                     if (touched.registrationNo) {
-                      setFieldErrors(validateFields(userType, e.target.value, email, password));
+                      setFieldErrors(validateFields(userType, e.target.value, e.target.value, password));
                     }
                   }}
                   onBlur={() => handleBlur('registrationNo')}
@@ -371,8 +388,9 @@ const LoginPage: React.FC = () => {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
+                    setRegistrationNo(e.target.value);
                     if (touched.email) {
-                      setFieldErrors(validateFields(userType, registrationNo, e.target.value, password));
+                      setFieldErrors(validateFields(userType, e.target.value, e.target.value, password));
                     }
                   }}
                   onBlur={() => handleBlur('email')}

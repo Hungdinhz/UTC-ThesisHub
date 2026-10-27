@@ -12,12 +12,12 @@ import type { SupervisorAssignment } from '../../assignment/types';
 export const ProposalManagementPage: React.FC = () => {
   const { user, userType } = useAuth();
   const isStudent = userType === 'student';
-  const isSupervisor = userType === 'supervisor';
+  const isSupervisor = userType === 'supervisor' || userType === 'committee_member';
   const isAdmin = userType === 'admin';
 
   // Quyền duyệt: Giảng viên hướng dẫn xác nhận đề cương, Khoa (Admin/Tiểu ban) phê duyệt chính thức
   const canSupervisorApprove = isSupervisor || isAdmin;
-  const canReview = isSupervisor || isAdmin || userType === 'committee_member';
+  const canReview = isSupervisor || isAdmin;
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -178,11 +178,7 @@ export const ProposalManagementPage: React.FC = () => {
   };
 
   const handleOpenCreateModal = () => {
-    if (!isStudent) {
-      alert('Chức năng tạo mới đề cương chỉ dành cho sinh viên.');
-      return;
-    }
-    if (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId) {
+    if (isStudent && (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId)) {
       alert('Sinh viên chưa được phân công giảng viên hướng dẫn thì không thể tạo đề cương mới.');
       return;
     }

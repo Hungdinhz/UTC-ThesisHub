@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
 import { Button, Table, StatusBadge } from '../../../components/ui';
 import type { Column } from '../../../components/ui';
 import { ScoreEntryForm } from '../components/ScoreEntryForm';
@@ -8,6 +9,8 @@ import type { ScoreItem, LecturerOption, GraduationResult, SynthesizeResultReque
 import './DefensePages.css';
 
 export const DefenseScoringPage: React.FC = () => {
+  const { user } = useAuth();
+  const [theses, setTheses] = useState<Thesis[]>([]);
   const [selectedThesisId, setSelectedThesisId] = useState<number>(101);
   const [scores, setScores] = useState<ScoreItem[]>([]);
   const [graders, setGraders] = useState<LecturerOption[]>([]);
@@ -17,6 +20,22 @@ export const DefenseScoringPage: React.FC = () => {
   const [showMinutesModal, setShowMinutesModal] = useState(false);
   const [showFinalExportModal, setShowFinalExportModal] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+
+  useEffect(() => {
+    if (!notification) return;
+    const timer = setTimeout(() => setNotification(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notification]);
+
+  useEffect(() => {
+    thesisService.searchTheses().then((list) => {
+      if (Array.isArray(list) && list.length > 0) {
+        setTheses(list);
+        setSelectedThesisId(list[0].id);
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadThesisData();
@@ -112,13 +131,25 @@ export const DefenseScoringPage: React.FC = () => {
     },
   ];
 
+  const selectedThesis = theses.find((t) => t.id === selectedThesisId);
+  const currentUserId = user?.id ? Number(user.id) : null;
+  const currentLecturerId = (user as any)?.lecturerId ? Number((user as any).lecturerId) : currentUserId;
+  const userFullName = (user?.fullName || '').toLowerCase();
+
+  const isCurrentSupervisor = selectedThesis && (
+    (selectedThesis.lecturerId && selectedThesis.lecturerId === currentLecturerId) ||
+    (selectedThesis.lecturerFullName && userFullName && selectedThesis.lecturerFullName.toLowerCase().includes(userFullName))
+  );
+
+  const supervisorScoreItem = scores.find((s) => s.scoreType === 'SUPERVISOR');
+
   return (
     <div className="feature-page-container">
       <div className="feature-page-header">
         <div>
           <h1 className="feature-page-title">Chấm điểm và Tổng hợp Kết quả Tốt nghiệp</h1>
           <p className="feature-page-subtitle">
-            Nhập điểm tiêu chí Hội đồng/GVHD/GVPB, nhập nhận xét, xuất Biên bản bảo vệ PDF và dữ liệu cuối kỳ (ký).
+            Cơ cấu điểm: GVHD (30% - chấm lúc duyệt bảo vệ), GVPB (20%), Hội đồng (50% - 1CT-2TK-2UV). Xuất biên bản bảo vệ PDF &amp; dữ liệu cuối kỳ.
           </p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -126,7 +157,7 @@ export const DefenseScoringPage: React.FC = () => {
             🎯 Tổng hợp kết quả tốt nghiệp (Synthesize)
           </Button>
           <Button variant="primary" onClick={() => setShowMinutesModal(true)}>
-            🖨️ Xuất Biên bản PDF & Ký
+            🖨️ Xuất Biên bản PDF &amp; Ký
           </Button>
           <Button variant="outline" onClick={() => setShowFinalExportModal(true)}>
             📦 Xuất Dữ liệu Cuối kỳ (Ký)
@@ -205,11 +236,126 @@ export const DefenseScoringPage: React.FC = () => {
         </div>
       )}
 
+      {/* DEDICATED SUPERVISOR PROCESS SCORE CARD (30%) */}
+      <div style={{
+        background: supervisorScoreItem ? '#f0fdf4' : '#fffbeb',
+        border: `1px solid ${supervisorScoreItem ? '#86efac' : '#fde68a'}`,
+        borderRadius: '10px',
+        padding: '18px 22px',
+        marginBottom: '20px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '20px' }}>👨‍🏫</span>
+            <span style={{ fontWeight: 700, color: supervisorScoreItem ? '#166534' : '#92400e', fontSize: '15px' }}>
+              Điểm Quá Trình Của Giảng Viên Hướng Dẫn (Tỷ trọng: 30% tổng kết)
+            </span>
+          </div>
+          {supervisorScoreItem ? (
+            <span style={{
+              background: '#16a34a',
+              color: '#fff',
+              padding: '3px 12px',
+              borderRadius: '20px',
+              fontWeight: 700,
+              fontSize: '11px',
+              letterSpacing: '0.5px'
+            }}>
+              ✓ ĐÃ CHẤM TẠI BƯỚC DUYỆT ĐỦ ĐIỀU KIỆN BẢO VỆ
+            </span>
+          ) : (
+            <span style={{
+              background: '#fef3c7',
+              color: '#92400e',
+              border: '1px solid #fde68a',
+              padding: '3px 12px',
+              borderRadius: '20px',
+              fontWeight: 700,
+              fontSize: '11px'
+            }}>
+              ⏳ CHƯA CÓ ĐIỂM GVHD
+            </span>
+          )}
+        </div>
+
+        {supervisorScoreItem ? (
+          <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{
+              background: '#fff',
+              padding: '12px 20px',
+              borderRadius: '8px',
+              border: '1px solid #bbf7d0',
+              textAlign: 'center',
+              minWidth: '110px'
+            }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>ĐIỂM HƯỚNG DẪN</div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: '#15803d', lineHeight: '1.2' }}>
+                {supervisorScoreItem.score.toFixed(2)}
+              </div>
+              <div style={{ fontSize: '11px', color: '#16a34a' }}>Thang điểm 10.0</div>
+            </div>
+
+            <div style={{ flex: 1, minWidth: '280px' }}>
+              <div style={{ fontSize: '13px', color: '#334155' }}>
+                <strong>Người chấm:</strong> {supervisorScoreItem.graderName || selectedThesis?.lecturerFullName || 'Giảng viên hướng dẫn'}
+              </div>
+              <div style={{ fontSize: '13px', color: '#1e293b', marginTop: '4px', lineHeight: '1.4' }}>
+                <strong>Nhận xét &amp; Đánh giá:</strong> "<em>{supervisorScoreItem.feedback || 'Sinh viên hoàn thành tốt mục tiêu đề tài.'}</em>"
+              </div>
+              <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '6px', fontWeight: 600 }}>
+                🛡️ Ràng buộc cứng: Giảng viên hướng dẫn KHÔNG ngồi trong Hội đồng chấm thi đề tài này.
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: '13px', color: '#b45309' }}>
+            Giảng viên hướng dẫn sẽ chấm điểm quá trình ngay khi bấm xác nhận sinh viên "Đủ điều kiện bảo vệ" tại GĐ4 (TaskBoard).
+          </div>
+        )}
+      </div>
+
       {/* Main Content: Form and Table */}
       <div className="scoring-grid-layout">
         {/* Left Column: Form */}
         <div className="scoring-col-form">
-          <ScoreEntryForm thesisId={selectedThesisId} graders={graders} onSubmit={handleScoreSubmit} />
+          {isCurrentSupervisor ? (
+            <div style={{
+              background: '#fef2f2',
+              border: '2px solid #fca5a5',
+              borderRadius: '10px',
+              padding: '24px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '24px' }}>🛡️</span>
+                <h3 style={{ margin: 0, color: '#991b1b', fontSize: '16px', fontWeight: 700 }}>
+                  Quy chế: GVHD không tham gia Hội đồng chấm thi
+                </h3>
+              </div>
+              <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#7f1d1d', lineHeight: '1.6' }}>
+                Bạn là <strong>Giảng viên hướng dẫn ({selectedThesis?.lecturerFullName || user?.fullName})</strong> của đề tài này. Theo quy định đào tạo đồ án tốt nghiệp UTC:
+              </p>
+              <ul style={{ margin: '0 0 16px 0', paddingLeft: '20px', fontSize: '13px', color: '#991b1b', lineHeight: '1.6' }}>
+                <li>GVHD tuyệt đối <strong>không ngồi trong Hội đồng chấm thi</strong> sinh viên do mình hướng dẫn.</li>
+                <li>Điểm hướng dẫn quá trình của bạn <strong>({supervisorScoreItem ? `${supervisorScoreItem.score.toFixed(2)} đ` : 'đã chấm lúc xác nhận đủ ĐK bảo vệ'})</strong> chiếm 30% điểm tốt nghiệp.</li>
+                <li>5 thành viên Hội đồng (1CT, 2TK, 2UV) độc lập sẽ thực hiện chấm điểm bảo vệ (50%).</li>
+              </ul>
+              <div style={{
+                background: '#fff',
+                padding: '10px 14px',
+                borderRadius: '6px',
+                border: '1px solid #fecaca',
+                fontSize: '12px',
+                color: '#b91c1c',
+                fontWeight: 600
+              }}>
+                ✓ Bạn đã hoàn tất nhiệm vụ đánh giá quá trình cho đề tài này.
+              </div>
+            </div>
+          ) : (
+            <ScoreEntryForm thesisId={selectedThesisId} graders={graders} onSubmit={handleScoreSubmit} />
+          )}
         </div>
 
         {/* Right Column: Existing Scores Table */}
@@ -226,6 +372,7 @@ export const DefenseScoringPage: React.FC = () => {
           />
         </div>
       </div>
+
 
       {/* Synthesis Modal */}
       <ResultSynthesisModal

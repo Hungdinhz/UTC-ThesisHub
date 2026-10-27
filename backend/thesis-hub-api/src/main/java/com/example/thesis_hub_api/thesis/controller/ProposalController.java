@@ -22,13 +22,13 @@ public class ProposalController {
     private final StudentRepository studentRepository;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ProposalResponse> createProposal(@Valid @RequestBody CreateProposalRequest request) {
         return ApiResponse.success("Tạo đề cương thành công", proposalService.createProposal(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ProposalResponse> updateProposal(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProposalRequest request) {
@@ -36,13 +36,13 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ProposalResponse> submitProposal(@PathVariable Long id) {
         return ApiResponse.success("Nộp đề cương thành công", proposalService.submitProposal(id));
     }
 
     @PostMapping("/{id}/supervisor-approve")
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<ProposalResponse> supervisorApprove(
             @PathVariable Long id,
             @RequestParam boolean approved,

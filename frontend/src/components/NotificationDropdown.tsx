@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import type { Notification, NotificationType } from '../types';
+import type { Notification } from '../types';
 import './NotificationDropdown.css';
 
 interface NotificationDropdownProps {
@@ -17,31 +17,41 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Fetch unread count
   const fetchUnreadCount = useCallback(async () => {
     try {
-      const data = await apiService.getUnreadNotificationCount();
-      setUnreadCount(data.unread_count);
+      const data: any = await apiService.getUnreadNotificationCount();
+      const count = typeof data === 'number' ? data : (data?.unread_count ?? data?.unreadCount ?? 0);
+      setUnreadCount(Number(count) || 0);
     } catch (error) {
       console.error('Failed to fetch unread count:', error);
     }
   }, []);
 
   // Fetch notifications
-  const fetchNotifications = useCallback(async (page = 1, append = false) => {
+  const fetchNotifications = useCallback(async (page = 0, append = false) => {
     setLoading(true);
     try {
-      const data = await apiService.getNotifications({ page });
+      const data: any = await apiService.getNotifications({ page, size: 10 } as any);
+      const list: Notification[] = Array.isArray(data)
+        ? data
+        : (data?.content || data?.results || []);
+
       if (append) {
-        setNotifications(prev => [...prev, ...data.results]);
+        setNotifications(prev => [...prev, ...list]);
       } else {
-        setNotifications(data.results);
+        setNotifications(list);
       }
-      setHasMore(data.next !== null);
+
+      const hasNext = data?.totalPages !== undefined
+        ? page < data.totalPages - 1
+        : Boolean(data?.next);
+
+      setHasMore(hasNext);
       setCurrentPage(page);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
@@ -50,13 +60,12 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
     }
   }, []);
 
-  // Initial fetch and polling setup
+  // Initial fetch and polling setup (every 30s)
   useEffect(() => {
     fetchUnreadCount();
-    
-    // Poll for unread count every 30 seconds
+
     pollIntervalRef.current = setInterval(fetchUnreadCount, 30000);
-    
+
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -67,7 +76,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
   // Fetch notifications when dropdown opens
   useEffect(() => {
     if (isOpen) {
-      fetchNotifications(1);
+      fetchNotifications(0);
     }
   }, [isOpen, fetchNotifications]);
 
@@ -85,12 +94,15 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
 
   // Handle notification click
   const handleNotificationClick = async (notification: Notification) => {
+    const isRead = notification.is_read ?? notification.isRead ?? false;
+    const actionUrl = notification.referenceUrl || notification.action_url;
+
     // Mark as read
-    if (!notification.is_read) {
+    if (!isRead) {
       try {
         await apiService.markNotificationsAsRead([notification.id]);
         setNotifications(prev =>
-          prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
+          prev.map(n => n.id === notification.id ? { ...n, is_read: true, isRead: true } : n)
         );
         setUnreadCount(prev => Math.max(0, prev - 1));
       } catch (error) {
@@ -99,75 +111,30 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
     }
 
     // Navigate if action URL exists
-    if (notification.action_url) {
+    if (actionUrl) {
       if (onNavigate) {
-        onNavigate(notification.action_url);
+        onNavigate(actionUrl);
       } else {
-        navigate(notification.action_url);
+        navigate(actionUrl);
       }
       setIsOpen(false);
       return;
     }
 
-    // Handle navigation based on notification type
+    // Fallback navigation by notification type
+    const nType = String(notification.type || notification.notification_type || '').toUpperCase();
     let targetUrl = '';
-    switch (notification.notification_type) {
-      case 'external_assignment':
-      case 'external_evaluation':
-        if (userType === 'external_examiner') {
-          targetUrl = '/external_examiner/dashboard';
-        } else if (userType === 'student') {
-          targetUrl = '/student/dashboard';
-        }
-        break;
-      case 'external_schedule':
-        if (userType === 'external_examiner') {
-          targetUrl = '/external_examiner/dashboard';
-        } else if (userType === 'student') {
-          targetUrl = '/student/dashboard';
-        } else if (userType === 'committee_member') {
-          targetUrl = '/committee_member/dashboard';
-        }
-        break;
-      case 'group_request':
-      case 'group_request_accepted':
-      case 'group_request_rejected':
-        if (userType === 'student') {
-          targetUrl = '/student/dashboard';
-        }
-        break;
-      case 'supervisor_request':
-      case 'supervisor_request_accepted':
-      case 'supervisor_request_rejected':
-        if (userType === 'student') {
-          targetUrl = '/student/dashboard';
-        } else if (userType === 'supervisor') {
-          targetUrl = '/supervisor/dashboard';
-        }
-        break;
-      case 'new_chat_message':
-        if (userType === 'student') {
-          targetUrl = '/student/dashboard';
-        } else if (userType === 'supervisor') {
-          targetUrl = '/supervisor/dashboard';
-        }
-        break;
-      case 'document_uploaded':
-      case 'document_approved':
-      case 'document_rejected':
-        if (userType === 'student') {
-          targetUrl = '/student/dashboard';
-        } else if (userType === 'supervisor') {
-          targetUrl = '/supervisor/dashboard';
-        }
-        break;
-      case 'evaluation_completed':
-        if (userType === 'student') {
-          targetUrl = '/student/dashboard';
-        }
-        break;
-      default:
-        break;
+
+    if (nType.startsWith('TASK')) {
+      targetUrl = '/progress/tasks';
+    } else if (nType.startsWith('PROPOSAL')) {
+      targetUrl = '/thesis/proposals';
+    } else if (nType === 'ASSIGNMENT') {
+      targetUrl = (userType === 'supervisor') ? '/supervisor/dashboard' : '/student/dashboard';
+    } else if (nType === 'DEFENSE') {
+      targetUrl = (userType === 'supervisor' || userType === 'committee_member') ? '/admin/defense-schedules' : '/student/dashboard';
+    } else if (nType === 'ELIGIBILITY') {
+      targetUrl = '/student/dashboard';
     }
 
     if (targetUrl) {
@@ -184,7 +151,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
   const handleMarkAllAsRead = async () => {
     try {
       await apiService.markNotificationsAsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true, isRead: true })));
       setUnreadCount(0);
     } catch (error) {
       console.error('Failed to mark all as read:', error);
@@ -196,10 +163,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
     e.stopPropagation();
     try {
       await apiService.deleteNotification(notificationId);
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      // Update unread count if the deleted notification was unread
       const deletedNotification = notifications.find(n => n.id === notificationId);
-      if (deletedNotification && !deletedNotification.is_read) {
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      const wasUnread = !(deletedNotification?.is_read ?? deletedNotification?.isRead ?? true);
+      if (wasUnread) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
     } catch (error) {
@@ -215,62 +182,50 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
   };
 
   // Get notification icon based on type
-  const getNotificationIcon = (type: NotificationType): string => {
-    const icons: Record<NotificationType, string> = {
-      group_request: '👥',
-      group_request_accepted: '✅',
-      group_request_rejected: '❌',
-      supervisor_request: '👨‍🏫',
-      supervisor_request_accepted: '✅',
-      supervisor_request_rejected: '❌',
-      new_chat_message: '💬',
-      document_uploaded: '📄',
-      document_approved: '✅',
-      document_rejected: '❌',
-      evaluation_completed: '📝',
-      new_comment: '💭',
-      external_assignment: '🌐',
-      external_evaluation: '📋',
-      external_schedule: '📅',
-      general: '🔔'
-    };
-    return icons[type] || '🔔';
+  const getNotificationIcon = (type?: string): string => {
+    if (!type) return '🔔';
+    const upper = type.toUpperCase();
+    if (upper === 'TASK') return '📋';
+    if (upper === 'TASK_SUBMISSION') return '📥';
+    if (upper === 'TASK_REVIEW') return '📝';
+    if (upper === 'PROPOSAL') return '📑';
+    if (upper === 'ASSIGNMENT') return '🎯';
+    if (upper === 'DEFENSE') return '📅';
+    if (upper === 'ELIGIBILITY') return '⚖️';
+    if (upper.includes('GROUP')) return '👥';
+    if (upper.includes('SUPERVISOR')) return '👨‍🏫';
+    if (upper.includes('CHAT')) return '💬';
+    if (upper.includes('DOCUMENT')) return '📄';
+    return '🔔';
   };
 
   // Get notification color based on type
-  const getNotificationColor = (type: NotificationType): string => {
-    const colors: Record<NotificationType, string> = {
-      group_request: '#3b82f6',
-      group_request_accepted: '#10b981',
-      group_request_rejected: '#ef4444',
-      supervisor_request: '#8b5cf6',
-      supervisor_request_accepted: '#10b981',
-      supervisor_request_rejected: '#ef4444',
-      new_chat_message: '#06b6d4',
-      document_uploaded: '#f59e0b',
-      document_approved: '#10b981',
-      document_rejected: '#ef4444',
-      evaluation_completed: '#10b981',
-      new_comment: '#64748b',
-      external_assignment: '#3b82f6',
-      external_evaluation: '#10b981',
-      external_schedule: '#06b6d4',
-      general: '#64748b'
-    };
-    return colors[type] || '#64748b';
+  const getNotificationColor = (type?: string): string => {
+    if (!type) return '#64748b';
+    const upper = type.toUpperCase();
+    if (upper === 'TASK') return '#3b82f6';
+    if (upper === 'TASK_SUBMISSION') return '#06b6d4';
+    if (upper === 'TASK_REVIEW') return '#10b981';
+    if (upper === 'PROPOSAL') return '#8b5cf6';
+    if (upper === 'ASSIGNMENT') return '#f59e0b';
+    if (upper === 'DEFENSE') return '#ec4899';
+    if (upper === 'ELIGIBILITY') return '#14b8a6';
+    return '#64748b';
   };
 
-  // Format time ago
-  const formatTimeAgo = (dateString: string): string => {
+  // Format time ago (Vietnamese)
+  const formatTimeAgo = (dateString?: string): string => {
+    if (!dateString) return 'Vừa xong';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Vừa xong';
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-    return date.toLocaleDateString();
+    if (diffInSeconds < 60) return 'Vừa xong';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút trước`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
   };
 
   return (
@@ -279,11 +234,12 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="notification-bell-button"
-        aria-label="Notifications"
+        aria-label="Thông báo"
+        title="Thông báo hệ thống"
       >
         <svg
-          width="24"
-          height="24"
+          width="22"
+          height="22"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -306,10 +262,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
         <div className="notification-dropdown">
           {/* Header */}
           <div className="notification-header">
-            <h3 className="notification-header-title">Notifications</h3>
+            <h3 className="notification-header-title">Thông báo</h3>
             {unreadCount > 0 && (
               <button onClick={handleMarkAllAsRead} className="notification-mark-all-btn">
-                Mark all as read
+                Đánh dấu đã đọc tất cả
               </button>
             )}
           </div>
@@ -319,45 +275,55 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
             {notifications.length === 0 && !loading ? (
               <div className="notification-empty-state">
                 <span className="notification-empty-icon">🔔</span>
-                <p>No notifications yet</p>
+                <p>Chưa có thông báo nào</p>
               </div>
             ) : (
               <>
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`notification-item ${notification.is_read ? 'notification-item-read' : 'notification-item-unread'} ${notification.action_url || notification.notification_type ? 'notification-item-clickable' : ''}`}
-                  >
-                    <span 
-                      className="notification-icon"
-                      style={{ 
-                        backgroundColor: `${getNotificationColor(notification.notification_type)}15`,
-                        borderRadius: '8px',
-                        padding: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
+                {notifications.map((notification) => {
+                  const isRead = notification.is_read ?? notification.isRead ?? false;
+                  const itemType = notification.type || notification.notification_type || 'SYSTEM';
+                  const itemContent = notification.content || notification.message || '';
+                  const itemTime = notification.createdAt || notification.created_at;
+                  const itemUrl = notification.referenceUrl || notification.action_url;
+
+                  return (
+                    <div
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`notification-item ${isRead ? 'notification-item-read' : 'notification-item-unread'} ${itemUrl || itemType ? 'notification-item-clickable' : ''}`}
                     >
-                      {getNotificationIcon(notification.notification_type)}
-                    </span>
-                    <div className="notification-content">
-                      <div className="notification-title">{notification.title}</div>
-                      <div className="notification-message">{notification.message}</div>
-                      <div className="notification-time">
-                        {formatTimeAgo(notification.created_at)}
+                      <span
+                        className="notification-icon"
+                        style={{
+                          backgroundColor: `${getNotificationColor(itemType)}18`,
+                          borderRadius: '8px',
+                          padding: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '18px'
+                        }}
+                      >
+                        {getNotificationIcon(itemType)}
+                      </span>
+                      <div className="notification-content">
+                        <div className="notification-title">{notification.title}</div>
+                        <div className="notification-message">{itemContent}</div>
+                        <div className="notification-time">
+                          {formatTimeAgo(itemTime)}
+                        </div>
                       </div>
+                      <button
+                        onClick={(e) => handleDeleteNotification(e, notification.id)}
+                        className="notification-delete-btn"
+                        aria-label="Xóa thông báo"
+                        title="Xóa thông báo"
+                      >
+                        ×
+                      </button>
                     </div>
-                    <button
-                      onClick={(e) => handleDeleteNotification(e, notification.id)}
-                      className="notification-delete-btn"
-                      aria-label="Delete notification"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* Load More */}
                 {hasMore && (
@@ -366,14 +332,14 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
                     disabled={loading}
                     className="notification-load-more-btn"
                   >
-                    {loading ? 'Loading...' : 'Load more'}
+                    {loading ? 'Đang tải...' : 'Xem thêm thông báo'}
                   </button>
                 )}
               </>
             )}
 
             {loading && notifications.length === 0 && (
-              <div className="notification-loading-state">Loading notifications...</div>
+              <div className="notification-loading-state">Đang tải thông báo...</div>
             )}
           </div>
         </div>
