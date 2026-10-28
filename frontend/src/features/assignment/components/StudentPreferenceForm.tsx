@@ -352,7 +352,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                         fontWeight: 700,
                       }}
                     >
-                      Còn {l.remainingCapacity}/{l.maxQuota}
+                      Còn {l.remainingCapacity}/{l.effectiveCapacity != null ? l.effectiveCapacity : (l.maxQuota || 0)}
                     </span>
                   </div>
                 ))}
@@ -373,11 +373,14 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                 required
               >
                 <option value="">-- Chọn Giảng viên NV1 --</option>
-                {eligibleLecturers.map((l) => (
-                  <option key={l.lecturerId} value={l.lecturerId}>
-                    {l.fullName} ({l.academicDegree} - {l.departmentName}) [Còn {l.remainingCapacity} chỗ]
-                  </option>
-                ))}
+                {eligibleLecturers.map((l) => {
+                  const totalQuota = l.effectiveCapacity != null ? l.effectiveCapacity : (l.maxQuota || 0);
+                  return (
+                    <option key={l.lecturerId} value={l.lecturerId}>
+                      {l.fullName} ({l.academicDegree} - {l.departmentName}) [Còn {l.remainingCapacity}/{totalQuota} chỗ]
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -392,11 +395,14 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                 <option value="">-- Chọn Giảng viên NV2 (Tùy chọn) --</option>
                 {eligibleLecturers
                   .filter((l) => l.lecturerId !== nv1)
-                  .map((l) => (
-                    <option key={l.lecturerId} value={l.lecturerId}>
-                      {l.fullName} ({l.academicDegree} - {l.departmentName}) [Còn {l.remainingCapacity} chỗ]
-                    </option>
-                  ))}
+                  .map((l) => {
+                    const totalQuota = l.effectiveCapacity != null ? l.effectiveCapacity : (l.maxQuota || 0);
+                    return (
+                      <option key={l.lecturerId} value={l.lecturerId}>
+                        {l.fullName} ({l.academicDegree} - {l.departmentName}) [Còn {l.remainingCapacity}/{totalQuota} chỗ]
+                      </option>
+                    );
+                  })}
               </select>
             </div>
 
@@ -411,11 +417,14 @@ export const StudentPreferenceForm: React.FC<Props> = ({
                 <option value="">-- Chọn Giảng viên NV3 (Tùy chọn) --</option>
                 {eligibleLecturers
                   .filter((l) => l.lecturerId !== nv1 && l.lecturerId !== nv2)
-                  .map((l) => (
-                    <option key={l.lecturerId} value={l.lecturerId}>
-                      {l.fullName} ({l.academicDegree} - {l.departmentName}) [Còn {l.remainingCapacity} chỗ]
-                    </option>
-                  ))}
+                  .map((l) => {
+                    const totalQuota = l.effectiveCapacity != null ? l.effectiveCapacity : (l.maxQuota || 0);
+                    return (
+                      <option key={l.lecturerId} value={l.lecturerId}>
+                        {l.fullName} ({l.academicDegree} - {l.departmentName}) [Còn {l.remainingCapacity}/{totalQuota} chỗ]
+                      </option>
+                    );
+                  })}
               </select>
             </div>
           </div>
