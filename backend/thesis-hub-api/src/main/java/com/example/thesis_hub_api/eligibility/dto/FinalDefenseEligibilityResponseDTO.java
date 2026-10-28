@@ -14,12 +14,17 @@ import java.util.List;
 @AllArgsConstructor
 public class FinalDefenseEligibilityResponseDTO {
     private Long studentId;
+    private String studentCode;
+    private String studentName;
     private Long thesisId;
+    private String thesisTitle;
     private boolean eligibleForDefense;
     private double thesisProgressPercentage;
+    private boolean allProgressStagesCompleted;
     private boolean supervisorApproved;
     private BigDecimal supervisorScore;
     private boolean reviewerAssigned;
     private BigDecimal reviewerScore;
+    private double plagiarismRate;
     private List<String> reasons;
 }

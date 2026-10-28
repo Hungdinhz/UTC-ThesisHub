@@ -106,13 +106,17 @@ public class EligibilityController {
     }
 
     /**
-     * API xét điều kiện bảo vệ cuối kỳ
+     * API xét điều kiện bảo vệ cuối kỳ (Hỗ trợ tra cứu theo Mã sinh viên MSSV)
      */
     @GetMapping("/final-defense")
     public ResponseEntity<ApiResponse<FinalDefenseEligibilityResponseDTO>> checkFinalDefenseEligibility(
             @RequestParam(required = false) Long thesisId,
-            @RequestParam(required = false) Long studentId) {
-        FinalDefenseEligibilityResponseDTO result = eligibilityService.checkFinalDefenseEligibility(thesisId, studentId);
+            @RequestParam(required = false) Long studentId,
+            @RequestParam(required = false) String studentCode,
+            @RequestParam(required = false) Long projectRoundId) {
+        FinalDefenseEligibilityResponseDTO result = (studentCode == null && projectRoundId == null)
+                ? eligibilityService.checkFinalDefenseEligibility(thesisId, studentId)
+                : eligibilityService.checkFinalDefenseEligibility(thesisId, studentId, studentCode, projectRoundId);
         return ResponseEntity.ok(ApiResponse.success("Xét điều kiện bảo vệ cuối kỳ thành công", result));
     }
 }

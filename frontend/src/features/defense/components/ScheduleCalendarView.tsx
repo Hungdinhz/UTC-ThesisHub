@@ -6,11 +6,13 @@ import './DefenseComponents.css';
 interface ScheduleCalendarViewProps {
   schedules: DefenseSchedule[];
   viewMode: 'TIMELINE' | 'ROOM' | 'SESSION';
+  onSelectSchedule?: (schedule: DefenseSchedule) => void;
 }
 
 export const ScheduleCalendarView: React.FC<ScheduleCalendarViewProps> = ({
   schedules,
   viewMode,
+  onSelectSchedule,
 }) => {
   if (schedules.length === 0) {
     return <div className="schedule-empty-view">Chưa có lịch bảo vệ nào được xếp cho ngày đã chọn</div>;
@@ -31,17 +33,26 @@ export const ScheduleCalendarView: React.FC<ScheduleCalendarViewProps> = ({
               </div>
               <div className="room-schedules-list">
                 {roomSchedules.map((item) => (
-                  <div key={item.id} className={`schedule-item-card session-${item.session.toLowerCase()}`}>
+                  <div
+                    key={item.id}
+                    className={`schedule-item-card session-${item.session.toLowerCase()}`}
+                    onClick={() => onSelectSchedule && onSelectSchedule(item)}
+                    style={{ cursor: onSelectSchedule ? 'pointer' : 'default' }}
+                    title="Bấm vào để xem chi tiết ca bảo vệ, thành viên hội đồng và danh sách sinh viên"
+                  >
                     <div className="schedule-time-badge">
                       ⏰ {item.startTime} - {item.endTime} ({item.session === 'MORNING' ? 'Sáng' : 'Chiều'})
                     </div>
                     <div className="schedule-council-name">{item.councilName}</div>
                     <div className="schedule-capacity">
-                      👥 Tối đa {item.maxStudents} sinh viên bảo vệ
+                      👥 {item.assignedStudents?.length || item.studentIds?.length || 0} / {item.maxStudents} sinh viên bảo vệ
                     </div>
                     {item.notes && <div className="schedule-notes">{item.notes}</div>}
-                    <div className="schedule-footer">
+                    <div className="schedule-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <StatusBadge status={item.status} label={item.status === 'SCHEDULED' ? 'Đã lên lịch' : item.status} size="sm" />
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#0a3273' }}>
+                        🔍 Xem chi tiết &raquo;
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -68,15 +79,24 @@ export const ScheduleCalendarView: React.FC<ScheduleCalendarViewProps> = ({
               </div>
               <div className="session-schedules-list">
                 {sessSchedules.map((item) => (
-                  <div key={item.id} className="schedule-item-card">
+                  <div
+                    key={item.id}
+                    className="schedule-item-card"
+                    onClick={() => onSelectSchedule && onSelectSchedule(item)}
+                    style={{ cursor: onSelectSchedule ? 'pointer' : 'default' }}
+                    title="Bấm vào để xem chi tiết ca bảo vệ, thành viên hội đồng và danh sách sinh viên"
+                  >
                     <div className="schedule-room-badge">📍 {item.room}</div>
                     <div className="schedule-council-name">{item.councilName}</div>
                     <div className="schedule-time-row">
-                      ⏰ {item.startTime} - {item.endTime} | 👥 {item.maxStudents} SV
+                      ⏰ {item.startTime} - {item.endTime} | 👥 {item.assignedStudents?.length || item.studentIds?.length || 0} / {item.maxStudents} SV
                     </div>
                     {item.notes && <div className="schedule-notes">{item.notes}</div>}
-                    <div className="schedule-footer">
+                    <div className="schedule-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <StatusBadge status={item.status} size="sm" />
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#0a3273' }}>
+                        🔍 Xem chi tiết &raquo;
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -92,7 +112,13 @@ export const ScheduleCalendarView: React.FC<ScheduleCalendarViewProps> = ({
   return (
     <div className="schedule-timeline-view">
       {schedules.map((item) => (
-        <div key={item.id} className="timeline-row">
+        <div
+          key={item.id}
+          className="timeline-row"
+          onClick={() => onSelectSchedule && onSelectSchedule(item)}
+          style={{ cursor: onSelectSchedule ? 'pointer' : 'default' }}
+          title="Bấm vào để xem chi tiết ca bảo vệ, thành viên hội đồng và danh sách sinh viên"
+        >
           <div className="timeline-time-col">
             <span className="time-start">{item.startTime}</span>
             <span className="time-divider">↓</span>
@@ -107,9 +133,14 @@ export const ScheduleCalendarView: React.FC<ScheduleCalendarViewProps> = ({
                 <StatusBadge status={item.status} size="sm" />
               </div>
             </div>
-            <div className="timeline-card-details">
-              <span>👥 Quy mô: Tối đa {item.maxStudents} sinh viên</span>
-              {item.notes && <span className="notes-text">📝 {item.notes}</span>}
+            <div className="timeline-card-details" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <span>👥 Sinh viên bảo vệ: {item.assignedStudents?.length || item.studentIds?.length || 0} / {item.maxStudents} SV</span>
+                {item.notes && <span className="notes-text" style={{ marginLeft: '12px' }}>📝 {item.notes}</span>}
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#0a3273' }}>
+                🔍 Bấm để xem chi tiết ca bảo vệ &raquo;
+              </span>
             </div>
           </div>
         </div>

@@ -338,6 +338,8 @@ class EligibilityService {
   async checkFinalDefenseEligibility(params: {
     thesisId?: number;
     studentId?: number;
+    studentCode?: string;
+    projectRoundId?: number;
   }): Promise<FinalDefenseEligibilityResponse> {
     try {
       const res = await axios.get<ApiResponse<any>>(`${API_BASE}/final-defense`, {
@@ -350,7 +352,7 @@ class EligibilityService {
           thesisId: d.thesisId || params.thesisId || 101,
           thesisTitle: d.thesisTitle || `Đề tài tốt nghiệp #${d.thesisId || params.thesisId || 101}`,
           studentId: d.studentId || params.studentId || 101,
-          studentCode: d.studentCode || `SV${d.studentId || params.studentId || 101}`,
+          studentCode: d.studentCode || params.studentCode || `SV${d.studentId || params.studentId || 101}`,
           studentName: d.studentName || `Sinh viên #${d.studentId || params.studentId || 101}`,
           supervisorScore: Number(d.supervisorScore ?? 8.5),
           reviewerScore: Number(d.reviewerScore ?? 8.0),
@@ -375,7 +377,7 @@ class EligibilityService {
       thesisId: tId,
       thesisTitle: 'Nghiên cứu ứng dụng Deep Learning trong nhận diện cử chỉ tay',
       studentId: sId,
-      studentCode: `SV202100${sId}`,
+      studentCode: params.studentCode || `SV202100${sId}`,
       studentName: 'Nguyễn Văn An',
       supervisorScore: isOk ? 8.5 : 4.5,
       reviewerScore: isOk ? 8.0 : 6.0,

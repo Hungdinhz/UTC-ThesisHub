@@ -41,6 +41,11 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   const [studentRoundGpa, setStudentRoundGpa] = useState<number | undefined>(undefined);
   const [isStudentInRound, setIsStudentInRound] = useState<boolean>(true);
   const [checkingEnrollment, setCheckingEnrollment] = useState<boolean>(true);
+  const [studentRoundStatus, setStudentRoundStatus] = useState<{
+    status?: string;
+    note?: string;
+    isDropped?: boolean;
+  } | null>(null);
 
   // 1. Load project rounds & synchronize strictly with the student's enrolled round
   useEffect(() => {
@@ -52,6 +57,14 @@ export const StudentAssignmentPage: React.FC<Props> = ({
           apiService.getMyRoundStatus().catch(() => null),
         ]);
         const allRounds = roundList || [];
+
+        if (myStatus) {
+          setStudentRoundStatus({
+            status: myStatus.status,
+            note: myStatus.note,
+            isDropped: myStatus.isDropped || myStatus.status === 'DROPPED',
+          });
+        }
 
         if (propRoundId) {
           setRounds(allRounds);
@@ -179,7 +192,22 @@ export const StudentAssignmentPage: React.FC<Props> = ({
       );
       setMyAssignment(assigned || null);
 
-      const finalized = propsData?.some((p) => p.status === 'FINALIZED') || assigned?.status === 'FINALIZED';
+      const latestMyStatus = await apiService.getMyRoundStatus().catch(() => null);
+      if (latestMyStatus) {
+        setStudentRoundStatus({
+          status: latestMyStatus.status,
+          note: latestMyStatus.note,
+          isDropped: latestMyStatus.isDropped || latestMyStatus.status === 'DROPPED',
+        });
+      }
+
+      const isSupplementaryOpenForMe =
+        (latestMyStatus?.note || studentRoundStatus?.note || '').toLowerCase().includes('bổ sung') &&
+        !(latestMyStatus?.isDropped || latestMyStatus?.status === 'DROPPED');
+
+      const finalized =
+        assigned?.status === 'FINALIZED' ||
+        (!isSupplementaryOpenForMe && !!propsData?.some((p) => p.status === 'FINALIZED'));
       setIsRoundFinalized(!!finalized);
 
       // Fetch student's round registration to obtain exact official GPA
@@ -224,8 +252,12 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   }, [user, currentRound]);
 
   const isRoundClosed = currentRound?.status === 'CLOSED' || currentRound?.status === 'ARCHIVED';
+  const isStudentDropped = !!studentRoundStatus?.isDropped || studentRoundStatus?.status === 'DROPPED';
+  const isSupplementaryPeriod =
+    !isStudentDropped &&
+    (studentRoundStatus?.note || '').toLowerCase().includes('bổ sung');
   const hasSubmitted = !!currentRegistration || myPreferences.length > 0;
-  const canEdit = !isRoundClosed && !isRoundFinalized;
+  const canEdit = !isRoundClosed && !isRoundFinalized && !isStudentDropped;
 
   const initialFormValues = {
     directionId: currentRegistration?.directionId,
@@ -306,6 +338,55 @@ export const StudentAssignmentPage: React.FC<Props> = ({
 
   return (
     <div className="assignment-container">
+      {/* Banner thông báo khi sinh viên đã bị loại khỏi đợt đồ án (DROPPED) */}
+      {isStudentDropped && (
+        <div
+          style={{
+            backgroundColor: '#fef2f2',
+            border: '2px solid #ef4444',
+            borderRadius: '12px',
+            padding: '18px 22px',
+            marginBottom: '20px',
+            color: '#991b1b',
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.12)',
+          }}
+        >
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 700, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            🚫 Bạn đã bị loại khỏi đợt đồ án ({currentRound?.roundCode || `Đợt #${effectiveRoundId}`})
+          </h3>
+          <p style={{ margin: '0 0 6px 0', fontSize: '0.96rem', lineHeight: 1.5 }}>
+            <strong>Lý do:</strong>{' '}
+            {studentRoundStatus?.note ||
+              'Bạn không đăng ký nguyện vọng giảng viên hướng dẫn trước khi Khoa chốt kết quả phân công.'}
+          </p>
+          <p style={{ margin: 0, fontSize: '0.88rem', color: '#7f1d1d' }}>
+            💡 Nếu bạn thuộc diện được phép đăng ký bổ sung, vui lòng liên hệ Giáo vụ Khoa để mở <strong>Đợt đăng ký bổ sung</strong>. Lưu ý: Sau khi kết thúc đợt đăng ký bổ sung, sinh viên vẫn không đăng ký sẽ bị <strong>xóa hoàn toàn khỏi đợt đồ án</strong>.
+          </p>
+        </div>
+      )}
+
+      {/* Banner thông báo khi sinh viên đang trong Đợt đăng ký bổ sung */}
+      {isSupplementaryPeriod && !myAssignment && (
+        <div
+          style={{
+            backgroundColor: '#fff7ed',
+            border: '2px solid #f97316',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '20px',
+            color: '#9a3412',
+          }}
+        >
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '1.02rem', fontWeight: 700, color: '#c2410c' }}>
+            📢 ĐỢT ĐĂNG KÝ BỔ SUNG NGUYỆN VỌNG ĐANG MỞ
+          </h4>
+          <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: 1.5 }}>
+            Khoa đã mở đợt đăng ký bổ sung nguyện vọng GVHD cho bạn. Vui lòng chọn hướng đồ án và 3 nguyện vọng GVHD bên dưới rồi bấm <strong>Gửi đăng ký</strong>.{' '}
+            <strong>Cảnh báo:</strong> Nếu kết thúc đợt đăng ký bổ sung mà bạn vẫn chưa đăng ký, bạn sẽ bị <strong>xóa vĩnh viễn khỏi danh sách đợt đồ án này</strong>.
+          </p>
+        </div>
+      )}
+
       {/* Project Round Context & Selector Bar */}
       <div className="assignment-round-control-card">
         <div className="round-control-left">

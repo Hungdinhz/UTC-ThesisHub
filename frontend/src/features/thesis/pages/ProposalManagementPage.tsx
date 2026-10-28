@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { thesisService } from '../services/thesisService';
 import type { Proposal } from '../types';
@@ -10,6 +11,7 @@ import { assignmentService } from '../../assignment/services/assignmentService';
 import type { SupervisorAssignment } from '../../assignment/types';
 
 export const ProposalManagementPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user, userType } = useAuth();
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor' || userType === 'committee_member';
@@ -18,6 +20,13 @@ export const ProposalManagementPage: React.FC = () => {
   // Quyền duyệt: Giảng viên hướng dẫn xác nhận đề cương, Khoa (Admin/Tiểu ban) phê duyệt chính thức
   const canSupervisorApprove = isSupervisor || isAdmin;
   const canReview = isSupervisor || isAdmin;
+
+  const hasValidUploadedFile = (url?: string | null): boolean => {
+    if (!url || !url.trim()) return false;
+    const clean = url.trim().toLowerCase();
+    if (clean.includes('de_cuong_mau.pdf') || clean.includes('sample.pdf')) return false;
+    return true;
+  };
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -30,7 +39,17 @@ export const ProposalManagementPage: React.FC = () => {
   const [reviewStatus, setReviewStatus] = useState<string>('APPROVED');
   const [reviewNotes, setReviewNotes] = useState<string>('');
   const [pdfPreviewProposal, setPdfPreviewProposal] = useState<Proposal | null>(null);
-  const [signedProposalIds, setSignedProposalIds] = useState<Record<number, boolean>>({ 1: true });
+  const [signedProposalIds, setSignedProposalIds] = useState<Record<number, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('utc_signed_proposals_v1');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {
+      // ignore
+    }
+    return { 1: true };
+  });
   const [bannerMsg, setBannerMsg] = useState<string | null>(null);
 
   // Round and assignment integration
@@ -321,13 +340,14 @@ export const ProposalManagementPage: React.FC = () => {
     setDescription(proposal.description || '');
     setObjectives(proposal.objectives || '');
     setExpectedResults(proposal.expectedResults || '');
-    setFileUrl(proposal.fileUrl || '');
+    setFileUrl(hasValidUploadedFile(proposal.fileUrl) ? proposal.fileUrl || '' : '');
     setShowModal(true);
   };
 
   const handleSaveProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const cleanFileUrl = hasValidUploadedFile(fileUrl) ? fileUrl.trim() : '';
       if (editingProposal) {
         await thesisService.updateProposal(editingProposal.id, {
           titleVn,
@@ -335,7 +355,7 @@ export const ProposalManagementPage: React.FC = () => {
           description,
           objectives,
           expectedResults,
-          fileUrl: fileUrl || '/uploads/proposals/de_cuong_mau.pdf',
+          fileUrl: cleanFileUrl,
         });
         setBannerMsg(
           editingProposal.status === 'REVISE_REQUIRED'
@@ -358,7 +378,7 @@ export const ProposalManagementPage: React.FC = () => {
           description,
           objectives,
           expectedResults,
-          fileUrl: fileUrl || '/uploads/proposals/de_cuong_mau.pdf',
+          fileUrl: cleanFileUrl,
         });
         setBannerMsg('Đã tạo và lưu Đề cương đề tài thành công vào CSDL!');
         alert('🎉 Đã tạo Đề cương thành công! Bạn có thể bấm nút "🚀 Nộp Đề Cương" trong danh sách để gửi GVHD phê duyệt.');
@@ -425,8 +445,184 @@ export const ProposalManagementPage: React.FC = () => {
   };
 
   const handleSignAndArchive = (proposal: Proposal) => {
-    setSignedProposalIds((prev) => ({ ...prev, [proposal.id]: true }));
+    setSignedProposalIds((prev) => {
+      const next = { ...prev, [proposal.id]: true };
+      try {
+        localStorage.setItem('utc_signed_proposals_v1', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
     setBannerMsg(`Sinh viên ${proposal.studentFullName} đã ký nộp và Khoa CNTT đã lưu hồ sơ đề cương (Bước 24 hoàn tất)!`);
+  };
+
+  const handleNavigateToThesis = async (proposal: Proposal, target: 'detail' | 'tasks') => {
+    try {
+      const theses = await thesisService.searchTheses({
+        roundId: proposal.projectRoundId || selectedRoundId,
+      });
+      const matched = (Array.isArray(theses) ? theses : []).find(
+        (t) =>
+          (t.proposalId && t.proposalId === proposal.id) ||
+          (t.studentId && proposal.studentId && t.studentId === proposal.studentId) ||
+          (t.studentCode &&
+            proposal.studentCode &&
+            t.studentCode.trim().toLowerCase() === proposal.studentCode.trim().toLowerCase())
+      );
+      const targetThesisId = matched?.id || proposal.id;
+      if (target === 'detail') {
+        navigate(`/thesis/detail?id=${targetThesisId}`);
+      } else {
+        navigate(`/progress/tasks?thesisId=${targetThesisId}`);
+      }
+    } catch {
+      if (target === 'detail') {
+        navigate(`/thesis/detail?id=${proposal.id}`);
+      } else {
+        navigate(`/progress/tasks?thesisId=${proposal.id}`);
+      }
+    }
+  };
+
+  const handlePrintProposalPdf = (proposal: Proposal) => {
+    const isSigned = !!signedProposalIds[proposal.id];
+    const printWin = window.open('', '_blank', 'width=850,height=950');
+    if (!printWin) {
+      window.print();
+      return;
+    }
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Đề cương Đồ án Tốt nghiệp - ${proposal.studentCode || ''} - ${proposal.studentFullName || ''}</title>
+        <style>
+          @page { size: A4; margin: 18mm; }
+          body {
+            font-family: "Times New Roman", Times, serif;
+            color: #0f172a;
+            line-height: 1.6;
+            padding: 12px;
+            font-size: 13pt;
+          }
+          .header-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 11.5pt;
+          }
+          .doc-title {
+            text-align: center;
+            margin: 18px 0 4px 0;
+            color: #0a3273;
+            font-size: 15pt;
+            font-weight: bold;
+          }
+          .doc-subtitle {
+            text-align: center;
+            font-size: 11.5pt;
+            color: #334155;
+            margin-bottom: 20px;
+          }
+          .section-row { margin-bottom: 12px; }
+          .box {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            padding: 10px 14px;
+            border-radius: 4px;
+            margin-top: 4px;
+          }
+          .sign-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            text-align: center;
+            margin-top: 36px;
+            font-size: 11.5pt;
+          }
+          .sign-status {
+            margin-top: 48px;
+            font-weight: bold;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header-grid">
+          <div>
+            <div style="font-weight: 600;">TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI</div>
+            <div style="font-weight: 700;">KHOA CÔNG NGHỆ THÔNG TIN</div>
+            <hr style="width: 40%; margin: 4px auto;" />
+          </div>
+          <div>
+            <div style="font-weight: 700;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+            <div style="font-weight: 600;">Độc lập - Tự do - Hạnh phúc</div>
+            <hr style="width: 40%; margin: 4px auto;" />
+          </div>
+        </div>
+
+        <div class="doc-title">BẢN GIAO NHIỆM VỤ & ĐỀ CƯƠNG ĐỒ ÁN TỐT NGHIỆP</div>
+        <div class="doc-subtitle">(${proposal.projectRoundName || 'Đợt Đồ án Tốt nghiệp Năm học 2026-2027'})</div>
+
+        <div class="section-row">
+          <strong>1. Họ và tên sinh viên:</strong> ${proposal.studentFullName || ''} — <strong>MSSV:</strong> ${proposal.studentCode || ''} — <strong>Lớp:</strong> ${proposal.studentClass || ''}
+        </div>
+        <div class="section-row">
+          <strong>2. Giảng viên hướng dẫn:</strong> ${proposal.lecturerFullName || ''} (${proposal.lecturerDegree || ''})
+        </div>
+        <div class="section-row">
+          <strong>3. Tên đề tài (Tiếng Việt):</strong> ${proposal.titleVn || ''}
+        </div>
+        <div class="section-row">
+          <strong>4. Tên đề tài (Tiếng Anh):</strong> ${proposal.titleEn || 'N/A'}
+        </div>
+        <div class="section-row">
+          <strong>5. Nội dung và phạm vi nghiên cứu:</strong>
+          <div class="box">${proposal.description || 'Nghiên cứu lý thuyết và xây dựng hệ thống thực nghiệm.'}</div>
+        </div>
+        <div class="section-row">
+          <strong>6. Mục tiêu và kết quả dự kiến đạt được:</strong>
+          <div class="box">
+            <div>• Mục tiêu: ${proposal.objectives || 'Hoàn thiện đầy đủ các yêu cầu kỹ thuật của đề tài.'}</div>
+            <div>• Sản phẩm dự kiến: ${proposal.expectedResults || 'Báo cáo toàn văn + Chương trình phần mềm thực nghiệm.'}</div>
+          </div>
+        </div>
+
+        <div class="sign-grid">
+          <div>
+            <strong>SINH VIÊN THỰC HIỆN</strong>
+            <div class="sign-status" style="color: #15803d;">
+              ${isSigned ? `[Đã ký số: ${proposal.studentFullName}]` : '(Chưa ký nộp)'}
+            </div>
+          </div>
+          <div>
+            <strong>GIẢNG VIÊN HƯỚNG DẪN</strong>
+            <div class="sign-status" style="color: #0a3273;">
+              ${proposal.supervisorApproved ? `[Đã xác nhận: ${proposal.lecturerFullName}]` : '(Chờ xác nhận)'}
+            </div>
+          </div>
+          <div>
+            <strong>TRƯỞNG KHOA / BAN DUYỆT</strong>
+            <div class="sign-status" style="color: #b91c1c;">
+              ${proposal.status === 'APPROVED' ? '[Đã phê duyệt & Lưu hồ sơ Khoa CNTT]' : '(Đang xét duyệt)'}
+            </div>
+          </div>
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.focus();
+              window.print();
+            }, 250);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+    printWin.document.open();
+    printWin.document.write(htmlContent);
+    printWin.document.close();
   };
 
   const isCurrentStudentProposal = (p: Proposal) => {
@@ -793,10 +989,10 @@ export const ProposalManagementPage: React.FC = () => {
                   <td style={{ padding: '12px 16px', maxWidth: '340px' }}>
                     <div style={{ fontWeight: '600', color: '#0f172a' }}>{p.titleVn}</div>
                     {p.titleEn && <div style={{ fontSize: '12px', color: '#64748b' }}>{p.titleEn}</div>}
-                    {p.fileUrl && (
+                    {hasValidUploadedFile(p.fileUrl) ? (
                       <div style={{ marginTop: '6px' }}>
                         <a
-                          href={resolveFileUrl(p.fileUrl)}
+                          href={resolveFileUrl(p.fileUrl!)}
                           target="_blank"
                           rel="noreferrer"
                           download
@@ -814,14 +1010,18 @@ export const ProposalManagementPage: React.FC = () => {
                             border: '1px solid #bfdbfe',
                             maxWidth: '100%'
                           }}
-                          title={extractFileName(p.fileUrl)}
+                          title={extractFileName(p.fileUrl!)}
                         >
-                          <span>{getFileIcon(p.fileUrl)}</span>
+                          <span>{getFileIcon(p.fileUrl!)}</span>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
-                            {extractFileName(p.fileUrl)}
+                            {extractFileName(p.fileUrl!)}
                           </span>
                           <span style={{ fontSize: '11px', color: '#2563eb' }}>👁️ Mở / ⬇️ Tải</span>
                         </a>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                        📄 Chưa đính kèm file PDF
                       </div>
                     )}
                     {signedProposalIds[p.id] && (
@@ -947,15 +1147,16 @@ export const ProposalManagementPage: React.FC = () => {
                         🖨️ Xuất PDF Đề cương
                       </button>
                       {p.status === 'APPROVED' && (
-                        <a
-                          href={`/thesis/detail?id=${p.id}`}
+                        <button
+                          type="button"
+                          onClick={() => handleNavigateToThesis(p, 'detail')}
                           style={{
                             background: '#ecfdf5',
                             color: '#065f46',
                             border: '1px solid #a7f3d0',
                             padding: '6px 10px',
                             borderRadius: '4px',
-                            textDecoration: 'none',
+                            cursor: 'pointer',
                             fontSize: '12px',
                             fontWeight: 600,
                             display: 'inline-flex',
@@ -963,18 +1164,19 @@ export const ProposalManagementPage: React.FC = () => {
                           }}
                         >
                           🎓 Đề Tài
-                        </a>
+                        </button>
                       )}
                       {p.status === 'APPROVED' && (
-                        <a
-                          href={`/progress/tasks?thesisId=${p.id}`}
+                        <button
+                          type="button"
+                          onClick={() => handleNavigateToThesis(p, 'tasks')}
                           style={{
                             background: '#eff6ff',
                             color: '#1e40af',
                             border: '1px solid #bfdbfe',
                             padding: '6px 10px',
                             borderRadius: '4px',
-                            textDecoration: 'none',
+                            cursor: 'pointer',
                             fontSize: '12px',
                             fontWeight: 600,
                             display: 'inline-flex',
@@ -982,7 +1184,7 @@ export const ProposalManagementPage: React.FC = () => {
                           }}
                         >
                           📋 Bảng Task
-                        </a>
+                        </button>
                       )}
                     </div>
                   </td>
@@ -1087,25 +1289,42 @@ export const ProposalManagementPage: React.FC = () => {
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <strong style={{ color: '#0a3273' }}>📄 BẢN XEM TRƯỚC PDF ĐỀ CƯƠNG ĐỒ ÁN TỐT NGHIỆP (CHUẨN UTC)</strong>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {isStudent && pdfPreviewProposal.status === 'APPROVED' && isCurrentStudentProposal(pdfPreviewProposal) && !signedProposalIds[pdfPreviewProposal.id] && (
+                  <button
+                    onClick={() => handleSignAndArchive(pdfPreviewProposal)}
+                    style={{
+                      backgroundColor: '#16a34a',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✍️ SV Ký nộp & Khoa lưu hồ sơ
+                  </button>
+                )}
+                {signedProposalIds[pdfPreviewProposal.id] && (
+                  <span
+                    style={{
+                      backgroundColor: '#dcfce7',
+                      color: '#15803d',
+                      border: '1px solid #86efac',
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ✓ Sinh viên đã ký nộp & Khoa lưu hồ sơ
+                  </span>
+                )}
                 <button
-                  onClick={() => handleSignAndArchive(pdfPreviewProposal)}
-                  style={{
-                    backgroundColor: '#16a34a',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  ✍️ SV Ký nộp & Khoa lưu hồ sơ
-                </button>
-                <button
-                  onClick={() => window.print()}
+                  onClick={() => handlePrintProposalPdf(pdfPreviewProposal)}
                   style={{
                     backgroundColor: '#0a3273',
                     color: '#fff',
@@ -1183,27 +1402,31 @@ export const ProposalManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              {pdfPreviewProposal.fileUrl && (
+              {hasValidUploadedFile(pdfPreviewProposal.fileUrl) ? (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 16px', borderRadius: '6px', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '20px' }}>{getFileIcon(pdfPreviewProposal.fileUrl)}</span>
+                    <span style={{ fontSize: '20px' }}>{getFileIcon(pdfPreviewProposal.fileUrl!)}</span>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '13px', color: '#0a3273' }}>
                         Tập tin đề cương gốc đã tải lên:
                       </div>
                       <div style={{ fontSize: '12px', color: '#475569' }}>
-                        {extractFileName(pdfPreviewProposal.fileUrl)}
+                        {extractFileName(pdfPreviewProposal.fileUrl!)}
                       </div>
                     </div>
                   </div>
                   <a
-                    href={resolveFileUrl(pdfPreviewProposal.fileUrl)}
+                    href={resolveFileUrl(pdfPreviewProposal.fileUrl!)}
                     target="_blank"
                     rel="noreferrer"
                     style={{ background: '#0a3273', color: '#fff', textDecoration: 'none', padding: '6px 14px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}
                   >
                     ⬇️ Tải file đề cương
                   </a>
+                </div>
+              ) : (
+                <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '10px 16px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px', color: '#64748b' }}>
+                  📄 <strong>Tập tin đính kèm:</strong> Người gửi chưa đính kèm file PDF đề cương gốc.
                 </div>
               )}
 

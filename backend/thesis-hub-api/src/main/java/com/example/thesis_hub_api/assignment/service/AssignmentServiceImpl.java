@@ -225,10 +225,6 @@ public class AssignmentServiceImpl implements AssignmentService {
     public DirectionRegistrationResponseDTO registerDirection(DirectionRegistrationRequestDTO request, Long currentUserId) {
         ProjectRound round = getAndValidateActiveRound(request.getProjectRoundId());
 
-        if (assignmentRepository.countByProjectRoundIdAndStatus(request.getProjectRoundId(), "FINALIZED") > 0) {
-            throw new AppException(ErrorCode.ASSIGNMENT_ALREADY_FINALIZED);
-        }
-
         Long studentId = null;
         if (currentUserId != null) {
             Optional<Student> studentOpt = studentRepository.findByUserId(currentUserId);
@@ -246,6 +242,8 @@ public class AssignmentServiceImpl implements AssignmentService {
         final Long finalStudentId = studentId;
         Student student = studentRepository.findById(finalStudentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sinh viên với ID: " + finalStudentId));
+
+        validateNotAlreadyFinalizedOrAllowSupplementary(student, round);
         validateStudentInRound(student, round, currentUserId);
         ProjectDirection direction = directionRepository.findById(request.getDirectionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hướng đồ án với ID: " + request.getDirectionId()));
@@ -353,10 +351,6 @@ public class AssignmentServiceImpl implements AssignmentService {
     public List<PreferenceResponseDTO> submitPreferences(PreferenceSubmitRequestDTO request, Long currentUserId) {
         ProjectRound round = getAndValidateActiveRound(request.getProjectRoundId());
 
-        if (assignmentRepository.countByProjectRoundIdAndStatus(request.getProjectRoundId(), "FINALIZED") > 0) {
-            throw new AppException(ErrorCode.ASSIGNMENT_ALREADY_FINALIZED);
-        }
-
         Long studentId = null;
         if (currentUserId != null) {
             Optional<Student> studentOpt = studentRepository.findByUserId(currentUserId);
@@ -374,6 +368,8 @@ public class AssignmentServiceImpl implements AssignmentService {
         final Long finalStudentId = studentId;
         Student student = studentRepository.findById(finalStudentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sinh viên ID: " + finalStudentId));
+
+        validateNotAlreadyFinalizedOrAllowSupplementary(student, round);
         validateStudentInRound(student, round, currentUserId);
 
         // Kiểm tra sinh viên đã đăng ký hướng đồ án chưa (Mục A.2)
@@ -1164,6 +1160,152 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .averageLoadRatio(Math.round(avgLoad * 100.0) / 100.0)
                 .droppedCount(dropped)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public AssignmentStatsResponseDTO openSupplementaryRegistration(Long projectRoundId) {
+        ProjectRound round = getAndValidateActiveRound(projectRoundId);
+        if (studentProjectRoundRepository == null) {
+            return getAssignmentStats(projectRoundId);
+        }
+
+        Set<Long> assignedStudentIds = assignmentRepository.findByProjectRoundId(projectRoundId).stream()
+                .map(SupervisorAssignment::getStudentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<StudentProjectRound> roundStudents = studentProjectRoundRepository.findByProjectRoundId(projectRoundId);
+        int reopenedCount = 0;
+        for (StudentProjectRound spr : roundStudents) {
+            if (spr.getStudent() == null || spr.getStudent().getId() == null) {
+                continue;
+            }
+            Long sId = spr.getStudent().getId();
+            if ("RESERVED".equalsIgnoreCase(spr.getStatus()) || assignedStudentIds.contains(sId)) {
+                continue;
+            }
+            // Cho phép các sinh viên chưa được phân công (bao gồm cả SV đã bị DROPPED do chưa đăng ký NV đợt 1) đăng ký bổ sung
+            spr.setStatus("ELIGIBLE");
+            spr.setNote("Đợt đăng ký bổ sung nguyện vọng GVHD đang mở");
+            studentProjectRoundRepository.save(spr);
+            reopenedCount++;
+
+            if (notificationService != null && spr.getStudent().getUser() != null && spr.getStudent().getUser().getId() != null) {
+                try {
+                    notificationService.createNotification(
+                            spr.getStudent().getUser().getId(),
+                            "Mở đợt đăng ký bổ sung nguyện vọng GVHD",
+                            "Khoa đã mở đợt đăng ký bổ sung nguyện vọng GVHD cho đợt [" + round.getRoundCode() + "]. Vui lòng hoàn tất đăng ký trước khi kết thúc đợt bổ sung.",
+                            "ASSIGNMENT",
+                            "/assignment/student"
+                    );
+                } catch (Exception ignored) {}
+            }
+        }
+        log.info("Đã mở đợt đăng ký bổ sung cho {} sinh viên trong đợt {}", reopenedCount, round.getRoundCode());
+        return getAssignmentStats(projectRoundId);
+    }
+
+    @Override
+    @Transactional
+    public AssignmentStatsResponseDTO finalizeSupplementaryRegistration(Long projectRoundId, Long currentUserId) {
+        ProjectRound round = getAndValidateActiveRound(projectRoundId);
+
+        // Chạy thuật toán gán cho các sinh viên mới đăng ký bổ sung (reassignAll = false để giữ nguyên các SV đã FINALIZED)
+        try {
+            AssignmentGenerateRequestDTO genReq = new AssignmentGenerateRequestDTO();
+            genReq.setProjectRoundId(projectRoundId);
+            genReq.setReassignAll(false);
+            generateAssignments(genReq);
+        } catch (Exception ex) {
+            log.warn("Không thể chạy tự động phân công khi chốt đợt bổ sung: {}", ex.getMessage());
+        }
+
+        // Chốt toàn bộ phân công mới phát sinh
+        List<SupervisorAssignment> assignments = assignmentRepository.findByProjectRoundId(projectRoundId);
+        Instant now = Instant.now();
+        for (SupervisorAssignment sa : assignments) {
+            if (!"FINALIZED".equalsIgnoreCase(sa.getStatus())) {
+                sa.setStatus("FINALIZED");
+                sa.setFinalizedBy(currentUserId);
+                sa.setFinalizedAt(now);
+                assignmentRepository.save(sa);
+
+                if (studentProjectRoundRepository != null && sa.getStudentId() != null) {
+                    studentProjectRoundRepository.findByStudentIdAndProjectRoundId(sa.getStudentId(), projectRoundId)
+                            .ifPresent(spr -> {
+                                spr.setStatus("ASSIGNED");
+                                spr.setNote("Đã được phân công GVHD chính thức (Đợt bổ sung)");
+                                studentProjectRoundRepository.save(spr);
+                            });
+                }
+            }
+        }
+
+        // Sau khi kết thúc đợt đăng ký bổ sung: Sinh viên nào vẫn KHÔNG đăng ký thì XÓA HẲN khỏi đợt đồ án
+        if (studentProjectRoundRepository != null) {
+            Set<Long> registeredStudentIds = registrationRepository.findByProjectRoundId(projectRoundId).stream()
+                    .map(DirectionRegistration::getStudentId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Set<Long> preferenceStudentIds = preferenceRepository.findByProjectRoundIdOrderByStudentIdAscPriorityAsc(projectRoundId).stream()
+                    .map(Preference::getStudentId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Set<Long> assignedStudentIds = assignments.stream()
+                    .map(SupervisorAssignment::getStudentId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            List<StudentProjectRound> roundStudents = studentProjectRoundRepository.findByProjectRoundId(projectRoundId);
+            int removedCount = 0;
+            for (StudentProjectRound spr : roundStudents) {
+                if (spr.getStudent() == null || spr.getStudent().getId() == null) {
+                    continue;
+                }
+                if ("RESERVED".equalsIgnoreCase(spr.getStatus())) {
+                    continue;
+                }
+                Long sId = spr.getStudent().getId();
+                boolean hasRegistered = registeredStudentIds.contains(sId)
+                        || preferenceStudentIds.contains(sId)
+                        || assignedStudentIds.contains(sId);
+                if (!hasRegistered) {
+                    studentProjectRoundRepository.delete(spr);
+                    removedCount++;
+                }
+            }
+            log.info("Kết thúc đợt đăng ký bổ sung đợt {}: Đã xóa vĩnh viễn {} sinh viên không đăng ký khỏi đợt đồ án",
+                    round.getRoundCode(), removedCount);
+        }
+
+        return getAssignmentStats(projectRoundId);
+    }
+
+    private void validateNotAlreadyFinalizedOrAllowSupplementary(Student student, ProjectRound round) {
+        if (student == null || round == null) {
+            return;
+        }
+        // Nếu cá nhân sinh viên này đã có phân công FINALIZED thì không cho đăng ký lại
+        Optional<SupervisorAssignment> myAssign = assignmentRepository.findByStudentIdAndProjectRoundId(student.getId(), round.getId());
+        if (myAssign.isPresent() && "FINALIZED".equalsIgnoreCase(myAssign.get().getStatus())) {
+            throw new AppException(ErrorCode.ASSIGNMENT_ALREADY_FINALIZED);
+        }
+        // Nếu đợt đã có các SV khác FINALIZED, kiểm tra xem sinh viên này có đang được mở đăng ký bổ sung không
+        if (assignmentRepository.countByProjectRoundIdAndStatus(round.getId(), "FINALIZED") > 0) {
+            if (studentProjectRoundRepository != null) {
+                Optional<StudentProjectRound> sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(student.getId(), round.getId());
+                if (sprOpt.isPresent()) {
+                    StudentProjectRound spr = sprOpt.get();
+                    boolean isSupplementary = spr.getNote() != null && spr.getNote().toLowerCase().contains("bổ sung");
+                    if (isSupplementary && !"DROPPED".equalsIgnoreCase(spr.getStatus())) {
+                        return;
+                    }
+                }
+            }
+            throw new AppException(ErrorCode.ASSIGNMENT_ALREADY_FINALIZED);
+        }
     }
 
     private void validateStudentInRound(Student student, ProjectRound round, Long currentUserId) {

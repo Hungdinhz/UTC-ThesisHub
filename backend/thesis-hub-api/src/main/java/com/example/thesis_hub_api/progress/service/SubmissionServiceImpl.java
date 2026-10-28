@@ -36,14 +36,24 @@ public class SubmissionServiceImpl implements SubmissionService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", taskId));
 
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseGet(() -> studentRepository.findByUserId(request.getStudentId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Student", request.getStudentId())));
+        Student student = null;
+        if (request.getStudentId() != null) {
+            student = studentRepository.findById(request.getStudentId())
+                    .orElseGet(() -> studentRepository.findByUserId(request.getStudentId()).orElse(null));
+        }
+        if (student == null && task.getThesis() != null && task.getThesis().getStudent() != null) {
+            student = task.getThesis().getStudent();
+        }
+        if (student == null) {
+            throw new ResourceNotFoundException("Student", request.getStudentId());
+        }
+
+        boolean isReviseTask = "REVISE".equalsIgnoreCase(task.getStatus()) || "REVISE_REQUIRED".equalsIgnoreCase(task.getStatus());
 
         Submission submission = Submission.builder()
                 .task(task)
                 .student(student)
-                .title(request.getTitle() != null ? request.getTitle() : "Nộp bài cho công việc: " + task.getTitle())
+                .title(request.getTitle() != null ? request.getTitle() : (isReviseTask ? "[Đã sửa bài] " + task.getTitle() : "Nộp bài cho công việc: " + task.getTitle()))
                 .submissionContent(request.getSubmissionContent())
                 .fileUrl(request.getFileUrl())
                 .status("SUBMITTED")
@@ -52,9 +62,11 @@ public class SubmissionServiceImpl implements SubmissionService {
 
         Submission saved = submissionRepository.save(submission);
 
-        // Update task status to SUBMITTED
-        task.setStatus("SUBMITTED");
-        taskRepository.save(task);
+        // Nếu task đang ở cột REVISE (Cần sửa), giữ nguyên ở cột REVISE để hiển thị trạng thái "Đã sửa" màu xanh
+        if (!isReviseTask) {
+            task.setStatus("SUBMITTED");
+            taskRepository.save(task);
+        }
 
         // Gửi thông báo cho GVHD người tạo task
         if (task.getCreatedBy() != null && task.getCreatedBy().getId() != null) {

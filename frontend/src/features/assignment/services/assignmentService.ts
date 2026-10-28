@@ -608,4 +608,20 @@ export const assignmentService = {
       };
     }
   },
+
+  async openSupplementaryRegistration(projectRoundId: number): Promise<AssignmentStats> {
+    const res = await axios.post(`${API_BASE}/supplementary/open`, null, {
+      params: { projectRoundId },
+      headers: getAuthHeaders(),
+    });
+    return res.data?.data || res.data;
+  },
+
+  async finalizeSupplementaryRegistration(projectRoundId: number): Promise<AssignmentStats> {
+    const res = await axios.post(`${API_BASE}/supplementary/finalize`, null, {
+      params: { projectRoundId },
+      headers: getAuthHeaders(),
+    });
+    return res.data?.data || res.data;
+  },
 };

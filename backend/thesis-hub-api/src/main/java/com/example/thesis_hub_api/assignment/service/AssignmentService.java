@@ -42,4 +42,6 @@ public interface AssignmentService {
     SupervisorAssignmentResponseDTO overrideAssignment(Long assignmentId, AssignmentOverrideRequestDTO request, Long currentUserId);
     AssignmentStatsResponseDTO finalizeAssignments(AssignmentFinalizeRequestDTO request, Long currentUserId);
     AssignmentStatsResponseDTO getAssignmentStats(Long projectRoundId);
+    AssignmentStatsResponseDTO openSupplementaryRegistration(Long projectRoundId);
+    AssignmentStatsResponseDTO finalizeSupplementaryRegistration(Long projectRoundId, Long currentUserId);
 }

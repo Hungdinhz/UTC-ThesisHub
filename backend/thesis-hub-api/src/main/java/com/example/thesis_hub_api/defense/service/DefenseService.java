@@ -1,5 +1,7 @@
 package com.example.thesis_hub_api.defense.service;
 
+import com.example.thesis_hub_api.assignment.entity.SupervisorAssignment;
+import com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository;
 import com.example.thesis_hub_api.defense.algorithm.DefenseCouncilScheduler;
 import com.example.thesis_hub_api.defense.dto.*;
 import com.example.thesis_hub_api.defense.entity.*;
@@ -8,7 +10,9 @@ import com.example.thesis_hub_api.defense.service.mock.ExternalThesisMockService
 import com.example.thesis_hub_api.defense.service.mock.ExternalThesisMockService.MockLecturer;
 import com.example.thesis_hub_api.defense.service.mock.ExternalThesisMockService.MockThesis;
 import com.example.thesis_hub_api.organization.entity.Lecturer;
+import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.repository.LecturerRepository;
+import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.thesis.entity.Thesis;
 import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +48,12 @@ public class DefenseService {
     @Autowired(required = false)
     private LecturerRepository lecturerRepository;
 
+    @Autowired(required = false)
+    private StudentRepository studentRepository;
+
+    @Autowired(required = false)
+    private SupervisorAssignmentRepository supervisorAssignmentRepository;
+
     private String resolveLecturerName(Long lecturerId) {
         if (lecturerRepository != null && lecturerId != null) {
             Optional<Lecturer> dbLec = lecturerRepository.findById(lecturerId);
@@ -71,15 +81,44 @@ public class DefenseService {
             List<Thesis> dbTheses = thesisRepository != null
                     ? thesisRepository.findByProjectRoundId(roundId)
                     : Collections.emptyList();
-            if (!dbTheses.isEmpty()) {
-                for (Thesis t : dbTheses) {
+            List<Thesis> eligibleTheses = dbTheses.stream()
+                    .filter(t -> Boolean.TRUE.equals(t.getDefenseEligible())
+                            || "DEFENSE_READY".equalsIgnoreCase(t.getStatus())
+                            || "COMPLETED".equalsIgnoreCase(t.getStatus()))
+                    .collect(Collectors.toList());
+            List<Thesis> targetTheses = !eligibleTheses.isEmpty() ? eligibleTheses : dbTheses;
+
+            if (!targetTheses.isEmpty()) {
+                for (Thesis t : targetTheses) {
+                    if (t.getStudent() == null) continue;
                     CouncilSchedulingRequestDTO.StudentInfo si = new CouncilSchedulingRequestDTO.StudentInfo();
                     si.setStudentId(String.valueOf(t.getStudent().getId()));
                     si.setThesisId(String.valueOf(t.getId()));
-                    si.setAdvisorId(String.valueOf(t.getLecturer().getId()));
+                    if (t.getLecturer() != null) {
+                        si.setAdvisorId(String.valueOf(t.getLecturer().getId()));
+                    }
                     students.add(si);
                 }
-            } else {
+            } else if (supervisorAssignmentRepository != null) {
+                List<SupervisorAssignment> activeAssignments = supervisorAssignmentRepository.findByProjectRoundId(roundId)
+                        .stream()
+                        .filter(sa -> !"CANCELLED".equalsIgnoreCase(sa.getStatus()))
+                        .collect(Collectors.toList());
+                if (!activeAssignments.isEmpty()) {
+                    for (SupervisorAssignment sa : activeAssignments) {
+                        if (sa.getStudentId() == null) continue;
+                        CouncilSchedulingRequestDTO.StudentInfo si = new CouncilSchedulingRequestDTO.StudentInfo();
+                        si.setStudentId(String.valueOf(sa.getStudentId()));
+                        si.setThesisId(String.valueOf(sa.getId()));
+                        if (sa.getLecturerId() != null) {
+                            si.setAdvisorId(String.valueOf(sa.getLecturerId()));
+                        }
+                        students.add(si);
+                    }
+                }
+            }
+
+            if (students.isEmpty()) {
                 List<MockThesis> thesesInRound = thesisMockService.getThesesByProjectRound(roundId);
                 for (MockThesis mt : thesesInRound) {
                     CouncilSchedulingRequestDTO.StudentInfo si = new CouncilSchedulingRequestDTO.StudentInfo();
@@ -99,28 +138,40 @@ public class DefenseService {
             List<Lecturer> dbLecturers = lecturerRepository != null
                     ? lecturerRepository.findAll()
                     : Collections.emptyList();
-            if (dbLecturers.size() >= 5) {
+            if (!dbLecturers.isEmpty()) {
                 for (Lecturer l : dbLecturers) {
                     CouncilSchedulingRequestDTO.LecturerInfo li = new CouncilSchedulingRequestDTO.LecturerInfo();
                     li.setLecturerId(String.valueOf(l.getId()));
                     String degree = l.getAcademicDegree() != null ? l.getAcademicDegree().toUpperCase() : "";
-                    boolean canBePres = degree.contains("TIEN_SI") || degree.contains("PGS") || degree.contains("GS");
+                    boolean canBePres = degree.contains("TIEN_SI") || degree.contains("TIẾN SĨ")
+                            || degree.contains("TS") || degree.contains("PGS") || degree.contains("GS")
+                            || degree.contains("PHÓ GIÁO SƯ") || degree.contains("GIÁO SƯ") || degree.contains("PHD");
                     li.setPresidentEligible(canBePres);
                     li.setSecretaryEligible(true);
                     li.setMemberEligible(true);
                     li.setCurrentLoad(0);
                     lecturers.add(li);
                 }
-            } else {
+                if (lecturers.stream().noneMatch(CouncilSchedulingRequestDTO.LecturerInfo::isPresidentEligible)) {
+                    lecturers.forEach(li -> li.setPresidentEligible(true));
+                }
+            }
+            if (lecturers.size() < 5) {
+                Set<String> existingLecIds = lecturers.stream()
+                        .map(CouncilSchedulingRequestDTO.LecturerInfo::getLecturerId)
+                        .collect(Collectors.toSet());
                 List<MockLecturer> allLecs = thesisMockService.getAllLecturers();
                 for (MockLecturer ml : allLecs) {
-                    CouncilSchedulingRequestDTO.LecturerInfo li = new CouncilSchedulingRequestDTO.LecturerInfo();
-                    li.setLecturerId(String.valueOf(ml.getLecturerId()));
-                    li.setPresidentEligible(ml.isCanBePresident());
-                    li.setSecretaryEligible(ml.isCanBeSecretary());
-                    li.setMemberEligible(ml.isCanBeMember());
-                    li.setCurrentLoad(ml.getCurrentLoad());
-                    lecturers.add(li);
+                    String mlId = String.valueOf(ml.getLecturerId());
+                    if (!existingLecIds.contains(mlId)) {
+                        CouncilSchedulingRequestDTO.LecturerInfo li = new CouncilSchedulingRequestDTO.LecturerInfo();
+                        li.setLecturerId(mlId);
+                        li.setPresidentEligible(ml.isCanBePresident());
+                        li.setSecretaryEligible(ml.isCanBeSecretary());
+                        li.setMemberEligible(ml.isCanBeMember());
+                        li.setCurrentLoad(ml.getCurrentLoad());
+                        lecturers.add(li);
+                    }
                 }
             }
         }
@@ -131,6 +182,30 @@ public class DefenseService {
         schedulerRequest.setMaxStudentsPerCouncil(request.getMaxStudentsPerCouncil() > 0 ? request.getMaxStudentsPerCouncil() : 5);
 
         CouncilSchedulingResultDTO schedulerResult = councilScheduler.schedule(schedulerRequest);
+
+        // Fallback if single-batch advisor exclusion left fewer than 5 non-advisor lecturers in a small faculty pool
+        if (schedulerResult.getCouncils().isEmpty() && lecturers.size() >= 5) {
+            Set<String> batchAdvisors = students.stream()
+                    .map(CouncilSchedulingRequestDTO.StudentInfo::getAdvisorId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            List<CouncilSchedulingRequestDTO.LecturerInfo> sortedPool = new ArrayList<>(lecturers);
+            sortedPool.sort(Comparator
+                    .comparing((CouncilSchedulingRequestDTO.LecturerInfo l) -> batchAdvisors.contains(l.getLecturerId()))
+                    .thenComparing(l -> !l.isPresidentEligible())
+                    .thenComparingInt(CouncilSchedulingRequestDTO.LecturerInfo::getCurrentLoad));
+
+            CouncilSchedulingResultDTO.CouncilResult fallbackCr = new CouncilSchedulingResultDTO.CouncilResult();
+            fallbackCr.setStudentIds(students.stream()
+                    .map(CouncilSchedulingRequestDTO.StudentInfo::getStudentId)
+                    .collect(Collectors.toList()));
+            fallbackCr.setPresidentId(sortedPool.get(0).getLecturerId());
+            fallbackCr.setSecretary1Id(sortedPool.get(1).getLecturerId());
+            fallbackCr.setSecretary2Id(sortedPool.get(2).getLecturerId());
+            fallbackCr.setMember1Id(sortedPool.get(3).getLecturerId());
+            fallbackCr.setMember2Id(sortedPool.get(4).getLecturerId());
+            schedulerResult.getCouncils().add(fallbackCr);
+        }
 
         List<CouncilResponseDTO> responseList = new ArrayList<>();
 
@@ -145,7 +220,7 @@ public class DefenseService {
 
         List<DefenseCouncil> remaining = councilRepository.findByProjectRoundId(roundId);
         Set<String> existingCodes = remaining.stream().map(DefenseCouncil::getCode).collect(Collectors.toSet());
-        long nextNum = 1;
+        long nextNum = Math.max(1L, councilRepository.count() + 1L);
 
         for (CouncilSchedulingResultDTO.CouncilResult cr : schedulerResult.getCouncils()) {
             while (existingCodes.contains("HD-" + roundId + "-" + String.format("%02d", nextNum))) {
@@ -159,7 +234,7 @@ public class DefenseService {
                     .projectRoundId(roundId)
                     .code(code)
                     .name(name)
-                    .status("DRAFT")
+                    .status("ACTIVE")
                     .description("Hội đồng sinh tự động bằng thuật toán CSP Backtracking + Greedy (1CT - 2TK - 2UV)")
                     .build();
             DefenseCouncil savedCouncil = councilRepository.save(council);
@@ -176,7 +251,11 @@ public class DefenseService {
             memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMember1Id()), "MEMBER"));
             memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMember2Id()), "MEMBER"));
 
-            responseList.add(mapToCouncilResponse(savedCouncil));
+            CouncilResponseDTO councilResp = mapToCouncilResponse(savedCouncil);
+            if (councilResp.getMembers() == null || councilResp.getMembers().isEmpty()) {
+                councilResp.setMembers(memberDTOs);
+            }
+            responseList.add(councilResp);
         }
 
         return responseList;
@@ -279,7 +358,14 @@ public class DefenseService {
         List<CouncilStudentDetailDTO> assignedStudents = new ArrayList<>();
         if (thesisRepository != null && council.getProjectRoundId() != null) {
             List<Thesis> dbTheses = thesisRepository.findByProjectRoundId(council.getProjectRoundId());
-            for (Thesis t : dbTheses) {
+            List<Thesis> eligibleTheses = dbTheses.stream()
+                    .filter(t -> Boolean.TRUE.equals(t.getDefenseEligible())
+                            || "DEFENSE_READY".equalsIgnoreCase(t.getStatus())
+                            || "COMPLETED".equalsIgnoreCase(t.getStatus()))
+                    .collect(Collectors.toList());
+            List<Thesis> targetTheses = !eligibleTheses.isEmpty() ? eligibleTheses : dbTheses;
+
+            for (Thesis t : targetTheses) {
                 if (t.getStudent() != null) {
                     studentIds.add(t.getStudent().getId());
                     String sName = (t.getStudent().getUser() != null) ? t.getStudent().getUser().getFullName() : ("Sinh viên #" + t.getStudent().getId());
@@ -293,6 +379,40 @@ public class DefenseService {
                             .studentCode(sCode)
                             .thesisId(t.getId())
                             .thesisTitle(t.getTitleVn())
+                            .advisorId(advId)
+                            .advisorName(advName)
+                            .build());
+                }
+            }
+        }
+        if (assignedStudents.isEmpty() && supervisorAssignmentRepository != null && council.getProjectRoundId() != null) {
+            List<SupervisorAssignment> activeAssignments = supervisorAssignmentRepository.findByProjectRoundId(council.getProjectRoundId())
+                    .stream()
+                    .filter(sa -> !"CANCELLED".equalsIgnoreCase(sa.getStatus()))
+                    .collect(Collectors.toList());
+            for (SupervisorAssignment sa : activeAssignments) {
+                if (sa.getStudentId() != null) {
+                    studentIds.add(sa.getStudentId());
+                    String sName = "Sinh viên #" + sa.getStudentId();
+                    String sCode = "SV" + sa.getStudentId();
+                    if (studentRepository != null) {
+                        Optional<Student> stOpt = studentRepository.findById(sa.getStudentId());
+                        if (stOpt.isPresent()) {
+                            sCode = stOpt.get().getStudentCode();
+                            if (stOpt.get().getUser() != null) {
+                                sName = stOpt.get().getUser().getFullName();
+                            }
+                        }
+                    }
+                    Long advId = sa.getLecturerId();
+                    String advName = advId != null ? resolveLecturerName(advId) : "—";
+
+                    assignedStudents.add(CouncilStudentDetailDTO.builder()
+                            .studentId(sa.getStudentId())
+                            .studentName(sName)
+                            .studentCode(sCode)
+                            .thesisId(sa.getId())
+                            .thesisTitle("Đề tài tốt nghiệp đợt " + council.getProjectRoundId())
                             .advisorId(advId)
                             .advisorName(advName)
                             .build());
