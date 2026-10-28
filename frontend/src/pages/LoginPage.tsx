@@ -170,6 +170,9 @@ const LoginPage: React.FC = () => {
         const detail = err.response?.data?.detail || '';
         const seconds = detail.match(/\d+/)?.[0] || '60';
         setError(t('login.throttled', `Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ${seconds} giây.`));
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || !err.response) {
+        // Trường hợp máy chủ Render đang cold start hoặc request bị ngắt kết nối
+        setError('Máy chủ đang khởi động (Cold Start trên Render). Vui lòng đợi khoảng 200-300 giây rồi thử đăng nhập lại!');
       } else {
         setError(err.response?.data?.message || err.response?.data?.detail || t('login.loginFailed', 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản.'));
       }
