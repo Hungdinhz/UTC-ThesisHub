@@ -72,11 +72,14 @@ export const CouncilGenerateModal: React.FC<CouncilGenerateModalProps> = ({
             onChange={(e) => setProjectRoundId(Number(e.target.value))}
           >
             {rounds && rounds.length > 0 ? (
-              rounds.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name} ({r.roundCode || `ID: ${r.id}`})
-                </option>
-              ))
+              rounds.map((r: any) => {
+                const rid = r.roundId || r.id;
+                return (
+                  <option key={rid} value={rid}>
+                    {r.name} ({r.roundCode || `ID: ${rid}`})
+                  </option>
+                );
+              })
             ) : (
               <>
                 <option value={16}>Đợt đồ án hiện tại (ID: 16)</option>

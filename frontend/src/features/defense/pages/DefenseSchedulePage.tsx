@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
-import { Button } from '../../../components/ui';
+import { Button, Modal } from '../../../components/ui';
 import { ScheduleCalendarView } from '../components/ScheduleCalendarView';
 import { ScheduleConfigModal } from '../components/ScheduleConfigModal';
 import { defenseService } from '../services/defenseService';
@@ -27,6 +27,7 @@ export const DefenseSchedulePage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'TIMELINE' | 'ROOM' | 'SESSION'>('ROOM');
   const [loading, setLoading] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [selectedScheduleDetail, setSelectedScheduleDetail] = useState<DefenseSchedule | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
@@ -501,8 +502,187 @@ export const DefenseSchedulePage: React.FC = () => {
 
       {/* Schedules Content */}
       <div className="schedule-content-box">
-        <ScheduleCalendarView schedules={visibleSchedules} viewMode={viewMode} />
+        <ScheduleCalendarView
+          schedules={visibleSchedules}
+          viewMode={viewMode}
+          onSelectSchedule={(sched) => setSelectedScheduleDetail(sched)}
+        />
       </div>
+
+      {/* Defense Schedule Detail Modal */}
+      {selectedScheduleDetail && (() => {
+        const detailCouncil = councils.find((c) => c.id === selectedScheduleDetail.councilId);
+        const detailMembers =
+          (selectedScheduleDetail.members && selectedScheduleDetail.members.length > 0
+            ? selectedScheduleDetail.members
+            : detailCouncil?.members) || [];
+        const detailStudents =
+          (selectedScheduleDetail.assignedStudents && selectedScheduleDetail.assignedStudents.length > 0
+            ? selectedScheduleDetail.assignedStudents
+            : detailCouncil?.assignedStudents) || [];
+
+        return (
+          <Modal
+            isOpen={true}
+            onClose={() => setSelectedScheduleDetail(null)}
+            title={`📋 Chi Tiết Ca Bảo Vệ — ${selectedScheduleDetail.councilName}`}
+            maxWidth="820px"
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* 1. Thông tin phòng, ngày, ca */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: '12px',
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '14px 16px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>🏛️ Phòng bảo vệ</div>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#0a3273', marginTop: '2px' }}>
+                    {selectedScheduleDetail.room}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>📅 Ngày bảo vệ</div>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#0a3273', marginTop: '2px' }}>
+                    {selectedScheduleDetail.defenseDate}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>⏰ Ca &amp; Khung giờ</div>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#0a3273', marginTop: '2px' }}>
+                    {selectedScheduleDetail.session === 'MORNING' ? 'Ca Sáng' : 'Ca Chiều'} ({selectedScheduleDetail.startTime} - {selectedScheduleDetail.endTime})
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>⚖️ Hội đồng</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#15803d', marginTop: '2px' }}>
+                    {selectedScheduleDetail.councilCode || detailCouncil?.code || selectedScheduleDetail.councilName}
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Danh sách 5 thành viên Hội đồng */}
+              <div
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '14px 16px',
+                }}
+              >
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '10px' }}>
+                  👥 Thành viên Hội đồng chấm thi ({detailMembers.length} Giảng viên — Cơ cấu 1CT - 2TK - 2UV):
+                </div>
+                {detailMembers.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+                    {detailMembers.map((m) => {
+                      const roleLabel =
+                        m.role === 'PRESIDENT'
+                          ? '⭐ Chủ tịch Hội đồng'
+                          : m.role === 'SECRETARY'
+                          ? '📝 Ủy viên Thư ký'
+                          : '👤 Ủy viên Hội đồng';
+                      const roleColor =
+                        m.role === 'PRESIDENT' ? '#b45309' : m.role === 'SECRETARY' ? '#0369a1' : '#334155';
+                      const roleBg =
+                        m.role === 'PRESIDENT' ? '#fef3c7' : m.role === 'SECRETARY' ? '#e0f2fe' : '#f1f5f9';
+                      return (
+                        <div
+                          key={m.id || `${m.lecturerId}-${m.role}`}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            background: '#fff',
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              background: roleBg,
+                              color: roleColor,
+                              marginBottom: '4px',
+                            }}
+                          >
+                            {roleLabel}
+                          </span>
+                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13.5px' }}>{m.lecturerName}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ color: '#64748b', fontSize: '13px', fontStyle: 'italic' }}>
+                    Chưa có danh sách thành viên Hội đồng.
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Danh sách Sinh viên bảo vệ trong ca đó */}
+              <div
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '14px 16px',
+                }}
+              >
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '10px' }}>
+                  🎓 Danh sách sinh viên bảo vệ trong ca này ({detailStudents.length} sinh viên):
+                </div>
+                {detailStudents.length > 0 ? (
+                  <div style={{ overflowX: 'auto', maxHeight: '300px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ background: '#f1f5f9', color: '#334155', borderBottom: '1px solid #cbd5e1' }}>
+                          <th style={{ padding: '8px 10px' }}>STT</th>
+                          <th style={{ padding: '8px 10px' }}>MSSV</th>
+                          <th style={{ padding: '8px 10px' }}>Họ và tên SV</th>
+                          <th style={{ padding: '8px 10px' }}>Đề tài bảo vệ</th>
+                          <th style={{ padding: '8px 10px' }}>GVHD</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailStudents.map((st, idx) => (
+                          <tr key={st.studentId || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '8px 10px', fontWeight: 600 }}>{idx + 1}</td>
+                            <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
+                            <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>{st.studentName}</td>
+                            <td style={{ padding: '8px 10px', color: '#334155' }}>{st.thesisTitle}</td>
+                            <td style={{ padding: '8px 10px', color: '#15803d', fontWeight: 600 }}>
+                              {st.advisorName || (st.advisorId ? `GV #${st.advisorId}` : '—')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ color: '#64748b', fontSize: '13px', fontStyle: 'italic' }}>
+                    Chưa có sinh viên nào được xếp trong ca bảo vệ này.
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button variant="primary" onClick={() => setSelectedScheduleDetail(null)}>
+                  Đóng
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* Config Modal */}
       {canManageSchedule && (

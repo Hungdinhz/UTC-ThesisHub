@@ -154,13 +154,15 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         try {
           const myStatus = await apiService.getMyRoundStatus();
           if (myStatus && myStatus.inRound) {
+            let finalRoundStage = myStatus.roundCurrentStage || 1;
             if (myStatus.roundId) {
               try {
                 const studentRound = await apiService.getProjectRoundById(myStatus.roundId);
                 if (studentRound) {
                   setActiveRound(studentRound);
                   const st = getRoundStageNumber(studentRound.currentMilestone?.phaseType, studentRound.status);
-                  setRoundCurrentStage(myStatus.roundCurrentStage || st);
+                  finalRoundStage = Math.max(myStatus.roundCurrentStage || 1, st);
+                  setRoundCurrentStage(finalRoundStage);
                 }
               } catch {
                 if (myStatus.roundCurrentStage) {
@@ -176,10 +178,8 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
             });
             if (myStatus.isDropped) {
               setUserCompletedStageState(myStatus.completedStage || 1);
-            } else if (myStatus.completedStage) {
-              setUserCompletedStageState(myStatus.completedStage);
             } else {
-              setUserCompletedStageState(1);
+              setUserCompletedStageState(Math.max(myStatus.completedStage || 1, finalRoundStage - 1));
             }
             return;
           }
@@ -193,7 +193,13 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         setActiveRound(round);
         const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
         setRoundCurrentStage(st);
-        if (currentRole === 'supervisor' || currentRole === 'lecturer' || currentRole === 'committee_member' || currentRole === 'committee') {
+        if (
+          currentRole === 'student' ||
+          currentRole === 'supervisor' ||
+          currentRole === 'lecturer' ||
+          currentRole === 'committee_member' ||
+          currentRole === 'committee'
+        ) {
           setUserCompletedStageState(Math.max(st - 1, 1));
         }
       }

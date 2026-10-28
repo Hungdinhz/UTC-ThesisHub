@@ -261,6 +261,70 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
     }
   };
 
+  // Mở đợt đăng ký bổ sung cho các sinh viên chưa đăng ký
+  const handleOpenSupplementary = async () => {
+    if (isRoundClosed) return;
+    if (!window.confirm('Bạn có chắc chắn muốn mở ĐỢT ĐĂNG KÝ BỔ SUNG cho các sinh viên chưa đăng ký nguyện vọng trong đợt đồ án này?')) {
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setAlert(null);
+      const updatedStats = await assignmentService.openSupplementaryRegistration(effectiveRoundId);
+      setStats(updatedStats);
+      setAlert({
+        type: 'success',
+        message: 'Đã mở Đợt đăng ký bổ sung! Các sinh viên chưa đăng ký trong đợt hiện có thể vào đăng ký nguyện vọng bổ sung.',
+      });
+    } catch {
+      setAlert({
+        type: 'danger',
+        message: 'Có lỗi xảy ra khi mở đợt đăng ký bổ sung.',
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Chốt đợt đăng ký bổ sung & Xóa hẳn sinh viên không đăng ký khỏi đợt
+  const handleFinalizeSupplementary = async () => {
+    if (isRoundClosed) return;
+    if (
+      !window.confirm(
+        'XÁC NHẬN CHỐT ĐỢT ĐĂNG KÝ BỔ SUNG:\n\n- Các sinh viên đã đăng ký bổ sung sẽ được phân công GVHD.\n- Các sinh viên VẪN CHƯA ĐĂNG KÝ sẽ bị XÓA HOÀN TOÀN khỏi đợt đồ án (không còn trong danh sách đợt nữa).\n\nBạn có chắc chắn muốn thực hiện?'
+      )
+    ) {
+      return;
+    }
+    try {
+      setActionLoading(true);
+      setAlert(null);
+      const updatedStats = await assignmentService.finalizeSupplementaryRegistration(effectiveRoundId);
+      setStats(updatedStats);
+      const [updatedProps, updatedCaps, updatedRegs, updatedPrefs] = await Promise.all([
+        assignmentService.getProposals(effectiveRoundId),
+        assignmentService.getCapacities(effectiveRoundId),
+        assignmentService.getRegistrations(effectiveRoundId),
+        assignmentService.getPreferences(effectiveRoundId),
+      ]);
+      setProposals(updatedProps);
+      setCapacities(updatedCaps);
+      setRegistrations(updatedRegs);
+      setPreferences(updatedPrefs);
+      setAlert({
+        type: 'success',
+        message: 'Đã chốt Đợt đăng ký bổ sung thành công! Những sinh viên không đăng ký đã bị xóa hoàn toàn khỏi đợt đồ án.',
+      });
+    } catch {
+      setAlert({
+        type: 'danger',
+        message: 'Có lỗi xảy ra khi chốt đợt đăng ký bổ sung.',
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Update Lecturer Capacity
   const handleUpdateCapacity = async (id: number, data: Partial<LecturerCapacity>) => {
     if (isRoundClosed) {
@@ -468,6 +532,44 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
                 </span>
               ) : null}
             </p>
+            {!isRoundClosed && (
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={handleOpenSupplementary}
+                  disabled={actionLoading || loading}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #f59e0b',
+                    backgroundColor: '#fffbeb',
+                    color: '#b45309',
+                    fontWeight: 700,
+                    fontSize: '0.84rem',
+                    cursor: actionLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  🔓 Mở đợt đăng ký bổ sung (Cho SV chưa ĐK)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFinalizeSupplementary}
+                  disabled={actionLoading || loading}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #dc2626',
+                    backgroundColor: '#fef2f2',
+                    color: '#b91c1c',
+                    fontWeight: 700,
+                    fontSize: '0.84rem',
+                    cursor: actionLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  🔒 Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

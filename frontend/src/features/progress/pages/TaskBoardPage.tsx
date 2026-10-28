@@ -17,7 +17,8 @@ export const TaskBoardPage: React.FC = () => {
 
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor' || userType === 'committee_member';
-  const canCreateTask = isSupervisor;
+  const isAdmin = userType === 'admin';
+  const canCreateTask = isSupervisor && !isAdmin;
 
   // Project Rounds state for separate filtering
   const [projectRounds, setProjectRounds] = useState<ProjectRoundItem[]>([]);
@@ -163,6 +164,15 @@ export const TaskBoardPage: React.FC = () => {
   const [submissionContent, setSubmissionContent] = useState<string>('');
   const [submissionFileUrl, setSubmissionFileUrl] = useState<string>('');
   const [submitSuccessMsg, setSubmitSuccessMsg] = useState<string | null>(null);
+  const [showReviseForm, setShowReviseForm] = useState<boolean>(false);
+  const [revisedTaskIds, setRevisedTaskIds] = useState<Record<number, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem('utc_revised_tasks_v1');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
 
   // Review modal state
   const [reviewModalSubmission, setReviewModalSubmission] = useState<Submission | null>(null);
@@ -313,7 +323,37 @@ export const TaskBoardPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await progressService.getTasksByThesis(id);
-      setTasks(data || []);
+      const taskList = data || [];
+      setTasks(taskList);
+
+      // Kiểm tra các task ở cột REVISE xem bài nộp mới nhất đã được SV nộp sửa lại (SUBMITTED) hay chưa
+      const reviseTasks = taskList.filter(t => t.status === 'REVISE');
+      if (reviseTasks.length > 0) {
+        Promise.all(
+          reviseTasks.map(async (rt) => {
+            try {
+              const subs = await progressService.getSubmissionsByTask(rt.id);
+              const latest = subs && subs.length > 0 ? subs[0] : null;
+              return { taskId: rt.id, isRevised: !!latest && latest.status === 'SUBMITTED' };
+            } catch {
+              return null;
+            }
+          })
+        ).then((results) => {
+          setRevisedTaskIds((prev) => {
+            const next = { ...prev };
+            results.forEach((r) => {
+              if (r) {
+                next[r.taskId] = r.isRevised;
+              }
+            });
+            try {
+              localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+            } catch {}
+            return next;
+          });
+        });
+      }
     } catch (err) {
       console.error('Lỗi khi tải danh sách nhiệm vụ:', err);
       setTasks([]);
@@ -325,6 +365,7 @@ export const TaskBoardPage: React.FC = () => {
   const handleOpenDetail = async (task: Task) => {
     setSelectedTask(task);
     setSubmitSuccessMsg(null);
+    setShowReviseForm(false);
     try {
       const [cList, sList] = await Promise.all([
         progressService.getCommentsByTask(task.id).catch(() => []),
@@ -332,6 +373,16 @@ export const TaskBoardPage: React.FC = () => {
       ]);
       setComments(cList);
       setSubmissions(sList);
+      if (task.status === 'REVISE' && sList.length > 0) {
+        const latestIsSubmitted = sList[0].status === 'SUBMITTED';
+        setRevisedTaskIds((prev) => {
+          const next = { ...prev, [task.id]: latestIsSubmitted };
+          try {
+            localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      }
     } catch {
       setComments([]);
       setSubmissions([]);
@@ -341,9 +392,13 @@ export const TaskBoardPage: React.FC = () => {
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !selectedTask) return;
+    const contentToSave = newComment.trim();
+    setNewComment('');
     try {
-      const added = await progressService.addComment(selectedTask.id, user?.id || 1, newComment);
+      const added = await progressService.addComment(selectedTask.id, user?.id || 1, contentToSave);
       setComments(prev => [...prev, added]);
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, commentCount: (t.commentCount || 0) + 1 } : t));
+      setSelectedTask(prev => prev ? { ...prev, commentCount: (prev.commentCount || 0) + 1 } : null);
     } catch {
       setComments(prev => [
         ...prev,
@@ -352,28 +407,43 @@ export const TaskBoardPage: React.FC = () => {
           taskId: selectedTask.id,
           userId: user?.id || 1,
           userFullName: user?.fullName || 'Người dùng',
-          content: newComment,
+          content: contentToSave,
           isEdited: false,
           replies: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
       ]);
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, commentCount: (t.commentCount || 0) + 1 } : t));
     }
-    setNewComment('');
   };
 
   const handleSubmitTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTask) return;
+    const isReviseTask = selectedTask.status === 'REVISE';
+    const nextTaskStatus: Task['status'] = isReviseTask ? 'REVISE' : 'SUBMITTED';
     try {
       const effectiveStudentId = currentThesis?.studentId || user?.id || 1;
       const sub = await progressService.submitTask(selectedTask.id, effectiveStudentId, submissionContent, submissionFileUrl);
       setSubmissions(prev => [sub, ...prev]);
-      setSelectedTask(prev => prev ? { ...prev, status: 'SUBMITTED', submissionCount: (prev.submissionCount || 0) + 1 } : null);
-      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'SUBMITTED', submissionCount: (t.submissionCount || 0) + 1 } : t));
-      setSubmitSuccessMsg('🎉 Nộp bài thành công! File và báo cáo kết quả của bạn đã được ghi nhận.');
-      alert('🎉 Nộp bài thành công! Task đã chuyển sang trạng thái ĐÃ NỘP BÀI (SUBMITTED) chờ GVHD nghiệm thu.');
+      setSelectedTask(prev => prev ? { ...prev, status: nextTaskStatus, submissionCount: (prev.submissionCount || 0) + 1 } : null);
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: nextTaskStatus, submissionCount: (t.submissionCount || 0) + 1 } : t));
+      if (isReviseTask) {
+        setRevisedTaskIds(prev => {
+          const next = { ...prev, [selectedTask.id]: true };
+          try {
+            localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+        setShowReviseForm(false);
+        setSubmitSuccessMsg('✅ Đã nộp bài sửa thành công! Trạng thái công việc trong cột Cần Sửa đã chuyển sang màu xanh (Đã sửa - Chờ GVHD duyệt).');
+        alert('✅ Đã nộp bài sửa thành công! Nhiệm vụ vẫn ở cột Cần Sửa (Revise) với nhãn màu xanh "ĐÃ SỬA BÀI" chờ GVHD duyệt.');
+      } else {
+        setSubmitSuccessMsg('🎉 Nộp bài thành công! File và báo cáo kết quả của bạn đã được ghi nhận.');
+        alert('🎉 Nộp bài thành công! Task đã chuyển sang trạng thái ĐÃ NỘP BÀI (SUBMITTED) chờ GVHD nghiệm thu.');
+      }
     } catch (err: any) {
       console.error('Lỗi khi nộp bài:', err);
       const fallbackSub: Submission = {
@@ -389,10 +459,21 @@ export const TaskBoardPage: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
       setSubmissions(prev => [fallbackSub, ...prev]);
-      setSelectedTask(prev => prev ? { ...prev, status: 'SUBMITTED', submissionCount: (prev.submissionCount || 0) + 1 } : null);
-      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'SUBMITTED', submissionCount: (t.submissionCount || 0) + 1 } : t));
-      setSubmitSuccessMsg('🎉 Đã lưu bài nộp vào hệ thống!');
-      alert('🎉 Đã nộp bài! Task đã chuyển sang trạng thái ĐÃ NỘP BÀI (SUBMITTED).');
+      setSelectedTask(prev => prev ? { ...prev, status: nextTaskStatus, submissionCount: (prev.submissionCount || 0) + 1 } : null);
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: nextTaskStatus, submissionCount: (t.submissionCount || 0) + 1 } : t));
+      if (isReviseTask) {
+        setRevisedTaskIds(prev => {
+          const next = { ...prev, [selectedTask.id]: true };
+          try {
+            localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+        setShowReviseForm(false);
+        setSubmitSuccessMsg('✅ Đã lưu bài sửa thành công! Trạng thái chuyển sang ĐÃ SỬA BÀI (Màu xanh).');
+      } else {
+        setSubmitSuccessMsg('🎉 Đã lưu bài nộp vào hệ thống!');
+      }
     }
     setSubmissionContent('');
     setSubmissionFileUrl('');
@@ -417,6 +498,11 @@ export const TaskBoardPage: React.FC = () => {
     feedback: string
   ) => {
     if (!selectedTask) return;
+    if (status === 'ACCEPTED') {
+      if (!window.confirm('Xác nhận NGHIỆM THU ĐẠT bài nộp này? Công việc sẽ chuyển sang trạng thái HOÀN THÀNH (COMPLETED).')) {
+        return;
+      }
+    }
     try {
       setReviewLoading(true);
       await progressService.reviewSubmission(submissionId, status, feedback);
@@ -430,6 +516,13 @@ export const TaskBoardPage: React.FC = () => {
       } : s));
 
       if (status === 'ACCEPTED') {
+        setRevisedTaskIds(prev => {
+          const next = { ...prev, [selectedTask.id]: false };
+          try {
+            localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
         await handleStatusChange(selectedTask.id, 'COMPLETED');
 
         // Recalculate progress rate
@@ -446,18 +539,37 @@ export const TaskBoardPage: React.FC = () => {
 
         alert(`✅ Đã nghiệm thu ĐẠT! Task đã chuyển sang HOÀN THÀNH. Tiến độ đề tài tăng lên ${newRate}%.`);
       } else {
+        setRevisedTaskIds(prev => {
+          const next = { ...prev, [selectedTask.id]: false };
+          try {
+            localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
         await handleStatusChange(selectedTask.id, 'REVISE');
-        alert('⚠️ Đã gửi yêu cầu sửa lại (REVISE_REQUIRED). Task đã quay về cột YÊU CẦU SỬA (REVISE) để SV làm lại.');
+        alert('⚠️ Đã gửi yêu cầu sửa lại (REVISE_REQUIRED). Task đã chuyển về cột CẦN SỬA (REVISE) để sinh viên làm lại.');
       }
     } catch (err: any) {
       console.error('Lỗi khi đánh giá bài nộp:', err);
-      // Client-side state update if offline
+      setSubmissions(prev => prev.map(s => s.id === submissionId ? {
+        ...s,
+        status,
+        reviewFeedback: feedback,
+        reviewedAt: new Date().toISOString()
+      } : s));
+      setRevisedTaskIds(prev => {
+        const next = { ...prev, [selectedTask.id]: false };
+        try {
+          localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
       if (status === 'ACCEPTED') {
         await handleStatusChange(selectedTask.id, 'COMPLETED');
         alert('✅ Đã nghiệm thu ĐẠT và chuyển Task sang HOÀN THÀNH!');
       } else {
         await handleStatusChange(selectedTask.id, 'REVISE');
-        alert('⚠️ Đã chuyển Task sang trạng thái YÊU CẦU SỬA (REVISE)!');
+        alert('⚠️ Đã chuyển Task sang trạng thái CẦN SỬA (REVISE)!');
       }
     } finally {
       setReviewLoading(false);
@@ -488,6 +600,28 @@ export const TaskBoardPage: React.FC = () => {
   const handleOpenDefenseReadyModal = () => {
     if (!currentThesis) return;
     setShowDefenseReadyModal(true);
+  };
+
+  // Lecturer confirm NOT eligible for defense
+  const handleConfirmNotDefenseEligible = async () => {
+    if (!currentThesis) return;
+    const ok = window.confirm(
+      `Xác nhận đánh dấu sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp?`
+    );
+    if (!ok) return;
+    try {
+      setDefenseReadyLoading(true);
+      const updated = await thesisService.setDefenseEligible(selectedThesisId, false);
+      setCurrentThesis({ ...updated, defenseEligible: false, status: 'IN_PROGRESS' });
+      setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'IN_PROGRESS' } : t));
+      alert(`❌ Đã xác nhận sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp.`);
+    } catch {
+      setCurrentThesis({ ...currentThesis, defenseEligible: false, status: 'IN_PROGRESS' });
+      setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'IN_PROGRESS' } : t));
+      alert(`❌ Đã cập nhật trạng thái: CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ cho sinh viên ${currentThesis.studentFullName}.`);
+    } finally {
+      setDefenseReadyLoading(false);
+    }
   };
 
   const handleSubmitDefenseReadyWithScore = async (e: React.FormEvent) => {
@@ -832,7 +966,7 @@ export const TaskBoardPage: React.FC = () => {
               {/* Defense Ready Confirmation Button / Badge */}
               <div>
                 {currentThesis.status === 'DEFENSE_READY' || currentThesis.defenseEligible ? (
-                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '8px', maxWidth: '420px' }}>
+                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '8px', maxWidth: '450px' }}>
                     <div style={{ fontWeight: 700, color: '#15803d', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `| Điểm GVHD: ${supervisorScoreData.score} / 10 đ`}
                     </div>
@@ -845,46 +979,90 @@ export const TaskBoardPage: React.FC = () => {
                       (Quy chế: GVHD đã chấm điểm quá trình và không ngồi trong Hội đồng chấm thi)
                     </div>
                     {canCreateTask && (
-                      <button
-                        onClick={handleOpenDefenseReadyModal}
-                        style={{
-                          marginTop: '6px',
-                          background: 'none',
-                          border: '1px solid #86efac',
-                          borderRadius: '4px',
-                          padding: '3px 8px',
-                          fontSize: '11px',
-                          color: '#15803d',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                        }}
-                      >
-                        ✏️ Cập nhật Điểm &amp; Nhận xét GVHD
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={handleOpenDefenseReadyModal}
+                          style={{
+                            background: 'none',
+                            border: '1px solid #86efac',
+                            borderRadius: '4px',
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            color: '#15803d',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✏️ Cập nhật Điểm &amp; Nhận xét GVHD
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleConfirmNotDefenseEligible}
+                          disabled={defenseReadyLoading}
+                          style={{
+                            background: '#fef2f2',
+                            border: '1px solid #fca5a5',
+                            borderRadius: '4px',
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            color: '#b91c1c',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ❌ Chưa đủ điều kiện bảo vệ
+                        </button>
+                      </div>
                     )}
                   </div>
                 ) : canCreateTask ? (
-                  <button
-                    onClick={handleOpenDefenseReadyModal}
-                    disabled={defenseReadyLoading}
-                    style={{
-                      background: '#16a34a',
-                      color: '#fff',
-                      border: 'none',
-                      padding: '10px 18px',
-                      borderRadius: '6px',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
-                    }}
-                    title="Chấm điểm quá trình và xác nhận sinh viên đủ điều kiện bảo vệ trước Hội đồng"
-                  >
-                    <span>🎓</span> Chấm điểm GVHD &amp; Xác nhận Đủ ĐK Bảo Vệ
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleOpenDefenseReadyModal}
+                      disabled={defenseReadyLoading}
+                      style={{
+                        background: '#16a34a',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '10px 16px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
+                      }}
+                      title="Chấm điểm quá trình và xác nhận sinh viên đủ điều kiện bảo vệ trước Hội đồng"
+                    >
+                      <span>🎓</span> Chấm điểm GVHD &amp; Xác nhận Đủ ĐK Bảo Vệ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmNotDefenseEligible}
+                      disabled={defenseReadyLoading}
+                      style={{
+                        background: '#dc2626',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '10px 14px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)'
+                      }}
+                      title="Xác nhận sinh viên chưa đủ điều kiện bảo vệ đồ án tốt nghiệp"
+                    >
+                      <span>❌</span> Chưa đủ điều kiện bảo vệ
+                    </button>
+                  </div>
                 ) : (
                   <div style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
                     ⏳ Đang thực hiện (Chờ GVHD xác nhận bảo vệ)
@@ -1247,12 +1425,18 @@ export const TaskBoardPage: React.FC = () => {
                           gap: '12px',
                           flex: 1,
                           alignContent: 'start',
+                          maxHeight: '68vh',
+                          overflowY: 'auto',
+                          paddingRight: '4px',
                         }
                       : {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '10px',
                           flex: 1,
+                          maxHeight: '65vh',
+                          overflowY: 'auto',
+                          paddingRight: '4px',
                         }
                   }
                 >
@@ -1265,7 +1449,12 @@ export const TaskBoardPage: React.FC = () => {
                         padding: '12px',
                         borderRadius: '6px',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                        border: t.status === 'REVISE' ? '1px solid #f87171' : '1px solid #cbd5e1',
+                        border:
+                          t.status === 'REVISE'
+                            ? revisedTaskIds[t.id]
+                              ? '1.5px solid #22c55e'
+                              : '1px solid #f87171'
+                            : '1px solid #cbd5e1',
                         cursor: 'pointer',
                         transition: 'transform 0.15s, box-shadow 0.15s',
                       }}
@@ -1340,23 +1529,43 @@ export const TaskBoardPage: React.FC = () => {
                         </div>
                       )}
                       {t.status === 'REVISE' && (
-                        <div
-                          style={{
-                            marginTop: '8px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            color: '#b91c1c',
-                            background: '#fee2e2',
-                            border: '1px solid #fecaca',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}
-                        >
-                          ⚠️ CẦN SỬA CHỮA LẠI (Revise)
-                        </div>
+                        revisedTaskIds[t.id] ? (
+                          <div
+                            style={{
+                              marginTop: '8px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#15803d',
+                              background: '#dcfce7',
+                              border: '1px solid #86efac',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            ✅ Đã sửa (Chờ GVHD duyệt)
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              marginTop: '8px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: '#b91c1c',
+                              background: '#fee2e2',
+                              border: '1px solid #fecaca',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            ⚠️ CẦN SỬA CHỮA LẠI (Revise)
+                          </div>
+                        )
                       )}
                       {t.status === 'COMPLETED' && (
                         <div
@@ -1426,32 +1635,78 @@ export const TaskBoardPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Status Selector */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+            {/* Status Selector (Phân quyền theo vai trò) */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Trạng thái công việc:</span>
-              <select
-                value={selectedTask.status}
-                onChange={e => handleStatusChange(selectedTask.id, e.target.value as any)}
-                style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: 600 }}
-              >
-                <option value="TODO">Cần làm (TODO)</option>
-                <option value="IN_PROGRESS">Đang làm (IN_PROGRESS)</option>
-                <option value="SUBMITTED">Đã nộp bài (SUBMITTED)</option>
-                <option value="REVISE">Cần sửa chữa (REVISE)</option>
-                {canCreateTask ? (
-                  <option value="COMPLETED">Hoàn thành (COMPLETED)</option>
-                ) : (
-                  <option value="COMPLETED" disabled>Hoàn thành (Chỉ GVHD nghiệm thu)</option>
-                )}
-              </select>
-              {isStudent && (
-                <span style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic', marginLeft: 'auto' }}>
-                  💡 Sinh viên kéo sang IN_PROGRESS để làm và Nộp bài bên dưới
+              {isStudent && (selectedTask.status === 'TODO' || selectedTask.status === 'IN_PROGRESS') ? (
+                <select
+                  value={selectedTask.status}
+                  onChange={e => handleStatusChange(selectedTask.id, e.target.value as any)}
+                  style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: 600, background: '#fff' }}
+                >
+                  <option value="TODO">Cần làm (TODO)</option>
+                  <option value="IN_PROGRESS">Đang làm (IN_PROGRESS)</option>
+                </select>
+              ) : (
+                <span
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    background:
+                      selectedTask.status === 'COMPLETED'
+                        ? '#dcfce7'
+                        : selectedTask.status === 'REVISE'
+                        ? revisedTaskIds[selectedTask.id]
+                          ? '#dcfce7'
+                          : '#fee2e2'
+                        : selectedTask.status === 'SUBMITTED'
+                        ? '#fef3c7'
+                        : selectedTask.status === 'IN_PROGRESS'
+                        ? '#e0f2fe'
+                        : '#f1f5f9',
+                    color:
+                      selectedTask.status === 'COMPLETED'
+                        ? '#15803d'
+                        : selectedTask.status === 'REVISE'
+                        ? revisedTaskIds[selectedTask.id]
+                          ? '#15803d'
+                          : '#b91c1c'
+                        : selectedTask.status === 'SUBMITTED'
+                        ? '#92400e'
+                        : selectedTask.status === 'IN_PROGRESS'
+                        ? '#0369a1'
+                        : '#334155',
+                    border: '1px solid #cbd5e1',
+                  }}
+                >
+                  {selectedTask.status === 'TODO'
+                    ? '📋 Cần làm (TODO)'
+                    : selectedTask.status === 'IN_PROGRESS'
+                    ? '⚙ Đang làm (IN_PROGRESS)'
+                    : selectedTask.status === 'SUBMITTED'
+                    ? '📤 Đã nộp bài (SUBMITTED)'
+                    : selectedTask.status === 'REVISE'
+                    ? revisedTaskIds[selectedTask.id]
+                      ? '✅ Đã sửa bài (Chờ GVHD duyệt)'
+                      : '⚠️ Cần sửa chữa (REVISE)'
+                    : '✓ Hoàn thành (COMPLETED)'}
                 </span>
               )}
-              {isSupervisor && (
+              {isStudent && (
                 <span style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic', marginLeft: 'auto' }}>
-                  💡 Giảng viên duyệt nghiệm thu bài nộp của sinh viên ở bên dưới
+                  💡 Sinh viên chỉ chọn Đang làm (IN_PROGRESS), khi bấm Nộp bài mới chuyển sang Đã nộp bài
+                </span>
+              )}
+              {isSupervisor && !isAdmin && (
+                <span style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic', marginLeft: 'auto' }}>
+                  💡 Giảng viên bấm "Nghiệm thu Đạt" hoặc "Yêu cầu sửa lại" ở bài nộp bên dưới để chuyển trạng thái
+                </span>
+              )}
+              {isAdmin && (
+                <span style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic', marginLeft: 'auto' }}>
+                  👁️ Quản trị viên: Chế độ chỉ xem tiến độ công việc
                 </span>
               )}
             </div>
@@ -1607,7 +1862,72 @@ export const TaskBoardPage: React.FC = () => {
               )}
 
               {/* Submit Form for Student (Chỉ hiển thị cho sinh viên) */}
-              {isStudent && (
+              {isStudent && selectedTask.status === 'REVISE' && (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: revisedTaskIds[selectedTask.id] ? '#f0fdf4' : '#fef2f2', border: `1px solid ${revisedTaskIds[selectedTask.id] ? '#86efac' : '#fecaca'}`, padding: '12px 14px', borderRadius: '8px', marginBottom: showReviseForm ? '10px' : 0 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: revisedTaskIds[selectedTask.id] ? '#15803d' : '#b91c1c' }}>
+                        {revisedTaskIds[selectedTask.id]
+                          ? '✅ Đã sửa bài (Đang chờ GVHD kiểm tra & nghiệm thu)'
+                          : '⚠️ Công việc cần sửa lại theo yêu cầu của GVHD'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#475569', marginTop: '2px' }}>
+                        {revisedTaskIds[selectedTask.id]
+                          ? 'Bạn đã gửi bản sửa bài mới nhất. Bạn vẫn có thể bấm nút bên cạnh để cập nhật lại nếu cần.'
+                          : 'Bấm nút "🛠️ Sửa bài" để tải lên bản báo cáo/kết quả đã chỉnh sửa.'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowReviseForm(prev => !prev)}
+                      style={{
+                        background: revisedTaskIds[selectedTask.id] ? '#16a34a' : '#dc2626',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      🛠️ {showReviseForm ? 'Đóng form sửa bài' : 'Sửa bài'}
+                    </button>
+                  </div>
+
+                  {showReviseForm && (
+                    <form onSubmit={handleSubmitTask} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f0fdf4', padding: '14px', borderRadius: '8px', border: '1px solid #86efac' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#166534', fontWeight: 700 }}>
+                        🛠️ Nộp Kết Quả Đã Sửa Bài (Cập nhật vào mục Cần sửa):
+                      </h4>
+                      <textarea
+                        rows={2}
+                        required
+                        placeholder="Mô tả những nội dung đã chỉnh sửa, bổ sung theo nhận xét của GVHD..."
+                        value={submissionContent}
+                        onChange={e => setSubmissionContent(e.target.value)}
+                        style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
+                      />
+                      <FileUploadInput
+                        label="Tập tin bài sửa / Minh chứng đã cập nhật"
+                        value={submissionFileUrl}
+                        onChange={url => setSubmissionFileUrl(url)}
+                        placeholder="Dán link Github demo, Google Drive hoặc tải file đính kèm..."
+                        helperText="Hỗ trợ tải lên file Zip, PDF, Word, RAR (tối đa 50MB) hoặc dán đường dẫn trực tiếp"
+                      />
+                      <button
+                        type="submit"
+                        style={{ alignSelf: 'flex-end', background: '#16a34a', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: '6px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
+                      >
+                        ✅ Hoàn tất &amp; Gửi Bài Đã Sửa
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {isStudent && selectedTask.status !== 'REVISE' && selectedTask.status !== 'COMPLETED' && (
                 <form onSubmit={handleSubmitTask} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fafafa', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#1e293b', fontWeight: 600 }}>
                   📤 Gửi Báo Cáo / Nộp Kết Quả:
@@ -1637,36 +1957,63 @@ export const TaskBoardPage: React.FC = () => {
               )}
             </div>
 
-            {/* Comments Section */}
-            <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px' }}>
-                💬 Thảo Luận Trao Đổi ({comments.length})
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '180px', overflowY: 'auto', marginBottom: '12px' }}>
-                {comments.map(c => (
-                  <div key={c.id} style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', fontSize: '13px' }}>
-                    <div style={{ fontWeight: '600', color: '#1e293b' }}>{c.userFullName}</div>
-                    <div style={{ color: '#475569' }}>{c.content}</div>
-                  </div>
-                ))}
-              </div>
+            {/* Comments Section (Ẩn đối với Quản trị viên - Admin chỉ xem tiến độ & các mục ở trên) */}
+            {!isAdmin && (
+              <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 'bold', margin: 0 }}>
+                    💬 Thảo Luận Trao Đổi Trực Tiếp ({comments.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const latest = await progressService.getCommentsByTask(selectedTask.id).catch(() => []);
+                      setComments(latest);
+                    }}
+                    style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer', color: '#334155', fontWeight: 600 }}
+                  >
+                    🔄 Làm mới tin nhắn
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '200px', overflowY: 'auto', marginBottom: '12px' }}>
+                  {comments.length === 0 ? (
+                    <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', padding: '8px 0' }}>
+                      Chưa có tin nhắn thảo luận nào. Giảng viên và Sinh viên có thể trao đổi trực tiếp tại đây.
+                    </div>
+                  ) : (
+                    comments.map(c => (
+                      <div key={c.id} style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                          <span style={{ fontWeight: '700', color: '#0a3273' }}>{c.userFullName}</span>
+                          {c.createdAt && (
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                              {new Date(c.createdAt).toLocaleString('vi-VN')}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ color: '#334155' }}>{c.content}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-              <form onSubmit={handleAddComment} style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  placeholder="Viết bình luận trao đổi..."
-                  value={newComment}
-                  onChange={e => setNewComment(e.target.value)}
-                  style={{ flex: 1, padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
-                />
-                <button
-                  type="submit"
-                  style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  Gửi
-                </button>
-              </form>
-            </div>
+                <form onSubmit={handleAddComment} style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Nhập nội dung trao đổi trực tiếp giữa GVHD và Sinh viên..."
+                    value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    style={{ flex: 1, padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
+                  />
+                  <button
+                    type="submit"
+                    style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                    Gửi
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}
