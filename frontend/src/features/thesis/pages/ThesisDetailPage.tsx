@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { thesisService } from '../services/thesisService';
 import type { Thesis, ThesisDocument } from '../types';
@@ -7,12 +7,14 @@ import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 
 export const ThesisDetailPage: React.FC = () => {
+  const navigate = useNavigate();
   const { userType, user } = useAuth();
   const [searchParams] = useSearchParams();
-  const targetId = Number(searchParams.get('id') || searchParams.get('thesisId')) || 1;
+  const queryParamId = Number(searchParams.get('id') || searchParams.get('thesisId')) || null;
 
   const isStudent = userType === 'student';
-  const isLecturerOrAdmin = userType === 'supervisor' || userType === 'committee_member' || userType === 'admin';
+  const isSupervisor = userType === 'supervisor';
+  const isLecturerOrAdmin = isSupervisor || userType === 'committee_member' || userType === 'admin';
 
   const [thesis, setThesis] = useState<Thesis | null>(null);
   const [documents, setDocuments] = useState<ThesisDocument[]>([]);
@@ -27,63 +29,82 @@ export const ThesisDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadThesisData();
-  }, [targetId]);
+  }, [queryParamId, user?.id]);
 
   const loadThesisData = async () => {
     setLoading(true);
     try {
-      const [tData, dList] = await Promise.all([
-        thesisService.getThesisById(targetId),
-        thesisService.getDocumentsByThesis(targetId)
-      ]);
-      setThesis(tData);
-      setDocuments(dList);
-    } catch {
-      // Fallback sample data
-      setThesis({
-        id: 1,
-        projectRoundId: 1,
-        projectRoundName: 'Đợt Đồ án Tốt nghiệp K62 CNTT - HK1 2026-2027',
-        studentId: 1,
-        studentCode: '2021601234',
-        studentFullName: 'Nguyễn Văn Sinh Viên',
-        studentClass: 'CNTT1 - K62',
-        lecturerId: 1,
-        lecturerCode: 'GV001',
-        lecturerFullName: 'TS. Trần Văn Giảng Viên',
-        lecturerDegree: 'TIEN_SI',
-        thesisCode: 'DT_2026_CNTT_001',
-        titleVn: 'Nghiên cứu và xây dựng hệ thống quản lý đồ án tốt nghiệp UTC-ThesisHub',
-        titleEn: 'Research and development of UTC-ThesisHub graduation thesis management system',
-        description: 'Hệ thống quản lý trực tuyến toàn bộ vòng đời đồ án tốt nghiệp UTC.',
-        objectives: 'Xây dựng hoàn chỉnh nền tảng web Modular Monolith trên Spring Boot 3 và React.',
-        scope: 'Áp dụng cho toàn bộ sinh viên và giảng viên Khoa Công nghệ thông tin.',
-        technologies: 'Spring Boot 3, PostgreSQL, React, TypeScript, Docker',
-        status: 'IN_PROGRESS',
-        completionRate: 50.0,
-        defenseEligible: false,
-        createdAt: '2026-10-10T08:00:00Z',
-        updatedAt: '2026-10-15T08:00:00Z'
-      });
+      // 1. If explicit query parameter ID is present, fetch that specific thesis
+      if (queryParamId) {
+        const [tData, dList] = await Promise.all([
+          thesisService.getThesisById(queryParamId),
+          thesisService.getDocumentsByThesis(queryParamId).catch(() => []),
+        ]);
+        setThesis(tData || null);
+        setDocuments(dList || []);
+        return;
+      }
 
-      setDocuments([
-        {
-          id: 1,
-          thesisId: 1,
-          uploaderId: 1,
-          uploaderFullName: 'Nguyễn Văn Sinh Viên',
-          name: 'Đề cương chi tiết đồ án tốt nghiệp ThesisHub.pdf',
-          documentType: 'PROPOSAL',
-          fileUrl: '/files/theses/DT_2026_CNTT_001/de_cuong_v1.pdf',
-          fileSize: 2048576,
-          mimeType: 'application/pdf',
-          version: 1,
-          isLatest: true,
-          description: 'Bản đề cương hoàn chỉnh đã được tiểu ban duyệt thông qua.',
-          createdAt: '2026-10-10T09:00:00Z',
-          updatedAt: '2026-10-10T09:00:00Z'
+      // 2. If no query param: determine thesis dynamically based on current logged in user
+      const allTheses = await thesisService.searchTheses().catch(() => []);
+
+      if (isStudent && user) {
+        const studentId = (user as any).student?.id || (user as any).student_id || user.id;
+        const userCode = (user as any).student?.student_code || (user as any).studentCode || (user as any).student_id || (user as any).registration_no || user.username;
+        const userFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
+
+        const myThesis = (allTheses || []).find((t) =>
+          (studentId && (t.studentId === studentId || String(t.studentId) === String(studentId))) ||
+          (userCode && t.studentCode === String(userCode)) ||
+          (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
+        );
+
+        if (myThesis) {
+          setThesis(myThesis);
+          const dList = await thesisService.getDocumentsByThesis(myThesis.id).catch(() => []);
+          setDocuments(dList || []);
+        } else {
+          setThesis(null);
+          setDocuments([]);
         }
-      ]);
+        return;
+      }
+
+      if (isSupervisor && user) {
+        const lecturerId = (user as any).lecturer?.id || (user as any).lecturer_id || user.id;
+        const lecturerCode = (user as any).lecturer?.lecturer_code || (user as any).lecturerCode || (user as any).registration_no || user.username;
+        const lecturerFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
+
+        const myTheses = (allTheses || []).filter((t) =>
+          (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
+          (lecturerCode && t.lecturerCode === String(lecturerCode)) ||
+          (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
+        );
+
+        if (myTheses.length > 0) {
+          setThesis(myTheses[0]);
+          const dList = await thesisService.getDocumentsByThesis(myTheses[0].id).catch(() => []);
+          setDocuments(dList || []);
+        } else {
+          setThesis(null);
+          setDocuments([]);
+        }
+        return;
+      }
+
+      // For admin or committee member without param, show first thesis if available
+      if (allTheses && allTheses.length > 0) {
+        setThesis(allTheses[0]);
+        const dList = await thesisService.getDocumentsByThesis(allTheses[0].id).catch(() => []);
+        setDocuments(dList || []);
+      } else {
+        setThesis(null);
+        setDocuments([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load thesis data:', err);
+      setThesis(null);
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
@@ -91,15 +112,16 @@ export const ThesisDetailPage: React.FC = () => {
 
   const handleUploadDocument = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!thesis) return;
     const effectiveUploaderId = (user as unknown as { student_id?: number })?.student_id || user?.id || 1;
     try {
-      const doc = await thesisService.uploadDocument(targetId, effectiveUploaderId, {
+      const doc = await thesisService.uploadDocument(thesis.id, effectiveUploaderId, {
         name: docName,
         documentType: docType,
-        fileUrl: docUrl || `/files/theses/DT_${targetId}/tailieu_demo.pdf`,
-        description: docDesc
+        fileUrl: docUrl || `/files/theses/DT_${thesis.id}/tailieu_demo.pdf`,
+        description: docDesc,
       });
-      setDocuments(prev => [doc, ...prev]);
+      setDocuments((prev) => [doc, ...prev]);
       alert('🎉 Đã tải lên tài liệu đồ án thành công!');
     } catch {
       alert('🎉 Đã tải lên tài liệu thành công!');
@@ -124,17 +146,125 @@ export const ThesisDetailPage: React.FC = () => {
       setThesis(updated);
       alert('Đã cập nhật trạng thái đủ điều kiện bảo vệ thành công!');
     } catch {
-      setThesis(prev => prev ? { ...prev, defenseEligible: newStatus } : null);
+      setThesis((prev) => (prev ? { ...prev, defenseEligible: newStatus } : null));
       alert('Đã cập nhật trạng thái đủ điều kiện bảo vệ!');
     }
   };
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Đang tải thông tin đề tài...</div>;
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>
+        <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
+        <div>Đang tải thông tin đề tài...</div>
+      </div>
+    );
   }
 
   if (!thesis) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#475569', fontWeight: 600 }}>Không tìm thấy đề tài.</div>;
+    return (
+      <div style={{ padding: '40px 24px', maxWidth: '800px', margin: '40px auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            padding: '48px 32px',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+          }}
+        >
+          <div
+            style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              backgroundColor: '#f0fdf4',
+              color: '#0a3273',
+              fontSize: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px auto',
+              border: '2px solid #bae6fd',
+            }}
+          >
+            📋
+          </div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+            {isStudent
+              ? 'Bạn chưa có Đề tài Đồ án Tốt nghiệp chính thức'
+              : 'Không tìm thấy thông tin Đề tài'}
+          </h2>
+          <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.6', maxWidth: '520px', margin: '0 auto 24px auto' }}>
+            {isStudent
+              ? 'Hồ sơ đề tài sẽ tự động hiển thị tại đây sau khi bạn hoàn tất đăng ký nguyện vọng GVHD (GĐ2) và đề cương đồ án được Hội đồng / Khoa phê duyệt (GĐ3).'
+              : 'Đề tài được yêu cầu không tồn tại hoặc bạn chưa được chỉ định phụ trách đề tài này trong hệ thống.'}
+          </p>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {isStudent ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate('/student/assignment')}
+                  style={{
+                    backgroundColor: '#0a3273',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  🎯 Đến GĐ2: Chọn Hướng & NV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/thesis/proposals')}
+                  style={{
+                    backgroundColor: '#f1f5f9',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  📑 Đến GĐ3: Đề cương đồ án
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate(isSupervisor ? '/supervisor/dashboard' : '/admin/project-rounds')}
+                style={{
+                  backgroundColor: '#0a3273',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                Quay lại Trang quản lý
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
