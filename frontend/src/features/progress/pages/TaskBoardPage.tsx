@@ -1449,6 +1449,11 @@ export const TaskBoardPage: React.FC = () => {
                   💡 Sinh viên kéo sang IN_PROGRESS để làm và Nộp bài bên dưới
                 </span>
               )}
+              {isSupervisor && (
+                <span style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic', marginLeft: 'auto' }}>
+                  💡 Giảng viên duyệt nghiệm thu bài nộp của sinh viên ở bên dưới
+                </span>
+              )}
             </div>
 
             <p style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', fontSize: '13px', color: '#334155', lineHeight: 1.5 }}>
@@ -1597,12 +1602,13 @@ export const TaskBoardPage: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '16px', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '13px', marginBottom: '16px' }}>
-                  Chưa có bài nộp nào cho công việc này. Sinh viên hãy tải file hoặc dán link ở form bên dưới.
+                  {isStudent ? 'Chưa có bài nộp nào cho công việc này. Bạn hãy tải file hoặc dán link ở form bên dưới.' : 'Chưa có bài nộp nào từ sinh viên cho công việc này. Đang chờ sinh viên thực hiện và nộp kết quả.'}
                 </div>
               )}
 
-              {/* Submit Form for Student */}
-              <form onSubmit={handleSubmitTask} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fafafa', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              {/* Submit Form for Student (Chỉ hiển thị cho sinh viên) */}
+              {isStudent && (
+                <form onSubmit={handleSubmitTask} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fafafa', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#1e293b', fontWeight: 600 }}>
                   📤 Gửi Báo Cáo / Nộp Kết Quả:
                 </h4>
@@ -1628,6 +1634,7 @@ export const TaskBoardPage: React.FC = () => {
                   🚀 Gửi Bài Nộp
                 </button>
               </form>
+              )}
             </div>
 
             {/* Comments Section */}
