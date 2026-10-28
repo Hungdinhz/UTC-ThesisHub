@@ -21,7 +21,7 @@ const ProjectRoundManagementPage: React.FC = () => {
   const [roundActiveTab, setRoundActiveTab] = useState<'timeline' | 'students' | 'lecturers'>('students');
 
   // Filter
-  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [filterStatus] = useState<string>('');
   const [filterYear, setFilterYear] = useState<string>('');
 
   // Modal Create Round
@@ -303,23 +303,12 @@ const ProjectRoundManagementPage: React.FC = () => {
         {/* Top Action Bar */}
         <div className="round-action-bar">
           <div className="round-filter-group">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-            >
-              <option value="">-- Tất cả trạng thái --</option>
-              <option value="DRAFT">Bản nháp (DRAFT)</option>
-              <option value="OPEN">Đang mở (OPEN)</option>
-              <option value="IN_PROGRESS">Đang làm (IN_PROGRESS)</option>
-              <option value="CLOSED">Đã đóng (CLOSED)</option>
-            </select>
             <input
               type="text"
               placeholder="Năm học (VD: 2026-2027)..."
               value={filterYear}
               onChange={(e) => setFilterYear(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '200px' }}
+              style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '220px' }}
             />
             <button
               onClick={loadRounds}
@@ -460,6 +449,16 @@ const ProjectRoundManagementPage: React.FC = () => {
                       }}>
                         {getStatusBadge(selectedRound.status).label}
                       </span>
+                      {selectedRound.status === 'DRAFT' && (
+                        <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.76rem', fontWeight: 600, backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+                          🔑 Tài khoản SV sẽ được cấp khi Mở đợt (OPEN)
+                        </span>
+                      )}
+                      {selectedRound.supplementaryOpen && (
+                        <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.76rem', fontWeight: 700, backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fdba74' }}>
+                          🔔 Đang mở ĐK bổ sung (Khóa chốt/chuyển đợt)
+                        </span>
+                      )}
                     </div>
                     <p style={{ margin: '6px 0 0 0', color: '#64748b', fontSize: '0.85rem' }}>
                       Mã đợt: <strong>{selectedRound.roundCode}</strong> • Năm học: {selectedRound.academicYear} • {selectedRound.semester} • Chương trình: <strong>{selectedRound.trainingProgramName || selectedRound.trainingProgram}</strong>
@@ -487,16 +486,24 @@ const ProjectRoundManagementPage: React.FC = () => {
                     )}
                     {selectedRound.status === 'OPEN' && (
                       <button
-                        onClick={() => openTransitionModal('IN_PROGRESS')}
+                        disabled={Boolean(selectedRound.supplementaryOpen)}
+                        onClick={() => {
+                          if (selectedRound.supplementaryOpen) {
+                            setError('Đợt đồ án đang mở đăng ký bổ sung. Vui lòng kết thúc đợt đăng ký bổ sung tại mục Phân công GVHD trước khi chuyển sang thực hiện!');
+                            return;
+                          }
+                          openTransitionModal('IN_PROGRESS');
+                        }}
+                        title={selectedRound.supplementaryOpen ? 'Đang mở đăng ký bổ sung - Không thể chốt/chuyển đợt' : undefined}
                         style={{
-                          backgroundColor: '#0284c7',
+                          backgroundColor: selectedRound.supplementaryOpen ? '#94a3b8' : '#0284c7',
                           color: '#fff',
                           border: 'none',
                           padding: '6px 14px',
                           borderRadius: '6px',
                           fontWeight: 600,
                           fontSize: '0.85rem',
-                          cursor: 'pointer'
+                          cursor: selectedRound.supplementaryOpen ? 'not-allowed' : 'pointer'
                         }}
                       >
                         ⚡ Chuyển sang thực hiện
@@ -504,23 +511,36 @@ const ProjectRoundManagementPage: React.FC = () => {
                     )}
                     {(selectedRound.status === 'OPEN' || selectedRound.status === 'IN_PROGRESS') && (
                       <button
-                        onClick={() => openTransitionModal('CLOSED')}
+                        disabled={Boolean(selectedRound.supplementaryOpen)}
+                        onClick={() => {
+                          if (selectedRound.supplementaryOpen) {
+                            setError('Đợt đồ án đang mở đăng ký bổ sung. Vui lòng kết thúc đợt đăng ký bổ sung trước khi đóng đợt!');
+                            return;
+                          }
+                          openTransitionModal('CLOSED');
+                        }}
+                        title={selectedRound.supplementaryOpen ? 'Đang mở đăng ký bổ sung - Không thể đóng đợt' : undefined}
                         style={{
-                          backgroundColor: '#dc2626',
+                          backgroundColor: selectedRound.supplementaryOpen ? '#94a3b8' : '#dc2626',
                           color: '#fff',
                           border: 'none',
                           padding: '6px 14px',
                           borderRadius: '6px',
                           fontWeight: 600,
                           fontSize: '0.85rem',
-                          cursor: 'pointer'
+                          cursor: selectedRound.supplementaryOpen ? 'not-allowed' : 'pointer'
                         }}
                       >
                         🔒 Đóng đợt
                       </button>
                     )}
                     <button
+                      disabled={Boolean(selectedRound.supplementaryOpen)}
                       onClick={async () => {
+                        if (selectedRound.supplementaryOpen) {
+                          setError('Đợt đồ án đang mở đăng ký bổ sung. Vui lòng kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn!');
+                          return;
+                        }
                         try {
                           setLoading(true);
                           const updated = await apiService.advanceRoundPhase(selectedRound.roundId);
@@ -534,19 +554,19 @@ const ProjectRoundManagementPage: React.FC = () => {
                         }
                       }}
                       style={{
-                        backgroundColor: '#f59e0b',
-                        color: '#0f172a',
+                        backgroundColor: selectedRound.supplementaryOpen ? '#cbd5e1' : '#f59e0b',
+                        color: selectedRound.supplementaryOpen ? '#64748b' : '#0f172a',
                         border: 'none',
                         padding: '6px 14px',
                         borderRadius: '6px',
                         fontWeight: 700,
                         fontSize: '0.85rem',
-                        cursor: 'pointer',
+                        cursor: selectedRound.supplementaryOpen ? 'not-allowed' : 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px'
                       }}
-                      title="Demo: Kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo"
+                      title={selectedRound.supplementaryOpen ? 'Đang mở đăng ký bổ sung - Không thể chuyển giai đoạn' : 'Demo: Kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo'}
                     >
                       ⚡ Demo: Kết thúc GĐ & Chuyển tiếp
                     </button>

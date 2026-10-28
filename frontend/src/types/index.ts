@@ -777,6 +777,7 @@ export interface ProjectRoundItem {
   trainingProgram?: string; // e.g. "CU_NHAN", "KY_SU"
   trainingProgramName?: string;
   status: RoundStatus;
+  supplementaryOpen?: boolean;
   startDate?: string;
   endDate?: string;
   description?: string;
@@ -864,6 +865,7 @@ export interface StudentProjectRoundItem {
   gpa?: number;
   note?: string;
   enrolledAt?: string;
+  accountActive?: boolean;
 }
 
 export interface StudentEligibilityCheckResponse {

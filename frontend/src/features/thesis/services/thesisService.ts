@@ -63,6 +63,11 @@ export const thesisService = {
     return res.data.data;
   },
 
+  async signProposal(id: number): Promise<Proposal> {
+    const res = await apiClient.post(`/proposals/${id}/sign`);
+    return res.data.data;
+  },
+
   async searchProposals(params?: { roundId?: number; lecturerId?: number; studentId?: number; status?: string; search?: string }): Promise<Proposal[]> {
     const res = await apiClient.get('/proposals', { params });
     return res.data?.data?.content || res.data?.content || res.data?.data || res.data || [];

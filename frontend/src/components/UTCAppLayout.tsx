@@ -29,7 +29,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   user: propUser,
   onLogout: propLogout,
   children,
-  activeTab = 'overview',
+  activeTab = 'project-rounds',
   onTabChange,
   hideHeroBanner = false,
   pageTitle,
@@ -50,7 +50,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [expandedMenu, setExpandedMenu] = useState<string | null>('academic');
 
-  // Demo Phase & Individual Progression State
   const [activeRound, setActiveRound] = useState<ProjectRoundItem | null>(null);
   const [roundCurrentStage, setRoundCurrentStage] = useState<number>(2);
   const [userCompletedStageState, setUserCompletedStageState] = useState<number>(1);
@@ -63,7 +62,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     status?: string;
   } | null>(null);
 
-  // Xác định role thực tế
   const currentRole = (
     authUserType ||
     (user?.role?.name ? user.role.name.replace('ROLE_', '').toLowerCase() : '') ||
@@ -71,7 +69,23 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     'student'
   ).toLowerCase();
 
-  // Dynamic greeting theo giờ
+  const getRoleHomeRoute = () => {
+    switch (currentRole) {
+      case 'admin':
+        return '/admin/project-rounds';
+      case 'student':
+        return '/student/assignment';
+      case 'supervisor':
+      case 'lecturer':
+        return '/admin/assignments';
+      case 'committee_member':
+      case 'committee':
+        return '/admin/councils';
+      default:
+        return '/';
+    }
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (i18n.language.startsWith('en')) {
@@ -84,7 +98,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     return 'Chào buổi tối,';
   };
 
-  // Ngày hiện tại
   const getCurrentDateString = () => {
     const now = new Date();
     if (i18n.language.startsWith('en')) {
@@ -184,7 +197,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
             return;
           }
         } catch {
-          // fallback to getActiveProjectRound below
+          // fallback below
         }
       }
 
@@ -222,6 +235,10 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   }, [currentUserId, currentRole]);
 
   const handleAdminAdvancePhase = async (targetPhase?: string) => {
+    if (activeRound?.supplementaryOpen) {
+      alert('Đợt đồ án đang mở đăng ký nguyện vọng bổ sung! Vui lòng đóng/kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn.');
+      return;
+    }
     try {
       setAdvancingPhase(true);
       const updated = await apiService.advanceActivePhase(targetPhase);
@@ -229,9 +246,10 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
       const st = getRoundStageNumber(updated.currentMilestone?.phaseType, updated.status);
       setRoundCurrentStage(st);
       window.dispatchEvent(new CustomEvent('utc-phase-change'));
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('Error advancing phase:', err);
-      alert(err instanceof Error ? err.message : 'Lỗi khi chuyển giai đoạn');
+      const msg = err?.response?.data?.message || (err instanceof Error ? err.message : 'Lỗi khi chuyển giai đoạn');
+      alert(msg);
     } finally {
       setAdvancingPhase(false);
     }
@@ -301,7 +319,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     return <span className="utc-stage-badge locked" title="Giai đoạn chưa mở hoặc chưa hoàn thành giai đoạn trước">🔒 Chưa mở</span>;
   };
 
-  // Xử lý click chuyển tab hoặc điều hướng trang (chặn click nếu giai đoạn bị khóa)
   const handleNavClick = (tabOrRoute: string, isRoute: boolean = false, stageNumber?: number) => {
     if (stageNumber && (currentRole === 'student' || currentRole === 'supervisor' || currentRole === 'lecturer')) {
       if (isStageLocked(stageNumber)) {
@@ -318,12 +335,10 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     }
     if (isRoute) {
       navigate(tabOrRoute);
+    } else if (onTabChange) {
+      onTabChange(tabOrRoute);
     } else {
-      if (onTabChange) {
-        onTabChange(tabOrRoute);
-      } else {
-        navigate(`/${currentRole === 'lecturer' ? 'supervisor' : currentRole}/dashboard`);
-      }
+      navigate(getRoleHomeRoute());
     }
   };
 
@@ -331,7 +346,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   return (
     <div className={`utc-dashboard-wrapper ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>
-      {/* Mobile Backdrop Overlay */}
       {sidebarOpen && (
         <div
           className="utc-sidebar-backdrop"
@@ -343,7 +357,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
       {/* 1. Left Sidebar Navigation */}
       <aside className="utc-sidebar">
         <div className="utc-sidebar-header-row">
-          <div className="utc-sidebar-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+          <div className="utc-sidebar-logo" onClick={() => navigate(getRoleHomeRoute())} style={{ cursor: 'pointer' }}>
             <span className="utc-seal">
               <img src={utcLogo} alt="UTC Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }} />
             </span>
@@ -362,23 +376,15 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         </div>
 
         <nav className="utc-sidebar-nav">
-          {/* MENU DÀNH CHO ADMIN (ĐẦY ĐỦ 5 GIAI ĐOẠN) */}
+          {/* MENU DÀNH CHO ADMIN (#26 bỏ Tổng quan, #27 bỏ Bảo lưu) */}
           {currentRole === 'admin' && (
             <>
-              <div
-                className={`utc-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/admin/dashboard', true)}
-              >
-                <span className="utc-nav-icon">🏠</span>
-                <span className="utc-nav-label">Tổng quan 5 Giai đoạn</span>
-              </div>
-
               <div
                 className={`utc-nav-item ${activeTab === 'project-rounds' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/admin/project-rounds', true)}
               >
                 <span className="utc-nav-icon">🗓️</span>
-                <span className="utc-nav-label">GĐ1: Đợt đồ án & Import SV</span>
+                <span className="utc-nav-label">GĐ1: Đợt đồ án &amp; Import SV</span>
               </div>
 
               <div
@@ -386,7 +392,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/organization', true)}
               >
                 <span className="utc-nav-icon">🏛️</span>
-                <span className="utc-nav-label">GĐ1: Khoa, Bộ môn, GV & SV</span>
+                <span className="utc-nav-label">GĐ1: Khoa, Bộ môn, GV &amp; SV</span>
               </div>
 
               <div
@@ -394,7 +400,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/assignments', true)}
               >
                 <span className="utc-nav-icon">🎯</span>
-                <span className="utc-nav-label">GĐ2: Phân công GVHD & NV</span>
+                <span className="utc-nav-label">GĐ2: Phân công GVHD &amp; NV</span>
               </div>
 
               <div
@@ -402,7 +408,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/thesis/proposals', true)}
               >
                 <span className="utc-nav-icon">📑</span>
-                <span className="utc-nav-label">GĐ3: Đề cương & Xuất PDF</span>
+                <span className="utc-nav-label">GĐ3: Đề cương &amp; Xuất PDF</span>
               </div>
 
               <div
@@ -410,7 +416,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/progress/tasks', true)}
               >
                 <span className="utc-nav-icon">📋</span>
-                <span className="utc-nav-label">GĐ4: Giao Task & Tiến độ</span>
+                <span className="utc-nav-label">GĐ4: Giao Task &amp; Tiến độ</span>
               </div>
 
               <div
@@ -442,36 +448,20 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-scoring', true)}
               >
                 <span className="utc-nav-icon">🏆</span>
-                <span className="utc-nav-label">GĐ5: Chấm điểm & Biên bản PDF</span>
-              </div>
-
-              <div
-                className={`utc-nav-item ${activeTab === 'reservations' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/admin/reservations', true)}
-              >
-                <span className="utc-nav-icon">⏸️</span>
-                <span className="utc-nav-label">GĐ5: Nhánh Bảo lưu Đồ án</span>
+                <span className="utc-nav-label">GĐ5: Chấm điểm &amp; Tổng hợp</span>
               </div>
             </>
           )}
 
-          {/* MENU DÀNH CHO SINH VIÊN */}
+          {/* MENU DÀNH CHO SINH VIÊN (#26 bỏ Trang chủ, #27 bỏ Bảo lưu, #28 thêm Nhóm Chat) */}
           {currentRole === 'student' && (
             <>
-              <div
-                className={`utc-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/student/dashboard', true)}
-              >
-                <span className="utc-nav-icon">🏠</span>
-                <span className="utc-nav-label">{t('nav.overview', 'Trang chủ')}</span>
-              </div>
-
               <div
                 className={`utc-nav-item ${activeTab === 'student-assignment' ? 'active' : ''} ${isStageLocked(2) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/student/assignment', true, 2)}
               >
                 <span className="utc-nav-icon">🎯</span>
-                <span className="utc-nav-label">GĐ2: Chọn Hướng & NV1–NV3</span>
+                <span className="utc-nav-label">GĐ2: Chọn Hướng &amp; NV1–NV3</span>
                 {renderStageBadge(2)}
               </div>
 
@@ -480,7 +470,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/thesis/proposals', true, 3)}
               >
                 <span className="utc-nav-icon">📑</span>
-                <span className="utc-nav-label">GĐ3: Đề cương & Ký nộp PDF</span>
+                <span className="utc-nav-label">GĐ3: Đề cương &amp; Ký nộp PDF</span>
                 {renderStageBadge(3)}
               </div>
 
@@ -489,7 +479,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/progress/tasks', true, 4)}
               >
                 <span className="utc-nav-icon">📋</span>
-                <span className="utc-nav-label">GĐ4: Nhận Task & Nộp kết quả</span>
+                <span className="utc-nav-label">GĐ4: Nhận Task &amp; Nộp kết quả</span>
                 {renderStageBadge(4)}
               </div>
 
@@ -498,17 +488,16 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-schedules', true, 5)}
               >
                 <span className="utc-nav-icon">📅</span>
-                <span className="utc-nav-label">GĐ5: Xem Lịch Bảo vệ</span>
+                <span className="utc-nav-label">GĐ5: Lịch Bảo vệ &amp; Kết quả</span>
                 {renderStageBadge(5)}
               </div>
 
               <div
-                className={`utc-nav-item ${activeTab === 'reservations' ? 'active' : ''} ${isStageLocked(5) ? 'utc-nav-locked' : ''}`}
-                onClick={() => handleNavClick('/student/reservation', true, 5)}
+                className={`utc-nav-item ${activeTab === 'chat' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/chat', true)}
               >
-                <span className="utc-nav-icon">⏸️</span>
-                <span className="utc-nav-label">GĐ5: Đơn Xin Bảo Lưu</span>
-                {renderStageBadge(5)}
+                <span className="utc-nav-icon">💬</span>
+                <span className="utc-nav-label">Nhóm Chat Hướng Dẫn</span>
               </div>
 
               <div
@@ -516,7 +505,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => setExpandedMenu(expandedMenu === 'academic' ? null : 'academic')}
               >
                 <span className="utc-nav-icon">📚</span>
-                <span className="utc-nav-label">Góc học tập & Tiện ích</span>
+                <span className="utc-nav-label">Góc học tập &amp; Tiện ích</span>
                 <span className="utc-arrow">{expandedMenu === 'academic' ? '▾' : '▸'}</span>
               </div>
 
@@ -539,23 +528,15 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
             </>
           )}
 
-          {/* MENU DÀNH CHO GIẢNG VIÊN (SUPERVISOR) */}
+          {/* MENU DÀNH CHO GIẢNG VIÊN (SUPERVISOR) (#26 bỏ Tổng quan, #28 thêm Nhóm Chat) */}
           {(currentRole === 'supervisor' || currentRole === 'lecturer') && (
             <>
-              <div
-                className={`utc-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/supervisor/dashboard', true)}
-              >
-                <span className="utc-nav-icon">🏠</span>
-                <span className="utc-nav-label">Tổng quan hướng dẫn</span>
-              </div>
-
               <div
                 className={`utc-nav-item ${activeTab === 'assignments' ? 'active' : ''} ${isStageLocked(2) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/admin/assignments', true, 2)}
               >
                 <span className="utc-nav-icon">👥</span>
-                <span className="utc-nav-label">GĐ2: Phân công & Duyệt NV</span>
+                <span className="utc-nav-label">GĐ2: Phân công &amp; Duyệt NV</span>
                 {renderStageBadge(2)}
               </div>
 
@@ -573,7 +554,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/progress/tasks', true, 4)}
               >
                 <span className="utc-nav-icon">📋</span>
-                <span className="utc-nav-label">GĐ4: Giao Task & Review</span>
+                <span className="utc-nav-label">GĐ4: Giao Task &amp; Review</span>
                 {renderStageBadge(4)}
               </div>
 
@@ -591,7 +572,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-scoring', true, 5)}
               >
                 <span className="utc-nav-icon">🏆</span>
-                <span className="utc-nav-label">GĐ5: Chấm điểm GVHD & GVPB</span>
+                <span className="utc-nav-label">GĐ5: Chấm điểm &amp; Biên bản PDF</span>
                 {renderStageBadge(5)}
               </div>
 
@@ -603,26 +584,26 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 <span className="utc-nav-label">Lịch hội đồng bảo vệ</span>
                 {renderStageBadge(5)}
               </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'chat' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/chat', true)}
+              >
+                <span className="utc-nav-icon">💬</span>
+                <span className="utc-nav-label">Nhóm Chat Hướng Dẫn</span>
+              </div>
             </>
           )}
 
-          {/* MENU DÀNH CHO HỘI ĐỒNG (COMMITTEE MEMBER) */}
+          {/* MENU DÀNH CHO HỘI ĐỒNG (COMMITTEE MEMBER) (#26 bỏ Tổng quan, #28 thêm Nhóm Chat) */}
           {(currentRole === 'committee_member' || currentRole === 'committee') && (
             <>
-              <div
-                className={`utc-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/committee_member/dashboard', true)}
-              >
-                <span className="utc-nav-icon">🏠</span>
-                <span className="utc-nav-label">Tổng quan hội đồng</span>
-              </div>
-
               <div
                 className={`utc-nav-item ${activeTab === 'assignments' ? 'active' : ''} ${isStageLocked(2) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/admin/assignments', true, 2)}
               >
                 <span className="utc-nav-icon">👥</span>
-                <span className="utc-nav-label">GĐ2: Phân công & Duyệt NV</span>
+                <span className="utc-nav-label">GĐ2: Phân công &amp; Duyệt NV</span>
                 {renderStageBadge(2)}
               </div>
 
@@ -640,7 +621,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/progress/tasks', true, 4)}
               >
                 <span className="utc-nav-icon">📋</span>
-                <span className="utc-nav-label">GĐ4: Giao Task & Review</span>
+                <span className="utc-nav-label">GĐ4: Giao Task &amp; Review</span>
                 {renderStageBadge(4)}
               </div>
 
@@ -674,7 +655,15 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/defense-scoring', true)}
               >
                 <span className="utc-nav-icon">🏆</span>
-                <span className="utc-nav-label">GĐ5: Chấm điểm & Biên bản PDF</span>
+                <span className="utc-nav-label">GĐ5: Chấm điểm &amp; Biên bản PDF</span>
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'chat' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/chat', true)}
+              >
+                <span className="utc-nav-icon">💬</span>
+                <span className="utc-nav-label">Nhóm Chat Hướng Dẫn</span>
               </div>
             </>
           )}
@@ -687,7 +676,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
       {/* Main Content Area */}
       <div className="utc-main-container">
-        {/* 2. Top Header Bar */}
         <header className="utc-topbar">
           <div className="utc-topbar-left">
             <button
@@ -768,36 +756,53 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         {currentRole === 'admin' && (
           <div className="utc-demo-control-bar admin-bar">
             <div className="utc-demo-info">
-              <span className="utc-demo-tag">⚡ DEMO ADMIN</span>
+              <span className="utc-demo-tag">⚡ ĐIỀU HÀNH ĐỢT</span>
               <span className="utc-demo-round">
-                Đợt: <strong>{activeRound?.roundCode || activeRound?.name || 'DA_CNTT_K62_HK1'}</strong>
+                Đợt: <strong>{activeRound?.roundCode || activeRound?.name || 'Chưa mở đợt'}</strong>
               </span>
               <span className="utc-demo-phase">
                 Giai đoạn hiện tại: <strong className="phase-badge">{currentStageDef?.name || `Giai đoạn ${roundCurrentStage}`}</strong>
               </span>
+              {activeRound?.supplementaryOpen && (
+                <span
+                  style={{
+                    background: '#fef3c7',
+                    color: '#92400e',
+                    border: '1px solid #f59e0b',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}
+                >
+                  ⚠️ Đang mở ĐK bổ sung (Khóa chuyển GĐ)
+                </span>
+              )}
             </div>
             <div className="utc-demo-actions">
               <button
                 className="utc-demo-btn primary"
                 onClick={() => handleAdminAdvancePhase()}
-                disabled={advancingPhase}
-                title="Admin kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo"
+                disabled={advancingPhase || Boolean(activeRound?.supplementaryOpen)}
+                title={
+                  activeRound?.supplementaryOpen
+                    ? 'Vui lòng đóng đợt đăng ký bổ sung trước khi chuyển giai đoạn'
+                    : 'Admin kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo'
+                }
               >
                 {advancingPhase ? '⏳ Đang chuyển...' : '⚡ Kết thúc GĐ & Chuyển tiếp theo'}
               </button>
               <div className="utc-demo-quick-jumps">
                 <span className="jump-label">Chuyển nhanh:</span>
-                <button className={`jump-btn ${roundCurrentStage === 1 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('DRAFT')}>GĐ1</button>
-                <button className={`jump-btn ${roundCurrentStage === 2 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('REGISTRATION')}>GĐ2</button>
-                <button className={`jump-btn ${roundCurrentStage === 3 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('PROPOSAL_SUBMISSION')}>GĐ3</button>
-                <button className={`jump-btn ${roundCurrentStage === 4 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('WEEKLY_REPORT')}>GĐ4</button>
-                <button className={`jump-btn ${roundCurrentStage === 5 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('DEFENSE')}>GĐ5</button>
+                <button disabled={Boolean(activeRound?.supplementaryOpen)} className={`jump-btn ${roundCurrentStage === 1 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('DRAFT')}>GĐ1</button>
+                <button disabled={Boolean(activeRound?.supplementaryOpen)} className={`jump-btn ${roundCurrentStage === 2 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('REGISTRATION')}>GĐ2</button>
+                <button disabled={Boolean(activeRound?.supplementaryOpen)} className={`jump-btn ${roundCurrentStage === 3 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('PROPOSAL_SUBMISSION')}>GĐ3</button>
+                <button disabled={Boolean(activeRound?.supplementaryOpen)} className={`jump-btn ${roundCurrentStage === 4 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('WEEKLY_REPORT')}>GĐ4</button>
+                <button disabled={Boolean(activeRound?.supplementaryOpen)} className={`jump-btn ${roundCurrentStage === 5 ? 'active' : ''}`} onClick={() => handleAdminAdvancePhase('DEFENSE')}>GĐ5</button>
               </div>
             </div>
           </div>
         )}
-
-
 
         {/* Cảnh báo khi sinh viên bị loại / không đạt */}
         {currentRole === 'student' && studentStatusInfo?.isDropped && (
@@ -828,7 +833,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           </div>
         )}
 
-        {/* Lock alert toast if user tries to click locked stage */}
         {lockAlertMessage && (
           <div className="utc-demo-lock-toast">
             <div className="lock-toast-content">
@@ -839,7 +843,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           </div>
         )}
 
-        {/* 3. Hero Greeting Banner (Chỉ hiện khi không ẩn) */}
         {!hideHeroBanner && (
           <section className="utc-hero-banner">
             <div className="utc-hero-text-block">
@@ -855,7 +858,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           </section>
         )}
 
-        {/* Page Title bar nếu có */}
         {pageTitle && (
           <div
             style={{
@@ -872,13 +874,11 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           </div>
         )}
 
-        {/* 4. Children Inner Content */}
         <main className="utc-dashboard-body-content" style={{ padding: hideHeroBanner ? '20px 28px' : undefined }}>
           {children}
         </main>
       </div>
 
-      {/* Change Password Modal */}
       {showChangePassword && (
         <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
       )}

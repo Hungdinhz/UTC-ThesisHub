@@ -145,6 +145,8 @@ export interface AssignmentStats {
   totalCapacity: number;
   averageLoadRatio: number;
   droppedCount?: number;
+  supplementaryOpen?: boolean;
+  supplementaryCount?: number;
 }
 
 /**

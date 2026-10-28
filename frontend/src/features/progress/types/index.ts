@@ -13,6 +13,7 @@ export interface Task {
   dueDate?: string;
   completedAt?: string;
   submissionCount: number;
+  latestSubmissionStatus?: string;
   commentCount: number;
   createdAt: string;
   updatedAt: string;

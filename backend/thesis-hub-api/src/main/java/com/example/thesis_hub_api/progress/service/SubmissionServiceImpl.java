@@ -30,6 +30,9 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final StudentRepository studentRepository;
     private final NotificationService notificationService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.thesis.repository.ThesisRepository thesisRepository;
+
     @Override
     @Transactional
     public SubmissionResponse submitTask(Long taskId, CreateSubmissionRequest request) {
@@ -109,6 +112,17 @@ public class SubmissionServiceImpl implements SubmissionService {
         taskRepository.save(task);
 
         Submission updatedSubmission = submissionRepository.save(submission);
+
+        if (thesisRepository != null && task.getThesis() != null && task.getThesis().getId() != null) {
+            List<Task> allTasks = taskRepository.findByThesisId(task.getThesis().getId());
+            if (!allTasks.isEmpty()) {
+                long completed = allTasks.stream().filter(t -> "COMPLETED".equalsIgnoreCase(t.getStatus())).count();
+                java.math.BigDecimal rate = java.math.BigDecimal.valueOf(Math.round((completed * 100.0) / allTasks.size()));
+                com.example.thesis_hub_api.thesis.entity.Thesis thesis = task.getThesis();
+                thesis.setCompletionRate(rate);
+                thesisRepository.save(thesis);
+            }
+        }
 
         // Gửi thông báo kết quả review cho Sinh viên
         if (submission.getStudent() != null && submission.getStudent().getUser() != null && submission.getStudent().getUser().getId() != null) {

@@ -5,6 +5,8 @@ import { thesisService } from '../services/thesisService';
 import type { Thesis, ThesisDocument } from '../types';
 import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
+import { defenseService } from '../../defense/services/defenseService';
+import type { GraduationResult } from '../../defense/types';
 
 export const ThesisDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +20,7 @@ export const ThesisDetailPage: React.FC = () => {
 
   const [thesis, setThesis] = useState<Thesis | null>(null);
   const [documents, setDocuments] = useState<ThesisDocument[]>([]);
+  const [graduationResult, setGraduationResult] = useState<GraduationResult | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
 
@@ -30,6 +33,16 @@ export const ThesisDetailPage: React.FC = () => {
   useEffect(() => {
     loadThesisData();
   }, [queryParamId, user?.id]);
+
+  useEffect(() => {
+    if (thesis?.id) {
+      defenseService.getGraduationResult(thesis.id)
+        .then((res) => setGraduationResult(res))
+        .catch(() => setGraduationResult(null));
+    } else {
+      setGraduationResult(null);
+    }
+  }, [thesis?.id]);
 
   const loadThesisData = async () => {
     setLoading(true);
@@ -138,16 +151,19 @@ export const ThesisDetailPage: React.FC = () => {
     const newStatus = !thesis.defenseEligible;
     const confirmMsg = newStatus
       ? 'Xác nhận sinh viên ĐỦ điều kiện bảo vệ đồ án tốt nghiệp?'
-      : 'Hủy xác nhận đủ điều kiện bảo vệ đồ án?';
+      : 'Xác nhận chuyển trạng thái sang CHƯA ĐỦ điều kiện bảo vệ đồ án?';
     if (!window.confirm(confirmMsg)) return;
 
     try {
       const updated = await thesisService.setDefenseEligible(thesis.id, newStatus);
       setThesis(updated);
-      alert('Đã cập nhật trạng thái đủ điều kiện bảo vệ thành công!');
-    } catch {
-      setThesis((prev) => (prev ? { ...prev, defenseEligible: newStatus } : null));
-      alert('Đã cập nhật trạng thái đủ điều kiện bảo vệ!');
+      alert(
+        newStatus
+          ? '✅ Đã xác nhận sinh viên ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!'
+          : '❌ Đã cập nhật sang trạng thái CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!'
+      );
+    } catch (err: any) {
+      alert('Không thể cập nhật trạng thái điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -246,7 +262,7 @@ export const ThesisDetailPage: React.FC = () => {
             ) : (
               <button
                 type="button"
-                onClick={() => navigate(isSupervisor ? '/supervisor/dashboard' : '/admin/project-rounds')}
+                onClick={() => navigate(isSupervisor ? '/progress/tasks' : '/admin/project-rounds')}
                 style={{
                   backgroundColor: '#0a3273',
                   color: '#fff',
@@ -281,14 +297,19 @@ export const ThesisDetailPage: React.FC = () => {
           </div>
           <div>
             <span style={{
-              background: '#e0f2fe',
-              color: '#0369a1',
+              background: thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#dcfce7' : '#e0f2fe',
+              color: thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#15803d' : '#0369a1',
+              border: `1px solid ${thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#86efac' : '#bae6fd'}`,
               padding: '6px 12px',
               borderRadius: '20px',
               fontWeight: 'bold',
               fontSize: '13px'
             }}>
-              {thesis.status}
+              {thesis.status === 'COMPLETED'
+                ? '✓ ĐÃ BẢO VỆ HOÀN THÀNH'
+                : thesis.defenseEligible
+                ? '🎓 ĐỦ ĐK BẢO VỆ (DEFENSE_READY)'
+                : '⏳ ĐANG THỰC HIỆN (IN_PROGRESS)'}
             </span>
           </div>
         </div>
@@ -311,6 +332,65 @@ export const ThesisDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Official Graduation Result Card when synthesized / published */}
+      {graduationResult && graduationResult.finalScore !== undefined && graduationResult.finalScore !== null && (
+        <div style={{
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+          padding: '22px 24px',
+          borderRadius: '12px',
+          border: '1.5px solid #86efac',
+          marginBottom: '24px',
+          boxShadow: '0 4px 12px rgba(22, 163, 74, 0.08)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '28px' }}>🎓</span>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#0a3273' }}>
+                  KẾT QUẢ CHÍNH THỨC BẢO VỆ ĐỒ ÁN TỐT NGHIỆP
+                </h2>
+                <div style={{ fontSize: '12px', color: '#475569' }}>
+                  Công thức quy chế UTC: 0.3 × GVHD + 0.2 × GVPB + 0.5 × Hội đồng
+                </div>
+              </div>
+            </div>
+            <span style={{
+              background: graduationResult.finalResult === 'PASSED' ? '#16a34a' : '#dc2626',
+              color: '#fff',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontWeight: 700,
+              fontSize: '13px'
+            }}>
+              {graduationResult.finalResult === 'PASSED' ? '✅ ĐẠT TỐT NGHIỆP' : '❌ KHÔNG ĐẠT'} — Xếp loại: {
+                graduationResult.grade === 'EXCELLENT' ? 'Xuất sắc (A)' :
+                graduationResult.grade === 'VERY_GOOD' ? 'Giỏi (B+)' :
+                graduationResult.grade === 'GOOD' ? 'Khá (B)' :
+                graduationResult.grade === 'AVERAGE' ? 'Trung bình (C)' : 'Kém (F)'
+              }
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+            <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVHD (30%)</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(graduationResult.supervisorScore || 0).toFixed(2)}</div>
+            </div>
+            <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVPB (20%)</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(graduationResult.reviewerScore || 0).toFixed(2)}</div>
+            </div>
+            <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm TB Hội đồng (50%)</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(graduationResult.councilScore || 0).toFixed(2)}</div>
+            </div>
+            <div style={{ background: '#0a3273', padding: '12px', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', opacity: 0.9 }}>ĐIỂM TỔNG KẾT</div>
+              <div style={{ fontSize: '20px', fontWeight: 800 }}>{Number(graduationResult.finalScore).toFixed(2)} ({graduationResult.grade})</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Scope, Objectives, Technologies */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '24px' }}>

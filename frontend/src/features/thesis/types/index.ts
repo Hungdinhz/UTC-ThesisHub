@@ -22,6 +22,8 @@ export interface Proposal {
   supervisorComment?: string;
   version: number;
   submittedAt?: string;
+  studentSigned?: boolean;
+  studentSignedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

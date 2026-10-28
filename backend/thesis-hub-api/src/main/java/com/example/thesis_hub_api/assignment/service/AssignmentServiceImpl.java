@@ -1066,7 +1066,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                                     "Kết quả phân công GVHD",
                                     "Khoa đã chốt kết quả phân công GVHD cho bạn trong đợt đồ án.",
                                     "ASSIGNMENT",
-                                    "/student/dashboard"
+                                    "/student/assignment"
                             );
                         } catch (Exception e) {
                             log.warn("Không thể gửi thông báo phân công cho sinh viên ID={}: {}", student.getId(), e.getMessage());
@@ -1159,6 +1159,9 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .totalCapacity(totalCap)
                 .averageLoadRatio(Math.round(avgLoad * 100.0) / 100.0)
                 .droppedCount(dropped)
+                .supplementaryOpen(projectRoundRepository.findById(projectRoundId)
+                        .map(r -> Boolean.TRUE.equals(r.getSupplementaryOpen()))
+                        .orElse(false))
                 .build();
     }
 
@@ -1198,12 +1201,22 @@ public class AssignmentServiceImpl implements AssignmentService {
                             "Mở đợt đăng ký bổ sung nguyện vọng GVHD",
                             "Khoa đã mở đợt đăng ký bổ sung nguyện vọng GVHD cho đợt [" + round.getRoundCode() + "]. Vui lòng hoàn tất đăng ký trước khi kết thúc đợt bổ sung.",
                             "ASSIGNMENT",
-                            "/assignment/student"
+                            "/student/assignment"
                     );
                 } catch (Exception ignored) {}
             }
         }
+        round.setSupplementaryOpen(true);
+        projectRoundRepository.save(round);
         log.info("Đã mở đợt đăng ký bổ sung cho {} sinh viên trong đợt {}", reopenedCount, round.getRoundCode());
+        AssignmentStatsResponseDTO stats = getAssignmentStats(projectRoundId);
+        stats.setSupplementaryOpen(true);
+        stats.setSupplementaryCount(reopenedCount);
+        return stats;
+    }
+
+    @SuppressWarnings("unused")
+    private AssignmentStatsResponseDTO unusedAnchor(Long projectRoundId) {
         return getAssignmentStats(projectRoundId);
     }
 
@@ -1212,6 +1225,9 @@ public class AssignmentServiceImpl implements AssignmentService {
     public AssignmentStatsResponseDTO finalizeSupplementaryRegistration(Long projectRoundId, Long currentUserId) {
         ProjectRound round = getAndValidateActiveRound(projectRoundId);
 
+        if (!Boolean.TRUE.equals(round.getSupplementaryOpen())) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Đợt đăng ký bổ sung chưa được mở nên không thể thực hiện kết thúc đợt bổ sung!");
+        }
         // Chạy thuật toán gán cho các sinh viên mới đăng ký bổ sung (reassignAll = false để giữ nguyên các SV đã FINALIZED)
         try {
             AssignmentGenerateRequestDTO genReq = new AssignmentGenerateRequestDTO();
@@ -1243,7 +1259,8 @@ public class AssignmentServiceImpl implements AssignmentService {
             }
         }
 
-        // Sau khi kết thúc đợt đăng ký bổ sung: Sinh viên nào vẫn KHÔNG đăng ký thì XÓA HẲN khỏi đợt đồ án
+        round.setSupplementaryOpen(false);
+        projectRoundRepository.save(round);
         if (studentProjectRoundRepository != null) {
             Set<Long> registeredStudentIds = registrationRepository.findByProjectRoundId(projectRoundId).stream()
                     .map(DirectionRegistration::getStudentId)
@@ -1294,6 +1311,9 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
         // Nếu đợt đã có các SV khác FINALIZED, kiểm tra xem sinh viên này có đang được mở đăng ký bổ sung không
         if (assignmentRepository.countByProjectRoundIdAndStatus(round.getId(), "FINALIZED") > 0) {
+            if (Boolean.TRUE.equals(round.getSupplementaryOpen())) {
+                return;
+            }
             if (studentProjectRoundRepository != null) {
                 Optional<StudentProjectRound> sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(student.getId(), round.getId());
                 if (sprOpt.isPresent()) {

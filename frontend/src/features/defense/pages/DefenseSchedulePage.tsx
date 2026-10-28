@@ -5,8 +5,10 @@ import { Button, Modal } from '../../../components/ui';
 import { ScheduleCalendarView } from '../components/ScheduleCalendarView';
 import { ScheduleConfigModal } from '../components/ScheduleConfigModal';
 import { defenseService } from '../services/defenseService';
+import { thesisService } from '../../thesis/services/thesisService';
 import { apiService } from '../../../services/api';
-import type { DefenseSchedule, DefenseCouncil, ScheduleConfig } from '../types';
+import type { DefenseSchedule, DefenseCouncil, ScheduleConfig, GraduationResult } from '../types';
+import type { Thesis } from '../../thesis/types';
 import './DefensePages.css';
 
 export const DefenseSchedulePage: React.FC = () => {
@@ -16,17 +18,22 @@ export const DefenseSchedulePage: React.FC = () => {
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor' || (userType as any) === 'lecturer';
   const isCommittee = userType === 'committee_member' || (userType as any) === 'committee';
-  const canManageSchedule = userType === 'admin' || isCommittee;
+  const canManageSchedule = userType === 'admin';
 
   const [rounds, setRounds] = useState<any[]>([]);
-  const [selectedRoundId, setSelectedRoundId] = useState<number>(16);
+  const [selectedRoundId, setSelectedRoundId] = useState<number>(10);
 
   const [schedules, setSchedules] = useState<DefenseSchedule[]>([]);
   const [councils, setCouncils] = useState<DefenseCouncil[]>([]);
+  const [eligibleTheses, setEligibleTheses] = useState<Thesis[]>([]);
+  const [myStudentThesis, setMyStudentThesis] = useState<Thesis | null>(null);
+  const [myGraduationResult, setMyGraduationResult] = useState<GraduationResult | null>(null);
+
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [viewMode, setViewMode] = useState<'TIMELINE' | 'ROOM' | 'SESSION'>('ROOM');
   const [loading, setLoading] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<DefenseSchedule | null>(null);
   const [selectedScheduleDetail, setSelectedScheduleDetail] = useState<DefenseSchedule | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -37,15 +44,15 @@ export const DefenseSchedulePage: React.FC = () => {
   const initPage = async () => {
     try {
       setLoading(true);
-      const rList = await apiService.getProjectRounds();
+      const rList = await apiService.getProjectRounds().catch(() => []);
       setRounds(rList || []);
 
       const queryRoundId = searchParams.get('roundId');
-      let targetRoundId = 16;
+      let targetRoundId = 10;
       if (queryRoundId && !isNaN(Number(queryRoundId))) {
         targetRoundId = Number(queryRoundId);
       } else if (rList && rList.length > 0) {
-        const active: any = rList.find((r: any) => r.status === 'IN_PROGRESS');
+        const active: any = rList.find((r: any) => r.status === 'IN_PROGRESS' || r.status === 'OPEN');
         const last: any = rList[rList.length - 1];
         targetRoundId = active ? (active.roundId || active.id) : (last?.roundId || last?.id);
       }
@@ -61,14 +68,38 @@ export const DefenseSchedulePage: React.FC = () => {
   const loadSchedulesForRound = async (roundId: number) => {
     try {
       setLoading(true);
-      const [sList, cList] = await Promise.all([
+      const [sList, cList, tList] = await Promise.all([
         defenseService.getSchedules(undefined, roundId),
         defenseService.getCouncils(roundId),
+        thesisService.searchTheses({ roundId }).catch(() => [] as Thesis[]),
       ]);
       setSchedules(sList);
       setCouncils(cList);
 
-      // Auto pick date if schedules exist
+      const eligibleOnly = (tList || []).filter(
+        (t) => Boolean(t.defenseEligible) || t.status === 'COMPLETED'
+      );
+      setEligibleTheses(eligibleOnly);
+
+      if (isStudent && user) {
+        const studentId = (user as any).student?.id || (user as any).student_id || user.id;
+        const userCode = String(
+          (user as any).student?.student_code || (user as any).studentCode || user.username || ''
+        ).toLowerCase();
+        const foundThesis = (tList || []).find(
+          (t) =>
+            (studentId && String(t.studentId) === String(studentId)) ||
+            (userCode && (t.studentCode || '').toLowerCase() === userCode)
+        ) || null;
+        setMyStudentThesis(foundThesis);
+        if (foundThesis?.id) {
+          const gRes = await defenseService.getGraduationResult(foundThesis.id).catch(() => null);
+          setMyGraduationResult(gRes);
+        } else {
+          setMyGraduationResult(null);
+        }
+      }
+
       if (sList.length > 0) {
         const hasCurrentDate = sList.some((s) => s.defenseDate === currentDate);
         if (!hasCurrentDate && sList[0].defenseDate) {
@@ -88,82 +119,61 @@ export const DefenseSchedulePage: React.FC = () => {
     await loadSchedulesForRound(newRoundId);
   };
 
+  const selectedRoundObj = useMemo(
+    () => rounds.find((r: any) => (r.roundId || r.id) === selectedRoundId) || null,
+    [rounds, selectedRoundId]
+  );
+
   // Determine if student is scheduled in any council/schedule
   const currentStudentDefense = useMemo(() => {
     if (!user) return null;
     const uId = user.id ? Number(user.id) : null;
-    const uStudentId = user.student_id ? Number(user.student_id) : null;
-    const code = (user.studentCode || user.registration_no || user.student_id || user.username || '').toString().toLowerCase();
+    const uStudentId = (user as any).student_id ? Number((user as any).student_id) : null;
+    const code = ((user as any).studentCode || (user as any).registration_no || user.username || '').toString().toLowerCase();
     const fullName = (user.fullName || '').toString().toLowerCase();
 
     for (const schedule of schedules) {
-      // Check in assignedStudents if available
       if (schedule.assignedStudents && schedule.assignedStudents.length > 0) {
         const match = schedule.assignedStudents.find((s) => {
-          if (uId && s.studentId === uId) return true;
+          if (myStudentThesis && s.thesisId === myStudentThesis.id) return true;
           if (uStudentId && s.studentId === uStudentId) return true;
-          if (s.studentCode && code.includes(s.studentCode.toLowerCase())) return true;
-          if (s.studentName && fullName.includes(s.studentName.toLowerCase())) return true;
+          if (uId && s.studentId === uId) return true;
+          if (s.studentCode && code && s.studentCode.toLowerCase() === code) return true;
+          if (s.studentName && fullName && s.studentName.toLowerCase() === fullName) return true;
           return false;
         });
         if (match) {
           return { schedule, studentDetail: match };
         }
       }
-
-      // Check council studentIds
-      const council = councils.find((c) => c.id === schedule.councilId);
-      const studentIds = schedule.studentIds || council?.studentIds || [];
-      const matchId = studentIds.some((sId) => {
-        if (uId && sId === uId) return true;
-        if (uStudentId && sId === uStudentId) return true;
-        if (String(sId) === code || code.endsWith(String(sId))) return true;
-        return false;
-      });
-      if (matchId) {
-        return {
-          schedule,
-          studentDetail: {
-            studentId: uId || 0,
-            studentName: user.fullName || 'Bạn',
-            studentCode: user.studentCode || user.username || '',
-            thesisId: 0,
-            thesisTitle: 'Đề tài tốt nghiệp chính thức',
-            advisorId: 0,
-            advisorName: 'Giảng viên hướng dẫn',
-          },
-        };
-      }
     }
     return null;
-  }, [schedules, councils, user]);
+  }, [schedules, user, myStudentThesis]);
 
   // Lecturer role in schedules
   const lecturerDefenseInfo = useMemo(() => {
     if (!user || (!isSupervisor && !isCommittee)) return null;
     const uId = user.id ? Number(user.id) : null;
-    const lecturerId = user.lecturerId ? Number(user.lecturerId) : uId;
+    const lecturerId = (user as any).lecturerId ? Number((user as any).lecturerId) : uId;
     const fullName = (user.fullName || '').toLowerCase();
 
     const supervisingSchedules: Array<{ schedule: DefenseSchedule; students: any[] }> = [];
     const committeeSchedules: Array<{ schedule: DefenseSchedule; role: string }> = [];
 
     for (const schedule of schedules) {
-      // 1. Is this lecturer GVHD of any student in this schedule?
       if (schedule.assignedStudents && schedule.assignedStudents.length > 0) {
         const mySupervised = schedule.assignedStudents.filter(
-          (s) => s.advisorId === lecturerId || (s.advisorName && fullName.includes(s.advisorName.toLowerCase()))
+          (s) => s.advisorId === lecturerId || (s.advisorName && fullName && s.advisorName.toLowerCase() === fullName)
         );
         if (mySupervised.length > 0) {
           supervisingSchedules.push({ schedule, students: mySupervised });
         }
       }
 
-      // 2. Is this lecturer a Council Member in this schedule?
       const council = councils.find((c) => c.id === schedule.councilId);
       const members = schedule.members || council?.members || [];
       const myMember = members.find(
-        (m) => m.lecturerId === lecturerId || (m.lecturerName && fullName.includes(m.lecturerName.toLowerCase()))
+        (m) => m.lecturerId === lecturerId || (m.lecturerName && fullName && m.lecturerName.toLowerCase() === fullName)
       );
       if (myMember) {
         let roleName = 'Ủy viên';
@@ -176,7 +186,6 @@ export const DefenseSchedulePage: React.FC = () => {
     return { supervisingSchedules, committeeSchedules };
   }, [schedules, councils, user, isSupervisor, isCommittee]);
 
-  // Schedules filtered by currentDate
   const visibleSchedules = useMemo(() => {
     if (!currentDate) return schedules;
     const list = schedules.filter((s) => s.defenseDate === currentDate);
@@ -195,7 +204,7 @@ export const DefenseSchedulePage: React.FC = () => {
       setSchedules(res);
       setNotification({
         type: 'success',
-        message: 'Tự động xếp lịch bảo vệ thành công! Cả Giảng viên và Sinh viên đều đã có thể xem lịch chính thức.',
+        message: 'Tự động xếp lịch bảo vệ thành công cho các sinh viên đủ điều kiện!',
       });
       await loadSchedulesForRound(selectedRoundId);
     } catch (err: any) {
@@ -205,13 +214,48 @@ export const DefenseSchedulePage: React.FC = () => {
     }
   };
 
-  const handleSaveSchedule = async (config: ScheduleConfig) => {
-    try {
+  const handleSaveSchedule = async (config: ScheduleConfig, scheduleId?: number) => {
+    if (scheduleId) {
+      await defenseService.updateSchedule(scheduleId, config);
+      setNotification({ type: 'success', message: 'Đã cập nhật ca bảo vệ và danh sách sinh viên thành công!' });
+    } else {
       await defenseService.configureSchedule(config);
-      setNotification({ type: 'success', message: 'Lưu lịch bảo vệ thành công!' });
+      setNotification({ type: 'success', message: 'Đã tạo mới ca bảo vệ và xếp sinh viên thành công!' });
+    }
+    setEditingSchedule(null);
+    setSelectedScheduleDetail(null);
+    await loadSchedulesForRound(selectedRoundId);
+  };
+
+  const handleDeleteSchedule = async (schedule: DefenseSchedule) => {
+    if (!window.confirm(`Xác nhận xóa ca bảo vệ tại ${schedule.room} (${schedule.defenseDate})?`)) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await defenseService.deleteSchedule(schedule.id);
+      setSelectedScheduleDetail(null);
+      setNotification({ type: 'success', message: 'Đã xóa ca lịch bảo vệ thành công!' });
       await loadSchedulesForRound(selectedRoundId);
     } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Thất bại khi lưu lịch' });
+      setNotification({ type: 'error', message: err?.message || 'Không thể xóa ca lịch bảo vệ' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatGradeLabel = (grade?: string) => {
+    switch (grade) {
+      case 'EXCELLENT':
+        return 'Xuất sắc (A)';
+      case 'VERY_GOOD':
+        return 'Giỏi (B+)';
+      case 'GOOD':
+        return 'Khá (B)';
+      case 'AVERAGE':
+        return 'Trung bình (C)';
+      default:
+        return 'Không đạt (F)';
     }
   };
 
@@ -220,53 +264,60 @@ export const DefenseSchedulePage: React.FC = () => {
       <div className="feature-page-header">
         <div>
           <h1 className="feature-page-title">
-            {isStudent ? 'Lịch Bảo Vệ Đồ Án Tốt Nghiệp' : 'GĐ5: Xếp Lịch & Theo Dõi Bảo Vệ Luận Văn'}
+            {isStudent ? 'Lịch Bảo Vệ & Kết Quả Đồ Án Tốt Nghiệp' : 'Xếp lịch và Điều hành Bảo vệ Luận văn'}
           </h1>
           <p className="feature-page-subtitle">
             {isStudent
-              ? 'Xem thông tin phòng bảo vệ, hội đồng chấm (1CT-2TK-2UV) và khung thời gian bảo vệ của bạn.'
-              : 'Sau khi chốt Hội đồng, hệ thống tự động bố trí phòng bảo vệ, ca sáng/chiều tránh trùng lắp khung giờ.'}
+              ? 'Theo dõi lịch bảo vệ chính thức (Phòng, Ca, Hội đồng 5 thành viên) và kết quả tốt nghiệp được công bố cuối đợt.'
+              : 'Quản lý ca bảo vệ tự động hoặc thủ công, chọn sinh viên đủ điều kiện vào từng ca tránh trùng GVHD.'}
           </p>
         </div>
 
         <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Round Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '6px' }}>
-            <label htmlFor="roundSelectSchedule" style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-              📁 Đợt đồ án:
-            </label>
-            <select
-              id="roundSelectSchedule"
-              value={selectedRoundId}
-              onChange={handleRoundChange}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#0a3273',
-                background: '#fff',
-              }}
-            >
-              {rounds.map((r: any) => {
-                const rid = r.roundId || r.id;
-                return (
-                  <option key={rid} value={rid}>
-                    {r.name} ({r.roundCode || `ID: ${rid}`})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+          {rounds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '6px' }}>
+              <label htmlFor="roundSelectSchedule" style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                📁 Đợt đồ án:
+              </label>
+              <select
+                id="roundSelectSchedule"
+                value={selectedRoundId}
+                onChange={handleRoundChange}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#0a3273',
+                  background: '#fff',
+                }}
+              >
+                {rounds.map((r: any) => {
+                  const rid = r.roundId || r.id;
+                  return (
+                    <option key={rid} value={rid}>
+                      {r.name} ({r.roundCode || `ID: ${rid}`})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
 
           {canManageSchedule && (
             <>
               <Button variant="primary" onClick={handleAutoGenerate} loading={loading}>
                 ⚡ Tự động chạy xếp lịch
               </Button>
-              <Button variant="outline" onClick={() => setIsConfigModalOpen(true)}>
-                + Cấu hình ca bảo vệ
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditingSchedule(null);
+                  setIsConfigModalOpen(true);
+                }}
+              >
+                + Thêm ca &amp; Xếp sinh viên
               </Button>
             </>
           )}
@@ -284,28 +335,100 @@ export const DefenseSchedulePage: React.FC = () => {
         </div>
       )}
 
+      {/* OFFICIAL PUBLISHED RESULT BANNER FOR STUDENT (#25) */}
+      {isStudent && myGraduationResult && (selectedRoundObj?.status === 'CLOSED' || myGraduationResult.publishedAt) && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
+            border: '2px solid #22c55e',
+            borderRadius: '12px',
+            padding: '20px 24px',
+            marginBottom: '20px',
+            boxShadow: '0 4px 14px rgba(22, 163, 74, 0.12)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <span
+                style={{
+                  background: '#0a3273',
+                  color: '#fff',
+                  padding: '4px 12px',
+                  borderRadius: '999px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                }}
+              >
+                🎓 KẾT QUẢ BẢO VỆ ĐỒ ÁN TỐT NGHIỆP CHÍNH THỨC
+              </span>
+              <h2 style={{ margin: '8px 0 2px 0', fontSize: '18px', color: '#0f172a' }}>
+                {myGraduationResult.thesisTitle || myStudentThesis?.titleVn}
+              </h2>
+              <div style={{ fontSize: '13px', color: '#475569' }}>
+                Sinh viên: <strong>{myGraduationResult.studentName || user?.fullName}</strong> ({myGraduationResult.studentCode || myStudentThesis?.studentCode})
+              </div>
+            </div>
+            <div
+              style={{
+                background: myGraduationResult.finalResult === 'PASSED' ? '#16a34a' : '#dc2626',
+                color: '#fff',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                fontWeight: 800,
+                fontSize: '14px',
+              }}
+            >
+              {myGraduationResult.finalResult === 'PASSED' ? '✅ ĐẠT TỐT NGHIỆP' : '❌ KHÔNG ĐẠT'} — {formatGradeLabel(myGraduationResult.grade)}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+            <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVHD (30%)</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(myGraduationResult.supervisorScore || 0).toFixed(2)}</div>
+            </div>
+            <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVPB (20%)</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(myGraduationResult.reviewerScore || 0).toFixed(2)}</div>
+            </div>
+            <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>TB Hội đồng (50%)</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(myGraduationResult.councilScore || 0).toFixed(2)}</div>
+            </div>
+            <div style={{ background: '#0a3273', padding: '12px', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', opacity: 0.9 }}>ĐIỂM TỔNG KẾT HỆ 10</div>
+              <div style={{ fontSize: '21px', fontWeight: 800 }}>{Number(myGraduationResult.finalScore || 0).toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. STUDENT PERSONAL DEFENSE HERO CARD */}
       {isStudent && (
-        <div style={{
-          background: currentStudentDefense ? '#f0fdf4' : '#fffbeb',
-          border: `2px solid ${currentStudentDefense ? '#86efac' : '#fde68a'}`,
-          borderRadius: '10px',
-          padding: '20px 24px',
-          marginBottom: '20px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-        }}>
+        <div
+          style={{
+            background: currentStudentDefense ? '#f0fdf4' : '#fffbeb',
+            border: `2px solid ${currentStudentDefense ? '#86efac' : '#fde68a'}`,
+            borderRadius: '10px',
+            padding: '20px 24px',
+            marginBottom: '20px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+          }}
+        >
           {currentStudentDefense ? (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                <span style={{
-                  background: '#16a34a',
-                  color: '#fff',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  letterSpacing: '0.5px'
-                }}>
+                <span
+                  style={{
+                    background: '#16a34a',
+                    color: '#fff',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    letterSpacing: '0.5px',
+                  }}
+                >
                   🎉 ĐÃ XẾP LỊCH BẢO VỆ CHÍNH THỨC
                 </span>
                 <span style={{ fontSize: '13px', color: '#15803d', fontWeight: 600 }}>
@@ -321,16 +444,18 @@ export const DefenseSchedulePage: React.FC = () => {
                 📖 Đề tài: {currentStudentDefense.studentDetail.thesisTitle}
               </div>
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '12px',
-                background: '#fff',
-                padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid #bbf7d0',
-                marginBottom: '14px',
-              }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '12px',
+                  background: '#fff',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #bbf7d0',
+                  marginBottom: '14px',
+                }}
+              >
                 <div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>📅 Ngày bảo vệ</div>
                   <div style={{ fontSize: '15px', fontWeight: 700, color: '#0a3273' }}>
@@ -338,7 +463,7 @@ export const DefenseSchedulePage: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>⏰ Ca & Khung giờ</div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>⏰ Ca &amp; Khung giờ</div>
                   <div style={{ fontSize: '15px', fontWeight: 700, color: '#0a3273' }}>
                     {currentStudentDefense.schedule.session === 'MORNING' ? 'Ca Sáng' : 'Ca Chiều'} ({currentStudentDefense.schedule.startTime} - {currentStudentDefense.schedule.endTime})
                   </div>
@@ -357,7 +482,6 @@ export const DefenseSchedulePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Council 5 Members */}
               {currentStudentDefense.schedule.members && currentStudentDefense.schedule.members.length > 0 && (
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '13px', marginBottom: '8px' }}>
@@ -374,7 +498,7 @@ export const DefenseSchedulePage: React.FC = () => {
                           borderRadius: '6px',
                           fontSize: '12px',
                           fontWeight: 600,
-                          color: '#334155'
+                          color: '#334155',
                         }}
                       >
                         {m.role === 'PRESIDENT' ? '⭐ Chủ tịch: ' : m.role === 'SECRETARY' ? '📝 Thư ký: ' : '👤 Ủy viên: '}
@@ -383,7 +507,7 @@ export const DefenseSchedulePage: React.FC = () => {
                     ))}
                   </div>
                   <div style={{ marginTop: '8px', fontSize: '12px', color: '#dc2626', fontStyle: 'italic' }}>
-                    🛡️ GVHD: {currentStudentDefense.studentDetail.advisorName} (Đã chấm điểm hướng dẫn quá trình — Không tham gia chấm Hội đồng theo quy chế)
+                    🛡️ GVHD: {currentStudentDefense.studentDetail.advisorName} (Không tham gia Hội đồng theo quy chế UTC)
                   </div>
                 </div>
               )}
@@ -394,7 +518,9 @@ export const DefenseSchedulePage: React.FC = () => {
                 ℹ️ Chưa có lịch bảo vệ được xếp cho sinh viên: {user?.fullName || user?.username || 'Bạn'}
               </div>
               <div style={{ fontSize: '0.875rem', color: '#b45309' }}>
-                Admin Khoa đang hoàn tất chốt danh sách Hội đồng và xếp lịch bảo vệ. Vui lòng quay lại sau hoặc liên hệ Bộ môn.
+                {myStudentThesis && !myStudentThesis.defenseEligible
+                  ? 'Đề tài của bạn hiện chưa ở trạng thái Đủ điều kiện bảo vệ. Vui lòng hoàn thành tiến độ và liên hệ GVHD.'
+                  : 'Admin Khoa đang hoàn tất chốt danh sách Hội đồng và xếp lịch bảo vệ. Vui lòng quay lại sau.'}
               </div>
             </div>
           )}
@@ -404,18 +530,19 @@ export const DefenseSchedulePage: React.FC = () => {
       {/* 2. LECTURER SPECIFIC NOTICE BANNER */}
       {(isSupervisor || isCommittee) && lecturerDefenseInfo && (
         <div style={{ marginBottom: '20px' }}>
-          {/* Supervising Notice */}
           {lecturerDefenseInfo.supervisingSchedules.length > 0 && (
-            <div style={{
-              background: '#f0fdf4',
-              border: '1px solid #86efac',
-              borderRadius: '8px',
-              padding: '14px 18px',
-              marginBottom: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-            }}>
+            <div
+              style={{
+                background: '#f0fdf4',
+                border: '1px solid #86efac',
+                borderRadius: '8px',
+                padding: '14px 18px',
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
               <span style={{ fontSize: '1.5rem' }}>🎓</span>
               <div>
                 <strong style={{ color: '#166534', fontSize: '14px' }}>
@@ -425,28 +552,26 @@ export const DefenseSchedulePage: React.FC = () => {
                   {lecturerDefenseInfo.supervisingSchedules.map((item, idx) => (
                     <div key={idx}>
                       • Phòng <strong>{item.schedule.room}</strong> ({item.schedule.session === 'MORNING' ? 'Ca Sáng' : 'Ca Chiều'} {item.schedule.startTime} - {item.schedule.endTime}, ngày {item.schedule.defenseDate}):{' '}
-                      {item.students.map((s) => `${s.studentName} (${s.studentCode}) - Đề tài: "${s.thesisTitle}"`).join(', ')}
+                      {item.students.map((s) => `${s.studentName} (${s.studentCode}) - "${s.thesisTitle}"`).join(', ')}
                     </div>
                   ))}
-                  <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', fontWeight: 600 }}>
-                    ⚠️ Nhắc nhở quy chế: GVHD không ngồi trong Hội đồng chấm thi sinh viên của mình. Điểm hướng dẫn của bạn đã được ghi nhận lúc xác nhận đủ điều kiện bảo vệ.
-                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Committee Member Notice */}
           {lecturerDefenseInfo.committeeSchedules.length > 0 && (
-            <div style={{
-              background: '#eff6ff',
-              border: '1px solid #bfdbfe',
-              borderRadius: '8px',
-              padding: '14px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-            }}>
+            <div
+              style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px',
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
               <span style={{ fontSize: '1.5rem' }}>⚖️</span>
               <div>
                 <strong style={{ color: '#1e40af', fontSize: '14px' }}>
@@ -516,10 +641,7 @@ export const DefenseSchedulePage: React.FC = () => {
           (selectedScheduleDetail.members && selectedScheduleDetail.members.length > 0
             ? selectedScheduleDetail.members
             : detailCouncil?.members) || [];
-        const detailStudents =
-          (selectedScheduleDetail.assignedStudents && selectedScheduleDetail.assignedStudents.length > 0
-            ? selectedScheduleDetail.assignedStudents
-            : detailCouncil?.assignedStudents) || [];
+        const detailStudents = selectedScheduleDetail.assignedStudents || [];
 
         return (
           <Modal
@@ -529,7 +651,6 @@ export const DefenseSchedulePage: React.FC = () => {
             maxWidth="820px"
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* 1. Thông tin phòng, ngày, ca */}
               <div
                 style={{
                   display: 'grid',
@@ -567,15 +688,7 @@ export const DefenseSchedulePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 2. Danh sách 5 thành viên Hội đồng */}
-              <div
-                style={{
-                  background: '#fff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  padding: '14px 16px',
-                }}
-              >
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px 16px' }}>
                 <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '10px' }}>
                   👥 Thành viên Hội đồng chấm thi ({detailMembers.length} Giảng viên — Cơ cấu 1CT - 2TK - 2UV):
                 </div>
@@ -628,15 +741,7 @@ export const DefenseSchedulePage: React.FC = () => {
                 )}
               </div>
 
-              {/* 3. Danh sách Sinh viên bảo vệ trong ca đó */}
-              <div
-                style={{
-                  background: '#fff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  padding: '14px 16px',
-                }}
-              >
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px 16px' }}>
                 <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '10px' }}>
                   🎓 Danh sách sinh viên bảo vệ trong ca này ({detailStudents.length} sinh viên):
                 </div>
@@ -654,7 +759,7 @@ export const DefenseSchedulePage: React.FC = () => {
                       </thead>
                       <tbody>
                         {detailStudents.map((st, idx) => (
-                          <tr key={st.studentId || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr key={st.thesisId || st.studentId || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                             <td style={{ padding: '8px 10px', fontWeight: 600 }}>{idx + 1}</td>
                             <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
                             <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>{st.studentName}</td>
@@ -674,7 +779,26 @@ export const DefenseSchedulePage: React.FC = () => {
                 )}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                {canManageSchedule ? (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditingSchedule(selectedScheduleDetail);
+                        setSelectedScheduleDetail(null);
+                        setIsConfigModalOpen(true);
+                      }}
+                    >
+                      ✏️ Sửa ca &amp; Xếp sinh viên
+                    </Button>
+                    <Button variant="danger" onClick={() => handleDeleteSchedule(selectedScheduleDetail)}>
+                      🗑️ Xóa lịch ca này
+                    </Button>
+                  </div>
+                ) : (
+                  <div />
+                )}
                 <Button variant="primary" onClick={() => setSelectedScheduleDetail(null)}>
                   Đóng
                 </Button>
@@ -684,12 +808,17 @@ export const DefenseSchedulePage: React.FC = () => {
         );
       })()}
 
-      {/* Config Modal */}
       {canManageSchedule && (
         <ScheduleConfigModal
           isOpen={isConfigModalOpen}
-          onClose={() => setIsConfigModalOpen(false)}
+          onClose={() => {
+            setIsConfigModalOpen(false);
+            setEditingSchedule(null);
+          }}
           councils={councils}
+          eligibleTheses={eligibleTheses}
+          allSchedules={schedules}
+          editingSchedule={editingSchedule}
           defaultDate={currentDate}
           onSave={handleSaveSchedule}
         />

@@ -15,6 +15,13 @@ import java.time.Instant;
 public class GraduationResultResponseDTO {
     private Long id;
     private Long thesisId;
+    private String thesisCode;
+    private String thesisTitle;
+    private String studentCode;
+    private String studentName;
+    private String studentClass;
+    private String advisorName;
+    private String roundStatus;
     private BigDecimal supervisorScore;
     private BigDecimal reviewerScore;
     private BigDecimal councilScore;

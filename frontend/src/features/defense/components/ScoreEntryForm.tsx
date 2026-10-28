@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../../../components/ui';
 import type { ScoreType, LecturerOption } from '../types';
 import './DefenseComponents.css';
 
 interface ScoreEntryFormProps {
   thesisId: number;
-  graders: LecturerOption[];
+  graders?: LecturerOption[];
+  fixedGraderId?: number;
+  fixedGraderName?: string;
+  fixedGraderDegree?: string;
+  allowedScoreTypes?: ScoreType[];
   onSubmit: (data: {
     thesisId: number;
     graderId: number;
@@ -15,13 +19,38 @@ interface ScoreEntryFormProps {
   }) => Promise<void>;
 }
 
+const SCORE_TYPE_LABELS: Record<ScoreType, string> = {
+  COUNCIL: 'Thành viên Hội đồng chấm bảo vệ (COUNCIL)',
+  REVIEWER: 'Giảng viên Phản biện (REVIEWER)',
+  SUPERVISOR: 'Giảng viên Hướng dẫn quá trình (SUPERVISOR)',
+};
+
 export const ScoreEntryForm: React.FC<ScoreEntryFormProps> = ({
   thesisId,
-  graders,
+  graders = [],
+  fixedGraderId,
+  fixedGraderName,
+  fixedGraderDegree,
+  allowedScoreTypes,
   onSubmit,
 }) => {
-  const [graderId, setGraderId] = useState<number>(graders[0]?.lecturerId || 501);
-  const [scoreType, setScoreType] = useState<ScoreType>('COUNCIL');
+  const effectiveAllowedTypes: ScoreType[] =
+    allowedScoreTypes && allowedScoreTypes.length > 0 ? allowedScoreTypes : ['COUNCIL'];
+
+  const effectiveGraderId = fixedGraderId ?? graders[0]?.lecturerId ?? 0;
+  const effectiveGraderLabel = fixedGraderName
+    ? `${fixedGraderName}${fixedGraderDegree ? ` (${fixedGraderDegree})` : ''}`
+    : graders[0]
+    ? `${graders[0].fullName}${graders[0].degree ? ` (${graders[0].degree})` : ''}`
+    : 'Giảng viên đang đăng nhập';
+
+  const [scoreType, setScoreType] = useState<ScoreType>(effectiveAllowedTypes[0]);
+
+  useEffect(() => {
+    if (!effectiveAllowedTypes.includes(scoreType)) {
+      setScoreType(effectiveAllowedTypes[0]);
+    }
+  }, [thesisId, effectiveAllowedTypes.join(',')]);
 
   // 4 Criteria breakdown
   const [contentScore, setContentScore] = useState<number>(3.5); // Max 4.0
@@ -52,7 +81,7 @@ export const ScoreEntryForm: React.FC<ScoreEntryFormProps> = ({
       setSuccess(false);
       await onSubmit({
         thesisId,
-        graderId,
+        graderId: effectiveGraderId,
         scoreType,
         score: totalScore,
         feedback: feedback.trim(),
@@ -75,34 +104,52 @@ export const ScoreEntryForm: React.FC<ScoreEntryFormProps> = ({
       <form onSubmit={handleSubmit} className="score-form">
         <div className="form-row-2">
           <div className="form-group">
-            <label htmlFor="graderSelect">Người chấm (Cán bộ / Giảng viên):</label>
-            <select
-              id="graderSelect"
+            <label>Người chấm (Tài khoản đang đăng nhập):</label>
+            <div
               className="form-control"
-              value={graderId}
-              onChange={(e) => setGraderId(Number(e.target.value))}
-              required
+              style={{
+                background: '#f1f5f9',
+                color: '#0f172a',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'not-allowed',
+              }}
             >
-              {graders.map((g) => (
-                <option key={g.lecturerId} value={g.lecturerId}>
-                  {g.fullName} ({g.degree})
-                </option>
-              ))}
-            </select>
+              <span>🔒</span>
+              <span>{effectiveGraderLabel}</span>
+            </div>
           </div>
 
           <div className="form-group">
-            <label htmlFor="scoreTypeSelect">Tư cách chấm điểm:</label>
-            <select
-              id="scoreTypeSelect"
-              className="form-control"
-              value={scoreType}
-              onChange={(e) => setScoreType(e.target.value as ScoreType)}
-            >
-              <option value="COUNCIL">Thành viên Hội đồng chấm (COUNCIL)</option>
-              <option value="SUPERVISOR">Giảng viên Hướng dẫn (SUPERVISOR)</option>
-              <option value="REVIEWER">Giảng viên Phản biện (REVIEWER)</option>
-            </select>
+            <label htmlFor="scoreTypeSelect">Tư cách chấm điểm được phân công:</label>
+            {effectiveAllowedTypes.length === 1 ? (
+              <div
+                className="form-control"
+                style={{
+                  background: '#eff6ff',
+                  color: '#1e40af',
+                  fontWeight: 700,
+                  border: '1px solid #93c5fd',
+                }}
+              >
+                {SCORE_TYPE_LABELS[effectiveAllowedTypes[0]]}
+              </div>
+            ) : (
+              <select
+                id="scoreTypeSelect"
+                className="form-control"
+                value={scoreType}
+                onChange={(e) => setScoreType(e.target.value as ScoreType)}
+              >
+                {effectiveAllowedTypes.map((st) => (
+                  <option key={st} value={st}>
+                    {SCORE_TYPE_LABELS[st]}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
@@ -185,7 +232,6 @@ export const ScoreEntryForm: React.FC<ScoreEntryFormProps> = ({
             </div>
           </div>
 
-          {/* Total score box */}
           <div className="total-score-banner">
             <span className="total-label">TỔNG ĐIỂM ĐÁNH GIÁ (Thang điểm 10):</span>
             <span className="total-val">{totalScore.toFixed(2)} / 10.0</span>

@@ -33,6 +33,8 @@ public interface ThesisRepository extends JpaRepository<Thesis, Long> {
 
     List<Thesis> findByLecturerId(Long lecturerId);
 
+    List<Thesis> findByStudentId(Long studentId);
+
     List<Thesis> findByProjectRoundIdAndStatus(Long projectRoundId, String status);
 
     List<Thesis> findByProjectRoundIdAndDefenseEligible(Long projectRoundId, Boolean defenseEligible);

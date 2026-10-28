@@ -10,6 +10,7 @@ interface Props {
   loading?: boolean;
   roundName?: string;
   isRoundClosed?: boolean;
+  readOnly?: boolean;
 }
 
 export const AssignmentProposalTable: React.FC<Props> = ({
@@ -20,6 +21,7 @@ export const AssignmentProposalTable: React.FC<Props> = ({
   loading,
   roundName,
   isRoundClosed,
+  readOnly = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 1 | 2 | 3 | 'FALLBACK' | 'OVERRIDE'>('ALL');
@@ -217,7 +219,9 @@ export const AssignmentProposalTable: React.FC<Props> = ({
                     </span>
                   </td>
                   <td>
-                    {!isRoundClosed ? (
+                    {readOnly ? (
+                      <span className="text-muted text-xs">Chỉ xem</span>
+                    ) : !isRoundClosed ? (
                       <button
                         className="btn-action-override"
                         onClick={() => setSelectedForOverride(item)}

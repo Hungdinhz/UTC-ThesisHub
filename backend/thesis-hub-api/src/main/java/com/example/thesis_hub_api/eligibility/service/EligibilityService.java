@@ -421,7 +421,6 @@ public class EligibilityService {
             resolvedThesisTitle = t.getTitleVn();
             progressPercentage = t.getCompletionRate() != null ? t.getCompletionRate().doubleValue() : 0.0;
             supervisorApproved = Boolean.TRUE.equals(t.getDefenseEligible())
-                    || "DEFENSE_READY".equalsIgnoreCase(t.getStatus())
                     || "COMPLETED".equalsIgnoreCase(t.getStatus());
             if (t.getStudent() != null) {
                 studentId = t.getStudent().getId();

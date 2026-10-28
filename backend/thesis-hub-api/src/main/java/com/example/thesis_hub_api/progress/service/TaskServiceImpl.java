@@ -32,6 +32,9 @@ public class TaskServiceImpl implements TaskService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.progress.repository.SubmissionRepository submissionRepository;
+
     @Override
     @Transactional
     public TaskResponse createTask(CreateTaskRequest request) {
@@ -108,7 +111,19 @@ public class TaskServiceImpl implements TaskService {
         if (request.getDueDate() != null) task.setDueDate(request.getDueDate());
         if (request.getCompletedAt() != null) task.setCompletedAt(request.getCompletedAt());
 
-        return mapToResponse(taskRepository.save(task));
+        Task saved = taskRepository.save(task);
+        syncThesisCompletionRate(saved.getThesis());
+        return mapToResponse(saved);
+    }
+
+    private void syncThesisCompletionRate(Thesis thesis) {
+        if (thesis == null || thesis.getId() == null) return;
+        List<Task> allTasks = taskRepository.findByThesisId(thesis.getId());
+        if (allTasks.isEmpty()) return;
+        long completed = allTasks.stream().filter(t -> "COMPLETED".equalsIgnoreCase(t.getStatus())).count();
+        java.math.BigDecimal rate = java.math.BigDecimal.valueOf(Math.round((completed * 100.0) / allTasks.size()));
+        thesis.setCompletionRate(rate);
+        thesisRepository.save(thesis);
     }
 
     @Override
@@ -144,6 +159,18 @@ public class TaskServiceImpl implements TaskService {
     }
 
     private TaskResponse mapToResponse(Task task) {
+        int subCount = task.getSubmissions() != null ? task.getSubmissions().size() : 0;
+        String latestSubStatus = null;
+        if (submissionRepository != null && task.getId() != null) {
+            List<com.example.thesis_hub_api.progress.entity.Submission> subs = submissionRepository.findByTaskIdOrderBySubmittedAtDesc(task.getId());
+            subCount = subs.size();
+            if (!subs.isEmpty()) {
+                latestSubStatus = subs.get(0).getStatus();
+            }
+        } else if (task.getSubmissions() != null && !task.getSubmissions().isEmpty()) {
+            latestSubStatus = task.getSubmissions().get(task.getSubmissions().size() - 1).getStatus();
+        }
+
         return TaskResponse.builder()
                 .id(task.getId())
                 .thesisId(task.getThesis().getId())
@@ -158,7 +185,8 @@ public class TaskServiceImpl implements TaskService {
                 .status(task.getStatus())
                 .dueDate(task.getDueDate())
                 .completedAt(task.getCompletedAt())
-                .submissionCount(task.getSubmissions() != null ? task.getSubmissions().size() : 0)
+                .submissionCount(subCount)
+                .latestSubmissionStatus(latestSubStatus)
                 .commentCount(task.getComments() != null ? task.getComments().size() : 0)
                 .createdAt(task.getCreatedAt())
                 .updatedAt(task.getUpdatedAt())

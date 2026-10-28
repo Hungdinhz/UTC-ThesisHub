@@ -84,6 +84,13 @@ public class Proposal {
     @Column(name = "submitted_at")
     private Instant submittedAt;
 
+    @Column(name = "student_signed", nullable = false)
+    @Builder.Default
+    private Boolean studentSigned = false;
+
+    @Column(name = "student_signed_at")
+    private Instant studentSignedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
