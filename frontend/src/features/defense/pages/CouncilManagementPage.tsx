@@ -465,6 +465,7 @@ export const CouncilManagementPage: React.FC = () => {
                     allLecturers={lecturers}
                     onLecturerChange={handleMemberChange}
                     excludedAdvisorIds={excludedAdvisorIds}
+                    disabled={isFinalized}
                   />
                 ))}
               </div>
