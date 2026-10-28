@@ -39,17 +39,6 @@ export const ProposalManagementPage: React.FC = () => {
   const [reviewStatus, setReviewStatus] = useState<string>('APPROVED');
   const [reviewNotes, setReviewNotes] = useState<string>('');
   const [pdfPreviewProposal, setPdfPreviewProposal] = useState<Proposal | null>(null);
-  const [signedProposalIds, setSignedProposalIds] = useState<Record<number, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem('utc_signed_proposals_v1');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch {
-      // ignore
-    }
-    return { 1: true };
-  });
   const [bannerMsg, setBannerMsg] = useState<string | null>(null);
 
   // Round and assignment integration
@@ -297,10 +286,10 @@ export const ProposalManagementPage: React.FC = () => {
             (user?.id && p.studentId === user.id))
       );
       if (myExisting) {
-        if (myExisting.status === 'DRAFT' || myExisting.status === 'REVISE_REQUIRED') {
+        if (myExisting.status === 'REVISE_REQUIRED') {
           if (
             window.confirm(
-              `Bạn đã có đề cương ở trạng thái [${myExisting.status === 'DRAFT' ? 'Bản Nháp (DRAFT)' : 'Yêu Cầu Chỉnh Sửa (REVISE_REQUIRED)'}].\n\nTheo quy chế, mỗi sinh viên chỉ thực hiện 1 đề tài trong một đợt đồ án.\nBạn có muốn mở để CHỈNH SỬA đề cương này không?`
+              `Bạn đã có đề cương ở trạng thái [Yêu Cầu Chỉnh Sửa (REVISE_REQUIRED)].\n\nTheo quy chế, mỗi sinh viên chỉ thực hiện 1 đề tài trong một đợt đồ án.\nBạn có muốn mở để CHỈNH SỬA & NỘP LẠI đề cương này không?`
             )
           ) {
             handleOpenEditModal(myExisting);
@@ -308,7 +297,7 @@ export const ProposalManagementPage: React.FC = () => {
           return;
         } else {
           alert(
-            `Bạn đã có đề tài/đề cương "${myExisting.titleVn}" đang ở trạng thái [${myExisting.status}].\nTheo quy chế, mỗi sinh viên chỉ được phép có 1 đề tài trong 1 đợt đồ án.`
+            `Bạn đã nộp đề cương "${myExisting.titleVn}" (trạng thái: ${myExisting.status}).\nTheo quy chế, sau khi nộp không thể tự ý chỉnh sửa; chỉ được chỉnh sửa khi GVHD hoặc Khoa yêu cầu sửa đổi.`
           );
           return;
         }
@@ -357,11 +346,7 @@ export const ProposalManagementPage: React.FC = () => {
           expectedResults,
           fileUrl: cleanFileUrl,
         });
-        setBannerMsg(
-          editingProposal.status === 'REVISE_REQUIRED'
-            ? `Cập nhật đề cương "${titleVn}" thành công! Bạn có thể bấm 'Nộp Lại' để gửi GVHD/Khoa duyệt lại.`
-            : 'Nội dung bản nháp đã được lưu.'
-        );
+        setBannerMsg(`Đã cập nhật và nộp lại đề cương "${titleVn}" thành công! Đang chờ GVHD / Khoa xét duyệt lại.`);
       } else {
         const effectiveStudentId = isStudent ? (user?.student_id || user?.id || 1) : selectedStudentId;
         const effectiveLecturerId = isSupervisor
@@ -380,8 +365,8 @@ export const ProposalManagementPage: React.FC = () => {
           expectedResults,
           fileUrl: cleanFileUrl,
         });
-        setBannerMsg('Đã tạo và lưu Đề cương đề tài thành công vào CSDL!');
-        alert('🎉 Đã tạo Đề cương thành công! Bạn có thể bấm nút "🚀 Nộp Đề Cương" trong danh sách để gửi GVHD phê duyệt.');
+        setBannerMsg('Đã tạo và nộp Đề cương đề tài thành công (Trạng thái: Chờ GVHD xác nhận)!');
+        alert('🎉 Đã tạo và nộp Đề cương thành công! Đề cương đã được gửi trực tiếp lên Giảng viên hướng dẫn xác nhận.');
       }
       setShowModal(false);
       setEditingProposal(null);
@@ -419,11 +404,30 @@ export const ProposalManagementPage: React.FC = () => {
 
   const handleSupervisorConfirm = async (proposal: Proposal) => {
     try {
-      await thesisService.supervisorApprove(proposal.id, true, 'GVHD đồng ý xác nhận đề tài, chuyển Khoa/Ban duyệt.');
+      const comment = isAdmin
+        ? 'Quản trị viên Khoa xác nhận thay GVHD, chuyển xét duyệt đề tài.'
+        : 'GVHD đồng ý xác nhận đề tài, chuyển Khoa/Ban duyệt.';
+      await thesisService.supervisorApprove(proposal.id, true, comment);
       await loadProposals();
-      setBannerMsg(`GVHD đã xác nhận đề tài của SV ${proposal.studentFullName} thành công!`);
+      setBannerMsg(
+        isAdmin
+          ? `Quản trị viên đã duyệt xác nhận (thay GVHD) đề tài của SV ${proposal.studentFullName} thành công!`
+          : `GVHD đã xác nhận đề tài của SV ${proposal.studentFullName} thành công!`
+      );
     } catch (err: any) {
       alert('Lỗi xác nhận: ' + (err?.response?.data?.message || err?.message));
+    }
+  };
+
+  const handleSupervisorRequestRevise = async (proposal: Proposal) => {
+    const reason = window.prompt('Nhập nội dung yêu cầu sinh viên chỉnh sửa đề cương:', proposal.supervisorComment || '');
+    if (reason === null) return;
+    try {
+      await thesisService.supervisorApprove(proposal.id, false, reason || 'Yêu cầu chỉnh sửa lại nội dung đề cương.');
+      await loadProposals();
+      setBannerMsg(`Đã gửi yêu cầu chỉnh sửa đề cương cho SV ${proposal.studentFullName}.`);
+    } catch (err: any) {
+      alert('Lỗi gửi yêu cầu chỉnh sửa: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -444,17 +448,17 @@ export const ProposalManagementPage: React.FC = () => {
     }
   };
 
-  const handleSignAndArchive = (proposal: Proposal) => {
-    setSignedProposalIds((prev) => {
-      const next = { ...prev, [proposal.id]: true };
-      try {
-        localStorage.setItem('utc_signed_proposals_v1', JSON.stringify(next));
-      } catch {
-        // ignore
+  const handleSignAndArchive = async (proposal: Proposal) => {
+    try {
+      const updated = await thesisService.signProposal(proposal.id);
+      setProposals((prev) => prev.map((item) => (item.id === proposal.id ? updated : item)));
+      if (pdfPreviewProposal && pdfPreviewProposal.id === proposal.id) {
+        setPdfPreviewProposal(updated);
       }
-      return next;
-    });
-    setBannerMsg(`Sinh viên ${proposal.studentFullName} đã ký nộp và Khoa CNTT đã lưu hồ sơ đề cương (Bước 24 hoàn tất)!`);
+      setBannerMsg(`Sinh viên ${proposal.studentFullName} đã ký nộp và Khoa CNTT đã lưu hồ sơ đề cương trên hệ thống!`);
+    } catch (err: any) {
+      alert('Lỗi ký nộp đề cương: ' + (err?.response?.data?.message || err?.message));
+    }
   };
 
   const handleNavigateToThesis = async (proposal: Proposal, target: 'detail' | 'tasks') => {
@@ -486,7 +490,7 @@ export const ProposalManagementPage: React.FC = () => {
   };
 
   const handlePrintProposalPdf = (proposal: Proposal) => {
-    const isSigned = !!signedProposalIds[proposal.id];
+    const isSigned = Boolean(proposal.studentSigned);
     const printWin = window.open('', '_blank', 'width=850,height=950');
     if (!printWin) {
       window.print();
@@ -878,7 +882,7 @@ export const ProposalManagementPage: React.FC = () => {
         )}
         {isAdmin && (
           <span style={{ fontSize: '13px', color: '#475569', background: '#f1f5f9', padding: '4px 10px', borderRadius: '4px', fontWeight: 500 }}>
-            👁️ Quản trị viên (Chế độ xem & theo dõi đề tài)
+            ⚖️ Quản trị viên (Quản lý, duyệt thay GVHD & Khoa phê duyệt đề tài)
           </span>
         )}
       </div>
@@ -990,12 +994,11 @@ export const ProposalManagementPage: React.FC = () => {
                     <div style={{ fontWeight: '600', color: '#0f172a' }}>{p.titleVn}</div>
                     {p.titleEn && <div style={{ fontSize: '12px', color: '#64748b' }}>{p.titleEn}</div>}
                     {hasValidUploadedFile(p.fileUrl) ? (
-                      <div style={{ marginTop: '6px' }}>
+                      <div style={{ marginTop: '6px', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <a
                           href={resolveFileUrl(p.fileUrl!)}
                           target="_blank"
                           rel="noreferrer"
-                          download
                           style={{
                             fontSize: '12px',
                             color: '#0a3273',
@@ -1010,13 +1013,31 @@ export const ProposalManagementPage: React.FC = () => {
                             border: '1px solid #bfdbfe',
                             maxWidth: '100%'
                           }}
-                          title={extractFileName(p.fileUrl!)}
+                          title={`Mở xem trực tiếp: ${extractFileName(p.fileUrl!)}`}
                         >
                           <span>{getFileIcon(p.fileUrl!)}</span>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
                             {extractFileName(p.fileUrl!)}
                           </span>
-                          <span style={{ fontSize: '11px', color: '#2563eb' }}>👁️ Mở / ⬇️ Tải</span>
+                          <span style={{ fontSize: '11px', color: '#2563eb' }}>👁️ Mở xem</span>
+                        </a>
+                        <a
+                          href={`${resolveFileUrl(p.fileUrl!)}${resolveFileUrl(p.fileUrl!).includes('?') ? '&' : '?'}disposition=attachment`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontSize: '11px',
+                            color: '#475569',
+                            textDecoration: 'none',
+                            backgroundColor: '#f8fafc',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            fontWeight: 600,
+                          }}
+                          title="Tải tập tin về máy"
+                        >
+                          ⬇️ Tải
                         </a>
                       </div>
                     ) : (
@@ -1024,7 +1045,7 @@ export const ProposalManagementPage: React.FC = () => {
                         📄 Chưa đính kèm file PDF
                       </div>
                     )}
-                    {signedProposalIds[p.id] && (
+                    {p.studentSigned && (
                       <div style={{ marginTop: '4px', fontSize: '12px', color: '#15803d', fontWeight: 600 }}>
                         📌 Đã ký nộp & Khoa lưu hồ sơ
                       </div>
@@ -1037,8 +1058,8 @@ export const ProposalManagementPage: React.FC = () => {
                   <td style={{ padding: '12px 16px' }}>{getStatusBadge(p.status)}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {/* Nút Sửa đề cương khi DRAFT hoặc REVISE_REQUIRED */}
-                      {(p.status === 'DRAFT' || p.status === 'REVISE_REQUIRED') && (
+                      {/* Chỉ cho phép Sinh viên sửa & nộp lại đề cương khi có yêu cầu sửa đổi (REVISE_REQUIRED) */}
+                      {(isStudent && isCurrentStudentProposal(p)) && p.status === 'REVISE_REQUIRED' && (
                         <button
                           onClick={() => handleOpenEditModal(p)}
                           style={{
@@ -1051,14 +1072,14 @@ export const ProposalManagementPage: React.FC = () => {
                             fontSize: '12px',
                             fontWeight: 600,
                           }}
-                          title="Chỉnh sửa nội dung đề cương (tiêu đề, mục tiêu, kết quả dự kiến)"
+                          title="Chỉnh sửa nội dung đề cương theo yêu cầu của GVHD/Khoa và gửi nộp lại"
                         >
-                          ✏️ Sửa Đề Cương
+                          ✏️ Sửa Đề Cương & Nộp Lại
                         </button>
                       )}
 
-                      {/* Nút Nộp đề cương khi DRAFT hoặc REVISE_REQUIRED */}
-                      {(isStudent || isAdmin) && (p.status === 'DRAFT' || p.status === 'REVISE_REQUIRED') && (
+                      {/* Hỗ trợ nộp với đề cương cũ ở trạng thái DRAFT nếu tồn tại trong CSDL */}
+                      {isStudent && isCurrentStudentProposal(p) && p.status === 'DRAFT' && (
                         <button
                           onClick={() => handleSubmitProposalToSupervisor(p)}
                           style={{
@@ -1071,13 +1092,12 @@ export const ProposalManagementPage: React.FC = () => {
                             fontSize: '12px',
                             fontWeight: 600,
                           }}
-                          title="Nộp đề cương chính thức để Giảng viên hướng dẫn duyệt"
                         >
-                          {p.status === 'REVISE_REQUIRED' ? '🚀 Nộp Lại' : '🚀 Nộp Đề Cương'}
+                          🚀 Nộp Đề Cương
                         </button>
                       )}
 
-                      {canSupervisorApprove && !p.supervisorApproved && (
+                      {canSupervisorApprove && !p.supervisorApproved && p.status !== 'APPROVED' && p.status !== 'REJECTED' && (
                         <button
                           onClick={() => handleSupervisorConfirm(p)}
                           style={{
@@ -1091,7 +1111,24 @@ export const ProposalManagementPage: React.FC = () => {
                             fontWeight: 600,
                           }}
                         >
-                          ✓ Phê duyệt đề cương (GVHD)
+                          {isAdmin ? '✓ Duyệt thay GVHD' : '✓ Phê duyệt đề cương (GVHD)'}
+                        </button>
+                      )}
+                      {isSupervisor && !isAdmin && (p.status === 'SUBMITTED' || p.status === 'UNDER_REVIEW') && (
+                        <button
+                          onClick={() => handleSupervisorRequestRevise(p)}
+                          style={{
+                            background: '#fff7ed',
+                            color: '#c2410c',
+                            border: '1px solid #fed7aa',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ⚠️ Yêu cầu sửa đổi
                         </button>
                       )}
                       {canReview && p.status !== 'APPROVED' && (
@@ -1114,7 +1151,7 @@ export const ProposalManagementPage: React.FC = () => {
                           {isAdmin ? '⚖️ Khoa Duyệt Đề Tài' : 'Đánh Giá'}
                         </button>
                       )}
-                      {isStudent && p.status === 'APPROVED' && !signedProposalIds[p.id] && isCurrentStudentProposal(p) && (
+                      {isStudent && p.status === 'APPROVED' && !p.studentSigned && isCurrentStudentProposal(p) && (
                         <button
                           onClick={() => handleSignAndArchive(p)}
                           style={{
@@ -1292,7 +1329,7 @@ export const ProposalManagementPage: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
               <strong style={{ color: '#0a3273' }}>📄 BẢN XEM TRƯỚC PDF ĐỀ CƯƠNG ĐỒ ÁN TỐT NGHIỆP (CHUẨN UTC)</strong>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {isStudent && pdfPreviewProposal.status === 'APPROVED' && isCurrentStudentProposal(pdfPreviewProposal) && !signedProposalIds[pdfPreviewProposal.id] && (
+                {isStudent && pdfPreviewProposal.status === 'APPROVED' && isCurrentStudentProposal(pdfPreviewProposal) && !pdfPreviewProposal.studentSigned && (
                   <button
                     onClick={() => handleSignAndArchive(pdfPreviewProposal)}
                     style={{
@@ -1308,7 +1345,7 @@ export const ProposalManagementPage: React.FC = () => {
                     ✍️ SV Ký nộp & Khoa lưu hồ sơ
                   </button>
                 )}
-                {signedProposalIds[pdfPreviewProposal.id] && (
+                {pdfPreviewProposal.studentSigned && (
                   <span
                     style={{
                       backgroundColor: '#dcfce7',
@@ -1434,7 +1471,7 @@ export const ProposalManagementPage: React.FC = () => {
                 <div>
                   <strong>SINH VIÊN THỰC HIỆN</strong>
                   <div style={{ marginTop: '40px', fontWeight: 600, color: '#15803d' }}>
-                    {signedProposalIds[pdfPreviewProposal.id] ? `[Đã ký số: ${pdfPreviewProposal.studentFullName}]` : '(Chưa ký nộp)'}
+                    {pdfPreviewProposal.studentSigned ? `[Đã ký số: ${pdfPreviewProposal.studentFullName}]` : '(Chưa ký nộp)'}
                   </div>
                 </div>
                 <div>

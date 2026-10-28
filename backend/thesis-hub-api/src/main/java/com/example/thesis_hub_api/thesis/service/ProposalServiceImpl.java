@@ -91,7 +91,7 @@ public class ProposalServiceImpl implements ProposalService {
         java.util.Optional<Proposal> existingOpt = proposalRepository.findByStudentIdAndProjectRoundId(student.getId(), request.getProjectRoundId());
         if (existingOpt.isPresent()) {
             Proposal existing = existingOpt.get();
-            if ("DRAFT".equals(existing.getStatus()) || "REVISE_REQUIRED".equals(existing.getStatus())) {
+            if ("REVISE_REQUIRED".equals(existing.getStatus()) || "DRAFT".equals(existing.getStatus())) {
                 existing.setLecturer(lecturer);
                 existing.setTitleVn(request.getTitleVn());
                 if (request.getTitleEn() != null) existing.setTitleEn(request.getTitleEn());
@@ -100,12 +100,16 @@ public class ProposalServiceImpl implements ProposalService {
                 if (request.getExpectedResults() != null) existing.setExpectedResults(request.getExpectedResults());
                 if (request.getResearchContent() != null) existing.setResearchContent(request.getResearchContent());
                 if (request.getFileUrl() != null) existing.setFileUrl(request.getFileUrl());
+                existing.setStatus("SUBMITTED");
+                existing.setSubmittedAt(Instant.now());
+                existing.setSupervisorApproved(false);
+                existing.setVersion(existing.getVersion() + 1);
                 Proposal updated = proposalRepository.save(existing);
                 ensureThesisCreatedForProposal(updated);
-                log.info("Updated existing proposal with ID: {} for student: {}", updated.getId(), updated.getStudent().getStudentCode());
+                log.info("Updated & resubmitted proposal ID: {} for student: {}", updated.getId(), updated.getStudent().getStudentCode());
                 return mapToResponse(updated);
             }
-            throw new DuplicateResourceException("Sinh viên đã có đề cương trong đợt đồ án này (trạng thái: " + existing.getStatus() + ")");
+            throw new DuplicateResourceException("Sinh viên đã nộp đề cương trong đợt đồ án này (trạng thái: " + existing.getStatus() + ")");
         }
 
         Proposal proposal = Proposal.builder()
@@ -119,14 +123,16 @@ public class ProposalServiceImpl implements ProposalService {
                 .expectedResults(request.getExpectedResults())
                 .researchContent(request.getResearchContent())
                 .fileUrl(request.getFileUrl())
-                .status("DRAFT")
+                .status("SUBMITTED")
+                .submittedAt(Instant.now())
                 .supervisorApproved(false)
+                .studentSigned(false)
                 .version(1)
                 .build();
 
         Proposal saved = proposalRepository.save(proposal);
         ensureThesisCreatedForProposal(saved);
-        log.info("Created proposal with ID: {} for student: {}", saved.getId(), student.getStudentCode());
+        log.info("Created & submitted proposal with ID: {} for student: {}", saved.getId(), student.getStudentCode());
         return mapToResponse(saved);
     }
 
@@ -136,8 +142,8 @@ public class ProposalServiceImpl implements ProposalService {
         Proposal proposal = proposalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Proposal", id));
 
-        if (!"DRAFT".equals(proposal.getStatus()) && !"REVISE_REQUIRED".equals(proposal.getStatus())) {
-            throw new AppException(ErrorCode.VALIDATION_FAILED, "Chỉ có thể chỉnh sửa đề cương ở trạng thái DRAFT hoặc REVISE_REQUIRED");
+        if (!"REVISE_REQUIRED".equals(proposal.getStatus())) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Đề cương đã nộp không thể tự ý chỉnh sửa. Chỉ được phép chỉnh sửa khi Giảng viên hướng dẫn hoặc Khoa yêu cầu sửa đổi (REVISE_REQUIRED).");
         }
 
         if (request.getTitleVn() != null) proposal.setTitleVn(request.getTitleVn());
@@ -148,9 +154,10 @@ public class ProposalServiceImpl implements ProposalService {
         if (request.getResearchContent() != null) proposal.setResearchContent(request.getResearchContent());
         if (request.getFileUrl() != null) proposal.setFileUrl(request.getFileUrl());
 
-        if ("REVISE_REQUIRED".equals(proposal.getStatus())) {
-            proposal.setVersion(proposal.getVersion() + 1);
-        }
+        proposal.setVersion(proposal.getVersion() + 1);
+        proposal.setStatus("SUBMITTED");
+        proposal.setSubmittedAt(Instant.now());
+        proposal.setSupervisorApproved(false);
 
         Proposal saved = proposalRepository.save(proposal);
         ensureThesisCreatedForProposal(saved);
@@ -179,9 +186,13 @@ public class ProposalServiceImpl implements ProposalService {
         proposal.setSupervisorApproved(approved);
         proposal.setSupervisorComment(comment);
         if (approved) {
-            proposal.setStatus("UNDER_REVIEW");
+            if (!"APPROVED".equalsIgnoreCase(proposal.getStatus())) {
+                proposal.setStatus("UNDER_REVIEW");
+            }
         } else {
             proposal.setStatus("REVISE_REQUIRED");
+            proposal.setStudentSigned(false);
+            proposal.setStudentSignedAt(null);
         }
 
         Proposal saved = proposalRepository.save(proposal);
@@ -223,13 +234,15 @@ public class ProposalServiceImpl implements ProposalService {
             assignedBy = userRepository.findById(assignedById).orElse(null);
         }
 
-        ProposalReviewAssignment assignment = reviewAssignmentRepository
-                .findByProposalIdAndReviewGroupId(proposalId, reviewGroupId)
-                .orElseGet(() -> ProposalReviewAssignment.builder()
+        java.util.List<ProposalReviewAssignment> existingList = reviewAssignmentRepository.findByProposalId(proposalId);
+        ProposalReviewAssignment assignment = !existingList.isEmpty()
+                ? existingList.get(0)
+                : ProposalReviewAssignment.builder()
                         .proposal(proposal)
                         .reviewGroup(reviewGroup)
-                        .build());
+                        .build();
 
+        assignment.setReviewGroup(reviewGroup);
         assignment.setAssignedBy(assignedBy);
         assignment.setAssignedAt(Instant.now());
         assignment.setStatus("PENDING");
@@ -245,32 +258,35 @@ public class ProposalServiceImpl implements ProposalService {
         Proposal proposal = proposalRepository.findById(proposalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Proposal", proposalId));
 
-        ProposalReviewAssignment assignment = reviewAssignmentRepository
-                .findByProposalIdAndReviewGroupId(proposalId, request.getReviewGroupId())
-                .orElseGet(() -> {
-                    ReviewGroup rg = reviewGroupRepository.findById(request.getReviewGroupId())
-                            .orElse(null);
-                    if (rg == null) {
-                        java.util.List<ReviewGroup> groups = reviewGroupRepository.findByProjectRoundId(proposal.getProjectRound().getId());
-                        if (!groups.isEmpty()) {
-                            rg = groups.get(0);
-                        } else {
-                            rg = reviewGroupRepository.save(ReviewGroup.builder()
-                                    .projectRound(proposal.getProjectRound())
-                                    .code("RG_" + proposal.getProjectRound().getRoundCode() + "_" + System.currentTimeMillis() % 10000)
-                                    .name("Tiểu ban Xét duyệt Đề cương - " + proposal.getProjectRound().getName())
-                                    .description("Tiểu ban xét duyệt đề cương đợt đồ án")
-                                    .status("ACTIVE")
-                                    .build());
-                        }
-                    }
-                    return reviewAssignmentRepository.save(ProposalReviewAssignment.builder()
-                            .proposal(proposal)
-                            .reviewGroup(rg)
-                            .assignedAt(Instant.now())
-                            .status("PENDING")
+        java.util.List<ProposalReviewAssignment> existingAssignments = reviewAssignmentRepository.findByProposalId(proposalId);
+        ProposalReviewAssignment assignment;
+        if (!existingAssignments.isEmpty()) {
+            assignment = existingAssignments.get(0);
+        } else {
+            ReviewGroup rg = request.getReviewGroupId() != null
+                    ? reviewGroupRepository.findById(request.getReviewGroupId()).orElse(null)
+                    : null;
+            if (rg == null) {
+                java.util.List<ReviewGroup> groups = reviewGroupRepository.findByProjectRoundId(proposal.getProjectRound().getId());
+                if (!groups.isEmpty()) {
+                    rg = groups.get(0);
+                } else {
+                    rg = reviewGroupRepository.save(ReviewGroup.builder()
+                            .projectRound(proposal.getProjectRound())
+                            .code("RG_" + proposal.getProjectRound().getRoundCode() + "_" + System.currentTimeMillis() % 10000)
+                            .name("Tiểu ban Xét duyệt Đề cương - " + proposal.getProjectRound().getName())
+                            .description("Tiểu ban xét duyệt đề cương đợt đồ án")
+                            .status("ACTIVE")
                             .build());
-                });
+                }
+            }
+            assignment = ProposalReviewAssignment.builder()
+                    .proposal(proposal)
+                    .reviewGroup(rg)
+                    .assignedAt(Instant.now())
+                    .status("PENDING")
+                    .build();
+        }
 
         assignment.setStatus(request.getStatus());
         assignment.setEvaluationNotes(request.getEvaluationNotes());
@@ -278,6 +294,13 @@ public class ProposalServiceImpl implements ProposalService {
         reviewAssignmentRepository.save(assignment);
 
         proposal.setStatus(request.getStatus());
+        if ("APPROVED".equalsIgnoreCase(request.getStatus())) {
+            proposal.setSupervisorApproved(true);
+        } else if ("REVISE_REQUIRED".equalsIgnoreCase(request.getStatus()) || "REJECTED".equalsIgnoreCase(request.getStatus())) {
+            proposal.setSupervisorApproved(false);
+            proposal.setStudentSigned(false);
+            proposal.setStudentSignedAt(null);
+        }
         Proposal savedProposal = proposalRepository.save(proposal);
 
         // Auto-generate official Thesis when Proposal is APPROVED
@@ -305,6 +328,47 @@ public class ProposalServiceImpl implements ProposalService {
         }
 
         return mapToResponse(savedProposal);
+    }
+
+    @Override
+    @Transactional
+    public ProposalResponse signProposal(Long id, Long currentUserId) {
+        Proposal proposal = proposalRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Proposal", id));
+
+        if (!"APPROVED".equalsIgnoreCase(proposal.getStatus())) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Chỉ đề cương đã được Khoa phê duyệt (APPROVED) mới có thể ký nộp lưu hồ sơ.");
+        }
+
+        if (currentUserId != null && studentRepository != null) {
+            java.util.Optional<Student> callerStudent = studentRepository.findByUserId(currentUserId);
+            if (callerStudent.isPresent() && !callerStudent.get().getId().equals(proposal.getStudent().getId())) {
+                throw new AppException(ErrorCode.UNAUTHORIZED, "Sinh viên chỉ được phép ký đề cương của chính mình.");
+            }
+        }
+
+        proposal.setStudentSigned(true);
+        proposal.setStudentSignedAt(Instant.now());
+        Proposal saved = proposalRepository.save(proposal);
+
+        if (saved.getLecturer() != null && saved.getLecturer().getUser() != null && saved.getLecturer().getUser().getId() != null) {
+            try {
+                String studentName = saved.getStudent() != null && saved.getStudent().getUser() != null
+                        ? saved.getStudent().getUser().getFullName()
+                        : "Sinh viên";
+                notificationService.createNotification(
+                        saved.getLecturer().getUser().getId(),
+                        "SV đã ký nộp đề cương",
+                        studentName + " đã ký xác nhận nộp đề cương \"" + (saved.getTitleVn() != null ? saved.getTitleVn() : "Đồ án") + "\".",
+                        "PROPOSAL",
+                        "/thesis/proposals"
+                );
+            } catch (Exception e) {
+                log.warn("Không thể gửi thông báo SV ký đề cương: {}", e.getMessage());
+            }
+        }
+
+        return mapToResponse(saved);
     }
 
     private void ensureThesisCreatedForProposal(Proposal proposal) {
@@ -428,6 +492,8 @@ public class ProposalServiceImpl implements ProposalService {
                 .supervisorComment(proposal.getSupervisorComment())
                 .version(proposal.getVersion())
                 .submittedAt(proposal.getSubmittedAt())
+                .studentSigned(Boolean.TRUE.equals(proposal.getStudentSigned()))
+                .studentSignedAt(proposal.getStudentSignedAt())
                 .createdAt(proposal.getCreatedAt())
                 .updatedAt(proposal.getUpdatedAt())
                 .build();

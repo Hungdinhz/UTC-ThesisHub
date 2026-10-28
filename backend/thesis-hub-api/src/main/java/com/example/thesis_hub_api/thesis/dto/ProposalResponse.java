@@ -35,6 +35,8 @@ public class ProposalResponse {
     private String supervisorComment;
     private Integer version;
     private Instant submittedAt;
+    private Boolean studentSigned;
+    private Instant studentSignedAt;
     private Instant createdAt;
     private Instant updatedAt;
 }

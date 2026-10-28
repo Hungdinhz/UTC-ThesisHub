@@ -11,6 +11,8 @@ import type {
   ScheduleConfig,
   ScoreItem,
   ScoreSubmitRequest,
+  MyScoringThesis,
+  MinutesSignatureItem,
   GraduationResult,
   SynthesizeResultRequest,
 } from '../types';
@@ -27,6 +29,10 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function extractApiError(err: any, fallback: string): string {
+  return err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
+}
+
 export const mockLecturers: LecturerOption[] = [
   { lecturerId: 501, fullName: 'PGS. TS. Trần Văn Minh', degree: 'Phó Giáo sư', canBePresident: true, canBeSecretary: true, canBeMember: true, currentLoad: 2 },
   { lecturerId: 502, fullName: 'TS. Lê Thị Mai', degree: 'Tiến sĩ', canBePresident: true, canBeSecretary: true, canBeMember: true, currentLoad: 1 },
@@ -39,7 +45,7 @@ export const mockLecturers: LecturerOption[] = [
   { lecturerId: 509, fullName: 'ThS. Hoàng Phương Thảo', degree: 'Thạc sĩ', canBePresident: false, canBeSecretary: true, canBeMember: true, currentLoad: 0 },
 ];
 
-let mockCouncils: DefenseCouncil[] = [
+const mockCouncils: DefenseCouncil[] = [
   {
     id: 1,
     projectRoundId: 10,
@@ -56,25 +62,9 @@ let mockCouncils: DefenseCouncil[] = [
       { id: 5, councilId: 1, lecturerId: 506, lecturerName: 'ThS. Bùi Quang Huy', role: 'MEMBER', confirmed: true },
     ],
   },
-  {
-    id: 2,
-    projectRoundId: 10,
-    code: 'HD-10-02',
-    name: 'Hội đồng đánh giá luận văn HD-10-02',
-    status: 'ACTIVE',
-    description: 'Hội đồng Hệ thống Thông tin & Trí tuệ nhân tạo',
-    studentIds: [102, 103],
-    members: [
-      { id: 6, councilId: 2, lecturerId: 507, lecturerName: 'GS. TS. Nguyễn Đức Dũng', role: 'PRESIDENT', confirmed: true },
-      { id: 7, councilId: 2, lecturerId: 502, lecturerName: 'TS. Lê Thị Mai', role: 'SECRETARY', confirmed: true },
-      { id: 8, councilId: 2, lecturerId: 509, lecturerName: 'ThS. Hoàng Phương Thảo', role: 'SECRETARY', confirmed: true },
-      { id: 9, councilId: 2, lecturerId: 508, lecturerName: 'TS. Vũ Anh Tuấn', role: 'MEMBER', confirmed: true },
-      { id: 10, councilId: 2, lecturerId: 505, lecturerName: 'TS. Phạm Hải Nam', role: 'MEMBER', confirmed: true },
-    ],
-  },
 ];
 
-let mockSchedules: DefenseSchedule[] = [
+const mockSchedules: DefenseSchedule[] = [
   {
     id: 1,
     councilId: 1,
@@ -90,7 +80,7 @@ let mockSchedules: DefenseSchedule[] = [
   },
   {
     id: 2,
-    councilId: 2,
+    councilId: 1,
     councilName: 'Hội đồng đánh giá luận văn HD-10-02',
     defenseDate: new Date().toISOString().split('T')[0],
     session: 'AFTERNOON',
@@ -103,18 +93,17 @@ let mockSchedules: DefenseSchedule[] = [
   },
 ];
 
-let mockScores: ScoreItem[] = [
+const mockScores: ScoreItem[] = [
   { id: 1, thesisId: 101, graderId: 502, graderName: 'TS. Lê Thị Mai (GVHD)', scoreType: 'SUPERVISOR', score: 8.5, feedback: 'Sinh viên chủ động, hoàn thành tốt mục tiêu', gradedAt: '2026-09-20' },
   { id: 2, thesisId: 101, graderId: 507, graderName: 'GS. TS. Nguyễn Đức Dũng (GVPB)', scoreType: 'REVIEWER', score: 8.0, feedback: 'Tài liệu chỉnh chu, thực nghiệm rõ ràng', gradedAt: '2026-09-22' },
   { id: 3, thesisId: 101, graderId: 501, graderName: 'PGS. TS. Trần Văn Minh (Chủ tịch)', scoreType: 'COUNCIL', score: 9.0, feedback: 'Thuyết trình mạch lạc, trả lời xuất sắc', gradedAt: '2026-09-25' },
-  { id: 4, thesisId: 101, graderId: 503, graderName: 'ThS. Hoàng Quốc Bảo (Thư ký 1)', scoreType: 'COUNCIL', score: 8.5, feedback: 'Đáp ứng tốt tiêu chuẩn đồ án tốt nghiệp', gradedAt: '2026-09-25' },
-  { id: 5, thesisId: 101, graderId: 505, graderName: 'TS. Phạm Hải Nam (Ủy viên 1)', scoreType: 'COUNCIL', score: 8.5, feedback: 'Mô hình có tính ứng dụng thực tế cao', gradedAt: '2026-09-25' },
 ];
 
-let mockResults: GraduationResult[] = [
+const mockResults: GraduationResult[] = [
   {
     id: 1,
     thesisId: 101,
+    thesisCode: 'DT-101',
     thesisTitle: 'Nghiên cứu ứng dụng Deep Learning trong nhận diện cử chỉ tay',
     studentName: 'Nguyễn Văn An',
     studentCode: 'SV2021001',
@@ -134,7 +123,7 @@ class DefenseService {
     try {
       const res = await axios.get(`${BASE_URL}/lecturers`, { headers: authHeaders() });
       const list = res.data?.data || res.data;
-      if (Array.isArray(list) && list.length > 0) {
+      if (Array.isArray(list)) {
         const mapped = list.map((l: any) => {
           const deg = String(l.academicDegree || '').toUpperCase();
           const canBePres =
@@ -156,15 +145,17 @@ class DefenseService {
             currentLoad: 1,
           };
         });
-        if (mapped.every((m) => !m.canBePresident)) {
+        if (mapped.length > 0 && mapped.every((m) => !m.canBePresident)) {
           mapped.forEach((m) => {
             m.canBePresident = true;
           });
         }
         return mapped;
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        return [];
+      }
     }
     return mockLecturers;
   }
@@ -175,21 +166,26 @@ class DefenseService {
         params: { projectRoundId },
         headers: authHeaders(),
       });
-      if (res.data?.data && Array.isArray(res.data.data)) {
+      if (Array.isArray(res.data?.data)) {
         return res.data.data;
       }
-    } catch {
-      // Fallback
+      return [];
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        return [];
+      }
+      return mockCouncils;
     }
-    return mockCouncils;
   }
 
   async getCouncilById(id: number): Promise<DefenseCouncil> {
     try {
       const res = await axios.get(`${API_BASE}/councils/${id}`, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Không tìm thấy hội đồng'));
+      }
     }
     const found = mockCouncils.find((c) => c.id === id);
     if (found) return found;
@@ -199,36 +195,24 @@ class DefenseService {
   async generateCouncils(request: CouncilGenerationRequest): Promise<DefenseCouncil[]> {
     try {
       const res = await axios.post(`${API_BASE}/councils/generate`, request, { headers: authHeaders() });
-      if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback simulation of CSP algorithm
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Không thể sinh Hội đồng tự động'));
+      }
+      return mockCouncils;
     }
-    const newCouncil: DefenseCouncil = {
-      id: mockCouncils.length + 1,
-      projectRoundId: request.projectRoundId || 10,
-      code: `HD-10-0${mockCouncils.length + 1}`,
-      name: `Hội đồng tự động CSP HD-10-0${mockCouncils.length + 1}`,
-      status: 'ACTIVE',
-      description: 'Hội đồng sinh tự động bằng thuật toán CSP Backtracking + Greedy',
-      studentIds: [104, 105],
-      members: [
-        { id: 101, lecturerId: 508, lecturerName: 'TS. Vũ Anh Tuấn', role: 'PRESIDENT', confirmed: true },
-        { id: 102, lecturerId: 504, lecturerName: 'ThS. Đỗ Thùy Linh', role: 'SECRETARY', confirmed: true },
-        { id: 103, lecturerId: 509, lecturerName: 'ThS. Hoàng Phương Thảo', role: 'SECRETARY', confirmed: true },
-        { id: 104, lecturerId: 506, lecturerName: 'ThS. Bùi Quang Huy', role: 'MEMBER', confirmed: true },
-        { id: 105, lecturerId: 505, lecturerName: 'TS. Phạm Hải Nam', role: 'MEMBER', confirmed: true },
-      ],
-    };
-    mockCouncils.push(newCouncil);
-    return mockCouncils;
   }
 
   async finalizeCouncil(councilId: number): Promise<DefenseCouncil> {
     try {
       const res = await axios.post(`${API_BASE}/councils/${councilId}/finalize`, {}, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Không thể chốt Hội đồng'));
+      }
     }
     const council = mockCouncils.find((c) => c.id === councilId);
     if (council) {
@@ -239,7 +223,6 @@ class DefenseService {
   }
 
   async updateCouncilMembers(councilId: number, updatedMembers: CouncilMember[]): Promise<DefenseCouncil> {
-    // Validate 1CT - 2TK - 2UV
     const presidents = updatedMembers.filter((m) => m.role === 'PRESIDENT');
     const secretaries = updatedMembers.filter((m) => m.role === 'SECRETARY');
     const members = updatedMembers.filter((m) => m.role === 'MEMBER');
@@ -252,10 +235,9 @@ class DefenseService {
       const res = await axios.put(`${API_BASE}/councils/${councilId}/members`, updatedMembers, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
     } catch (err: any) {
-      if (err.response?.data?.message) {
-        throw new Error(err.response.data.message);
+      if (!IS_TEST_ENV || err?.response?.data?.message) {
+        throw new Error(extractApiError(err, 'Cập nhật thành viên Hội đồng thất bại'));
       }
-      // Fallback
     }
 
     const council = mockCouncils.find((c) => c.id === councilId);
@@ -268,14 +250,15 @@ class DefenseService {
     try {
       const res = await axios.post(`${API_BASE}/reviewers/assign`, request, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Phân công giảng viên phản biện thất bại'));
+      }
     }
     const reviewer = mockLecturers.find((l) => l.lecturerId === request.reviewerId);
     return {
-      id: Math.floor(Math.random() * 1000),
+      id: 1,
       thesisId: request.thesisId,
-      thesisTitle: `Đề tài luận văn #${request.thesisId}`,
       reviewerId: request.reviewerId,
       reviewerName: reviewer ? reviewer.fullName : `Giảng viên ${request.reviewerId}`,
       assignedBy: request.assignedBy,
@@ -291,157 +274,178 @@ class DefenseService {
       if (date) params.date = date;
       if (projectRoundId) params.projectRoundId = projectRoundId;
       const res = await axios.get(`${API_BASE}/schedules`, { params, headers: authHeaders() });
-      if (res.data?.data && Array.isArray(res.data.data)) return res.data.data;
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
     } catch {
-      // Fallback
+      if (!IS_TEST_ENV) {
+        return [];
+      }
+      return mockSchedules;
     }
-    return mockSchedules;
   }
-
 
   async autoGenerateSchedules(request: AutoScheduleRequest): Promise<DefenseSchedule[]> {
     try {
       const res = await axios.post(`${API_BASE}/schedules/auto-generate`, request, { headers: authHeaders() });
-      if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Không thể tự động xếp lịch bảo vệ'));
+      }
+      return mockSchedules;
     }
-    return mockSchedules;
   }
 
   async configureSchedule(config: ScheduleConfig): Promise<DefenseSchedule> {
     try {
       const res = await axios.post(`${API_BASE}/schedules/configure`, config, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+      throw new Error('Không nhận được dữ liệu lịch bảo vệ từ máy chủ');
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Cấu hình ca bảo vệ thất bại'));
+      }
+      return mockSchedules[0];
     }
-    const newSchedule: DefenseSchedule = {
-      id: mockSchedules.length + 1,
-      councilId: config.councilId,
-      councilName: `Hội đồng ${config.councilId}`,
-      defenseDate: config.defenseDate,
-      session: config.session as any,
-      room: config.room,
-      startTime: config.startTime,
-      endTime: config.endTime,
-      maxStudents: config.maxStudents || 5,
-      status: 'SCHEDULED',
-      notes: config.notes,
-    };
-    mockSchedules.push(newSchedule);
-    return newSchedule;
+  }
+
+  async updateSchedule(scheduleId: number, config: ScheduleConfig): Promise<DefenseSchedule> {
+    try {
+      const res = await axios.put(`${API_BASE}/schedules/${scheduleId}`, config, { headers: authHeaders() });
+      if (res.data?.data) return res.data.data;
+      throw new Error('Không nhận được dữ liệu cập nhật lịch bảo vệ');
+    } catch (err) {
+      throw new Error(extractApiError(err, 'Cập nhật ca bảo vệ thất bại'));
+    }
+  }
+
+  async deleteSchedule(scheduleId: number): Promise<void> {
+    try {
+      await axios.delete(`${API_BASE}/schedules/${scheduleId}`, { headers: authHeaders() });
+    } catch (err) {
+      throw new Error(extractApiError(err, 'Xóa lịch bảo vệ thất bại'));
+    }
+  }
+
+  async getMyScoringTheses(projectRoundId?: number): Promise<MyScoringThesis[]> {
+    try {
+      const params: any = {};
+      if (projectRoundId) params.projectRoundId = projectRoundId;
+      const res = await axios.get(`${API_BASE}/my-scoring-theses`, { params, headers: authHeaders() });
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
+    } catch {
+      if (!IS_TEST_ENV) {
+        return [];
+      }
+      return [
+        {
+          thesisId: 101,
+          thesisCode: 'DT-101',
+          titleVn: 'Nghiên cứu ứng dụng Deep Learning trong nhận diện cử chỉ tay',
+          studentName: 'Nguyễn Văn An',
+          studentCode: 'SV2021001',
+          advisorName: 'TS. Lê Thị Mai',
+          defenseEligible: true,
+          canScoreCouncil: false,
+          canScoreReviewer: false,
+          canScoreSupervisor: false,
+          isCouncilMember: false,
+        },
+      ];
+    }
   }
 
   async getScores(thesisId: number): Promise<ScoreItem[]> {
     try {
       const res = await axios.get(`${API_BASE}/scores`, { params: { thesisId }, headers: authHeaders() });
-      if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) return res.data.data;
+      if (Array.isArray(res.data?.data)) {
+        return res.data.data;
+      }
+      return [];
     } catch {
-      // Fallback
+      if (!IS_TEST_ENV) {
+        return [];
+      }
+      return mockScores.filter((s) => s.thesisId === thesisId);
     }
-    return mockScores.filter((s) => s.thesisId === thesisId);
   }
 
   async submitScore(request: ScoreSubmitRequest): Promise<ScoreItem> {
     try {
       const res = await axios.post(`${API_BASE}/scores`, request, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+      throw new Error('Không lưu được phiếu chấm điểm');
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Lưu điểm đánh giá thất bại'));
+      }
+      return {
+        id: mockScores.length + 1,
+        thesisId: request.thesisId,
+        graderId: request.graderId,
+        scoreType: request.scoreType,
+        score: request.score,
+        feedback: request.feedback,
+        gradedAt: new Date().toISOString(),
+      };
     }
-    const grader = mockLecturers.find((l) => l.lecturerId === request.graderId);
-    const newScore: ScoreItem = {
-      id: mockScores.length + 1,
-      thesisId: request.thesisId,
-      graderId: request.graderId,
-      graderName: grader ? grader.fullName : `Giảng viên ${request.graderId}`,
-      scoreType: request.scoreType,
-      score: request.score,
-      feedback: request.feedback,
-      gradedAt: new Date().toISOString(),
-    };
-    mockScores.push(newScore);
-    return newScore;
+  }
+
+  async getMinutesSignatures(thesisId: number): Promise<MinutesSignatureItem[]> {
+    try {
+      const res = await axios.get(`${API_BASE}/results/${thesisId}/signatures`, { headers: authHeaders() });
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  async signDefenseMinutes(thesisId: number): Promise<MinutesSignatureItem[]> {
+    try {
+      const res = await axios.post(`${API_BASE}/results/${thesisId}/sign-minutes`, {}, { headers: authHeaders() });
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
+    } catch (err) {
+      throw new Error(extractApiError(err, 'Ký xác nhận Biên bản bảo vệ thất bại'));
+    }
   }
 
   async synthesizeResult(request: SynthesizeResultRequest): Promise<GraduationResult> {
     try {
       const res = await axios.post(`${API_BASE}/results/synthesize`, request, { headers: authHeaders() });
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+      throw new Error('Không thể tổng hợp kết quả tốt nghiệp');
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Tổng hợp kết quả tốt nghiệp thất bại'));
+      }
+      return mockResults[0];
     }
-    const wSup = request.supervisorWeight ?? 0.3;
-    const wRev = request.reviewerWeight ?? 0.2;
-    const wCou = request.councilWeight ?? 0.5;
-
-    const scores = mockScores.filter((s) => s.thesisId === request.thesisId);
-    let sScore = 8.5;
-    let rScore = 8.0;
-    let cScores: number[] = [];
-
-    scores.forEach((s) => {
-      if (s.scoreType === 'SUPERVISOR') sScore = s.score;
-      if (s.scoreType === 'REVIEWER') rScore = s.score;
-      if (s.scoreType === 'COUNCIL') cScores.push(s.score);
-    });
-
-    const avgCouncil = cScores.length > 0 ? cScores.reduce((a, b) => a + b, 0) / cScores.length : 8.5;
-    const finalScore = Number((sScore * wSup + rScore * wRev + avgCouncil * wCou).toFixed(2));
-
-    let grade: any = 'GOOD';
-    if (finalScore >= 8.5) grade = 'EXCELLENT';
-    else if (finalScore >= 7.0) grade = 'VERY_GOOD';
-    else if (finalScore >= 5.5) grade = 'GOOD';
-    else if (finalScore >= 4.0) grade = 'AVERAGE';
-    else grade = 'POOR';
-
-    const finalResult = finalScore >= 5.0 ? 'PASSED' : 'FAILED';
-
-    const resultObj: GraduationResult = {
-      id: mockResults.length + 1,
-      thesisId: request.thesisId,
-      thesisTitle: 'Nghiên cứu ứng dụng Deep Learning trong nhận diện cử chỉ tay',
-      studentName: 'Nguyễn Văn An',
-      studentCode: 'SV2021001',
-      supervisorScore: sScore,
-      reviewerScore: rScore,
-      councilScore: Number(avgCouncil.toFixed(2)),
-      finalScore,
-      grade,
-      finalResult,
-      publishedAt: new Date().toISOString(),
-      notes: request.notes || 'Tổng hợp điểm tốt nghiệp',
-    };
-    mockResults = mockResults.filter((r) => r.thesisId !== request.thesisId);
-    mockResults.push(resultObj);
-    return resultObj;
   }
 
-  async getGraduationResult(thesisId: number): Promise<GraduationResult> {
+  async finalizeAndPublishRound(roundId: number): Promise<GraduationResult[]> {
+    try {
+      const res = await axios.post(`${API_BASE}/rounds/${roundId}/finalize-and-publish`, {}, { headers: authHeaders() });
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
+    } catch (err) {
+      throw new Error(extractApiError(err, 'Ký xuất dữ liệu & công bố kết quả đợt đồ án thất bại'));
+    }
+  }
+
+  async getGraduationResult(thesisId: number): Promise<GraduationResult | null> {
     try {
       const res = await axios.get(`${API_BASE}/results/${thesisId}`, { headers: authHeaders() });
-      if (res.data?.data) return res.data.data;
+      return res.data?.data ?? null;
     } catch {
-      // Fallback
+      if (!IS_TEST_ENV) {
+        return null;
+      }
+      return mockResults.find((r) => r.thesisId === thesisId) || mockResults[0];
     }
-    const found = mockResults.find((r) => r.thesisId === thesisId);
-    if (found) return found;
-    return {
-      id: 1,
-      thesisId,
-      thesisTitle: `Đề tài tốt nghiệp #${thesisId}`,
-      studentName: 'Nguyễn Văn An',
-      studentCode: 'SV2021001',
-      supervisorScore: 8.5,
-      reviewerScore: 8.0,
-      councilScore: 8.5,
-      finalScore: 8.4,
-      grade: 'VERY_GOOD',
-      finalResult: 'PASSED',
-      publishedAt: new Date().toISOString(),
-    };
   }
 }
 

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -22,4 +23,5 @@ public class ScheduleConfigDTO {
     @Builder.Default
     private Integer maxStudents = 12;
     private String notes;
+    private List<Long> thesisIds;
 }

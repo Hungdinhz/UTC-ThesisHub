@@ -90,7 +90,6 @@ const LoginPage: React.FC = () => {
 
   const handleUserTypeChange = (newRole: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin') => {
     setUserType(newRole);
-    // Keep username in sync across tab changes
     const currentIdent = registrationNo || email;
     setRegistrationNo(currentIdent);
     setEmail(currentIdent);
@@ -117,7 +116,6 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    // Trigger validation on submit
     setTouched({ registrationNo: true, email: true, password: true });
     const errors = validateFields(userType, registrationNo, email, password);
     setFieldErrors(errors);
@@ -148,10 +146,9 @@ const LoginPage: React.FC = () => {
       const accessToken = response?.access || (response as any)?.token || (response as any)?.data?.access || (response as any)?.data?.token;
       const refreshToken = response?.refresh || (response as any)?.refreshToken || '';
 
-      // Tự động nhận diện role thực tế từ token / response của backend
       const backendRole = response?.role || (response as any)?.data?.role;
       let resolvedUserType: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' = userType;
-      if (backendRole === 'ROLE_ADMIN') {
+      if (backendRole === 'ROLE_ADMIN' || backendRole === 'ROLE_FACULTY_ADMIN') {
         resolvedUserType = 'admin';
       } else if (backendRole === 'ROLE_LECTURER') {
         resolvedUserType = 'supervisor';
@@ -164,14 +161,20 @@ const LoginPage: React.FC = () => {
       }
 
       login(accessToken, refreshToken, resolvedUserType);
-      navigate(`/${resolvedUserType}/dashboard`);
+      const roleLandingMap: Record<string, string> = {
+        admin: '/admin/project-rounds',
+        student: '/student/assignment',
+        supervisor: '/admin/assignments',
+        committee_member: '/admin/councils',
+        external_examiner: '/external_examiner/dashboard',
+      };
+      navigate(roleLandingMap[resolvedUserType] || '/login');
     } catch (err: any) {
       if (err.response?.status === 429) {
         const detail = err.response?.data?.detail || '';
         const seconds = detail.match(/\d+/)?.[0] || '60';
         setError(t('login.throttled', `Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ${seconds} giây.`));
       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || !err.response) {
-        // Trường hợp máy chủ Render đang cold start hoặc request bị ngắt kết nối
         setError('Máy chủ đang khởi động (Cold Start trên Render). Vui lòng đợi khoảng 200-300 giây rồi thử đăng nhập lại!');
       } else {
         setError(err.response?.data?.message || err.response?.data?.detail || t('login.loginFailed', 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản.'));
@@ -185,11 +188,9 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="utc-portal-wrapper">
-      {/* Background Decorative Overlay */}
       <div className="utc-bg-glow glow-1"></div>
       <div className="utc-bg-glow glow-2"></div>
 
-      {/* Top Banner Header */}
       <header className="utc-portal-header">
         <div className="utc-brand-container">
           <div className="utc-logo-badge">
@@ -210,9 +211,7 @@ const LoginPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Grid Content Container */}
       <main className="utc-portal-body">
-        {/* Left Side Welcome Info Card */}
         <section className="utc-info-card">
           <div className="utc-info-header">
             <img src={utcLogo} alt="UTC" className="utc-icon-circle blue" style={{ padding: '6px', objectFit: 'contain' }} />
@@ -226,7 +225,6 @@ const LoginPage: React.FC = () => {
             {t('portal.welcomeNote', 'Đăng nhập để quản lý tiến độ đồ án tốt nghiệp, tra cứu điểm số, theo dõi lịch bảo vệ và sử dụng các tiện ích chuẩn hóa dành cho sinh viên và giảng viên UTC.')}
           </p>
 
-          {/* 4 Feature Boxes Grid */}
           <div className="utc-features-grid">
             <div className="utc-feature-box">
               <div className="utc-feature-icon icon-blue">📊</div>
@@ -253,16 +251,15 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="utc-feature-box">
-              <div className="utc-feature-icon icon-green">🏆</div>
+              <div className="utc-feature-icon icon-green">💬</div>
               <div>
-                <h4>{t('portal.feat4Title', 'Trọng số Điểm 40-20-40 & GPA')}</h4>
-                <p>{t('portal.feat4Desc', 'Tự động quy đổi thang GPA 4.0 & điểm chữ UTC')}</p>
+                <h4>{t('portal.feat4Title', 'Nhóm Chat Hướng dẫn')}</h4>
+                <p>{t('portal.feat4Desc', 'Trao đổi trực tiếp & chia sẻ tài liệu cùng GVHD')}</p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Right Side Login Card */}
         <section className={`utc-login-card ${isShaking ? 'utc-shake-anim' : ''}`}>
           <div className="utc-lock-badge">
             <span>🔒</span>
@@ -270,7 +267,6 @@ const LoginPage: React.FC = () => {
 
           <h2 className="utc-login-title">{t('portal.loginFormTitle', 'ĐĂNG NHẬP HỆ THỐNG')}</h2>
 
-          {/* Role Selector Tabs */}
           <div className="utc-role-tabs">
             <button
               type="button"
@@ -302,7 +298,6 @@ const LoginPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Demo Accounts Quick-Fill Box (Chỉ giữ lại 1 tài khoản Quản trị viên) */}
           <div className="utc-demo-accounts-box">
             <div className="utc-demo-title">
               <span>⚡</span> <span>Tài khoản mẫu để test (Click điền nhanh):</span>
@@ -321,7 +316,6 @@ const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          
           {userType === 'admin' && (
             <div className="utc-admin-register-prompt" style={{
               background: 'rgba(245, 158, 11, 0.12)',
@@ -359,7 +353,6 @@ const LoginPage: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="utc-login-form" noValidate>
-
             {userType === 'student' ? (
               <div className={`utc-input-group ${touched.registrationNo && fieldErrors.registrationNo ? 'has-error' : ''} ${touched.registrationNo && !fieldErrors.registrationNo && registrationNo ? 'is-valid' : ''}`}>
                 <span className="utc-input-icon">👤</span>
@@ -468,7 +461,6 @@ const LoginPage: React.FC = () => {
         </section>
       </main>
 
-      {/* Bottom Highlights KPI Banner */}
       <div className="utc-highlights-banner">
         <div className="utc-highlight-item">
           <div className="utc-hl-icon">🛡️</div>
@@ -503,7 +495,6 @@ const LoginPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Footer Notice */}
       <footer className="utc-portal-footer">
         {t('portal.footer', 'Đơn vị vận hành: Trường Đại học Giao thông Vận tải (UTC) — Địa chỉ: Số 3 Phố Cầu Giấy, Láng Thượng, Đống Đa, Hà Nội | Điện thoại: (024) 3766 4078')}
       </footer>

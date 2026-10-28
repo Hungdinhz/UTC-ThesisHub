@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import type { ProjectRoundItem } from '../../../types';
 import type {
   ProjectDirection,
@@ -22,6 +23,8 @@ interface Props {
 }
 
 export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: propRoundId }) => {
+  const { userType } = useAuth();
+  const isAdmin = userType === 'admin';
   const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(propRoundId || null);
   const [activeTab, setActiveTab] = useState<'proposals' | 'capacities' | 'registrations' | 'preferences'>('proposals');
@@ -74,6 +77,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
   const effectiveRoundId = selectedRoundId || propRoundId || 1;
   const currentRound = rounds.find((r) => r.roundId === effectiveRoundId);
   const isRoundClosed = currentRound?.status === 'CLOSED' || currentRound?.status === 'ARCHIVED';
+  const isSupplementaryOpen = Boolean(stats?.supplementaryOpen ?? currentRound?.supplementaryOpen);
 
   const isFinalized =
     (proposals.length > 0 && proposals.every((p) => p.status === 'FINALIZED')) ||
@@ -263,7 +267,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
 
   // Mở đợt đăng ký bổ sung cho các sinh viên chưa đăng ký
   const handleOpenSupplementary = async () => {
-    if (isRoundClosed) return;
+    if (isRoundClosed || !isAdmin) return;
     if (!window.confirm('Bạn có chắc chắn muốn mở ĐỢT ĐĂNG KÝ BỔ SUNG cho các sinh viên chưa đăng ký nguyện vọng trong đợt đồ án này?')) {
       return;
     }
@@ -271,11 +275,17 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       setActionLoading(true);
       setAlert(null);
       const updatedStats = await assignmentService.openSupplementaryRegistration(effectiveRoundId);
-      setStats(updatedStats);
+      setStats({ ...updatedStats, supplementaryOpen: true });
+      const refreshedRounds = await apiService.getProjectRounds();
+      setRounds(refreshedRounds || []);
+      const countInfo = updatedStats?.supplementaryCount !== undefined
+        ? ` (Đã mở lại và gửi thông báo cho ${updatedStats.supplementaryCount} sinh viên chưa đăng ký)`
+        : '';
       setAlert({
         type: 'success',
-        message: 'Đã mở Đợt đăng ký bổ sung! Các sinh viên chưa đăng ký trong đợt hiện có thể vào đăng ký nguyện vọng bổ sung.',
+        message: `🔔 THÔNG BÁO: Đã mở Đợt đăng ký bổ sung thành công!${countInfo}. Lưu ý: Trong thời gian mở đăng ký bổ sung, không thể bấm chốt/kết thúc đợt cho tới khi bấm "Kết thúc ĐK bổ sung".`,
       });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       setAlert({
         type: 'danger',
@@ -288,7 +298,14 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
 
   // Chốt đợt đăng ký bổ sung & Xóa hẳn sinh viên không đăng ký khỏi đợt
   const handleFinalizeSupplementary = async () => {
-    if (isRoundClosed) return;
+    if (isRoundClosed || !isAdmin) return;
+    if (!isSupplementaryOpen) {
+      setAlert({
+        type: 'warning',
+        message: 'Hiện tại đợt đồ án chưa mở đăng ký bổ sung nên không thể bấm Kết thúc ĐK bổ sung.',
+      });
+      return;
+    }
     if (
       !window.confirm(
         'XÁC NHẬN CHỐT ĐỢT ĐĂNG KÝ BỔ SUNG:\n\n- Các sinh viên đã đăng ký bổ sung sẽ được phân công GVHD.\n- Các sinh viên VẪN CHƯA ĐĂNG KÝ sẽ bị XÓA HOÀN TOÀN khỏi đợt đồ án (không còn trong danh sách đợt nữa).\n\nBạn có chắc chắn muốn thực hiện?'
@@ -300,21 +317,24 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       setActionLoading(true);
       setAlert(null);
       const updatedStats = await assignmentService.finalizeSupplementaryRegistration(effectiveRoundId);
-      setStats(updatedStats);
-      const [updatedProps, updatedCaps, updatedRegs, updatedPrefs] = await Promise.all([
+      setStats({ ...updatedStats, supplementaryOpen: false });
+      const [updatedProps, updatedCaps, updatedRegs, updatedPrefs, refreshedRounds] = await Promise.all([
         assignmentService.getProposals(effectiveRoundId),
         assignmentService.getCapacities(effectiveRoundId),
         assignmentService.getRegistrations(effectiveRoundId),
         assignmentService.getPreferences(effectiveRoundId),
+        apiService.getProjectRounds(),
       ]);
       setProposals(updatedProps);
       setCapacities(updatedCaps);
       setRegistrations(updatedRegs);
       setPreferences(updatedPrefs);
+      setRounds(refreshedRounds || []);
       setAlert({
         type: 'success',
-        message: 'Đã chốt Đợt đăng ký bổ sung thành công! Những sinh viên không đăng ký đã bị xóa hoàn toàn khỏi đợt đồ án.',
+        message: '✅ Đã kết thúc Đợt đăng ký bổ sung thành công! Các sinh viên đăng ký bổ sung đã được gán GVHD và các sinh viên không đăng ký đã bị xóa khỏi đợt đồ án.',
       });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       setAlert({
         type: 'danger',
@@ -373,30 +393,40 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
             🔄 Tải lại
           </button>
 
-          <button
-            className="btn-generate-algo"
-            onClick={handleGenerate}
-            disabled={actionLoading || loading || isRoundClosed}
-            title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể chạy phân công' : undefined}
-          >
-            ⚡ {actionLoading ? 'Đang tính toán...' : 'Chạy thuật toán phân công'}
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                className="btn-generate-algo"
+                onClick={handleGenerate}
+                disabled={actionLoading || loading || isRoundClosed}
+                title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể chạy phân công' : undefined}
+              >
+                ⚡ {actionLoading ? 'Đang tính toán...' : 'Chạy thuật toán phân công'}
+              </button>
 
-          <button
-            className="btn-finalize-action"
-            onClick={handleFinalize}
-            disabled={actionLoading || loading || proposals.length === 0 || isRoundClosed || isFinalized}
-            style={isFinalized ? { opacity: 0.7, cursor: 'not-allowed', background: '#059669' } : undefined}
-            title={
-              isFinalized
-                ? 'Đã chốt phân công chính thức - Nút đã bị khóa'
-                : isRoundClosed
-                ? 'Đợt đồ án đã đóng - Không thể chốt kết quả'
-                : undefined
-            }
-          >
-            {isFinalized ? '✅ Đã chốt chính thức (Đã khóa)' : '🔒 Chốt kết quả phân công'}
-          </button>
+              <button
+                className="btn-finalize-action"
+                onClick={handleFinalize}
+                disabled={actionLoading || loading || proposals.length === 0 || isRoundClosed || isFinalized || isSupplementaryOpen}
+                style={isFinalized || isSupplementaryOpen ? { opacity: 0.7, cursor: 'not-allowed', background: isSupplementaryOpen ? '#94a3b8' : '#059669' } : undefined}
+                title={
+                  isSupplementaryOpen
+                    ? 'Đang mở đăng ký bổ sung - Vui lòng kết thúc ĐK bổ sung trước khi chốt'
+                    : isFinalized
+                    ? 'Đã chốt phân công chính thức - Nút đã bị khóa'
+                    : isRoundClosed
+                    ? 'Đợt đồ án đã đóng - Không thể chốt kết quả'
+                    : undefined
+                }
+              >
+                {isSupplementaryOpen
+                  ? '🔒 Đang mở ĐK bổ sung (Khóa chốt)'
+                  : isFinalized
+                  ? '✅ Đã chốt chính thức (Đã khóa)'
+                  : '🔒 Chốt kết quả phân công'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -466,6 +496,55 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
         </div>
       </div>
 
+      {/* Top Immediate Alert Banner */}
+      {alert && (
+        <div
+          className={`alert-box alert-${alert.type}`}
+          style={{
+            marginBottom: '16px',
+            fontWeight: 600,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+            borderWidth: '1.5px',
+          }}
+        >
+          {alert.message}
+          <button
+            style={{ float: 'right', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+            onClick={() => setAlert(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Prominent Supplementary Registration Active Banner */}
+      {isSupplementaryOpen && !isRoundClosed && (
+        <div
+          style={{
+            backgroundColor: '#fff7ed',
+            border: '2px solid #fb923c',
+            borderRadius: '10px',
+            padding: '14px 20px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            color: '#9a3412',
+            boxShadow: '0 2px 10px rgba(234, 88, 12, 0.12)',
+          }}
+        >
+          <span style={{ fontSize: '1.7rem' }}>🔔</span>
+          <div style={{ flex: 1 }}>
+            <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>
+              ĐỢT ĐĂNG KÝ NGUYỆN VỌNG BỔ SUNG ĐANG MỞ
+            </strong>
+            <span style={{ fontSize: '0.9rem' }}>
+              Hệ thống đã gửi thông báo cho các sinh viên chưa đăng ký vào hoàn tất nguyện vọng. Trong thời gian mở đăng ký bổ sung, chức năng <strong>Chốt đợt / Chuyển giai đoạn</strong> tạm khóa cho đến khi Khoa bấm <strong>"🔒 Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt"</strong>.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Closed Round Alert Banner */}
       {isRoundClosed && (
         <div
@@ -532,38 +611,40 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
                 </span>
               ) : null}
             </p>
-            {!isRoundClosed && (
+            {isAdmin && !isRoundClosed && (
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' }}>
                 <button
                   type="button"
                   onClick={handleOpenSupplementary}
-                  disabled={actionLoading || loading}
+                  disabled={actionLoading || loading || isSupplementaryOpen}
                   style={{
                     padding: '7px 14px',
                     borderRadius: '8px',
                     border: '1px solid #f59e0b',
-                    backgroundColor: '#fffbeb',
+                    backgroundColor: isSupplementaryOpen ? '#fed7aa' : '#fffbeb',
                     color: '#b45309',
                     fontWeight: 700,
                     fontSize: '0.84rem',
-                    cursor: actionLoading ? 'not-allowed' : 'pointer',
+                    cursor: actionLoading || isSupplementaryOpen ? 'not-allowed' : 'pointer',
+                    opacity: isSupplementaryOpen ? 0.75 : 1,
                   }}
                 >
-                  🔓 Mở đợt đăng ký bổ sung (Cho SV chưa ĐK)
+                  {isSupplementaryOpen ? '🔔 Đang mở đợt đăng ký bổ sung...' : '🔓 Mở đợt đăng ký bổ sung (Cho SV chưa ĐK)'}
                 </button>
                 <button
                   type="button"
                   onClick={handleFinalizeSupplementary}
-                  disabled={actionLoading || loading}
+                  disabled={actionLoading || loading || !isSupplementaryOpen}
+                  title={!isSupplementaryOpen ? 'Chỉ bấm được khi đang mở đợt đăng ký bổ sung' : undefined}
                   style={{
                     padding: '7px 14px',
                     borderRadius: '8px',
                     border: '1px solid #dc2626',
-                    backgroundColor: '#fef2f2',
-                    color: '#b91c1c',
+                    backgroundColor: !isSupplementaryOpen ? '#f1f5f9' : '#fef2f2',
+                    color: !isSupplementaryOpen ? '#94a3b8' : '#b91c1c',
                     fontWeight: 700,
                     fontSize: '0.84rem',
-                    cursor: actionLoading ? 'not-allowed' : 'pointer',
+                    cursor: actionLoading || !isSupplementaryOpen ? 'not-allowed' : 'pointer',
                   }}
                 >
                   🔒 Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt
@@ -571,19 +652,6 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Alert Banner */}
-      {alert && (
-        <div className={`alert-box alert-${alert.type}`}>
-          {alert.message}
-          <button
-            style={{ float: 'right', background: 'none', border: 'none', cursor: 'pointer' }}
-            onClick={() => setAlert(null)}
-          >
-            ✕
-          </button>
         </div>
       )}
 
@@ -635,6 +703,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
           loading={loading}
           roundName={currentRound?.name}
           isRoundClosed={isRoundClosed}
+          readOnly={!isAdmin}
         />
       )}
 
@@ -645,7 +714,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
           onUpdateCapacity={handleUpdateCapacity}
           loading={loading}
           roundName={currentRound?.name}
-          isRoundClosed={isRoundClosed}
+          isRoundClosed={isRoundClosed || !isAdmin}
         />
       )}
 

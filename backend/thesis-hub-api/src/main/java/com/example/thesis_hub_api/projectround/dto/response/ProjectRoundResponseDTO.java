@@ -24,6 +24,7 @@ public class ProjectRoundResponseDTO {
     private String trainingProgram; // Mã chương trình, ví dụ "CU_NHAN", "KY_SU" (Contract 2)
     private String trainingProgramName;
     private String status; // DRAFT, OPEN, IN_PROGRESS, CLOSED, ARCHIVED
+    private Boolean supplementaryOpen;
     private LocalDate startDate;
     private LocalDate endDate;
     private String description;

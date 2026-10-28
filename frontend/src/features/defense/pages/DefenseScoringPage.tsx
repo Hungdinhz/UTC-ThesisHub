@@ -1,74 +1,134 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Button, Table, StatusBadge } from '../../../components/ui';
 import type { Column } from '../../../components/ui';
 import { ScoreEntryForm } from '../components/ScoreEntryForm';
 import { ResultSynthesisModal } from '../components/ResultSynthesisModal';
 import { defenseService } from '../services/defenseService';
-import { thesisService } from '../../thesis/services/thesisService';
-import type { ScoreItem, LecturerOption, GraduationResult, SynthesizeResultRequest } from '../types';
-import type { Thesis } from '../../thesis/types';
+import { apiService } from '../../../services/api';
+import type {
+  ScoreItem,
+  ScoreType,
+  MyScoringThesis,
+  MinutesSignatureItem,
+  GraduationResult,
+  SynthesizeResultRequest,
+} from '../types';
 import './DefensePages.css';
 
 export const DefenseScoringPage: React.FC = () => {
-  const { user } = useAuth();
-  const [theses, setTheses] = useState<Thesis[]>([]);
-  const [selectedThesisId, setSelectedThesisId] = useState<number>(101);
+  const { user, userType } = useAuth();
+  const isAdmin = userType === 'admin';
+
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [selectedRoundId, setSelectedRoundId] = useState<number | undefined>(undefined);
+
+  const [scoringTheses, setScoringTheses] = useState<MyScoringThesis[]>([]);
+  const [selectedThesisId, setSelectedThesisId] = useState<number>(0);
+
   const [scores, setScores] = useState<ScoreItem[]>([]);
-  const [graders, setGraders] = useState<LecturerOption[]>([]);
   const [graduationResult, setGraduationResult] = useState<GraduationResult | null>(null);
+  const [minutesSignatures, setMinutesSignatures] = useState<MinutesSignatureItem[]>([]);
+  const [signingMinutes, setSigningMinutes] = useState(false);
+
+  const [roundExportResults, setRoundExportResults] = useState<Array<{ thesis: MyScoringThesis; result: GraduationResult | null }>>([]);
+  const [publishingRound, setPublishingRound] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [isSynthModalOpen, setIsSynthModalOpen] = useState(false);
   const [showMinutesModal, setShowMinutesModal] = useState(false);
   const [showFinalExportModal, setShowFinalExportModal] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-
   useEffect(() => {
     if (!notification) return;
-    const timer = setTimeout(() => setNotification(null), 5000);
+    const timer = setTimeout(() => setNotification(null), 5500);
     return () => clearTimeout(timer);
   }, [notification]);
 
   useEffect(() => {
-    thesisService.searchTheses().then((list) => {
-      if (Array.isArray(list) && list.length > 0) {
-        setTheses(list);
-        setSelectedThesisId(list[0].id);
-      }
-    }).catch(() => {});
+    initPage();
   }, []);
 
-  useEffect(() => {
-    loadThesisData();
-  }, [selectedThesisId]);
-
-  const loadThesisData = async () => {
+  const initPage = async () => {
     try {
       setLoading(true);
-      const [sList, lList, rData] = await Promise.all([
-        defenseService.getScores(selectedThesisId),
-        defenseService.getLecturers(),
-        defenseService.getGraduationResult(selectedThesisId),
-      ]);
-      setScores(sList);
-      setGraders(lList);
-      setGraduationResult(rData);
+      const rList = await apiService.getProjectRounds().catch(() => []);
+      setRounds(rList || []);
+
+      let initialRoundId: number | undefined = undefined;
+      if (rList && rList.length > 0) {
+        const active: any = rList.find((r: any) => r.status === 'IN_PROGRESS' || r.status === 'OPEN');
+        const last: any = rList[rList.length - 1];
+        initialRoundId = active ? (active.roundId || active.id) : (last?.roundId || last?.id);
+      }
+      setSelectedRoundId(initialRoundId);
+      await loadScoringTheses(initialRoundId);
     } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Không thể tải dữ liệu điểm' });
+      setNotification({ type: 'error', message: err?.message || 'Không thể khởi tạo trang chấm điểm' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleScoreSubmit = async (data: any) => {
+  const loadScoringTheses = async (roundId?: number) => {
     try {
-      await defenseService.submitScore(data);
-      setNotification({ type: 'success', message: 'Lưu điểm và nhận xét thành công!' });
-      await loadThesisData();
+      setLoading(true);
+      const list = await defenseService.getMyScoringTheses(roundId);
+      setScoringTheses(list);
+      if (list.length > 0) {
+        const keepCurrent = list.some((t) => t.thesisId === selectedThesisId);
+        const nextThesisId = keepCurrent ? selectedThesisId : list[0].thesisId;
+        setSelectedThesisId(nextThesisId);
+        await loadThesisScoringDetails(nextThesisId);
+      } else {
+        setSelectedThesisId(0);
+        setScores([]);
+        setGraduationResult(null);
+        setMinutesSignatures([]);
+      }
     } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Thất bại khi lưu điểm' });
+      setNotification({ type: 'error', message: err?.message || 'Không thể tải danh sách đề tài chấm điểm' });
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const loadThesisScoringDetails = async (thesisId: number) => {
+    if (!thesisId) return;
+    try {
+      setLoading(true);
+      const [sList, rData, sigList] = await Promise.all([
+        defenseService.getScores(thesisId),
+        defenseService.getGraduationResult(thesisId),
+        defenseService.getMinutesSignatures(thesisId),
+      ]);
+      setScores(sList);
+      setGraduationResult(rData);
+      setMinutesSignatures(sigList);
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err?.message || 'Không thể tải dữ liệu điểm của đề tài' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRoundChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value ? Number(e.target.value) : undefined;
+    setSelectedRoundId(val);
+    await loadScoringTheses(val);
+  };
+
+  const handleThesisChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const tid = Number(e.target.value);
+    setSelectedThesisId(tid);
+    await loadThesisScoringDetails(tid);
+  };
+
+  const handleScoreSubmit = async (data: any) => {
+    await defenseService.submitScore(data);
+    setNotification({ type: 'success', message: 'Đã lưu phiếu chấm điểm và nhận xét thành công!' });
+    await loadThesisScoringDetails(selectedThesisId);
   };
 
   const handleSynthesize = async (data: SynthesizeResultRequest) => {
@@ -79,11 +139,91 @@ export const DefenseScoringPage: React.FC = () => {
         type: 'success',
         message: `Tổng hợp điểm thành công! Điểm tổng kết: ${res.finalScore.toFixed(2)} — Xếp loại: ${res.grade}`,
       });
-      await loadThesisData();
+      await loadThesisScoringDetails(selectedThesisId);
     } catch (err: any) {
       setNotification({ type: 'error', message: err?.message || 'Thất bại khi tổng hợp điểm' });
+      throw err;
     }
   };
+
+  const handleSignMinutes = async () => {
+    if (!selectedThesisId) return;
+    try {
+      setSigningMinutes(true);
+      const updatedSigs = await defenseService.signDefenseMinutes(selectedThesisId);
+      setMinutesSignatures(updatedSigs);
+      setNotification({
+        type: 'success',
+        message: '✍️ Bạn đã ký số xác nhận Biên bản bảo vệ Đồ án Tốt nghiệp thành công!',
+      });
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err?.message || 'Không thể ký xác nhận biên bản' });
+    } finally {
+      setSigningMinutes(false);
+    }
+  };
+
+  const handleOpenFinalExportModal = async () => {
+    setShowFinalExportModal(true);
+    const items = await Promise.all(
+      scoringTheses.map(async (t) => {
+        const res = await defenseService.getGraduationResult(t.thesisId).catch(() => null);
+        return { thesis: t, result: res };
+      })
+    );
+    setRoundExportResults(items);
+  };
+
+  const handleFinalizeAndPublishRound = async () => {
+    if (!selectedRoundId) {
+      setNotification({ type: 'error', message: 'Vui lòng chọn Đợt đồ án cần công bố kết quả và hoàn tất!' });
+      return;
+    }
+    if (!window.confirm('Xác nhận Ký xuất Dữ liệu cuối kỳ, công bố kết quả chính thức về tài khoản của tất cả Sinh viên và Đóng hoàn tất Đợt đồ án này?')) {
+      return;
+    }
+    try {
+      setPublishingRound(true);
+      await defenseService.finalizeAndPublishRound(selectedRoundId);
+      setShowFinalExportModal(false);
+      setNotification({
+        type: 'success',
+        message: '🎓 Đã công bố kết quả bảo vệ chính thức tới toàn bộ Sinh viên và hoàn tất đóng Đợt đồ án!',
+      });
+      await initPage();
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err?.message || 'Không thể hoàn tất và công bố kết quả đợt đồ án' });
+    } finally {
+      setPublishingRound(false);
+    }
+  };
+
+  const selectedThesis = useMemo(
+    () => scoringTheses.find((t) => t.thesisId === selectedThesisId) || null,
+    [scoringTheses, selectedThesisId]
+  );
+
+  const allowedScoreTypes = useMemo<ScoreType[]>(() => {
+    if (!selectedThesis || isAdmin) return [];
+    const list: ScoreType[] = [];
+    if (selectedThesis.canScoreCouncil) list.push('COUNCIL');
+    if (selectedThesis.canScoreReviewer) list.push('REVIEWER');
+    if (selectedThesis.canScoreSupervisor) list.push('SUPERVISOR');
+    return list;
+  }, [selectedThesis, isAdmin]);
+
+  const supervisorScoreItem = scores.find((s) => s.scoreType === 'SUPERVISOR');
+  const reviewerScoreItem = scores.find((s) => s.scoreType === 'REVIEWER');
+  const councilScoreItems = scores.filter((s) => s.scoreType === 'COUNCIL');
+  const liveCouncilAvg =
+    councilScoreItems.length > 0
+      ? councilScoreItems.reduce((sum, s) => sum + Number(s.score || 0), 0) / councilScoreItems.length
+      : null;
+
+  const signedCount = minutesSignatures.filter((s) => s.signed).length;
+  const mySignatureItem = selectedThesis?.myLecturerId
+    ? minutesSignatures.find((s) => s.lecturerId === selectedThesis.myLecturerId)
+    : undefined;
 
   const scoreColumns: Column<ScoreItem>[] = [
     {
@@ -116,7 +256,7 @@ export const DefenseScoringPage: React.FC = () => {
       width: '100px',
       render: (val: number) => (
         <span className="font-semibold text-primary" style={{ fontSize: '1.05rem' }}>
-          {val.toFixed(2)}
+          {Number(val).toFixed(2)}
         </span>
       ),
     },
@@ -133,17 +273,9 @@ export const DefenseScoringPage: React.FC = () => {
     },
   ];
 
-  const selectedThesis = theses.find((t) => t.id === selectedThesisId);
-  const currentUserId = user?.id ? Number(user.id) : null;
-  const currentLecturerId = (user as any)?.lecturerId ? Number((user as any).lecturerId) : currentUserId;
-  const userFullName = (user?.fullName || '').toLowerCase();
-
-  const isCurrentSupervisor = selectedThesis && (
-    (selectedThesis.lecturerId && selectedThesis.lecturerId === currentLecturerId) ||
-    (selectedThesis.lecturerFullName && userFullName && selectedThesis.lecturerFullName.toLowerCase().includes(userFullName))
-  );
-
-  const supervisorScoreItem = scores.find((s) => s.scoreType === 'SUPERVISOR');
+  const displayStudentName = graduationResult?.studentName || selectedThesis?.studentName || '—';
+  const displayStudentCode = graduationResult?.studentCode || selectedThesis?.studentCode || '—';
+  const displayThesisTitle = graduationResult?.thesisTitle || selectedThesis?.titleVn || '—';
 
   return (
     <div className="feature-page-container">
@@ -151,20 +283,60 @@ export const DefenseScoringPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Chấm điểm và Tổng hợp Kết quả Tốt nghiệp</h1>
           <p className="feature-page-subtitle">
-            Cơ cấu điểm: GVHD (30% - chấm lúc duyệt bảo vệ), GVPB (20%), Hội đồng (50% - 1CT-2TK-2UV). Xuất biên bản bảo vệ PDF &amp; dữ liệu cuối kỳ.
+            Cơ cấu điểm chuẩn UTC: GVHD (30%), GVPB (20%), Hội đồng 5 thành viên (50% - 1CT-2TK-2UV). Phân quyền nghiêm ngặt theo vai trò được giao.
           </p>
         </div>
-        <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <Button variant="success" onClick={() => setIsSynthModalOpen(true)}>
-            🎯 Tổng hợp kết quả tốt nghiệp (Synthesize)
-          </Button>
-          <Button variant="primary" onClick={() => setShowMinutesModal(true)}>
-            🖨️ Xuất Biên bản PDF &amp; Ký
-          </Button>
-          <Button variant="outline" onClick={() => setShowFinalExportModal(true)}>
-            📦 Xuất Dữ liệu Cuối kỳ (Ký)
-          </Button>
-          <Button variant="outline" onClick={loadThesisData} loading={loading}>
+
+        <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {rounds.length > 0 && (
+            <select
+              value={selectedRoundId || ''}
+              onChange={handleRoundChange}
+              style={{
+                padding: '7px 12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontWeight: 600,
+                fontSize: '13px',
+                color: '#0a3273',
+                background: '#fff',
+              }}
+            >
+              {rounds.map((r: any) => {
+                const rid = r.roundId || r.id;
+                return (
+                  <option key={rid} value={rid}>
+                    📁 {r.name} ({r.roundCode || rid})
+                  </option>
+                );
+              })}
+            </select>
+          )}
+
+          {isAdmin && selectedThesis && (
+            <Button variant="success" onClick={() => setIsSynthModalOpen(true)}>
+              🎯 Tổng hợp kết quả tốt nghiệp
+            </Button>
+          )}
+
+          {/* ONLY the 5 Council Members of this thesis can view/sign Defense Minutes PDF (#22) */}
+          {!isAdmin && selectedThesis?.isCouncilMember && (
+            <Button variant="primary" onClick={() => setShowMinutesModal(true)}>
+              🖨️ Xuất Biên bản PDF &amp; Ký ({signedCount}/5)
+            </Button>
+          )}
+
+          {isAdmin && (
+            <Button variant="outline" onClick={handleOpenFinalExportModal}>
+              📦 Xuất Dữ liệu Cuối kỳ &amp; Hoàn tất Đợt
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            onClick={() => (selectedThesisId ? loadThesisScoringDetails(selectedThesisId) : loadScoringTheses(selectedRoundId))}
+            loading={loading}
+          >
             Làm mới
           </Button>
         </div>
@@ -179,224 +351,250 @@ export const DefenseScoringPage: React.FC = () => {
         </div>
       )}
 
-      {/* Select Thesis Bar */}
-      <div className="select-thesis-bar">
-        <label htmlFor="thesisSelector">Chọn đề tài cần chấm điểm:</label>
-        <select
-          id="thesisSelector"
-          className="form-control thesis-dropdown"
-          value={selectedThesisId}
-          onChange={(e) => setSelectedThesisId(Number(e.target.value))}
+      {/* Empty state if lecturer has 0 assigned theses in this round (#17) */}
+      {scoringTheses.length === 0 ? (
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '44px 24px',
+            textAlign: 'center',
+            marginTop: '12px',
+          }}
         >
-          {theses.map((t) => (
-            <option key={t.id} value={t.id}>
-              Đề tài #{t.id} ({t.thesisCode}): {t.titleVn} (SV: {t.studentFullName} - {t.studentCode})
-            </option>
-          ))}
-          {!theses.some((t) => t.id === 101) && (
-            <option value={101}>Đề tài #101: Nghiên cứu ứng dụng Deep Learning trong nhận diện cử chỉ tay (SV: Nguyễn Văn An)</option>
-          )}
-          {!theses.some((t) => t.id === 103) && (
-            <option value={103}>Đề tài #103: Xây dựng hệ thống IoT giám sát chất lượng không khí thông minh (SV: Lê Hoàng Cường)</option>
-          )}
-          {!theses.some((t) => t.id === 104) && (
-            <option value={104}>Đề tài #104: Tối ưu hóa thuật toán xếp lịch và điều phối vi dịch vụ (SV: Phạm Minh Đức)</option>
-          )}
-        </select>
-      </div>
-
-      {/* Graduation Result Card (if synthesized) */}
-      {graduationResult && (
-        <div className="graduation-summary-card">
-          <div className="summary-left">
-            <span className="summary-badge">KẾT QUẢ TỐT NGHIỆP TỔNG HỢP</span>
-            <h2>
-              {graduationResult.studentName} ({graduationResult.studentCode})
-            </h2>
-            <p className="summary-thesis-title">{graduationResult.thesisTitle}</p>
-            <div className="scores-breakdown-row">
-              <div className="sub-score-item">
-                <span className="sub-score-lbl">Điểm GVHD (30%):</span>
-                <span className="sub-score-val">{graduationResult.supervisorScore?.toFixed(2)}</span>
-              </div>
-              <div className="sub-score-item">
-                <span className="sub-score-lbl">Điểm GVPB (20%):</span>
-                <span className="sub-score-val">{graduationResult.reviewerScore?.toFixed(2)}</span>
-              </div>
-              <div className="sub-score-item">
-                <span className="sub-score-lbl">TB Hội đồng (50%):</span>
-                <span className="sub-score-val">{graduationResult.councilScore?.toFixed(2)}</span>
-              </div>
-            </div>
+          <div style={{ fontSize: '36px', marginBottom: '10px' }}>📋</div>
+          <h3 style={{ margin: '0 0 6px 0', color: '#0f172a' }}>
+            {isAdmin
+              ? 'Chưa có đề tài nào đủ điều kiện bảo vệ trong đợt đồ án này'
+              : 'Bạn chưa được phân công chấm điểm đề tài nào trong đợt đồ án này'}
+          </h3>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+            {isAdmin
+              ? 'Danh sách đề tài tại GĐ5 sẽ hiển thị ngay khi Giảng viên hướng dẫn xác nhận sinh viên Đủ điều kiện bảo vệ ở GĐ4.'
+              : 'Hệ thống chỉ hiển thị những đề tài mà bạn là Giảng viên hướng dẫn, Giảng viên phản biện hoặc nằm trong 5 thành viên Hội đồng chấm bảo vệ.'}
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Select Thesis Bar — Strictly real assigned theses, NO mock options (#17) */}
+          <div className="select-thesis-bar">
+            <label htmlFor="thesisSelector">
+              {isAdmin ? 'Chọn đề tài cần theo dõi / tổng hợp:' : 'Đề tài bạn được phân công:'}
+            </label>
+            <select
+              id="thesisSelector"
+              className="form-control thesis-dropdown"
+              value={selectedThesisId}
+              onChange={handleThesisChange}
+            >
+              {scoringTheses.map((t) => {
+                const roleTags: string[] = [];
+                if (t.canScoreCouncil || t.isCouncilMember) roleTags.push('Hội đồng');
+                if (t.canScoreReviewer) roleTags.push('GVPB');
+                if (t.canScoreSupervisor) roleTags.push('GVHD');
+                const suffix = roleTags.length > 0 ? ` — [Vai trò: ${roleTags.join(', ')}]` : '';
+                return (
+                  <option key={t.thesisId} value={t.thesisId}>
+                    [{t.thesisCode || `DT-${t.thesisId}`}] {t.titleVn} (SV: {t.studentName} - {t.studentCode}){suffix}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
-          <div className="summary-right">
-            <div className="final-score-display">
-              <span className="final-score-lbl">ĐIỂM TỔNG KẾT</span>
-              <span className="final-score-num">{graduationResult.finalScore.toFixed(2)}</span>
+          {/* Synthesized Graduation Result Card OR Real Unsynthesized Thesis Info Card (#24) */}
+          {graduationResult ? (
+            <div className="graduation-summary-card">
+              <div className="summary-left">
+                <span className="summary-badge">KẾT QUẢ TỐT NGHIỆP TỔNG HỢP</span>
+                <h2>
+                  {displayStudentName} ({displayStudentCode})
+                </h2>
+                <p className="summary-thesis-title">{displayThesisTitle}</p>
+                <div className="scores-breakdown-row">
+                  <div className="sub-score-item">
+                    <span className="sub-score-lbl">Điểm GVHD (30%):</span>
+                    <span className="sub-score-val">{Number(graduationResult.supervisorScore || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="sub-score-item">
+                    <span className="sub-score-lbl">Điểm GVPB (20%):</span>
+                    <span className="sub-score-val">{Number(graduationResult.reviewerScore || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="sub-score-item">
+                    <span className="sub-score-lbl">TB Hội đồng (50%):</span>
+                    <span className="sub-score-val">{Number(graduationResult.councilScore || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="summary-right">
+                <div className="final-score-display">
+                  <span className="final-score-lbl">ĐIỂM TỔNG KẾT</span>
+                  <span className="final-score-num">{Number(graduationResult.finalScore).toFixed(2)}</span>
+                </div>
+                <div className="final-grade-box">
+                  <span className={`grade-tag grade-${graduationResult.grade?.toLowerCase()}`}>
+                    Xếp loại: {graduationResult.grade}
+                  </span>
+                  <StatusBadge
+                    status={graduationResult.finalResult}
+                    label={graduationResult.finalResult === 'PASSED' ? 'ĐẠT TỐT NGHIỆP' : 'KHÔNG ĐẠT'}
+                    size="md"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="final-grade-box">
-              <span className={`grade-tag grade-${graduationResult.grade?.toLowerCase()}`}>
-                Xếp loại: {graduationResult.grade}
-              </span>
-              <StatusBadge
-                status={graduationResult.finalResult}
-                label={graduationResult.finalResult === 'PASSED' ? 'ĐẠT TỐT NGHIỆP' : 'KHÔNG ĐẠT'}
-                size="md"
+          ) : selectedThesis && (
+            <div
+              style={{
+                background: '#fff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '18px 22px',
+                marginBottom: '20px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '16px',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span
+                    style={{
+                      background: '#fef3c7',
+                      color: '#92400e',
+                      border: '1px solid #fde68a',
+                      padding: '3px 10px',
+                      borderRadius: '999px',
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ⏳ CHƯA TỔNG HỢP ĐIỂM CUỐI KỲ
+                  </span>
+                  {selectedThesis.councilCode && (
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#0a3273' }}>
+                      Hội đồng: {selectedThesis.councilCode}
+                    </span>
+                  )}
+                </div>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '18px', color: '#0f172a' }}>
+                  {selectedThesis.studentName} ({selectedThesis.studentCode})
+                </h2>
+                <div style={{ fontSize: '14px', color: '#334155', fontWeight: 600 }}>
+                  [{selectedThesis.thesisCode}] {selectedThesis.titleVn}
+                </div>
+                <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '6px' }}>
+                  GVHD: <strong>{selectedThesis.advisorName || '—'}</strong> &nbsp;|&nbsp; GVPB:{' '}
+                  <strong>{selectedThesis.reviewerName || 'Chưa phân công'}</strong>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>GVHD (30%)</div>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                    {supervisorScoreItem ? supervisorScoreItem.score.toFixed(2) : 'Chưa chấm'}
+                  </div>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>GVPB (20%)</div>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                    {reviewerScoreItem ? reviewerScoreItem.score.toFixed(2) : 'Chưa chấm'}
+                  </div>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>TB Hội đồng ({councilScoreItems.length}/5)</div>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                    {liveCouncilAvg !== null ? liveCouncilAvg.toFixed(2) : 'Chưa chấm'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Content: Left = Role-Aware Form or Permission Notice, Right = Real Scores Table */}
+          <div className="scoring-grid-layout">
+            <div className="scoring-col-form">
+              {isAdmin ? (
+                <div
+                  style={{
+                    background: '#eff6ff',
+                    border: '1.5px solid #93c5fd',
+                    borderRadius: '10px',
+                    padding: '22px',
+                  }}
+                >
+                  <h3 style={{ margin: '0 0 10px 0', color: '#1e3a8a', fontSize: '16px' }}>
+                    🛡️ Tài khoản Quản trị Khoa / Bộ môn (Chế độ Giám sát &amp; Tổng hợp)
+                  </h3>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '13.5px', color: '#1e40af', lineHeight: 1.6 }}>
+                    Theo quy định phân quyền đào tạo, <strong>Admin không trực tiếp nhập điểm chấm hoặc ký biên bản Hội đồng</strong>.
+                  </p>
+                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', color: '#1e3a8a', lineHeight: 1.7 }}>
+                    <li>Điểm GVHD (30%), GVPB (20%) và 5 thành viên Hội đồng (50%) do từng giảng viên đăng nhập bằng tài khoản cá nhân để chấm.</li>
+                    <li>Sau khi đủ 3 đầu điểm, Admin bấm <strong>"🎯 Tổng hợp kết quả tốt nghiệp"</strong> hoặc <strong>"📦 Xuất Dữ liệu Cuối kỳ &amp; Hoàn tất Đợt"</strong> để công bố điểm cho sinh viên.</li>
+                  </ul>
+                </div>
+              ) : allowedScoreTypes.length > 0 && selectedThesis ? (
+                <ScoreEntryForm
+                  thesisId={selectedThesis.thesisId}
+                  fixedGraderId={selectedThesis.myLecturerId || 0}
+                  fixedGraderName={selectedThesis.myLecturerName || user?.fullName}
+                  fixedGraderDegree={selectedThesis.myLecturerDegree}
+                  allowedScoreTypes={allowedScoreTypes}
+                  onSubmit={handleScoreSubmit}
+                />
+              ) : (
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '22px',
+                  }}
+                >
+                  <h3 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '15px' }}>
+                    🔒 Phiếu chấm điểm đã khóa
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#475569', lineHeight: 1.6 }}>
+                    Đợt đồ án này đã kết thúc khóa sổ điểm hoặc đề tài hiện chưa ở trạng thái mở chấm điểm cho vai trò của bạn.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="scoring-col-table">
+              <div className="scores-table-header">
+                <h3>📋 Danh sách phiếu điểm thực tế đã nộp ({scores.length})</h3>
+              </div>
+              <Table
+                columns={scoreColumns}
+                dataSource={scores}
+                rowKey="id"
+                loading={loading}
+                emptyText="Chưa có giảng viên nào nộp phiếu chấm điểm cho đề tài này"
               />
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* DEDICATED SUPERVISOR PROCESS SCORE CARD (30%) */}
-      <div style={{
-        background: supervisorScoreItem ? '#f0fdf4' : '#fffbeb',
-        border: `1px solid ${supervisorScoreItem ? '#86efac' : '#fde68a'}`,
-        borderRadius: '10px',
-        padding: '18px 22px',
-        marginBottom: '20px',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '20px' }}>👨‍🏫</span>
-            <span style={{ fontWeight: 700, color: supervisorScoreItem ? '#166534' : '#92400e', fontSize: '15px' }}>
-              Điểm Quá Trình Của Giảng Viên Hướng Dẫn (Tỷ trọng: 30% tổng kết)
-            </span>
-          </div>
-          {supervisorScoreItem ? (
-            <span style={{
-              background: '#16a34a',
-              color: '#fff',
-              padding: '3px 12px',
-              borderRadius: '20px',
-              fontWeight: 700,
-              fontSize: '11px',
-              letterSpacing: '0.5px'
-            }}>
-              ✓ ĐÃ CHẤM TẠI BƯỚC DUYỆT ĐỦ ĐIỀU KIỆN BẢO VỆ
-            </span>
-          ) : (
-            <span style={{
-              background: '#fef3c7',
-              color: '#92400e',
-              border: '1px solid #fde68a',
-              padding: '3px 12px',
-              borderRadius: '20px',
-              fontWeight: 700,
-              fontSize: '11px'
-            }}>
-              ⏳ CHƯA CÓ ĐIỂM GVHD
-            </span>
-          )}
-        </div>
-
-        {supervisorScoreItem ? (
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{
-              background: '#fff',
-              padding: '12px 20px',
-              borderRadius: '8px',
-              border: '1px solid #bbf7d0',
-              textAlign: 'center',
-              minWidth: '110px'
-            }}>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>ĐIỂM HƯỚNG DẪN</div>
-              <div style={{ fontSize: '28px', fontWeight: 800, color: '#15803d', lineHeight: '1.2' }}>
-                {supervisorScoreItem.score.toFixed(2)}
-              </div>
-              <div style={{ fontSize: '11px', color: '#16a34a' }}>Thang điểm 10.0</div>
-            </div>
-
-            <div style={{ flex: 1, minWidth: '280px' }}>
-              <div style={{ fontSize: '13px', color: '#334155' }}>
-                <strong>Người chấm:</strong> {supervisorScoreItem.graderName || selectedThesis?.lecturerFullName || 'Giảng viên hướng dẫn'}
-              </div>
-              <div style={{ fontSize: '13px', color: '#1e293b', marginTop: '4px', lineHeight: '1.4' }}>
-                <strong>Nhận xét &amp; Đánh giá:</strong> "<em>{supervisorScoreItem.feedback || 'Sinh viên hoàn thành tốt mục tiêu đề tài.'}</em>"
-              </div>
-              <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '6px', fontWeight: 600 }}>
-                🛡️ Ràng buộc cứng: Giảng viên hướng dẫn KHÔNG ngồi trong Hội đồng chấm thi đề tài này.
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ fontSize: '13px', color: '#b45309' }}>
-            Giảng viên hướng dẫn sẽ chấm điểm quá trình ngay khi bấm xác nhận sinh viên "Đủ điều kiện bảo vệ" tại GĐ4 (TaskBoard).
-          </div>
-        )}
-      </div>
-
-      {/* Main Content: Form and Table */}
-      <div className="scoring-grid-layout">
-        {/* Left Column: Form */}
-        <div className="scoring-col-form">
-          {isCurrentSupervisor ? (
-            <div style={{
-              background: '#fef2f2',
-              border: '2px solid #fca5a5',
-              borderRadius: '10px',
-              padding: '24px',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                <span style={{ fontSize: '24px' }}>🛡️</span>
-                <h3 style={{ margin: 0, color: '#991b1b', fontSize: '16px', fontWeight: 700 }}>
-                  Quy chế: GVHD không tham gia Hội đồng chấm thi
-                </h3>
-              </div>
-              <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#7f1d1d', lineHeight: '1.6' }}>
-                Bạn là <strong>Giảng viên hướng dẫn ({selectedThesis?.lecturerFullName || user?.fullName})</strong> của đề tài này. Theo quy định đào tạo đồ án tốt nghiệp UTC:
-              </p>
-              <ul style={{ margin: '0 0 16px 0', paddingLeft: '20px', fontSize: '13px', color: '#991b1b', lineHeight: '1.6' }}>
-                <li>GVHD tuyệt đối <strong>không ngồi trong Hội đồng chấm thi</strong> sinh viên do mình hướng dẫn.</li>
-                <li>Điểm hướng dẫn quá trình của bạn <strong>({supervisorScoreItem ? `${supervisorScoreItem.score.toFixed(2)} đ` : 'đã chấm lúc xác nhận đủ ĐK bảo vệ'})</strong> chiếm 30% điểm tốt nghiệp.</li>
-                <li>5 thành viên Hội đồng (1CT, 2TK, 2UV) độc lập sẽ thực hiện chấm điểm bảo vệ (50%).</li>
-              </ul>
-              <div style={{
-                background: '#fff',
-                padding: '10px 14px',
-                borderRadius: '6px',
-                border: '1px solid #fecaca',
-                fontSize: '12px',
-                color: '#b91c1c',
-                fontWeight: 600
-              }}>
-                ✓ Bạn đã hoàn tất nhiệm vụ đánh giá quá trình cho đề tài này.
-              </div>
-            </div>
-          ) : (
-            <ScoreEntryForm thesisId={selectedThesisId} graders={graders} onSubmit={handleScoreSubmit} />
-          )}
-        </div>
-
-        {/* Right Column: Existing Scores Table */}
-        <div className="scoring-col-table">
-          <div className="scores-table-header">
-            <h3>📋 Danh sách phiếu điểm đã nộp ({scores.length})</h3>
-          </div>
-          <Table
-            columns={scoreColumns}
-            dataSource={scores}
-            rowKey="id"
-            loading={loading}
-            emptyText="Chưa có thành viên nào nộp phiếu chấm điểm"
-          />
-        </div>
-      </div>
-
-
       {/* Synthesis Modal */}
-      <ResultSynthesisModal
-        isOpen={isSynthModalOpen}
-        onClose={() => setIsSynthModalOpen(false)}
-        thesisId={selectedThesisId}
-        onSynthesize={handleSynthesize}
-      />
+      {isAdmin && selectedThesisId > 0 && (
+        <ResultSynthesisModal
+          isOpen={isSynthModalOpen}
+          onClose={() => setIsSynthModalOpen(false)}
+          thesisId={selectedThesisId}
+          onSynthesize={handleSynthesize}
+        />
+      )}
 
-      {/* Printable Defense Minutes PDF Modal (Step 40) */}
-      {showMinutesModal && graduationResult && (
+      {/* Printable Defense Minutes PDF Modal with 5 Council Member Signatures (#22, #23) */}
+      {showMinutesModal && selectedThesis && selectedThesis.isCouncilMember && (
         <div
           style={{
             position: 'fixed',
@@ -414,34 +612,52 @@ export const DefenseScoringPage: React.FC = () => {
               background: '#fff',
               borderRadius: '10px',
               width: '100%',
-              maxWidth: '820px',
+              maxWidth: '880px',
               maxHeight: '92vh',
               overflowY: 'auto',
-              padding: '32px',
+              padding: '28px 32px',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <strong style={{ color: '#0a3273' }}>📄 BIÊN BẢN HỘI ĐỒNG CHẤM ĐỒ ÁN TỐT NGHIỆP (BƯỚC 40)</strong>
-              <div style={{ display: 'flex', gap: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '10px',
+                marginBottom: '16px',
+                borderBottom: '1px solid #e2e8f0',
+                paddingBottom: '12px',
+              }}
+            >
+              <div>
+                <strong style={{ color: '#0a3273', fontSize: '15px' }}>
+                  📄 BIÊN BẢN HỘI ĐỒNG CHẤM ĐỒ ÁN TỐT NGHIỆP
+                </strong>
+                <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '2px' }}>
+                  Tiến độ ký số của 5 thành viên Hội đồng: <strong>{signedCount}/5 thành viên đã ký xác nhận</strong>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
-                  onClick={() => {
-                    setNotification({
-                      type: 'success',
-                      message: 'Hội đồng đã ký xác nhận và lưu hồ sơ Biên bản bảo vệ PDF thành công!',
-                    });
-                    setShowMinutesModal(false);
-                  }}
+                  onClick={handleSignMinutes}
+                  disabled={signingMinutes}
                   style={{
-                    backgroundColor: '#16a34a',
+                    backgroundColor: mySignatureItem?.signed ? '#0f766e' : '#16a34a',
                     color: '#fff',
                     border: 'none',
-                    padding: '6px 12px',
+                    padding: '7px 14px',
                     borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
+                    cursor: signingMinutes ? 'wait' : 'pointer',
+                    fontWeight: 700,
+                    fontSize: '13px',
                   }}
                 >
-                  ✍️ Hội đồng Ký & Lưu hồ sơ
+                  {signingMinutes
+                    ? 'Đang ký số...'
+                    : mySignatureItem?.signed
+                    ? `✓ Đã ký (${mySignatureItem.slotLabel})`
+                    : `✍️ Ký xác nhận biên bản (${mySignatureItem?.slotLabel || 'Thành viên HĐ'})`}
                 </button>
                 <button
                   onClick={() => window.print()}
@@ -449,10 +665,11 @@ export const DefenseScoringPage: React.FC = () => {
                     backgroundColor: '#0a3273',
                     color: '#fff',
                     border: 'none',
-                    padding: '6px 12px',
+                    padding: '7px 14px',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontWeight: 600,
+                    fontSize: '13px',
                   }}
                 >
                   🖨️ In / Lưu PDF
@@ -463,9 +680,10 @@ export const DefenseScoringPage: React.FC = () => {
                     backgroundColor: '#f1f5f9',
                     color: '#334155',
                     border: '1px solid #cbd5e1',
-                    padding: '6px 12px',
+                    padding: '7px 14px',
                     borderRadius: '6px',
                     cursor: 'pointer',
+                    fontSize: '13px',
                   }}
                 >
                   Đóng
@@ -473,11 +691,13 @@ export const DefenseScoringPage: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ border: '1px solid #cbd5e1', padding: '28px', borderRadius: '6px', lineHeight: 1.6, color: '#0f172a' }}>
+            <div style={{ border: '1px solid #cbd5e1', padding: '26px', borderRadius: '6px', lineHeight: 1.6, color: '#0f172a' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', textAlign: 'center', marginBottom: '16px' }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '13px' }}>TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI</div>
-                  <div style={{ fontWeight: 700, fontSize: '14px' }}>HỘI ĐỒNG CHẤM ĐỒ ÁN TỐT NGHIỆP</div>
+                  <div style={{ fontWeight: 700, fontSize: '14px' }}>
+                    {selectedThesis.councilName?.toUpperCase() || 'HỘI ĐỒNG CHẤM ĐỒ ÁN TỐT NGHIỆP'}
+                  </div>
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '13px' }}>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
@@ -489,64 +709,126 @@ export const DefenseScoringPage: React.FC = () => {
                 BIÊN BẢN BẢO VỆ ĐỒ ÁN TỐT NGHIỆP ĐẠI HỌC
               </h2>
 
-              <p>
-                <strong>1. Sinh viên bảo vệ:</strong> {graduationResult.studentName} — <strong>Mã SV:</strong> {graduationResult.studentCode}
+              <p style={{ margin: '6px 0' }}>
+                <strong>1. Sinh viên bảo vệ:</strong> {displayStudentName} — <strong>Mã SV:</strong> {displayStudentCode}
+                {selectedThesis.studentClass ? ` — Lớp: ${selectedThesis.studentClass}` : ''}
               </p>
-              <p>
-                <strong>2. Tên đề tài:</strong> {graduationResult.thesisTitle}
+              <p style={{ margin: '6px 0' }}>
+                <strong>2. Tên đề tài:</strong> [{selectedThesis.thesisCode}] {displayThesisTitle}
               </p>
-              <p>
-                <strong>3. Tổng hợp kết quả chấm điểm của Hội đồng (1 Chủ tịch - 2 Thư ký - 2 Ủy viên):</strong>
+              <p style={{ margin: '6px 0' }}>
+                <strong>3. Giảng viên hướng dẫn:</strong> {selectedThesis.advisorName || '—'}
+              </p>
+              <p style={{ margin: '10px 0 6px 0' }}>
+                <strong>4. Kết quả chấm điểm của GVHD, GVPB và Hội đồng (1 Chủ tịch - 2 Thư ký - 2 Ủy viên):</strong>
               </p>
 
-              <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <table style={{ width: '100%', minWidth: '520px', borderCollapse: 'collapse', margin: '12px 0' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Thành phần chấm</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Người chấm</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Điểm số</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Nhận xét</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scores.map((s) => (
-                    <tr key={s.id}>
-                      <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>{s.scoreType}</td>
-                      <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>{s.graderName}</td>
-                      <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 700, textAlign: 'center' }}>
-                        {s.score.toFixed(2)}
-                      </td>
-                      <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>{s.feedback}</td>
+              <div style={{ width: '100%', overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: '520px', borderCollapse: 'collapse', margin: '8px 0 14px 0', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                      <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Thành phần chấm</th>
+                      <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Người chấm</th>
+                      <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Điểm số</th>
+                      <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Nhận xét</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {scores.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '12px', textAlign: 'center', border: '1px solid #cbd5e1', color: '#64748b' }}>
+                          Chưa có phiếu điểm nào được nộp.
+                        </td>
+                      </tr>
+                    ) : (
+                      scores.map((s) => (
+                        <tr key={s.id}>
+                          <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>
+                            {s.scoreType === 'SUPERVISOR' ? 'GV Hướng dẫn' : s.scoreType === 'REVIEWER' ? 'GV Phản biện' : 'Thành viên Hội đồng'}
+                          </td>
+                          <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 600 }}>{s.graderName}</td>
+                          <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 700, textAlign: 'center' }}>
+                            {Number(s.score).toFixed(2)}
+                          </td>
+                          <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>{s.feedback}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
 
-              <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: '6px', margin: '16px 0', fontWeight: 600 }}>
-                Điểm GVHD (30%): {graduationResult.supervisorScore?.toFixed(2)} | Điểm GVPB (20%): {graduationResult.reviewerScore?.toFixed(2)} |
-                TB Hội đồng (50%): {graduationResult.councilScore?.toFixed(2)} ⇒ ĐIỂM TỔNG KẾT: {graduationResult.finalScore.toFixed(2)} (
-                {graduationResult.grade} - {graduationResult.finalResult === 'PASSED' ? 'ĐẠT' : 'KHÔNG ĐẠT'})
+              <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: '6px', margin: '12px 0 20px 0', fontWeight: 600, fontSize: '13.5px' }}>
+                {graduationResult ? (
+                  <>
+                    Điểm GVHD (30%): {Number(graduationResult.supervisorScore).toFixed(2)} | Điểm GVPB (20%):{' '}
+                    {Number(graduationResult.reviewerScore).toFixed(2)} | TB Hội đồng (50%):{' '}
+                    {Number(graduationResult.councilScore).toFixed(2)} ⇒ ĐIỂM TỔNG KẾT:{' '}
+                    {Number(graduationResult.finalScore).toFixed(2)} ({graduationResult.grade} -{' '}
+                    {graduationResult.finalResult === 'PASSED' ? 'ĐẠT' : 'KHÔNG ĐẠT'})
+                  </>
+                ) : (
+                  <>
+                    Điểm GVHD (30%): {supervisorScoreItem ? supervisorScoreItem.score.toFixed(2) : '—'} | Điểm GVPB (20%):{' '}
+                    {reviewerScoreItem ? reviewerScoreItem.score.toFixed(2) : '—'} | TB Hội đồng hiện tại:{' '}
+                    {liveCouncilAvg !== null ? liveCouncilAvg.toFixed(2) : '—'} (Đang chờ tổng hợp cuối kỳ)
+                  </>
+                )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', textAlign: 'center', marginTop: '28px' }}>
-                <div>
-                  <strong>THƯ KÝ HỘI ĐỒNG</strong>
-                  <div style={{ marginTop: '44px', fontWeight: 600, color: '#0a3273' }}>[Đã ký xác nhận: ThS. Hoàng Quốc Bảo]</div>
-                </div>
-                <div>
-                  <strong>CHỦ TỊCH HỘI ĐỒNG</strong>
-                  <div style={{ marginTop: '44px', fontWeight: 600, color: '#b91c1c' }}>[Đã ký xác nhận: PGS. TS. Trần Văn Minh]</div>
-                </div>
+              {/* 5 Council Members Digital Signature Boxes (#23) */}
+              <div style={{ fontWeight: 700, fontSize: '13.5px', marginBottom: '10px', color: '#0f172a' }}>
+                5. Xác nhận chữ ký số của đủ 5 thành viên Hội đồng ({signedCount}/5):
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '12px',
+                  marginTop: '8px',
+                }}
+              >
+                {minutesSignatures.map((sig) => (
+                  <div
+                    key={sig.memberId || sig.lecturerId}
+                    style={{
+                      border: `1.5px solid ${sig.signed ? '#86efac' : '#cbd5e1'}`,
+                      background: sig.signed ? '#f0fdf4' : '#f8fafc',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: '12.5px', color: '#0a3273', textTransform: 'uppercase' }}>
+                      {sig.slotLabel}
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#0f172a', margin: '6px 0' }}>
+                      {sig.lecturerName}
+                    </div>
+                    {sig.signed ? (
+                      <div style={{ color: '#15803d', fontWeight: 700, fontSize: '12px', marginTop: '10px' }}>
+                        ✓ Đã ký số xác nhận
+                        {sig.signedAt && (
+                          <div style={{ fontWeight: 500, fontSize: '11px', color: '#166534' }}>
+                            {new Date(sig.signedAt).toLocaleString('vi-VN')}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '12px', marginTop: '12px' }}>
+                        [Chưa ký xác nhận]
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Final Term Data Export & Round Completion Modal (Steps 41 & 42) */}
-      {showFinalExportModal && (
+      {/* Final Term Data Export & Round Completion Modal (#25, #27 — No Reservation Mock Row!) */}
+      {showFinalExportModal && isAdmin && (
         <div
           style={{
             position: 'fixed',
@@ -559,46 +841,61 @@ export const DefenseScoringPage: React.FC = () => {
             padding: '16px',
           }}
         >
-          <div style={{ background: '#fff', borderRadius: '10px', width: '100%', maxWidth: '720px', padding: '28px' }}>
-            <h3 style={{ margin: '0 0 12px 0', color: '#0a3273' }}>
-              📦 Xuất dữ liệu cuối kỳ (Ký) & Kết thúc đợt đồ án (Bước 41 - 42)
+          <div style={{ background: '#fff', borderRadius: '10px', width: '100%', maxWidth: '780px', maxHeight: '90vh', overflowY: 'auto', padding: '28px' }}>
+            <h3 style={{ margin: '0 0 8px 0', color: '#0a3273' }}>
+              📦 Bảng Tổng hợp Dữ liệu Cuối kỳ &amp; Công bố Kết quả Đợt đồ án
             </h3>
-            <p style={{ color: '#475569', fontSize: '14px', marginBottom: '16px' }}>
-              Bảng tổng hợp kết quả cuối kỳ bao gồm cả danh sách Sinh viên Đạt bảo vệ và Sinh viên được duyệt Bảo lưu kết quả sang đợt kế tiếp.
+            <p style={{ color: '#475569', fontSize: '13.5px', marginBottom: '16px' }}>
+              Khi bấm <strong>"Ký xuất Dữ liệu &amp; Hoàn tất Đợt đồ án"</strong>, hệ thống sẽ tự động tổng hợp điểm cuối kỳ cho các đề tài đủ đầu điểm, đóng đợt đồ án và gửi thông báo kết quả chính thức tới từng Sinh viên.
             </p>
-            <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table style={{ width: '100%', minWidth: '580px', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '20px' }}>
-              <thead>
-                <tr style={{ background: '#f1f5f9' }}>
-                  <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>MSSV</th>
-                  <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Họ và tên</th>
-                  <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Trạng thái cuối kỳ</th>
-                  <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Điểm tổng kết</th>
-                  <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Xếp loại / Ghi chú</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>{graduationResult?.studentCode || 'SV2021001'}</td>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 600 }}>{graduationResult?.studentName || 'Nguyễn Văn An'}</td>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1', color: '#16a34a', fontWeight: 600 }}>Hoàn thành Bảo vệ</td>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 700, textAlign: 'center' }}>
-                    {graduationResult?.finalScore.toFixed(2) || '8.55'}
-                  </td>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>{graduationResult?.grade || 'EXCELLENT'} (ĐẠT)</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>SV2021003</td>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 600 }}>Lê Hoàng Cường</td>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1', color: '#d97706', fontWeight: 600 }}>Bảo lưu (Đã duyệt)</td>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>—</td>
-                  <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Lưu hồ sơ bảo lưu 01 học kỳ</td>
-                </tr>
-              </tbody>
-            </table>
+            <div style={{ width: '100%', overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '20px' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9' }}>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>MSSV</th>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Họ và tên SV</th>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Đề tài</th>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Điểm tổng kết</th>
+                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Xếp loại / Kết quả</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roundExportResults.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '14px', textAlign: 'center', border: '1px solid #cbd5e1', color: '#64748b' }}>
+                        Chưa có sinh viên nào đủ điều kiện bảo vệ trong đợt này.
+                      </td>
+                    </tr>
+                  ) : (
+                    roundExportResults.map(({ thesis, result }) => (
+                      <tr key={thesis.thesisId}>
+                        <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 700, color: '#0a3273' }}>
+                          {thesis.studentCode}
+                        </td>
+                        <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 600 }}>
+                          {thesis.studentName}
+                        </td>
+                        <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>{thesis.titleVn}</td>
+                        <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 700, textAlign: 'center' }}>
+                          {result ? Number(result.finalScore).toFixed(2) : 'Chờ tổng hợp'}
+                        </td>
+                        <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>
+                          {result ? (
+                            <span style={{ color: result.finalResult === 'PASSED' ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+                              {result.grade} ({result.finalResult === 'PASSED' ? 'ĐẠT' : 'KHÔNG ĐẠT'})
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>Chưa tổng hợp</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setShowFinalExportModal(false)}
                 style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
@@ -612,16 +909,19 @@ export const DefenseScoringPage: React.FC = () => {
                 🖨️ In Bảng tổng hợp Cuối kỳ (PDF)
               </button>
               <button
-                onClick={() => {
-                  setNotification({
-                    type: 'success',
-                    message: 'Đã ký số xuất dữ liệu cuối kỳ và chốt hoàn tất đợt đồ án tốt nghiệp (Bước 41 & 42)!',
-                  });
-                  setShowFinalExportModal(false);
+                onClick={handleFinalizeAndPublishRound}
+                disabled={publishingRound}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#16a34a',
+                  color: '#fff',
+                  fontWeight: 700,
+                  cursor: publishingRound ? 'wait' : 'pointer',
                 }}
-                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
               >
-                ✅ Ký xuất Dữ liệu & Hoàn tất Đợt đồ án
+                {publishingRound ? 'Đang công bố & đóng đợt...' : '✅ Ký xuất Dữ liệu & Hoàn tất Đợt đồ án'}
               </button>
             </div>
           </div>

@@ -29,5 +29,6 @@ public class StudentProjectRoundResponseDTO {
     private Integer debtCredits;
     private Double gpa;
     private String note;
+    private Boolean accountActive;
     private Instant enrolledAt;
 }

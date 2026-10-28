@@ -18,6 +18,8 @@ public interface ProposalService {
 
     ProposalResponse reviewProposal(Long proposalId, ReviewProposalRequest request);
 
+    ProposalResponse signProposal(Long id, Long currentUserId);
+
     ProposalResponse getProposalById(Long id);
 
     ProposalResponse getProposalByStudentAndRound(Long studentId, Long roundId);

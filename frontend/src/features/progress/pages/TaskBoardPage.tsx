@@ -418,6 +418,14 @@ export const TaskBoardPage: React.FC = () => {
     }
   };
 
+  const isTaskRevised = (t: Task): boolean => {
+    if (t.status !== 'REVISE') return false;
+    if (t.latestSubmissionStatus) {
+      return t.latestSubmissionStatus === 'SUBMITTED';
+    }
+    return Boolean(revisedTaskIds[t.id]);
+  };
+
   const handleSubmitTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTask) return;
@@ -427,8 +435,18 @@ export const TaskBoardPage: React.FC = () => {
       const effectiveStudentId = currentThesis?.studentId || user?.id || 1;
       const sub = await progressService.submitTask(selectedTask.id, effectiveStudentId, submissionContent, submissionFileUrl);
       setSubmissions(prev => [sub, ...prev]);
-      setSelectedTask(prev => prev ? { ...prev, status: nextTaskStatus, submissionCount: (prev.submissionCount || 0) + 1 } : null);
-      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: nextTaskStatus, submissionCount: (t.submissionCount || 0) + 1 } : t));
+      setSelectedTask(prev => prev ? {
+        ...prev,
+        status: nextTaskStatus,
+        latestSubmissionStatus: 'SUBMITTED',
+        submissionCount: (prev.submissionCount || 0) + 1
+      } : null);
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? {
+        ...t,
+        status: nextTaskStatus,
+        latestSubmissionStatus: 'SUBMITTED',
+        submissionCount: (t.submissionCount || 0) + 1
+      } : t));
       if (isReviseTask) {
         setRevisedTaskIds(prev => {
           const next = { ...prev, [selectedTask.id]: true };
@@ -444,39 +462,13 @@ export const TaskBoardPage: React.FC = () => {
         setSubmitSuccessMsg('🎉 Nộp bài thành công! File và báo cáo kết quả của bạn đã được ghi nhận.');
         alert('🎉 Nộp bài thành công! Task đã chuyển sang trạng thái ĐÃ NỘP BÀI (SUBMITTED) chờ GVHD nghiệm thu.');
       }
+      setSubmissionContent('');
+      setSubmissionFileUrl('');
     } catch (err: any) {
       console.error('Lỗi khi nộp bài:', err);
-      const fallbackSub: Submission = {
-        id: Date.now(),
-        taskId: selectedTask.id,
-        studentId: currentThesis?.studentId || user?.id || 1,
-        studentFullName: user?.fullName || currentThesis?.studentFullName || 'Sinh viên',
-        submissionContent,
-        fileUrl: submissionFileUrl,
-        status: 'SUBMITTED',
-        submittedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      setSubmissions(prev => [fallbackSub, ...prev]);
-      setSelectedTask(prev => prev ? { ...prev, status: nextTaskStatus, submissionCount: (prev.submissionCount || 0) + 1 } : null);
-      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: nextTaskStatus, submissionCount: (t.submissionCount || 0) + 1 } : t));
-      if (isReviseTask) {
-        setRevisedTaskIds(prev => {
-          const next = { ...prev, [selectedTask.id]: true };
-          try {
-            localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
-          } catch {}
-          return next;
-        });
-        setShowReviseForm(false);
-        setSubmitSuccessMsg('✅ Đã lưu bài sửa thành công! Trạng thái chuyển sang ĐÃ SỬA BÀI (Màu xanh).');
-      } else {
-        setSubmitSuccessMsg('🎉 Đã lưu bài nộp vào hệ thống!');
-      }
+      const errMsg = err?.response?.data?.message || err?.message || 'Lỗi kết nối máy chủ';
+      alert('Không thể nộp bài vào hệ thống: ' + errMsg);
     }
-    setSubmissionContent('');
-    setSubmissionFileUrl('');
   };
 
   const handleStatusChange = async (taskId: number, newStatus: Task['status']) => {
@@ -523,7 +515,8 @@ export const TaskBoardPage: React.FC = () => {
           } catch {}
           return next;
         });
-        await handleStatusChange(selectedTask.id, 'COMPLETED');
+        setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'COMPLETED', latestSubmissionStatus: 'ACCEPTED' } : t));
+        setSelectedTask(prev => prev ? { ...prev, status: 'COMPLETED', latestSubmissionStatus: 'ACCEPTED' } : null);
 
         // Recalculate progress rate
         const updatedTasks = tasks.map(t => t.id === selectedTask.id ? { ...t, status: 'COMPLETED' as const } : t);
@@ -535,6 +528,7 @@ export const TaskBoardPage: React.FC = () => {
           if (currentThesis) {
             setCurrentThesis({ ...currentThesis, completionRate: newRate });
           }
+          setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, completionRate: newRate } : t));
         } catch {}
 
         alert(`✅ Đã nghiệm thu ĐẠT! Task đã chuyển sang HOÀN THÀNH. Tiến độ đề tài tăng lên ${newRate}%.`);
@@ -546,31 +540,13 @@ export const TaskBoardPage: React.FC = () => {
           } catch {}
           return next;
         });
-        await handleStatusChange(selectedTask.id, 'REVISE');
+        setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'REVISE', latestSubmissionStatus: 'REVISE_REQUIRED' } : t));
+        setSelectedTask(prev => prev ? { ...prev, status: 'REVISE', latestSubmissionStatus: 'REVISE_REQUIRED' } : null);
         alert('⚠️ Đã gửi yêu cầu sửa lại (REVISE_REQUIRED). Task đã chuyển về cột CẦN SỬA (REVISE) để sinh viên làm lại.');
       }
     } catch (err: any) {
       console.error('Lỗi khi đánh giá bài nộp:', err);
-      setSubmissions(prev => prev.map(s => s.id === submissionId ? {
-        ...s,
-        status,
-        reviewFeedback: feedback,
-        reviewedAt: new Date().toISOString()
-      } : s));
-      setRevisedTaskIds(prev => {
-        const next = { ...prev, [selectedTask.id]: false };
-        try {
-          localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-      if (status === 'ACCEPTED') {
-        await handleStatusChange(selectedTask.id, 'COMPLETED');
-        alert('✅ Đã nghiệm thu ĐẠT và chuyển Task sang HOÀN THÀNH!');
-      } else {
-        await handleStatusChange(selectedTask.id, 'REVISE');
-        alert('⚠️ Đã chuyển Task sang trạng thái CẦN SỬA (REVISE)!');
-      }
+      alert('Không thể lưu kết quả đánh giá bài nộp: ' + (err?.response?.data?.message || err?.message || 'Lỗi máy chủ'));
     } finally {
       setReviewLoading(false);
       setReviewModalSubmission(null);
@@ -651,7 +627,8 @@ export const TaskBoardPage: React.FC = () => {
 
       // 2. Chuyển trạng thái đề tài sang đủ điều kiện bảo vệ
       const updated = await thesisService.setDefenseEligible(selectedThesisId, true);
-      setCurrentThesis(updated);
+      setCurrentThesis({ ...updated, defenseEligible: true, status: 'DEFENSE_READY' });
+      setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: true, status: 'DEFENSE_READY' } : t));
       setSupervisorScoreData({
         score: supScoreInput,
         feedback: supFeedbackInput.trim(),
@@ -661,16 +638,7 @@ export const TaskBoardPage: React.FC = () => {
       alert(`🎉 ĐÃ CHẤM ĐIỂM GVHD & XÁC NHẬN BẢO VỆ THÀNH CÔNG!\nĐiểm hướng dẫn: ${supScoreInput} / 10 đ\nĐề tài đã chuyển sang trạng thái ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY).`);
     } catch (err: any) {
       console.error('Lỗi khi chấm điểm GVHD và xác nhận bảo vệ:', err);
-      if (currentThesis) {
-        setCurrentThesis({ ...currentThesis, status: 'DEFENSE_READY', defenseEligible: true });
-      }
-      setSupervisorScoreData({
-        score: supScoreInput,
-        feedback: supFeedbackInput.trim(),
-        graderName: user?.fullName || 'GVHD',
-      });
-      setShowDefenseReadyModal(false);
-      alert(`🎉 Đã lưu Điểm GVHD: ${supScoreInput} đ và xác nhận ĐỦ ĐIỀU KIỆN BẢO VỆ!`);
+      alert('Không thể lưu điểm và xác nhận đủ điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message || 'Lỗi máy chủ'));
     } finally {
       setDefenseReadyLoading(false);
     }
@@ -965,7 +933,7 @@ export const TaskBoardPage: React.FC = () => {
 
               {/* Defense Ready Confirmation Button / Badge */}
               <div>
-                {currentThesis.status === 'DEFENSE_READY' || currentThesis.defenseEligible ? (
+                {currentThesis.defenseEligible ? (
                   <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '8px', maxWidth: '450px' }}>
                     <div style={{ fontWeight: 700, color: '#15803d', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `| Điểm GVHD: ${supervisorScoreData.score} / 10 đ`}
@@ -1451,7 +1419,7 @@ export const TaskBoardPage: React.FC = () => {
                         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                         border:
                           t.status === 'REVISE'
-                            ? revisedTaskIds[t.id]
+                            ? isTaskRevised(t)
                               ? '1.5px solid #22c55e'
                               : '1px solid #f87171'
                             : '1px solid #cbd5e1',
@@ -1529,7 +1497,7 @@ export const TaskBoardPage: React.FC = () => {
                         </div>
                       )}
                       {t.status === 'REVISE' && (
-                        revisedTaskIds[t.id] ? (
+                        isTaskRevised(t) ? (
                           <div
                             style={{
                               marginTop: '8px',
@@ -1658,7 +1626,7 @@ export const TaskBoardPage: React.FC = () => {
                       selectedTask.status === 'COMPLETED'
                         ? '#dcfce7'
                         : selectedTask.status === 'REVISE'
-                        ? revisedTaskIds[selectedTask.id]
+                        ? isTaskRevised(selectedTask)
                           ? '#dcfce7'
                           : '#fee2e2'
                         : selectedTask.status === 'SUBMITTED'
@@ -1670,7 +1638,7 @@ export const TaskBoardPage: React.FC = () => {
                       selectedTask.status === 'COMPLETED'
                         ? '#15803d'
                         : selectedTask.status === 'REVISE'
-                        ? revisedTaskIds[selectedTask.id]
+                        ? isTaskRevised(selectedTask)
                           ? '#15803d'
                           : '#b91c1c'
                         : selectedTask.status === 'SUBMITTED'
@@ -1688,7 +1656,7 @@ export const TaskBoardPage: React.FC = () => {
                     : selectedTask.status === 'SUBMITTED'
                     ? '📤 Đã nộp bài (SUBMITTED)'
                     : selectedTask.status === 'REVISE'
-                    ? revisedTaskIds[selectedTask.id]
+                    ? isTaskRevised(selectedTask)
                       ? '✅ Đã sửa bài (Chờ GVHD duyệt)'
                       : '⚠️ Cần sửa chữa (REVISE)'
                     : '✓ Hoàn thành (COMPLETED)'}
@@ -1780,8 +1748,8 @@ export const TaskBoardPage: React.FC = () => {
                             {s.status === 'ACCEPTED' ? '✓ ĐÃ DUYỆT ĐẠT' : s.status === 'REVISE_REQUIRED' ? '⚠️ YÊU CẦU SỬA LẠI' : 'CHỜ DUYỆT'}
                           </span>
 
-                          {/* GVHD Action buttons */}
-                          {canCreateTask && s.status !== 'ACCEPTED' && (
+                          {/* GVHD Action buttons: chỉ hiển thị trên bài nộp MỚI NHẤT đang chờ duyệt (SUBMITTED) */}
+                          {canCreateTask && idx === 0 && s.status === 'SUBMITTED' && selectedTask.status !== 'COMPLETED' && (
                             <div style={{ display: 'flex', gap: '6px' }}>
                               <button
                                 type="button"
@@ -1864,15 +1832,15 @@ export const TaskBoardPage: React.FC = () => {
               {/* Submit Form for Student (Chỉ hiển thị cho sinh viên) */}
               {isStudent && selectedTask.status === 'REVISE' && (
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: revisedTaskIds[selectedTask.id] ? '#f0fdf4' : '#fef2f2', border: `1px solid ${revisedTaskIds[selectedTask.id] ? '#86efac' : '#fecaca'}`, padding: '12px 14px', borderRadius: '8px', marginBottom: showReviseForm ? '10px' : 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isTaskRevised(selectedTask) ? '#f0fdf4' : '#fef2f2', border: `1px solid ${isTaskRevised(selectedTask) ? '#86efac' : '#fecaca'}`, padding: '12px 14px', borderRadius: '8px', marginBottom: showReviseForm ? '10px' : 0 }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: revisedTaskIds[selectedTask.id] ? '#15803d' : '#b91c1c' }}>
-                        {revisedTaskIds[selectedTask.id]
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: isTaskRevised(selectedTask) ? '#15803d' : '#b91c1c' }}>
+                        {isTaskRevised(selectedTask)
                           ? '✅ Đã sửa bài (Đang chờ GVHD kiểm tra & nghiệm thu)'
                           : '⚠️ Công việc cần sửa lại theo yêu cầu của GVHD'}
                       </div>
                       <div style={{ fontSize: '12px', color: '#475569', marginTop: '2px' }}>
-                        {revisedTaskIds[selectedTask.id]
+                        {isTaskRevised(selectedTask)
                           ? 'Bạn đã gửi bản sửa bài mới nhất. Bạn vẫn có thể bấm nút bên cạnh để cập nhật lại nếu cần.'
                           : 'Bấm nút "🛠️ Sửa bài" để tải lên bản báo cáo/kết quả đã chỉnh sửa.'}
                       </div>
@@ -1881,7 +1849,7 @@ export const TaskBoardPage: React.FC = () => {
                       type="button"
                       onClick={() => setShowReviseForm(prev => !prev)}
                       style={{
-                        background: revisedTaskIds[selectedTask.id] ? '#16a34a' : '#dc2626',
+                        background: isTaskRevised(selectedTask) ? '#16a34a' : '#dc2626',
                         color: '#fff',
                         border: 'none',
                         padding: '8px 16px',

@@ -31,7 +31,6 @@ export interface DefenseCouncil {
   assignedStudents?: CouncilStudentDetail[];
 }
 
-
 export interface CouncilGenerationRequest {
   projectRoundId?: number;
   maxStudentsPerCouncil?: number;
@@ -103,9 +102,9 @@ export interface DefenseSchedule {
   notes?: string;
   members?: CouncilMember[];
   studentIds?: number[];
+  thesisIds?: number[];
   assignedStudents?: CouncilStudentDetail[];
 }
-
 
 export interface AutoScheduleRequest {
   projectRoundId?: number;
@@ -126,6 +125,7 @@ export interface ScheduleConfig {
   endTime: string;
   maxStudents?: number;
   notes?: string;
+  thesisIds?: number[];
 }
 
 export type ScoreType = 'SUPERVISOR' | 'REVIEWER' | 'COUNCIL';
@@ -156,15 +156,58 @@ export interface ScoreSubmitRequest {
   feedback: string;
 }
 
+export interface MyScoringThesis {
+  thesisId: number;
+  thesisCode?: string;
+  titleVn: string;
+  projectRoundId?: number;
+  studentId?: number;
+  studentCode?: string;
+  studentName?: string;
+  studentClass?: string;
+  advisorId?: number;
+  advisorName?: string;
+  reviewerId?: number;
+  reviewerName?: string;
+  councilId?: number;
+  councilCode?: string;
+  councilName?: string;
+  defenseEligible?: boolean;
+  status?: string;
+  canScoreSupervisor?: boolean;
+  canScoreReviewer?: boolean;
+  canScoreCouncil?: boolean;
+  isCouncilMember?: boolean;
+  myCouncilRole?: CouncilRole | string;
+  myLecturerId?: number;
+  myLecturerName?: string;
+  myLecturerDegree?: string;
+}
+
+export interface MinutesSignatureItem {
+  memberId: number;
+  councilId: number;
+  lecturerId: number;
+  lecturerName: string;
+  role: CouncilRole | string;
+  slotLabel: string;
+  signed: boolean;
+  signedAt?: string;
+}
+
 export type GradeClassification = 'EXCELLENT' | 'VERY_GOOD' | 'GOOD' | 'AVERAGE' | 'POOR';
 export type FinalGraduationResult = 'PASSED' | 'FAILED';
 
 export interface GraduationResult {
   id: number;
   thesisId: number;
+  thesisCode?: string;
   thesisTitle?: string;
   studentName?: string;
   studentCode?: string;
+  studentClass?: string;
+  advisorName?: string;
+  roundStatus?: string;
   supervisorScore: number;
   reviewerScore: number;
   councilScore: number;

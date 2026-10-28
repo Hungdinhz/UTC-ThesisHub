@@ -30,7 +30,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
   // Filter & Pagination states
   const [selectedMajorId, setSelectedMajorId] = useState<number | undefined>(undefined);
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedStatus] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -713,24 +713,6 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             </option>
           ))}
         </select>
-
-        <select
-          value={selectedStatus}
-          onChange={(e) => {
-            setSelectedStatus(e.target.value);
-            setCurrentPage(0);
-          }}
-          style={{ flex: '1 1 180px', minWidth: '150px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="ELIGIBLE">Đủ điều kiện (ELIGIBLE)</option>
-          <option value="REGISTERED">Đã có đề tài (REGISTERED)</option>
-          <option value="ASSIGNED">Đã gán GVHD (ASSIGNED)</option>
-          <option value="IN_PROGRESS">Đang làm đồ án (IN_PROGRESS)</option>
-          <option value="DROPPED">Bị loại (DROPPED)</option>
-          <option value="DEFENDED">Đã bảo vệ (DEFENDED)</option>
-          <option value="RESERVED">Bảo lưu (RESERVED)</option>
-        </select>
       </div>
 
       {/* Students Table */}
@@ -783,6 +765,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                         <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
                           {badge.label}
                         </span>
+                        <div style={{ marginTop: '4px', fontSize: '0.72rem', fontWeight: 600, color: st.accountActive === false ? '#b45309' : '#15803d' }}>
+                          {st.accountActive === false ? '⏳ Chờ mở đợt cấp TK' : '🔑 Đã cấp TK đăng nhập'}
+                        </div>
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                         {!isRoundClosed ? (
@@ -1357,23 +1342,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
-                    Trạng thái ban đầu trong đợt
-                  </label>
-                  <select
-                    value={manualForm.status}
-                    onChange={(e) => setManualForm({ ...manualForm, status: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  >
-                    <option value="ELIGIBLE">Đủ điều kiện tham gia (ELIGIBLE)</option>
-                    <option value="REGISTERED">Đã có đề tài (REGISTERED)</option>
-                    <option value="ASSIGNED">Đã gán GVHD (ASSIGNED)</option>
-                    <option value="IN_PROGRESS">Đang làm đồ án (IN_PROGRESS)</option>
-                  </select>
-                </div>
-
+              <div style={{ marginBottom: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
                     Điểm GPA tích lũy (Hệ 4.0) *

@@ -6,11 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import UTCAppLayout from './components/UTCAppLayout';
 import LoginPage from './pages/LoginPage';
 import AdminRegisterPage from './pages/AdminRegisterPage';
-import StudentDashboard from './pages/StudentDashboard';
-import SupervisorDashboard from './pages/SupervisorDashboard';
-import CommitteeMemberDashboard from './pages/CommitteeMemberDashboard';
 import ExternalDashboard from './pages/ExternalDashboard';
-import AdminDashboard from './pages/AdminDashboard';
 import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import ProjectRoundManagementPage from './pages/ProjectRoundManagementPage';
 import { AssignmentManagementPage } from './features/assignment/pages/AssignmentManagementPage';
@@ -20,12 +16,29 @@ import { ThesisDetailPage } from './features/thesis/pages/ThesisDetailPage';
 import { TaskBoardPage } from './features/progress/pages/TaskBoardPage';
 import { ProgressReportPage } from './features/progress/pages/ProgressReportPage';
 import { ThesisEligibilityPage } from './features/eligibility/pages/ThesisEligibilityPage';
-import { ReservationManagementPage } from './features/eligibility/pages/ReservationManagementPage';
 import { FinalDefenseEligibilityPage } from './features/eligibility/pages/FinalDefenseEligibilityPage';
 import { CouncilManagementPage } from './features/defense/pages/CouncilManagementPage';
 import { DefenseSchedulePage } from './features/defense/pages/DefenseSchedulePage';
 import { DefenseScoringPage } from './features/defense/pages/DefenseScoringPage';
+import { ChatGroupPage } from './features/chat/pages/ChatGroupPage';
 import './App.css';
+
+const getDefaultRouteForRole = (role?: string | null): string => {
+  switch (role) {
+    case 'admin':
+      return '/admin/project-rounds';
+    case 'student':
+      return '/student/assignment';
+    case 'supervisor':
+      return '/admin/assignments';
+    case 'committee_member':
+      return '/admin/councils';
+    case 'external_examiner':
+      return '/external_examiner/dashboard';
+    default:
+      return '/login';
+  }
+};
 
 const FullPageLoader: React.FC<{ message?: string }> = ({ message = 'Đang tải hệ thống UTC-ThesisHub...' }) => (
   <div
@@ -98,32 +111,15 @@ const AppRoutes: React.FC = () => {
       <Route path="/admin/register" element={<AdminRegisterPage />} />
       <Route
         path="/login"
-        element={userType ? <Navigate to={`/${userType}/dashboard`} replace /> : <LoginPage />}
+        element={userType ? <Navigate to={getDefaultRouteForRole(userType)} replace /> : <LoginPage />}
       />
-      <Route
-        path="/student/dashboard"
-        element={
-          <ProtectedRoute allowedTypes={['student']}>
-            <StudentDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/supervisor/dashboard"
-        element={
-          <ProtectedRoute allowedTypes={['supervisor']}>
-            <SupervisorDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/committee_member/dashboard"
-        element={
-          <ProtectedRoute allowedTypes={['committee_member']}>
-            <CommitteeMemberDashboard />
-          </ProtectedRoute>
-        }
-      />
+
+      {/* Redirect removed Overview dashboards directly to functional pages (#26) */}
+      <Route path="/admin/dashboard" element={<Navigate to="/admin/project-rounds" replace />} />
+      <Route path="/student/dashboard" element={<Navigate to="/student/assignment" replace />} />
+      <Route path="/supervisor/dashboard" element={<Navigate to="/admin/assignments" replace />} />
+      <Route path="/committee_member/dashboard" element={<Navigate to="/admin/councils" replace />} />
+
       <Route
         path="/external_examiner/dashboard"
         element={
@@ -132,15 +128,8 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+
       {/* Phase 1: Admin Master Data & Project Rounds */}
-      <Route
-        path="/admin/dashboard"
-        element={
-          <ProtectedRoute allowedTypes={['admin']}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
       <Route
         path="/admin/organization"
         element={
@@ -202,7 +191,7 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Phase 4: Thesis Eligibility & Force Approve */}
+      {/* Phase 4: Thesis Eligibility & Execution */}
       <Route
         path="/admin/eligibility"
         element={
@@ -213,8 +202,6 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* Phase 4: Thesis Execution (Tasks, Deadlines, Submissions, Reviews) */}
       <Route
         path="/progress/tasks"
         element={
@@ -236,37 +223,34 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Phase 5: Final Defense Eligibility, Reservation, Councils (1CT-2TK-2UV), Schedule, Scoring & PDF Minutes */}
+      {/* Supervisor - Student Group Chat (#28) */}
+      <Route
+        path="/chat"
+        element={
+          <ProtectedRoute allowedTypes={['student', 'supervisor', 'committee_member']}>
+            <LayoutPageWrapper activeTab="chat" pageTitle="Nhóm Chat Hướng Dẫn Đồ Án Tốt Nghiệp">
+              <ChatGroupPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Phase 5: Final Defense Eligibility, Councils, Schedule, Scoring & PDF Minutes */}
       <Route
         path="/admin/final-eligibility"
         element={
           <ProtectedRoute allowedTypes={['admin', 'supervisor', 'committee_member']}>
-            <LayoutPageWrapper activeTab="final-eligibility" pageTitle="Giai đoạn 5: Kiểm tra Điều kiện Học vụ & Bảo vệ Cuối kỳ">
+            <LayoutPageWrapper activeTab="final-eligibility" pageTitle="Giai đoạn 5: Kiểm tra Điều kiện Bảo vệ Cuối kỳ">
               <FinalDefenseEligibilityPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin/reservations"
-        element={
-          <ProtectedRoute allowedTypes={['admin', 'student', 'supervisor', 'committee_member']}>
-            <LayoutPageWrapper activeTab="reservations" pageTitle="Giai đoạn 5 (Nhánh Bảo lưu): Quản lý & Duyệt Đơn Bảo lưu Đồ án">
-              <ReservationManagementPage />
-            </LayoutPageWrapper>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/student/reservation"
-        element={
-          <ProtectedRoute allowedTypes={['student', 'admin']}>
-            <LayoutPageWrapper activeTab="reservations" pageTitle="Đơn Xin Bảo Lưu Đồ Án Tốt Nghiệp">
-              <ReservationManagementPage />
-            </LayoutPageWrapper>
-          </ProtectedRoute>
-        }
-      />
+
+      {/* Redirect removed Reservation routes (#27) */}
+      <Route path="/admin/reservations" element={<Navigate to="/admin/project-rounds" replace />} />
+      <Route path="/student/reservation" element={<Navigate to="/student/assignment" replace />} />
+
       <Route
         path="/admin/councils"
         element={
@@ -298,13 +282,13 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/student" element={<Navigate to="/student/dashboard" replace />} />
-      <Route path="/supervisor" element={<Navigate to="/supervisor/dashboard" replace />} />
-      <Route path="/committee" element={<Navigate to="/committee_member/dashboard" replace />} />
-      <Route path="/committee_member" element={<Navigate to="/committee_member/dashboard" replace />} />
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/admin" element={<Navigate to="/admin/project-rounds" replace />} />
+      <Route path="/student" element={<Navigate to="/student/assignment" replace />} />
+      <Route path="/supervisor" element={<Navigate to="/admin/assignments" replace />} />
+      <Route path="/committee" element={<Navigate to="/admin/councils" replace />} />
+      <Route path="/committee_member" element={<Navigate to="/admin/councils" replace />} />
+      <Route path="/" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
+      <Route path="*" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
     </Routes>
   );
 };

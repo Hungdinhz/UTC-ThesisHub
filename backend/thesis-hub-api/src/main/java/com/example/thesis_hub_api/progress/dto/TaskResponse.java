@@ -26,6 +26,7 @@ public class TaskResponse {
     private Instant dueDate;
     private Instant completedAt;
     private int submissionCount;
+    private String latestSubmissionStatus;
     private int commentCount;
     private Instant createdAt;
     private Instant updatedAt;

@@ -6,12 +6,11 @@ import type { Thesis } from '../../thesis/types';
 import { apiService } from '../../../services/api';
 import type { FinalDefenseEligibilityResponse } from '../types';
 import type { ProjectRoundItem, StudentProjectRoundItem } from '../../../types';
-import { RoundAcademicRecordsTab } from '../../project-round/components/RoundAcademicRecordsTab';
 import './EligibilityPages.css';
 
 export const FinalDefenseEligibilityPage: React.FC = () => {
-  // Navigation sub-tabs: 'check' | 'students' | 'academic'
-  const [activeTab, setActiveTab] = useState<'check' | 'students' | 'academic'>('check');
+  // Navigation sub-tabs: 'check' | 'students'
+  const [activeTab, setActiveTab] = useState<'check' | 'students'>('check');
 
   // Project Rounds state
   const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
@@ -200,7 +199,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Xét điều kiện bảo vệ đồ án tốt nghiệp cuối kỳ</h1>
           <p className="feature-page-subtitle">
-            Giai đoạn 5: Kiểm tra 4 tiêu chí cứng (GVHD đồng ý ≥ 5.0, GVPB đồng ý ≥ 5.0, Tỷ lệ đạo văn ≤ 20%, Hoàn thành tiến độ) và Dữ liệu kết quả học vụ.
+            Giai đoạn 5: Kiểm tra tiêu chí xét duyệt bảo vệ đồ án tốt nghiệp cuối kỳ (GVHD đồng ý ≥ 5.0, GVPB đồng ý ≥ 5.0, Tỷ lệ đạo văn ≤ 20%, Hoàn thành tiến độ).
           </p>
         </div>
       </div>
@@ -330,25 +329,6 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
           }}
         >
           👨‍🎓 Sinh viên trong đợt ({roundStudents.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab('academic')}
-          style={{
-            padding: '10px 18px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'academic' ? '3px solid #0a3273' : '3px solid transparent',
-            color: activeTab === 'academic' ? '#0a3273' : '#64748b',
-            fontWeight: 700,
-            fontSize: '0.95rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          📊 Quản lý kết quả học vụ (Import Excel & Thủ công)
         </button>
       </div>
 
@@ -558,7 +538,6 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     const isEligibleForDefense = Boolean(
                       thesis &&
                         (thesis.defenseEligible ||
-                          thesis.status === 'DEFENSE_READY' ||
                           thesis.status === 'COMPLETED')
                     );
                     const progressRate = thesis?.completionRate ?? (isEligibleForDefense ? 100 : 0);
@@ -668,18 +647,6 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
               Chưa có sinh viên nào trong đợt đồ án này hoặc không tìm thấy kết quả.
             </div>
           )}
-        </div>
-      )}
-
-      {/* TAB 3: Quản lý Kết quả học vụ (Import Excel, Thêm thủ công, Bảng học vụ) */}
-      {activeTab === 'academic' && selectedRound && (
-        <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '20px', border: '1px solid #e2e8f0' }}>
-          <RoundAcademicRecordsTab
-            roundId={selectedRound.roundId}
-            roundName={selectedRound.name}
-            roundCode={selectedRound.roundCode}
-            isRoundClosed={selectedRound.status === 'CLOSED' || selectedRound.status === 'ARCHIVED'}
-          />
         </div>
       )}
     </div>

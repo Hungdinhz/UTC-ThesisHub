@@ -27,6 +27,12 @@ public class ThesisServiceImpl implements ThesisService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.thesis_hub_api.organization.repository.LecturerRepository lecturerRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.progress.repository.TaskRepository taskRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @Override
     @Transactional(readOnly = true)
     public ThesisResponse getThesisById(Long id) {
@@ -65,7 +71,14 @@ public class ThesisServiceImpl implements ThesisService {
         if (request.getTechnologies() != null) thesis.setTechnologies(request.getTechnologies());
         if (request.getStatus() != null) thesis.setStatus(request.getStatus());
         if (request.getCompletionRate() != null) thesis.setCompletionRate(request.getCompletionRate());
-        if (request.getDefenseEligible() != null) thesis.setDefenseEligible(request.getDefenseEligible());
+        if (request.getDefenseEligible() != null) {
+            thesis.setDefenseEligible(request.getDefenseEligible());
+            if (Boolean.TRUE.equals(request.getDefenseEligible()) && !"COMPLETED".equalsIgnoreCase(thesis.getStatus())) {
+                thesis.setStatus("DEFENSE_READY");
+            } else if (Boolean.FALSE.equals(request.getDefenseEligible()) && "DEFENSE_READY".equalsIgnoreCase(thesis.getStatus())) {
+                thesis.setStatus("IN_PROGRESS");
+            }
+        }
 
         return mapToResponse(thesisRepository.save(thesis));
     }
@@ -87,8 +100,20 @@ public class ThesisServiceImpl implements ThesisService {
                 .orElseThrow(() -> new ResourceNotFoundException("Thesis", id));
 
         thesis.setDefenseEligible(eligible);
-        if (eligible && "IN_PROGRESS".equals(thesis.getStatus())) {
-            thesis.setStatus("DEFENSE_READY");
+        if (eligible) {
+            if (!"COMPLETED".equalsIgnoreCase(thesis.getStatus())) {
+                thesis.setStatus("DEFENSE_READY");
+            }
+        } else {
+            thesis.setStatus("IN_PROGRESS");
+            if (jdbcTemplate != null) {
+                try {
+                    jdbcTemplate.update("DELETE FROM defense_schedule_theses WHERE thesis_id = ?", id);
+                    jdbcTemplate.update("DELETE FROM reviewer_assignments WHERE thesis_id = ?", id);
+                } catch (Exception ex) {
+                    log.warn("Could not clean schedule/reviewer rows when unsetting defenseEligible for thesis {}: {}", id, ex.getMessage());
+                }
+            }
         }
         return mapToResponse(thesisRepository.save(thesis));
     }
@@ -149,6 +174,18 @@ public class ThesisServiceImpl implements ThesisService {
         String studentName = (thesis.getStudent() != null && thesis.getStudent().getUser() != null) ? thesis.getStudent().getUser().getFullName() : null;
         String lecturerName = (thesis.getLecturer() != null && thesis.getLecturer().getUser() != null) ? thesis.getLecturer().getUser().getFullName() : null;
 
+        BigDecimal effectiveCompletionRate = thesis.getCompletionRate();
+        if (taskRepository != null && thesis.getId() != null) {
+            try {
+                java.util.List<com.example.thesis_hub_api.progress.entity.Task> tasks = taskRepository.findByThesisId(thesis.getId());
+                if (!tasks.isEmpty()) {
+                    long completed = tasks.stream().filter(t -> "COMPLETED".equalsIgnoreCase(t.getStatus())).count();
+                    effectiveCompletionRate = BigDecimal.valueOf(Math.round((completed * 100.0) / tasks.size()));
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
         return ThesisResponse.builder()
                 .id(thesis.getId())
                 .proposalId(thesis.getProposal() != null ? thesis.getProposal().getId() : null)
@@ -170,7 +207,7 @@ public class ThesisServiceImpl implements ThesisService {
                 .scope(thesis.getScope())
                 .technologies(thesis.getTechnologies())
                 .status(thesis.getStatus())
-                .completionRate(thesis.getCompletionRate())
+                .completionRate(effectiveCompletionRate)
                 .defenseEligible(thesis.getDefenseEligible())
                 .createdAt(thesis.getCreatedAt())
                 .updatedAt(thesis.getUpdatedAt())

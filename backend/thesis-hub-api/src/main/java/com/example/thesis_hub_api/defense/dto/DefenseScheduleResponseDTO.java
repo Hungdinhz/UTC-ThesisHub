@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -26,8 +27,8 @@ public class DefenseScheduleResponseDTO {
     private Integer maxStudents;
     private String status;
     private String notes;
-    private java.util.List<CouncilMemberDTO> members;
-    private java.util.List<Long> studentIds;
-    private java.util.List<CouncilStudentDetailDTO> assignedStudents;
+    private List<CouncilMemberDTO> members;
+    private List<Long> studentIds;
+    private List<Long> thesisIds;
+    private List<CouncilStudentDetailDTO> assignedStudents;
 }
-

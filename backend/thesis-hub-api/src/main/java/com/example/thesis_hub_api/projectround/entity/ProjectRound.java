@@ -45,6 +45,10 @@ public class ProjectRound {
     @Builder.Default
     private String status = "DRAFT"; // DRAFT, OPEN, IN_PROGRESS, CLOSED, ARCHIVED
 
+    @Column(name = "supplementary_open", nullable = false)
+    @Builder.Default
+    private Boolean supplementaryOpen = false;
+
     @Column(name = "start_date")
     private LocalDate startDate;
 

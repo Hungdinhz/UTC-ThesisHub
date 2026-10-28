@@ -345,7 +345,8 @@ public class StudentProjectRoundService {
                             .role(studentRole)
                             .isActive(true)
                             .build();
-                    user = userRepository.save(user);
+                    user.setIsActive(shouldActivateStudentAccount(existingStudent, round));
+            user = userRepository.save(user);
                     newUsersCreated++;
                 } else {
                     if (StringUtils.hasText(fullName)) {
@@ -360,7 +361,8 @@ public class StudentProjectRoundService {
                             user.setEmail(email);
                         }
                     }
-                    user = userRepository.save(user);
+                    user.setIsActive(shouldActivateStudentAccount(existingStudent, round));
+            user = userRepository.save(user);
                 }
 
                 // 2. Tìm hoặc tạo Student
@@ -509,6 +511,7 @@ public class StudentProjectRoundService {
                     .role(studentRole)
                     .isActive(true)
                     .build();
+            user.setIsActive(shouldActivateStudentAccount(existingCheckStudent, round));
             user = userRepository.save(user);
         } else {
             user.setFullName(fullName);
@@ -522,6 +525,7 @@ public class StudentProjectRoundService {
                 }
             }
             user.setPassword(passwordEncoder.encode("Password@123"));
+            user.setIsActive(shouldActivateStudentAccount(existingCheckStudent, round));
             user = userRepository.save(user);
         }
 
@@ -733,6 +737,19 @@ public class StudentProjectRoundService {
         }
     }
 
+    private boolean shouldActivateStudentAccount(Student existingStudent, ProjectRound round) {
+        if (round != null && !"DRAFT".equalsIgnoreCase(round.getStatus())) {
+            return true;
+        }
+        if (existingStudent != null && existingStudent.getId() != null && studentProjectRoundRepository != null) {
+            return studentProjectRoundRepository.findByStudentId(existingStudent.getId()).stream()
+                    .filter(spr -> spr.getProjectRound() != null && (round == null || !Objects.equals(spr.getProjectRound().getId(), round.getId())))
+                    .anyMatch(spr -> "OPEN".equalsIgnoreCase(spr.getProjectRound().getStatus())
+                            || "IN_PROGRESS".equalsIgnoreCase(spr.getProjectRound().getStatus()));
+        }
+        return false;
+    }
+
     private StudentProjectRoundResponseDTO toStudentProjectRoundResponseDTO(
             StudentProjectRound spr,
             Map<Long, Major> majorMap,
@@ -766,6 +783,7 @@ public class StudentProjectRoundService {
                 .debtCredits(student != null ? student.getDebtCredits() : 0)
                 .gpa(spr.getGpa() != null ? spr.getGpa() : (student != null && student.getGpa() != null ? student.getGpa() : 3.20))
                 .note(spr.getNote())
+                .accountActive(user != null && Boolean.TRUE.equals(user.getIsActive()))
                 .enrolledAt(spr.getCreatedAt())
                 .build();
     }

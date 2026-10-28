@@ -42,7 +42,7 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/supervisor-approve")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'FACULTY_ADMIN')")
     public ApiResponse<ProposalResponse> supervisorApprove(
             @PathVariable Long id,
             @RequestParam boolean approved,
@@ -62,12 +62,21 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/reviews")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'FACULTY_ADMIN')")
     public ApiResponse<ProposalResponse> reviewProposal(
             @PathVariable Long id,
             @Valid @RequestBody ReviewProposalRequest request) {
         return ApiResponse.success("Đánh giá đề cương thành công",
                 proposalService.reviewProposal(id, request));
+    }
+
+    @PostMapping("/{id}/sign")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    public ApiResponse<ProposalResponse> signProposal(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        return ApiResponse.success("Sinh viên ký nộp đề cương thành công",
+                proposalService.signProposal(id, currentUser != null ? currentUser.getId() : null));
     }
 
     @GetMapping("/{id}")

@@ -28,4 +28,6 @@ public class AssignmentStatsResponseDTO {
     private int totalCapacity;
     private double averageLoadRatio;
     private int droppedCount;
+    private Boolean supplementaryOpen;
+    private Integer supplementaryCount;
 }
