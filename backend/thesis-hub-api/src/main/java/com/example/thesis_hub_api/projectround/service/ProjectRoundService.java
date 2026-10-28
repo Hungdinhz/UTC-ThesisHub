@@ -977,12 +977,39 @@ public class ProjectRoundService {
         String status = spr.getStatus();
         int completedStage = 1;
 
+        List<TimelineMilestone> milestones = timelineMilestoneRepository
+                .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId);
+        int currentRoundStage = 2;
+        Instant now = Instant.now();
+        for (TimelineMilestone m : milestones) {
+            if (!now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate())) {
+                currentRoundStage = Math.max(currentRoundStage, getStageNumberFromPhase(m.getPhaseType()));
+            }
+        }
+
+        boolean hasDefenseEligibleThesis = false;
+        boolean hasThesisOrApprovedProposal = false;
+        if (thesisRepository != null) {
+            var thesisOpt = thesisRepository.findByStudentIdAndProjectRoundId(student.getId(), roundId);
+            if (thesisOpt.isPresent()) {
+                hasThesisOrApprovedProposal = true;
+                var t = thesisOpt.get();
+                if (Boolean.TRUE.equals(t.getDefenseEligible())
+                        || "DEFENSE_READY".equalsIgnoreCase(t.getStatus())
+                        || "DEFENDED".equalsIgnoreCase(t.getStatus())) {
+                    hasDefenseEligibleThesis = true;
+                }
+            }
+        }
+
         if (!isDropped) {
-            if ("DEFENSE_READY".equalsIgnoreCase(status) || "DEFENDED".equalsIgnoreCase(status)) {
+            if ("DEFENSE_READY".equalsIgnoreCase(status) || "DEFENDED".equalsIgnoreCase(status)
+                    || hasDefenseEligibleThesis || currentRoundStage >= 5) {
                 completedStage = 4;
-            } else if ("IN_PROGRESS".equalsIgnoreCase(status)) {
+                currentRoundStage = Math.max(currentRoundStage, 5);
+            } else if ("IN_PROGRESS".equalsIgnoreCase(status) || hasThesisOrApprovedProposal || currentRoundStage >= 4) {
                 completedStage = 3;
-            } else if ("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status)) {
+            } else if ("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status) || currentRoundStage >= 3) {
                 completedStage = 2;
             } else {
                 completedStage = 1;
@@ -994,17 +1021,6 @@ public class ProjectRoundService {
                 completedStage = 2;
             } else {
                 completedStage = 1;
-            }
-        }
-
-        List<TimelineMilestone> milestones = timelineMilestoneRepository
-                .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId);
-        int currentRoundStage = 2;
-        Instant now = Instant.now();
-        for (TimelineMilestone m : milestones) {
-            if (!now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate())) {
-                currentRoundStage = getStageNumberFromPhase(m.getPhaseType());
-                break;
             }
         }
 
@@ -1107,7 +1123,27 @@ public class ProjectRoundService {
         log.info("Deleting project round: id={}, code={}, status={}", round.getId(), round.getRoundCode(), status);
 
         if (jdbcTemplate != null) {
+            // Lấy danh sách sinh viên chỉ thuộc đợt đồ án này (không tham gia đợt nào khác) để xóa tài khoản sinh viên
+            List<Long> studentIdsToDelete = jdbcTemplate.queryForList(
+                    "SELECT spr.student_id FROM student_project_rounds spr WHERE spr.project_round_id = ? " +
+                    "AND spr.student_id IS NOT NULL " +
+                    "AND NOT EXISTS (SELECT 1 FROM student_project_rounds spr2 WHERE spr2.student_id = spr.student_id AND spr2.project_round_id <> ?)",
+                    Long.class, roundId, roundId
+            );
+            List<Long> userIdsToDelete = new ArrayList<>();
+            if (!studentIdsToDelete.isEmpty()) {
+                String inStudentIds = studentIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
+                userIdsToDelete = jdbcTemplate.queryForList(
+                        "SELECT s.user_id FROM students s WHERE s.id IN (" + inStudentIds + ") AND s.user_id IS NOT NULL " +
+                        "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = s.user_id)",
+                        Long.class
+                );
+            }
+
             // Cleanup dependent tables without explicit ON DELETE CASCADE
+            try {
+                jdbcTemplate.update("DELETE FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            } catch (Exception ignored) {}
             jdbcTemplate.update("DELETE FROM scores WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM reviewer_assignments WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
             jdbcTemplate.update("DELETE FROM graduation_results WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
@@ -1130,6 +1166,42 @@ public class ProjectRoundService {
             jdbcTemplate.update("DELETE FROM lecturer_capacities WHERE project_round_id = ?", roundId);
             jdbcTemplate.update("DELETE FROM student_project_rounds WHERE project_round_id = ?", roundId);
             jdbcTemplate.update("DELETE FROM timeline_milestones WHERE project_round_id = ?", roundId);
+
+            // Xóa tài khoản sinh viên thuộc đợt đồ án này (tuyệt đối không xóa tài khoản giảng viên)
+            if (!studentIdsToDelete.isEmpty()) {
+                String inStudentIds = studentIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
+                try {
+                    jdbcTemplate.update("DELETE FROM preferences WHERE student_id IN (" + inStudentIds + ")");
+                    jdbcTemplate.update("DELETE FROM direction_registrations WHERE student_id IN (" + inStudentIds + ")");
+                    jdbcTemplate.update("DELETE FROM supervisor_assignments WHERE student_id IN (" + inStudentIds + ")");
+                    jdbcTemplate.update("DELETE FROM reservation_requests WHERE student_id IN (" + inStudentIds + ")");
+                    jdbcTemplate.update("DELETE FROM graduation_results WHERE student_id IN (" + inStudentIds + ")");
+                    jdbcTemplate.update("DELETE FROM proposals WHERE student_id IN (" + inStudentIds + ")");
+                    jdbcTemplate.update("DELETE FROM theses WHERE student_id IN (" + inStudentIds + ")");
+                    jdbcTemplate.update("DELETE FROM students WHERE id IN (" + inStudentIds + ")");
+                } catch (Exception ex) {
+                    log.warn("Lỗi khi dọn dẹp bảng students cho đợt {}: {}", roundId, ex.getMessage());
+                }
+            }
+            if (!userIdsToDelete.isEmpty()) {
+                String inUserIds = userIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
+                try {
+                    jdbcTemplate.update("DELETE FROM notifications WHERE user_id IN (" + inUserIds + ")");
+                } catch (Exception ignored) {}
+                try {
+                    jdbcTemplate.update("DELETE FROM comments WHERE author_id IN (" + inUserIds + ")");
+                } catch (Exception ignored) {}
+                try {
+                    jdbcTemplate.update("DELETE FROM user_roles WHERE user_id IN (" + inUserIds + ") " +
+                            "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = user_roles.user_id)");
+                    jdbcTemplate.update("DELETE FROM users WHERE id IN (" + inUserIds + ") " +
+                            "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = users.id) " +
+                            "AND NOT EXISTS (SELECT 1 FROM students s WHERE s.user_id = users.id)");
+                    log.info("Đã xóa {} tài khoản sinh viên khi xóa đợt đồ án id={}", userIdsToDelete.size(), roundId);
+                } catch (Exception ex) {
+                    log.warn("Lỗi khi dọn dẹp bảng users cho sinh viên đợt {}: {}", roundId, ex.getMessage());
+                }
+            }
         }
 
         projectRoundRepository.delete(round);

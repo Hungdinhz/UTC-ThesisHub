@@ -7,7 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.example.thesis_hub_api.identity.security.UserPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -136,10 +137,15 @@ public class DefenseController {
     @PostMapping("/scores")
     @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ResponseEntity<ApiResponse<ScoreResponseDTO>> submitScore(
-            @RequestBody ScoreSubmitRequestDTO request,
-            @AuthenticationPrincipal UserPrincipal currentUser) {
-        Long userId = (currentUser != null) ? currentUser.getId() : null;
-        ScoreResponseDTO result = defenseService.submitScore(request, userId);
+            @RequestBody ScoreSubmitRequestDTO request) {
+        Long userId = null;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
+            userId = principal.getId();
+        }
+        ScoreResponseDTO result = (userId == null)
+                ? defenseService.submitScore(request)
+                : defenseService.submitScore(request, userId);
         return ResponseEntity.ok(ApiResponse.success("Lưu điểm đánh giá thành công", result));
     }
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button, StatusBadge } from '../../../components/ui';
 import { eligibilityService } from '../services/eligibilityService';
+import { thesisService } from '../../thesis/services/thesisService';
+import type { Thesis } from '../../thesis/types';
 import { apiService } from '../../../services/api';
 import type { FinalDefenseEligibilityResponse } from '../types';
 import type { ProjectRoundItem, StudentProjectRoundItem } from '../../../types';
@@ -16,14 +18,15 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
   const [loadingRounds, setLoadingRounds] = useState(false);
 
-  // Students in selected round state
+  // Students & Theses in selected round state
   const [roundStudents, setRoundStudents] = useState<StudentProjectRoundItem[]>([]);
+  const [roundTheses, setRoundTheses] = useState<Thesis[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
+  const [updatingThesisId, setUpdatingThesisId] = useState<number | null>(null);
 
-  // Single thesis/student check state
-  const [thesisIdInput, setThesisIdInput] = useState('101');
-  const [studentIdInput, setStudentIdInput] = useState('');
+  // Single student check state (search by Student Code / MSSV only)
+  const [studentCodeInput, setStudentCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<FinalDefenseEligibilityResponse | null>(null);
   const [error, setError] = useState('');
@@ -53,19 +56,23 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
 
   const selectedRound = rounds.find((r) => r.roundId === selectedRoundId) || rounds[0] || null;
 
-  // 2. Fetch students in the selected round
+  // 2. Fetch students and theses in the selected round
   const loadStudentsInRound = async (roundId: number) => {
     try {
       setLoadingStudents(true);
-      const res = await apiService.getStudentsInRound(roundId, {
-        size: 100,
-        search: studentSearch || undefined,
-      });
+      const [res, thesesList] = await Promise.all([
+        apiService.getStudentsInRound(roundId, {
+          size: 100,
+          search: studentSearch || undefined,
+        }),
+        thesisService.searchTheses({ roundId }).catch(() => [] as Thesis[]),
+      ]);
       const rawList = res?.content || [];
       const sortedList = [...rawList].sort((a, b) =>
         (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
       );
       setRoundStudents(sortedList);
+      setRoundTheses(thesesList || []);
     } catch (err) {
       console.error('Lỗi khi tải sinh viên trong đợt:', err);
     } finally {
@@ -79,22 +86,59 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
     }
   }, [selectedRoundId]);
 
-  // 3. Handle check single thesis / student criteria
-  const handleCheck = async (e?: React.FormEvent, customStudentId?: number, customThesisId?: number) => {
-    if (e) e.preventDefault();
-    const effectiveThesisId = customThesisId !== undefined ? customThesisId : (thesisIdInput ? Number(thesisIdInput) : undefined);
-    const effectiveStudentId = customStudentId !== undefined ? customStudentId : (studentIdInput ? Number(studentIdInput) : undefined);
+  const findStudentThesis = (student: StudentProjectRoundItem): Thesis | undefined => {
+    return roundTheses.find(
+      (t) =>
+        (student.studentId && t.studentId === student.studentId) ||
+        (student.studentCode &&
+          t.studentCode &&
+          t.studentCode.toLowerCase() === student.studentCode.toLowerCase())
+    );
+  };
 
-    if (!effectiveThesisId && !effectiveStudentId) {
-      setError('Vui lòng nhập Mã đề tài hoặc Mã định danh sinh viên');
+  // 3. Handle check single student criteria by Student Code (MSSV)
+  const handleCheck = async (
+    e?: React.FormEvent,
+    customStudentId?: number,
+    customThesisId?: number,
+    customStudentCode?: string
+  ) => {
+    if (e) e.preventDefault();
+    const effectiveCode = (customStudentCode !== undefined ? customStudentCode : studentCodeInput).trim();
+
+    if (!effectiveCode && !customStudentId && !customThesisId) {
+      setError('Vui lòng nhập Mã sinh viên (MSSV) để tra cứu');
       return;
     }
+
+    // Try matching from loaded roundStudents / roundTheses first
+    let matchedStudentId = customStudentId;
+    let matchedThesisId = customThesisId;
+    if (effectiveCode && (!matchedStudentId || !matchedThesisId)) {
+      const matchedStudent = roundStudents.find(
+        (s) => s.studentCode && s.studentCode.toLowerCase() === effectiveCode.toLowerCase()
+      );
+      if (matchedStudent && !matchedStudentId) {
+        matchedStudentId = matchedStudent.studentId;
+      }
+      const matchedThesis = roundTheses.find(
+        (t) =>
+          (t.studentCode && t.studentCode.toLowerCase() === effectiveCode.toLowerCase()) ||
+          (matchedStudentId && t.studentId === matchedStudentId)
+      );
+      if (matchedThesis && !matchedThesisId) {
+        matchedThesisId = matchedThesis.id;
+      }
+    }
+
     try {
       setLoading(true);
       setError('');
       const data = await eligibilityService.checkFinalDefenseEligibility({
-        thesisId: effectiveThesisId,
-        studentId: effectiveStudentId,
+        thesisId: matchedThesisId,
+        studentId: matchedStudentId,
+        studentCode: effectiveCode || undefined,
+        projectRoundId: selectedRoundId || undefined,
       });
       setResult(data);
       setActiveTab('check');
@@ -106,9 +150,47 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
   };
 
   const handleQuickCheckStudent = (student: StudentProjectRoundItem) => {
-    setStudentIdInput(String(student.studentId));
-    setThesisIdInput('');
-    handleCheck(undefined, student.studentId, undefined);
+    const thesis = findStudentThesis(student);
+    setStudentCodeInput(student.studentCode || String(student.studentId));
+    handleCheck(undefined, student.studentId, thesis?.id, student.studentCode);
+  };
+
+  const handleToggleDefenseEligibility = async (
+    thesisId: number | undefined,
+    studentName: string,
+    studentCode: string,
+    currentEligible: boolean
+  ) => {
+    if (!thesisId || thesisId <= 0) {
+      alert(`Sinh viên ${studentName} (${studentCode}) hiện chưa có đề tài chính thức trong đợt này!`);
+      return;
+    }
+    const targetEligible = !currentEligible;
+    const actionText = targetEligible ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ' : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ';
+    const confirmed = window.confirm(
+      `Xác nhận chỉnh sửa trạng thái của sinh viên ${studentName} (${studentCode}) sang "${actionText}"?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setUpdatingThesisId(thesisId);
+      await thesisService.setDefenseEligible(thesisId, targetEligible);
+      if (selectedRoundId) {
+        await loadStudentsInRound(selectedRoundId);
+      }
+      if (result && (result.thesisId === thesisId || result.studentCode === studentCode)) {
+        const refreshed = await eligibilityService.checkFinalDefenseEligibility({
+          thesisId,
+          studentCode,
+          projectRoundId: selectedRoundId || undefined,
+        });
+        setResult(refreshed);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Không thể cập nhật trạng thái điều kiện bảo vệ');
+    } finally {
+      setUpdatingThesisId(null);
+    }
   };
 
   return (
@@ -273,36 +355,24 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
       {/* TAB 1: Kiểm tra Điều kiện Bảo vệ Cuối kỳ (4 tiêu chí cứng) */}
       {activeTab === 'check' && (
         <div>
-          {/* Search Input Box */}
+          {/* Search Input Box — Tìm duy nhất theo Mã sinh viên (MSSV) */}
           <div className="final-defense-query-card">
             <form onSubmit={handleCheck} className="query-form-row">
-              <div className="query-input-group">
-                <label htmlFor="thesisId">Mã đề tài (Thesis ID):</label>
+              <div className="query-input-group" style={{ flex: 1 }}>
+                <label htmlFor="stdCode">Mã sinh viên (MSSV):</label>
                 <input
-                  id="thesisId"
-                  type="number"
+                  id="stdCode"
+                  type="text"
                   className="form-control"
-                  placeholder="VD: 101, 102..."
-                  value={thesisIdInput}
-                  onChange={(e) => setThesisIdInput(e.target.value)}
-                />
-              </div>
-
-              <div className="query-input-group">
-                <label htmlFor="stdId">Hoặc Mã sinh viên (Student ID):</label>
-                <input
-                  id="stdId"
-                  type="number"
-                  className="form-control"
-                  placeholder="VD: 101, 102..."
-                  value={studentIdInput}
-                  onChange={(e) => setStudentIdInput(e.target.value)}
+                  placeholder="Nhập mã sinh viên (VD: 201200101)..."
+                  value={studentCodeInput}
+                  onChange={(e) => setStudentCodeInput(e.target.value)}
                 />
               </div>
 
               <div className="query-btn-group">
                 <Button type="submit" variant="primary" loading={loading}>
-                  🔍 Kiểm tra điều kiện
+                  🔍 Kiểm tra điều kiện theo MSSV
                 </Button>
               </div>
             </form>
@@ -320,14 +390,44 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   <h2>{result.eligibleForDefense ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ' : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}</h2>
                   <p>
                     Sinh viên: <strong>{result.studentName}</strong> ({result.studentCode}) — Đề tài:{' '}
-                    <strong>#{result.thesisId} - {result.thesisTitle}</strong>
+                    <strong>{result.thesisTitle}</strong>
                   </p>
                 </div>
-                <StatusBadge
-                  status={result.eligibleForDefense ? 'PASSED' : 'FAILED'}
-                  label={result.eligibleForDefense ? 'Đủ điều kiện' : 'Không đạt'}
-                  size="md"
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <StatusBadge
+                    status={result.eligibleForDefense ? 'PASSED' : 'FAILED'}
+                    label={result.eligibleForDefense ? 'Đủ điều kiện' : 'Chưa đủ điều kiện'}
+                    size="md"
+                  />
+                  {result.thesisId > 0 && (
+                    <button
+                      type="button"
+                      disabled={updatingThesisId === result.thesisId}
+                      onClick={() =>
+                        handleToggleDefenseEligibility(
+                          result.thesisId,
+                          result.studentName,
+                          result.studentCode,
+                          result.eligibleForDefense
+                        )
+                      }
+                      style={{
+                        backgroundColor: result.eligibleForDefense ? '#dc2626' : '#16a34a',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '8px 14px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {result.eligibleForDefense
+                        ? '✏️ Chỉnh sửa: Chưa đủ ĐK bảo vệ'
+                        : '✏️ Chỉnh sửa: Xác nhận Đủ ĐK bảo vệ'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Criteria Checklist Grid */}
@@ -401,7 +501,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: Danh sách Sinh viên trong Đợt & Xét điều kiện nhanh */}
+      {/* TAB 2: Danh sách Sinh viên trong Đợt & Trạng thái Đủ điều kiện bảo vệ */}
       {activeTab === 'students' && (
         <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '20px', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -410,7 +510,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                 Danh sách Sinh viên trong đợt — {selectedRound?.name} ({roundStudents.length} SV)
               </h3>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-                Bấm vào nút "Xét ĐK bảo vệ" để kiểm tra tức thì 4 tiêu chí cứng của sinh viên.
+                Hiển thị trực tiếp trạng thái đủ điều kiện bảo vệ của từng sinh viên. Bấm &quot;Kiểm tra lại / Chỉnh sửa&quot; để sang mục Xét ĐK bảo vệ.
               </p>
             </div>
 
@@ -446,54 +546,120 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     <th style={{ padding: '10px 12px' }}>STT</th>
                     <th style={{ padding: '10px 12px' }}>MSSV</th>
                     <th style={{ padding: '10px 12px' }}>Họ và tên</th>
-                    <th style={{ padding: '10px 12px' }}>Ngành</th>
-                    <th style={{ padding: '10px 12px' }}>Lớp</th>
+                    <th style={{ padding: '10px 12px' }}>Đề tài & Tiến độ</th>
                     <th style={{ padding: '10px 12px' }}>Điểm GPA</th>
-                    <th style={{ padding: '10px 12px' }}>Trạng thái</th>
+                    <th style={{ padding: '10px 12px' }}>Điều kiện Bảo vệ Cuối kỳ</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center' }}>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {roundStudents.map((st, idx) => (
-                    <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '10px 12px' }}>{idx + 1}</td>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
-                      <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{st.fullName}</td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontWeight: 600 }}>
-                          {st.majorCode || 'N/A'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 12px' }}>{st.className || '—'}</td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
-                          {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
-                          {st.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleQuickCheckStudent(st)}
-                          style={{
-                            backgroundColor: '#0a3273',
-                            color: '#fff',
-                            border: 'none',
-                            padding: '5px 12px',
-                            borderRadius: '5px',
-                            fontWeight: 600,
-                            fontSize: '0.78rem',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          🔍 Xét ĐK bảo vệ
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {roundStudents.map((st, idx) => {
+                    const thesis = findStudentThesis(st);
+                    const isEligibleForDefense = Boolean(
+                      thesis &&
+                        (thesis.defenseEligible ||
+                          thesis.status === 'DEFENSE_READY' ||
+                          thesis.status === 'COMPLETED')
+                    );
+                    const progressRate = thesis?.completionRate ?? (isEligibleForDefense ? 100 : 0);
+
+                    return (
+                      <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '10px 12px' }}>{idx + 1}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
+                          <div>{st.fullName}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>
+                            {st.className || st.majorCode || ''}
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 12px', maxWidth: '280px' }}>
+                          {thesis ? (
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: '2px' }}>
+                                {thesis.titleVn}
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 600 }}>
+                                Tiến độ: {progressRate}% {thesis.lecturerFullName ? `• GVHD: ${thesis.lecturerFullName}` : ''}
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa có đề tài chính thức</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
+                            {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {st.status === 'DROPPED' ? (
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                backgroundColor: '#fef2f2',
+                                color: '#dc2626',
+                                border: '1px solid #fecaca',
+                                display: 'inline-block',
+                              }}
+                            >
+                              🚫 Đã bị loại khỏi đợt
+                            </span>
+                          ) : isEligibleForDefense ? (
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                backgroundColor: '#dcfce7',
+                                color: '#15803d',
+                                border: '1px solid #86efac',
+                                display: 'inline-block',
+                              }}
+                            >
+                              ✅ Đủ điều kiện bảo vệ
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                backgroundColor: '#fff1f2',
+                                color: '#be123c',
+                                border: '1px solid #fecdd3',
+                                display: 'inline-block',
+                              }}
+                            >
+                              ❌ Chưa đủ điều kiện bảo vệ
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleQuickCheckStudent(st)}
+                            style={{
+                              backgroundColor: '#0a3273',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '6px 12px',
+                              borderRadius: '5px',
+                              fontWeight: 600,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            🔍 Kiểm tra lại / Chỉnh sửa
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

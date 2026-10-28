@@ -7,6 +7,7 @@ interface CouncilMemberCardProps {
   allLecturers: LecturerOption[];
   onLecturerChange: (memberId: number, newLecturerId: number) => void;
   excludedAdvisorIds?: number[];
+  disabled?: boolean;
 }
 
 export const CouncilMemberCard: React.FC<CouncilMemberCardProps> = ({
@@ -14,6 +15,7 @@ export const CouncilMemberCard: React.FC<CouncilMemberCardProps> = ({
   allLecturers,
   onLecturerChange,
   excludedAdvisorIds = [],
+  disabled = false,
 }) => {
   const getRoleConfig = (role: CouncilRole) => {
     switch (role) {
@@ -28,8 +30,9 @@ export const CouncilMemberCard: React.FC<CouncilMemberCardProps> = ({
 
   const roleConfig = getRoleConfig(member.role);
 
-  // Filter eligible lecturers based on role
+  // Filter eligible lecturers based on role, always keeping currently assigned lecturer in list
   const eligibleLecturers = allLecturers.filter((l) => {
+    if (l.lecturerId === member.lecturerId) return true;
     if (member.role === 'PRESIDENT') return l.canBePresident;
     if (member.role === 'SECRETARY') return l.canBeSecretary;
     return l.canBeMember;
@@ -58,7 +61,9 @@ export const CouncilMemberCard: React.FC<CouncilMemberCardProps> = ({
           id={`lecturerSelect-${member.id}`}
           className="form-control member-select"
           value={member.lecturerId}
+          disabled={disabled}
           onChange={(e) => onLecturerChange(member.id, Number(e.target.value))}
+          title={allLecturers.find((l) => l.lecturerId === member.lecturerId)?.fullName || ''}
         >
           {eligibleLecturers.map((lec) => {
             const isConflict = excludedAdvisorIds.includes(lec.lecturerId);

@@ -135,11 +135,19 @@ class DefenseService {
       const res = await axios.get(`${BASE_URL}/lecturers`, { headers: authHeaders() });
       const list = res.data?.data || res.data;
       if (Array.isArray(list) && list.length > 0) {
-        return list.map((l: any) => {
+        const mapped = list.map((l: any) => {
           const deg = String(l.academicDegree || '').toUpperCase();
-          const canBePres = deg.includes('TIEN_SI') || deg.includes('PGS') || deg.includes('GS');
+          const canBePres =
+            deg.includes('TIEN_SI') ||
+            deg.includes('TIẾN SĨ') ||
+            deg.includes('TS') ||
+            deg.includes('PGS') ||
+            deg.includes('GS') ||
+            deg.includes('PHÓ GIÁO SƯ') ||
+            deg.includes('GIÁO SƯ') ||
+            deg.includes('PHD');
           return {
-            lecturerId: l.lecturerId,
+            lecturerId: l.lecturerId || l.id,
             fullName: l.fullName,
             degree: l.academicDegree || 'Giảng viên',
             canBePresident: canBePres,
@@ -148,6 +156,12 @@ class DefenseService {
             currentLoad: 1,
           };
         });
+        if (mapped.every((m) => !m.canBePresident)) {
+          mapped.forEach((m) => {
+            m.canBePresident = true;
+          });
+        }
+        return mapped;
       }
     } catch {
       // Fallback
@@ -161,7 +175,7 @@ class DefenseService {
         params: { projectRoundId },
         headers: authHeaders(),
       });
-      if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+      if (res.data?.data && Array.isArray(res.data.data)) {
         return res.data.data;
       }
     } catch {
@@ -277,7 +291,7 @@ class DefenseService {
       if (date) params.date = date;
       if (projectRoundId) params.projectRoundId = projectRoundId;
       const res = await axios.get(`${API_BASE}/schedules`, { params, headers: authHeaders() });
-      if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) return res.data.data;
+      if (res.data?.data && Array.isArray(res.data.data)) return res.data.data;
     } catch {
       // Fallback
     }

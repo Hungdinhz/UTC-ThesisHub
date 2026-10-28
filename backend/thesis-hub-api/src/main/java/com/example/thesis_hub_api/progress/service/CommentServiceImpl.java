@@ -3,6 +3,7 @@ package com.example.thesis_hub_api.progress.service;
 import com.example.thesis_hub_api.common.exception.ResourceNotFoundException;
 import com.example.thesis_hub_api.identity.entity.User;
 import com.example.thesis_hub_api.identity.repository.UserRepository;
+import com.example.thesis_hub_api.identity.security.UserPrincipal;
 import com.example.thesis_hub_api.progress.dto.CommentResponse;
 import com.example.thesis_hub_api.progress.dto.CreateCommentRequest;
 import com.example.thesis_hub_api.progress.entity.Comment;
@@ -11,6 +12,8 @@ import com.example.thesis_hub_api.progress.repository.CommentRepository;
 import com.example.thesis_hub_api.progress.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +35,26 @@ public class CommentServiceImpl implements CommentService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", taskId));
 
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", request.getUserId()));
+        User user = null;
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal && principal.getId() != null) {
+                user = userRepository.findById(principal.getId()).orElse(null);
+            }
+        } catch (Exception ignored) {}
+
+        if (user == null && request.getUserId() != null) {
+            user = userRepository.findById(request.getUserId()).orElse(null);
+        }
+        if (user == null && task.getAssignedTo() != null) {
+            user = task.getAssignedTo();
+        }
+        if (user == null && task.getCreatedBy() != null) {
+            user = task.getCreatedBy();
+        }
+        if (user == null) {
+            throw new ResourceNotFoundException("User", request.getUserId());
+        }
 
         Comment parent = null;
         if (request.getParentId() != null) {

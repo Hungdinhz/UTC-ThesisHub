@@ -278,4 +278,24 @@ public class AssignmentController {
         AssignmentStatsResponseDTO stats = assignmentService.getAssignmentStats(projectRoundId);
         return ResponseEntity.ok(ApiResponse.success(stats));
     }
+
+    @PostMapping("/supplementary/open")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN') or hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Mở đợt đăng ký bổ sung cho các sinh viên chưa đăng ký nguyện vọng")
+    public ResponseEntity<ApiResponse<AssignmentStatsResponseDTO>> openSupplementaryRegistration(
+            @RequestParam Long projectRoundId) {
+        AssignmentStatsResponseDTO stats = assignmentService.openSupplementaryRegistration(projectRoundId);
+        return ResponseEntity.ok(ApiResponse.success("Đã mở đợt đăng ký bổ sung nguyện vọng cho sinh viên chưa đăng ký", stats));
+    }
+
+    @PostMapping("/supplementary/finalize")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN') or hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Chốt đợt đăng ký bổ sung và xóa hẳn những sinh viên vẫn không đăng ký khỏi đợt đồ án")
+    public ResponseEntity<ApiResponse<AssignmentStatsResponseDTO>> finalizeSupplementaryRegistration(
+            @RequestParam Long projectRoundId,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        Long userId = currentUser != null ? currentUser.getId() : null;
+        AssignmentStatsResponseDTO stats = assignmentService.finalizeSupplementaryRegistration(projectRoundId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Đã chốt đợt đăng ký bổ sung và xóa các sinh viên không đăng ký khỏi đợt đồ án", stats));
+    }
 }
