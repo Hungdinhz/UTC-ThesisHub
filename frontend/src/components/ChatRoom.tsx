@@ -56,7 +56,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ groupId }) => {
     if (userType === 'student') {
       const student = user as any;
       return message.sent_by === 'student' && message.student?.id === student.id;
-    } else if (userType === 'supervisor') {
+    } else if (userType === 'supervisor' || userType === 'committee_member') {
       const supervisor = user as any;
       return message.sent_by === 'supervisor' && message.supervisor?.id === supervisor.id;
     }

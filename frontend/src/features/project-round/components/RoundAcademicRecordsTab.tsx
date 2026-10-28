@@ -118,7 +118,11 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
     setShowManualModal(true);
     try {
       const res = await apiService.getStudentsInRound(roundId, { size: 100 });
-      setRoundStudents(res?.content || []);
+      const rawStudents = res?.content || [];
+      const sortedStudents = [...rawStudents].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setRoundStudents(sortedStudents);
     } catch {
       // ignore
     }
@@ -182,7 +186,11 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
         size: 15,
       });
 
-      setRecords(res?.content || []);
+      const rawRecords = res?.content || [];
+      const sortedRecords = [...rawRecords].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setRecords(sortedRecords);
       setTotalPages(res?.totalPages || 0);
       setTotalElements(res?.totalElements || 0);
     } catch (err: unknown) {
@@ -195,6 +203,20 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
   useEffect(() => {
     loadRecords();
   }, [roundId, filterTuitionDebt, filterDisciplinary, currentPage]);
+
+  useEffect(() => {
+    if (!error) return;
+    setSuccessMsg(null);
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    setError(null);
+    const timer = setTimeout(() => setSuccessMsg(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -288,16 +310,17 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       )}
 
       {/* Alert Messages */}
-      {error && (
-        <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
-          ⚠️ {error}
+      {error ? (
+        <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <span>⚠️ {error}</span>
+          <button type="button" onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer' }}>✕</button>
         </div>
-      )}
-      {successMsg && (
-        <div style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
-          ✅ {successMsg}
+      ) : successMsg ? (
+        <div style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <span>✅ {successMsg}</span>
+          <button type="button" onClick={() => setSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#16a34a', fontWeight: 700, cursor: 'pointer' }}>✕</button>
         </div>
-      )}
+      ) : null}
 
       {/* Action Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>

@@ -133,21 +133,37 @@ public class DefenseService {
         CouncilSchedulingResultDTO schedulerResult = councilScheduler.schedule(schedulerRequest);
 
         List<CouncilResponseDTO> responseList = new ArrayList<>();
-        long councilSeq = councilRepository.count() + 1;
+
+        // Delete existing councils of this round so only 1 council is maintained
+        List<DefenseCouncil> oldCouncils = councilRepository.findByProjectRoundId(roundId);
+        for (DefenseCouncil oc : oldCouncils) {
+            memberRepository.deleteByCouncilId(oc.getId());
+            scheduleRepository.deleteAll(scheduleRepository.findByCouncilId(oc.getId()));
+            councilRepository.delete(oc);
+        }
+        councilRepository.flush();
+
+        List<DefenseCouncil> remaining = councilRepository.findByProjectRoundId(roundId);
+        Set<String> existingCodes = remaining.stream().map(DefenseCouncil::getCode).collect(Collectors.toSet());
+        long nextNum = 1;
 
         for (CouncilSchedulingResultDTO.CouncilResult cr : schedulerResult.getCouncils()) {
-            String code = "HD-" + roundId + "-" + String.format("%02d", councilSeq);
+            while (existingCodes.contains("HD-" + roundId + "-" + String.format("%02d", nextNum))) {
+                nextNum++;
+            }
+            String code = "HD-" + roundId + "-" + String.format("%02d", nextNum);
+            existingCodes.add(code);
             String name = "Hội đồng đánh giá luận văn " + code;
 
             DefenseCouncil council = DefenseCouncil.builder()
                     .projectRoundId(roundId)
                     .code(code)
                     .name(name)
-                    .status("ACTIVE")
-                    .description("Hội đồng sinh tự động bằng thuật toán CSP Backtracking + Greedy")
+                    .status("DRAFT")
+                    .description("Hội đồng sinh tự động bằng thuật toán CSP Backtracking + Greedy (1CT - 2TK - 2UV)")
                     .build();
             DefenseCouncil savedCouncil = councilRepository.save(council);
-            councilSeq++;
+            nextNum++;
 
             List<CouncilMemberDTO> memberDTOs = new ArrayList<>();
 
@@ -160,18 +176,7 @@ public class DefenseService {
             memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMember1Id()), "MEMBER"));
             memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMember2Id()), "MEMBER"));
 
-            List<Long> assignedStudentIds = cr.getStudentIds().stream().map(Long::parseLong).collect(Collectors.toList());
-
-            responseList.add(CouncilResponseDTO.builder()
-                    .id(savedCouncil.getId())
-                    .projectRoundId(savedCouncil.getProjectRoundId())
-                    .code(savedCouncil.getCode())
-                    .name(savedCouncil.getName())
-                    .status(savedCouncil.getStatus())
-                    .description(savedCouncil.getDescription())
-                    .members(memberDTOs)
-                    .studentIds(assignedStudentIds)
-                    .build());
+            responseList.add(mapToCouncilResponse(savedCouncil));
         }
 
         return responseList;
@@ -197,14 +202,63 @@ public class DefenseService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public List<CouncilResponseDTO> getCouncilsByRound(Long projectRoundId) {
         List<DefenseCouncil> councils = councilRepository.findByProjectRoundId(projectRoundId);
         return councils.stream().map(this::mapToCouncilResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public CouncilResponseDTO getCouncilById(Long id) {
         DefenseCouncil council = councilRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
+        return mapToCouncilResponse(council);
+    }
+
+    @Transactional
+    public CouncilResponseDTO finalizeCouncil(Long id) {
+        DefenseCouncil council = councilRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
+        council.setStatus("FINALIZED");
+        DefenseCouncil saved = councilRepository.save(council);
+        return mapToCouncilResponse(saved);
+    }
+
+    @Transactional
+    public CouncilResponseDTO updateCouncilMembers(Long councilId, List<CouncilMemberDTO> updatedMembers) {
+        DefenseCouncil council = councilRepository.findById(councilId)
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + councilId));
+
+        if ("FINALIZED".equalsIgnoreCase(council.getStatus())) {
+            throw new IllegalStateException("Hội đồng đã được chốt (FINALIZED), không thể thay đổi thành viên!");
+        }
+
+        long presidents = updatedMembers.stream().filter(m -> "PRESIDENT".equalsIgnoreCase(m.getRole())).count();
+        long secretaries = updatedMembers.stream().filter(m -> "SECRETARY".equalsIgnoreCase(m.getRole())).count();
+        long regularMembers = updatedMembers.stream().filter(m -> "MEMBER".equalsIgnoreCase(m.getRole())).count();
+
+        if (presidents != 1 || secretaries != 2 || regularMembers != 2) {
+            throw new IllegalArgumentException("Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch, 2 Thư ký, 2 Ủy viên!");
+        }
+
+        CouncilResponseDTO current = mapToCouncilResponse(council);
+        Set<Long> advisorIds = current.getAssignedStudents().stream()
+                .map(CouncilStudentDetailDTO::getAdvisorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        for (CouncilMemberDTO m : updatedMembers) {
+            if (advisorIds.contains(m.getLecturerId())) {
+                String lecName = resolveLecturerName(m.getLecturerId());
+                throw new IllegalArgumentException("Ràng buộc cứng vi phạm: " + lecName + " là GVHD của sinh viên trong Hội đồng này! Không thể phân công.");
+            }
+        }
+
+        memberRepository.deleteByCouncilId(councilId);
+        for (CouncilMemberDTO m : updatedMembers) {
+            saveCouncilMember(councilId, m.getLecturerId(), m.getRole());
+        }
+
         return mapToCouncilResponse(council);
     }
 
@@ -221,6 +275,31 @@ public class DefenseService {
                     .build();
         }).collect(Collectors.toList());
 
+        List<Long> studentIds = new ArrayList<>();
+        List<CouncilStudentDetailDTO> assignedStudents = new ArrayList<>();
+        if (thesisRepository != null && council.getProjectRoundId() != null) {
+            List<Thesis> dbTheses = thesisRepository.findByProjectRoundId(council.getProjectRoundId());
+            for (Thesis t : dbTheses) {
+                if (t.getStudent() != null) {
+                    studentIds.add(t.getStudent().getId());
+                    String sName = (t.getStudent().getUser() != null) ? t.getStudent().getUser().getFullName() : ("Sinh viên #" + t.getStudent().getId());
+                    String sCode = t.getStudent().getStudentCode();
+                    Long advId = (t.getLecturer() != null) ? t.getLecturer().getId() : null;
+                    String advName = (t.getLecturer() != null && t.getLecturer().getUser() != null) ? t.getLecturer().getUser().getFullName() : ("GV #" + advId);
+
+                    assignedStudents.add(CouncilStudentDetailDTO.builder()
+                            .studentId(t.getStudent().getId())
+                            .studentName(sName)
+                            .studentCode(sCode)
+                            .thesisId(t.getId())
+                            .thesisTitle(t.getTitleVn())
+                            .advisorId(advId)
+                            .advisorName(advName)
+                            .build());
+                }
+            }
+        }
+
         return CouncilResponseDTO.builder()
                 .id(council.getId())
                 .projectRoundId(council.getProjectRoundId())
@@ -229,9 +308,11 @@ public class DefenseService {
                 .status(council.getStatus())
                 .description(council.getDescription())
                 .members(memberDTOs)
-                .studentIds(new ArrayList<>())
+                .studentIds(studentIds)
+                .assignedStudents(assignedStudents)
                 .build();
     }
+
 
     /**
      * 2. API Phân công Giảng viên phản biện (Reviewer Assignment)
@@ -308,15 +389,25 @@ public class DefenseService {
     @Transactional
     public List<DefenseScheduleResponseDTO> autoGenerateSchedules(AutoScheduleRequestDTO request) {
         List<Long> councilIds = request.getCouncilIds();
+        Long roundId = request.getProjectRoundId() != null ? request.getProjectRoundId() : 10L;
+
         if (councilIds == null || councilIds.isEmpty()) {
-            Long roundId = request.getProjectRoundId() != null ? request.getProjectRoundId() : 10L;
             councilIds = councilRepository.findByProjectRoundId(roundId)
                     .stream().map(DefenseCouncil::getId).collect(Collectors.toList());
         }
 
+        if (councilIds.isEmpty()) {
+            // Auto generate the 1 council first if none exists
+            CouncilGenerationRequestDTO genReq = new CouncilGenerationRequestDTO();
+            genReq.setProjectRoundId(roundId);
+            genReq.setMaxStudentsPerCouncil(50);
+            List<CouncilResponseDTO> genCouncils = generateCouncils(genReq);
+            councilIds = genCouncils.stream().map(CouncilResponseDTO::getId).collect(Collectors.toList());
+        }
+
         List<String> rooms = (request.getRooms() != null && !request.getRooms().isEmpty())
                 ? request.getRooms()
-                : List.of("Phòng Hội thảo A2", "Phòng 301-A1", "Phòng 402-A1");
+                : List.of("Phòng Hội thảo A2-301", "Phòng Lab 402-A1", "Phòng Chuyên đề A6-205");
 
         List<String> sessions = (request.getSessions() != null && !request.getSessions().isEmpty())
                 ? request.getSessions()
@@ -324,6 +415,12 @@ public class DefenseService {
 
         LocalDate currentDate = request.getStartDate() != null ? request.getStartDate() : LocalDate.now().plusDays(7);
         LocalDate endDate = request.getEndDate() != null ? request.getEndDate() : currentDate.plusDays(14);
+
+        // Clean up previous schedules of these councils before generating
+        for (Long cId : councilIds) {
+            scheduleRepository.deleteAll(scheduleRepository.findByCouncilId(cId));
+        }
+        scheduleRepository.flush();
 
         List<DefenseScheduleResponseDTO> result = new ArrayList<>();
         int roomIdx = 0;
@@ -388,20 +485,57 @@ public class DefenseService {
         return mapToScheduleResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public List<DefenseScheduleResponseDTO> getSchedulesByDate(LocalDate date) {
-        return scheduleRepository.findByDefenseDate(date).stream()
-                .map(this::mapToScheduleResponse).collect(Collectors.toList());
+        return getSchedules(date, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DefenseScheduleResponseDTO> getSchedules(LocalDate date, Long projectRoundId) {
+        List<DefenseSchedule> list;
+        if (date != null && projectRoundId != null) {
+            List<Long> councilIds = councilRepository.findByProjectRoundId(projectRoundId)
+                    .stream().map(DefenseCouncil::getId).collect(Collectors.toList());
+            list = scheduleRepository.findByDefenseDate(date).stream()
+                    .filter(s -> councilIds.contains(s.getCouncilId()))
+                    .collect(Collectors.toList());
+        } else if (date != null) {
+            list = scheduleRepository.findByDefenseDate(date);
+        } else if (projectRoundId != null) {
+            List<Long> councilIds = councilRepository.findByProjectRoundId(projectRoundId)
+                    .stream().map(DefenseCouncil::getId).collect(Collectors.toList());
+            list = scheduleRepository.findAll().stream()
+                    .filter(s -> councilIds.contains(s.getCouncilId()))
+                    .collect(Collectors.toList());
+        } else {
+            list = scheduleRepository.findAll();
+        }
+        return list.stream().map(this::mapToScheduleResponse).collect(Collectors.toList());
     }
 
     private DefenseScheduleResponseDTO mapToScheduleResponse(DefenseSchedule s) {
-        String councilName = councilRepository.findById(s.getCouncilId())
-                .map(DefenseCouncil::getName)
-                .orElse("Hội đồng " + s.getCouncilId());
+        DefenseCouncil council = councilRepository.findById(s.getCouncilId()).orElse(null);
+        String councilName = council != null ? council.getName() : ("Hội đồng " + s.getCouncilId());
+        String councilCode = council != null ? council.getCode() : "";
+        Long projectRoundId = council != null ? council.getProjectRoundId() : null;
+
+        List<CouncilMemberDTO> memberDTOs = Collections.emptyList();
+        List<Long> studentIds = Collections.emptyList();
+        List<CouncilStudentDetailDTO> assignedStudents = Collections.emptyList();
+
+        if (council != null) {
+            CouncilResponseDTO cDto = mapToCouncilResponse(council);
+            memberDTOs = cDto.getMembers();
+            studentIds = cDto.getStudentIds();
+            assignedStudents = cDto.getAssignedStudents();
+        }
 
         return DefenseScheduleResponseDTO.builder()
                 .id(s.getId())
                 .councilId(s.getCouncilId())
                 .councilName(councilName)
+                .councilCode(councilCode)
+                .projectRoundId(projectRoundId)
                 .defenseDate(s.getDefenseDate())
                 .session(s.getSession())
                 .room(s.getRoom())
@@ -410,14 +544,18 @@ public class DefenseService {
                 .maxStudents(s.getMaxStudents())
                 .status(s.getStatus())
                 .notes(s.getNotes())
+                .members(memberDTOs)
+                .studentIds(studentIds)
+                .assignedStudents(assignedStudents)
                 .build();
     }
 
+
     /**
-     * 4. API Chấm điểm, nhập nhận xét của Hội đồng
+     * 4. API Chấm điểm, nhập nhận xét của Hội đồng / GVHD / GVPB
      */
     @Transactional
-    public ScoreResponseDTO submitScore(ScoreSubmitRequestDTO request) {
+    public ScoreResponseDTO submitScore(ScoreSubmitRequestDTO request, Long currentUserId) {
         if (request.getScore() == null || request.getScore().compareTo(BigDecimal.ZERO) < 0 || request.getScore().compareTo(BigDecimal.TEN) > 0) {
             throw new IllegalArgumentException("Điểm số phải nằm trong thang điểm từ 0.00 đến 10.00");
         }
@@ -427,11 +565,42 @@ public class DefenseService {
             throw new IllegalArgumentException("Loại điểm không hợp lệ (Phải là SUPERVISOR, REVIEWER hoặc COUNCIL)");
         }
 
+        Long graderId = request.getGraderId();
+        if (graderId == null && currentUserId != null) {
+            if (lecturerRepository != null) {
+                graderId = lecturerRepository.findByUserId(currentUserId)
+                        .map(Lecturer::getId)
+                        .orElse(currentUserId);
+            } else {
+                graderId = currentUserId;
+            }
+        }
+        if (graderId == null && request.getThesisId() != null && thesisRepository != null) {
+            Optional<Thesis> tOpt = thesisRepository.findById(request.getThesisId());
+            if (tOpt.isPresent() && tOpt.get().getLecturer() != null) {
+                graderId = tOpt.get().getLecturer().getId();
+            }
+        }
+        if (graderId == null) {
+            graderId = 1L;
+        }
+
+        // Hard constraint: If scoreType is COUNCIL, ensure grader is NOT the thesis's advisor!
+        if ("COUNCIL".equalsIgnoreCase(scoreType) && request.getThesisId() != null && thesisRepository != null) {
+            Optional<Thesis> tOpt = thesisRepository.findById(request.getThesisId());
+            if (tOpt.isPresent() && tOpt.get().getLecturer() != null) {
+                Long advId = tOpt.get().getLecturer().getId();
+                if (Objects.equals(advId, graderId)) {
+                    throw new IllegalArgumentException("Quy chế đào tạo UTC: Giảng viên hướng dẫn không được phép tham gia Hội đồng chấm thi của chính sinh viên do mình hướng dẫn!");
+                }
+            }
+        }
+
         Score scoreEntity = scoreRepository.findByThesisIdAndGraderIdAndScoreType(
-                request.getThesisId(), request.getGraderId(), scoreType
+                request.getThesisId(), graderId, scoreType
         ).orElse(Score.builder()
                 .thesisId(request.getThesisId())
-                .graderId(request.getGraderId())
+                .graderId(graderId)
                 .scoreType(scoreType)
                 .build());
 
@@ -440,10 +609,13 @@ public class DefenseService {
         scoreEntity.setGradedAt(Instant.now());
 
         Score saved = scoreRepository.save(scoreEntity);
+        String graderName = resolveLecturerName(saved.getGraderId());
+
         return ScoreResponseDTO.builder()
                 .id(saved.getId())
                 .thesisId(saved.getThesisId())
                 .graderId(saved.getGraderId())
+                .graderName(graderName)
                 .scoreType(saved.getScoreType())
                 .score(saved.getScore())
                 .feedback(saved.getFeedback())
@@ -451,12 +623,18 @@ public class DefenseService {
                 .build();
     }
 
+    public ScoreResponseDTO submitScore(ScoreSubmitRequestDTO request) {
+        return submitScore(request, null);
+    }
+
+    @Transactional(readOnly = true)
     public List<ScoreResponseDTO> getScoresByThesis(Long thesisId) {
         return scoreRepository.findByThesisId(thesisId).stream()
                 .map(s -> ScoreResponseDTO.builder()
                         .id(s.getId())
                         .thesisId(s.getThesisId())
                         .graderId(s.getGraderId())
+                        .graderName(resolveLecturerName(s.getGraderId()))
                         .scoreType(s.getScoreType())
                         .score(s.getScore())
                         .feedback(s.getFeedback())

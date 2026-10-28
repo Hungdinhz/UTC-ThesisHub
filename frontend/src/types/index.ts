@@ -234,6 +234,14 @@ export interface SupervisorStudentComment {
 }
 
 export type NotificationType =
+  | 'TASK'
+  | 'TASK_SUBMISSION'
+  | 'TASK_REVIEW'
+  | 'PROPOSAL'
+  | 'ASSIGNMENT'
+  | 'ELIGIBILITY'
+  | 'DEFENSE'
+  | 'SYSTEM'
   | 'group_request'
   | 'group_request_accepted'
   | 'group_request_rejected'
@@ -249,19 +257,26 @@ export type NotificationType =
   | 'external_assignment'
   | 'external_evaluation'
   | 'external_schedule'
-  | 'general';
+  | 'general'
+  | string;
 
 export interface Notification {
   id: number;
-  notification_type: NotificationType;
+  userId?: number;
   title: string;
-  message: string;
-  is_read: boolean;
-  created_at: string;
-  related_group: number | null;
-  related_supervisor_group: number | null;
-  related_document: number | null;
-  action_url: string | null;
+  content?: string;
+  message?: string;
+  type?: NotificationType;
+  notification_type?: NotificationType;
+  referenceUrl?: string | null;
+  action_url?: string | null;
+  isRead?: boolean;
+  is_read?: boolean;
+  createdAt?: string;
+  created_at?: string;
+  related_group?: number | null;
+  related_supervisor_group?: number | null;
+  related_document?: number | null;
 }
 
 export interface NotificationPreference {
@@ -995,3 +1010,21 @@ export interface CreateRoundStudentManualPayload {
   status?: string;
   note?: string;
 }
+
+export interface StudentRoundStatusResponse {
+  hasActiveRound: boolean;
+  inRound: boolean;
+  roundId?: number;
+  roundCode?: string;
+  roundName?: string;
+  roundStatus?: string;
+  roundCurrentStage?: number;
+  studentId?: number;
+  studentCode?: string;
+  fullName?: string;
+  status?: string;
+  note?: string;
+  isDropped?: boolean;
+  completedStage?: number;
+}
+

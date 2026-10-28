@@ -21,6 +21,12 @@ public class ThesisServiceImpl implements ThesisService {
 
     private final ThesisRepository thesisRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.thesis.repository.ProposalRepository proposalRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.organization.repository.LecturerRepository lecturerRepository;
+
     @Override
     @Transactional(readOnly = true)
     public ThesisResponse getThesisById(Long id) {
@@ -88,32 +94,74 @@ public class ThesisServiceImpl implements ThesisService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<ThesisResponse> searchTheses(Long roundId, Long lecturerId, String status, Boolean defenseEligible, String search, Pageable pageable) {
+        syncMissingThesesFromProposals(roundId);
+        Long resolvedLecturerId = lecturerId;
+        if (lecturerId != null && lecturerRepository != null && !lecturerRepository.existsById(lecturerId)) {
+            resolvedLecturerId = lecturerRepository.findByUserId(lecturerId)
+                    .map(com.example.thesis_hub_api.organization.entity.Lecturer::getId)
+                    .orElse(lecturerId);
+        }
         String searchPattern = (search != null && !search.trim().isEmpty())
                 ? "%" + search.trim().toLowerCase() + "%"
                 : null;
-        return thesisRepository.searchTheses(roundId, lecturerId, status, defenseEligible, searchPattern, pageable)
+        return thesisRepository.searchTheses(roundId, resolvedLecturerId, status, defenseEligible, searchPattern, pageable)
                 .map(this::mapToResponse);
     }
 
+    private void syncMissingThesesFromProposals(Long roundId) {
+        if (proposalRepository == null) return;
+        try {
+            java.util.List<com.example.thesis_hub_api.thesis.entity.Proposal> proposals =
+                    (roundId != null) ? proposalRepository.findByProjectRoundId(roundId) : proposalRepository.findAll();
+            for (com.example.thesis_hub_api.thesis.entity.Proposal p : proposals) {
+                if (p.getStudent() == null || p.getProjectRound() == null || p.getLecturer() == null) continue;
+                if ("REJECTED".equalsIgnoreCase(p.getStatus())) continue;
+                boolean exists = thesisRepository.existsByStudentIdAndProjectRoundId(
+                        p.getStudent().getId(), p.getProjectRound().getId());
+                if (!exists) {
+                    String thesisCode = "DT_" + p.getProjectRound().getRoundCode() + "_" + p.getStudent().getStudentCode();
+                    Thesis thesis = Thesis.builder()
+                            .proposal(p)
+                            .projectRound(p.getProjectRound())
+                            .student(p.getStudent())
+                            .lecturer(p.getLecturer())
+                            .thesisCode(thesisCode)
+                            .titleVn(p.getTitleVn())
+                            .titleEn(p.getTitleEn())
+                            .description(p.getDescription())
+                            .objectives(p.getObjectives())
+                            .status("IN_PROGRESS")
+                            .completionRate(BigDecimal.ZERO)
+                            .defenseEligible(false)
+                            .build();
+                    thesisRepository.save(thesis);
+                    log.info("Auto-synced missing thesis {} from existing proposal {}", thesisCode, p.getId());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Could not auto-sync missing theses from proposals: {}", ex.getMessage());
+        }
+    }
+
     private ThesisResponse mapToResponse(Thesis thesis) {
-        String studentName = thesis.getStudent().getUser() != null ? thesis.getStudent().getUser().getFullName() : null;
-        String lecturerName = thesis.getLecturer().getUser() != null ? thesis.getLecturer().getUser().getFullName() : null;
+        String studentName = (thesis.getStudent() != null && thesis.getStudent().getUser() != null) ? thesis.getStudent().getUser().getFullName() : null;
+        String lecturerName = (thesis.getLecturer() != null && thesis.getLecturer().getUser() != null) ? thesis.getLecturer().getUser().getFullName() : null;
 
         return ThesisResponse.builder()
                 .id(thesis.getId())
                 .proposalId(thesis.getProposal() != null ? thesis.getProposal().getId() : null)
-                .projectRoundId(thesis.getProjectRound().getId())
-                .projectRoundName(thesis.getProjectRound().getName())
-                .studentId(thesis.getStudent().getId())
-                .studentCode(thesis.getStudent().getStudentCode())
+                .projectRoundId(thesis.getProjectRound() != null ? thesis.getProjectRound().getId() : null)
+                .projectRoundName(thesis.getProjectRound() != null ? thesis.getProjectRound().getName() : null)
+                .studentId(thesis.getStudent() != null ? thesis.getStudent().getId() : null)
+                .studentCode(thesis.getStudent() != null ? thesis.getStudent().getStudentCode() : null)
                 .studentFullName(studentName)
-                .studentClass(thesis.getStudent().getClassName())
-                .lecturerId(thesis.getLecturer().getId())
-                .lecturerCode(thesis.getLecturer().getLecturerCode())
+                .studentClass(thesis.getStudent() != null ? thesis.getStudent().getClassName() : null)
+                .lecturerId(thesis.getLecturer() != null ? thesis.getLecturer().getId() : null)
+                .lecturerCode(thesis.getLecturer() != null ? thesis.getLecturer().getLecturerCode() : null)
                 .lecturerFullName(lecturerName)
-                .lecturerDegree(thesis.getLecturer().getAcademicDegree())
+                .lecturerDegree(thesis.getLecturer() != null ? thesis.getLecturer().getAcademicDegree() : null)
                 .thesisCode(thesis.getThesisCode())
                 .titleVn(thesis.getTitleVn())
                 .titleEn(thesis.getTitleEn())

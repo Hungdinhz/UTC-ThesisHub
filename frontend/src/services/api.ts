@@ -57,6 +57,7 @@ import type {
   AcademicRecordImportResultResponse,
   AcademicRecordItem,
   CreateAcademicRecordManualPayload,
+  StudentRoundStatusResponse,
 } from '../types';
 import {
   AUTH, STUDENTS, SUPERVISORS, COMMITTEE_MEMBERS,
@@ -703,6 +704,7 @@ class ApiService {
 
   async getNotifications(params?: {
     page?: number;
+    size?: number;
     is_read?: boolean;
     type?: string;
   }): Promise<PaginatedResponse<Notification>> {
@@ -1073,6 +1075,10 @@ class ApiService {
     return response.data;
   }
 
+  async deleteProjectRound(id: number): Promise<void> {
+    await this.api.delete(PROJECT_ROUNDS.detail(id));
+  }
+
   async getRoundMilestones(roundId: number): Promise<MilestoneItem[]> {
     const response = await this.api.get<MilestoneItem[]>(PROJECT_ROUNDS.milestones(roundId));
     return response.data;
@@ -1085,6 +1091,30 @@ class ApiService {
 
   async deleteMilestone(milestoneId: number): Promise<void> {
     await this.api.delete(PROJECT_ROUNDS.milestoneDetail(milestoneId));
+  }
+
+  // ─── Demo Phase Transition Controls ─────────────────────────────
+  async advanceRoundPhase(roundId: number, targetPhaseType?: string): Promise<ProjectRoundItem> {
+    const response = await this.api.post<ProjectRoundItem>(
+      PROJECT_ROUNDS.advancePhase(roundId),
+      null,
+      { params: targetPhaseType ? { targetPhaseType } : undefined }
+    );
+    return response.data;
+  }
+
+  async advanceActivePhase(targetPhaseType?: string): Promise<ProjectRoundItem> {
+    const response = await this.api.post<ProjectRoundItem>(
+      PROJECT_ROUNDS.advanceActivePhase,
+      null,
+      { params: targetPhaseType ? { targetPhaseType } : undefined }
+    );
+    return response.data;
+  }
+
+  async getMyRoundStatus(): Promise<StudentRoundStatusResponse> {
+    const response = await this.api.get<StudentRoundStatusResponse>(PROJECT_ROUNDS.myRoundStatus);
+    return response.data;
   }
 
   // ─── Student Project Round & Ingestion APIs (Contract 3) ────────

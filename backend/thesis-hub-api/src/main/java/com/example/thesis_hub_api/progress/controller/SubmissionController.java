@@ -29,7 +29,7 @@ public class SubmissionController {
     }
 
     @PostMapping("/{id}/review")
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
     public ApiResponse<SubmissionResponse> reviewSubmission(
             @PathVariable Long id,
             @Valid @RequestBody ReviewSubmissionRequest request) {

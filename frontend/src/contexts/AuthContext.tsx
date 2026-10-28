@@ -35,7 +35,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshUser = async () => {
     try {
-      const type = localStorage.getItem('user_type') as UserType;
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      let type = localStorage.getItem('user_type') as UserType;
+
+      // 1. Fetch current user from /api/v1/users/me to reliably verify real role & user_type
+      let currentUser: any = null;
+      try {
+        currentUser = await apiService.getCurrentUser();
+        const apiUserType = currentUser?.userType || (currentUser as any)?.user_type;
+        const apiRole = currentUser?.role;
+
+        let detectedType: UserType | null = null;
+        if (apiUserType) {
+          detectedType = apiUserType as UserType;
+        } else if (apiRole === 'ROLE_ADMIN') {
+          detectedType = 'admin';
+        } else if (apiRole === 'ROLE_LECTURER') {
+          detectedType = 'supervisor';
+        } else if (apiRole === 'ROLE_COMMITTEE') {
+          detectedType = 'committee_member';
+        } else if (apiRole === 'ROLE_STUDENT') {
+          detectedType = 'student';
+        } else if (apiRole === 'ROLE_EXTERNAL') {
+          detectedType = 'external_examiner';
+        }
+
+        if (detectedType) {
+          type = detectedType;
+          localStorage.setItem('user_type', detectedType);
+        }
+      } catch (err) {
+        console.warn('Could not verify profile via /users/me, using stored user_type:', err);
+      }
+
       if (!type) {
         setLoading(false);
         return;
@@ -58,10 +95,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userData = await apiService.getExternalProfile();
           break;
         case 'admin':
-          userData = await apiService.getCurrentUser();
+          userData = currentUser || await apiService.getCurrentUser();
           break;
         default:
           throw new Error('Invalid user type');
+      }
+
+      if (userData && typeof userData === 'object') {
+        userData.fullName = userData.fullName || userData.full_name || userData.user?.fullName || userData.user?.full_name || currentUser?.fullName || currentUser?.full_name;
+        if (currentUser) {
+          if (!userData.lecturer && currentUser.lecturer) {
+            userData.lecturer = currentUser.lecturer;
+          }
+          if (!userData.student && currentUser.student) {
+            userData.student = currentUser.student;
+          }
+          if (!userData.role) {
+            userData.role = currentUser.role;
+          }
+        }
+        if (userData.student) {
+          userData.studentId = userData.student.id;
+          userData.student_id = userData.student.id;
+          userData.studentCode = userData.student.student_code || userData.student.registration_no;
+          userData.registration_no = userData.student.registration_no || userData.student.student_code;
+        }
+        if (userData.lecturer) {
+          userData.lecturerId = userData.lecturer.id;
+          userData.lecturer_id = userData.lecturer.id;
+          userData.lecturerCode = userData.lecturer.lecturer_code || userData.lecturer.supervisor_id;
+          userData.supervisor_id = userData.lecturer.supervisor_id || userData.lecturer.lecturer_code;
+        }
       }
 
       setUser(userData);

@@ -16,6 +16,7 @@ public class ScoreResponseDTO {
     private Long id;
     private Long thesisId;
     private Long graderId;
+    private String graderName;
     private String scoreType;
     private BigDecimal score;
     private String feedback;

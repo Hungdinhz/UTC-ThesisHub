@@ -44,7 +44,10 @@ const GroupRequestModal: React.FC<GroupRequestModalProps> = ({
     try {
       setLoadingStudents(true);
       const data = await apiService.getStudentsList({ forRequest: true, search });
-      setStudents(data.results || []);
+      const sorted = (data?.results || []).slice().sort((a: any, b: any) =>
+        (a.student_id || a.studentCode || '').localeCompare(b.student_id || b.studentCode || '', undefined, { numeric: true })
+      );
+      setStudents(sorted);
       if (data.results && data.results.length === 0 && !search) {
         setError('No students available for group request');
       }

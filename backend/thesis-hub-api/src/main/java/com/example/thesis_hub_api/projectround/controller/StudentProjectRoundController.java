@@ -110,7 +110,7 @@ public class StudentProjectRoundController {
             @RequestParam(required = false) Long majorId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            @PageableDefault(page = 0, size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(page = 0, size = 20, sort = "student.studentCode", direction = Sort.Direction.ASC) Pageable pageable) {
 
         PageResponse<StudentProjectRoundResponseDTO> response = studentProjectRoundService.getStudentsInRound(
                 roundId, majorId, status, search, pageable);

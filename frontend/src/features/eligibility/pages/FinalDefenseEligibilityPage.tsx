@@ -37,8 +37,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         setRounds(data || []);
         if (data && data.length > 0) {
           const active =
-            data.find((r) => r.status === 'OPEN') ||
             data.find((r) => r.status === 'IN_PROGRESS') ||
+            data.find((r) => r.status === 'OPEN') ||
             data[0];
           setSelectedRoundId(active.roundId);
         }
@@ -61,7 +61,11 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         size: 100,
         search: studentSearch || undefined,
       });
-      setRoundStudents(res?.content || []);
+      const rawList = res?.content || [];
+      const sortedList = [...rawList].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setRoundStudents(sortedList);
     } catch (err) {
       console.error('Lỗi khi tải sinh viên trong đợt:', err);
     } finally {

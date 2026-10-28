@@ -185,7 +185,11 @@ const OrganizationManagementPage: React.FC = () => {
         page: 0,
         size: 100,
       });
-      setStudents(res.content || []);
+      const rawStudents = res.content || [];
+      const sortedStudents = [...rawStudents].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setStudents(sortedStudents);
       setTotalStudents(res.totalElements || 0);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Lỗi tải danh sách sinh viên');
@@ -200,6 +204,20 @@ const OrganizationManagementPage: React.FC = () => {
     loadMajorsAndPrograms();
     loadProjectRounds();
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+    setSuccessMsg(null);
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    setError(null);
+    const timer = setTimeout(() => setSuccessMsg(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
 
   useEffect(() => {
     if (activeTab === 'faculties') {
@@ -700,7 +718,7 @@ const OrganizationManagementPage: React.FC = () => {
           </div>
         )}
 
-        {error && (
+        {error ? (
           <div
             style={{
               padding: '12px 16px',
@@ -708,13 +726,16 @@ const OrganizationManagementPage: React.FC = () => {
               color: '#991b1b',
               borderRadius: '8px',
               marginBottom: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
             }}
           >
-            ⚠️ {error}
+            <span>⚠️ {error}</span>
+            <button type="button" onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#991b1b', fontWeight: 700, cursor: 'pointer' }}>✕</button>
           </div>
-        )}
-
-        {successMsg && (
+        ) : successMsg ? (
           <div
             style={{
               padding: '12px 16px',
@@ -723,11 +744,16 @@ const OrganizationManagementPage: React.FC = () => {
               borderRadius: '8px',
               marginBottom: '16px',
               fontWeight: 600,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
             }}
           >
-            ✅ {successMsg}
+            <span>✅ {successMsg}</span>
+            <button type="button" onClick={() => setSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>✕</button>
           </div>
-        )}
+        ) : null}
 
         {/* Tab 1: Khoa & Bộ môn */}
         {activeTab === 'faculties' && (

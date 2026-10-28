@@ -20,4 +20,6 @@ public class CouncilResponseDTO {
     private String description;
     private List<CouncilMemberDTO> members;
     private List<Long> studentIds;
+    private List<CouncilStudentDetailDTO> assignedStudents;
 }
+

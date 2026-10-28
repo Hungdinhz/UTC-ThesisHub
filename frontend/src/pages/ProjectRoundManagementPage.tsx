@@ -100,6 +100,20 @@ const ProjectRoundManagementPage: React.FC = () => {
     loadRounds();
   }, []);
 
+  useEffect(() => {
+    if (!error) return;
+    setSuccessMsg(null);
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    setError(null);
+    const timer = setTimeout(() => setSuccessMsg(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
+
   const handleCreateRound = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -140,7 +154,7 @@ const ProjectRoundManagementPage: React.FC = () => {
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái';
       setTransitionError(msg);
-      setError(msg);
+      setSuccessMsg(null);
     } finally {
       setTransitionLoading(false);
     }
@@ -189,6 +203,48 @@ const ProjectRoundManagementPage: React.FC = () => {
     }
   };
 
+  // Modal Delete Round (Double Click on Finished Round)
+  const [roundToDelete, setRoundToDelete] = useState<ProjectRoundItem | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const canDeleteRound = (status?: string) =>
+    status === 'DRAFT' || status === 'CLOSED' || status === 'ARCHIVED';
+
+  const handleDoubleClickRound = (r: ProjectRoundItem) => {
+    if (!canDeleteRound(r.status)) return;
+    setRoundToDelete(r);
+    setDeleteError(null);
+  };
+
+  const handleConfirmDeleteRound = async () => {
+    if (!roundToDelete) return;
+    try {
+      setDeleteLoading(true);
+      setDeleteError(null);
+      await apiService.deleteProjectRound(roundToDelete.roundId);
+      setSuccessMsg(`Đã xóa vĩnh viễn đợt đồ án "${roundToDelete.name}" (${roundToDelete.roundCode}) thành công!`);
+      const deletedId = roundToDelete.roundId;
+      setRoundToDelete(null);
+      const remaining = rounds.filter(r => r.roundId !== deletedId);
+      setRounds(remaining);
+      if (selectedRound?.roundId === deletedId) {
+        if (remaining.length > 0) {
+          loadRoundDetail(remaining[0].roundId);
+        } else {
+          setSelectedRound(null);
+        }
+      }
+      await loadRounds();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Lỗi khi xóa đợt đồ án';
+      setDeleteError(msg);
+      setError(msg);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'OPEN':
@@ -218,16 +274,31 @@ const ProjectRoundManagementPage: React.FC = () => {
             ⏳ Đang tải dữ liệu hệ thống...
           </div>
         )}
-        {error && (
-          <div style={{ padding: '12px 16px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginBottom: '16px' }}>
-            ⚠️ {error}
+        {error ? (
+          <div style={{ padding: '12px 16px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <span>⚠️ {error}</span>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              style={{ background: 'none', border: 'none', color: '#991b1b', fontWeight: 700, cursor: 'pointer', fontSize: '1rem' }}
+              title="Đóng thông báo"
+            >
+              ✕
+            </button>
           </div>
-        )}
-        {successMsg && (
-          <div style={{ padding: '12px 16px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '8px', marginBottom: '16px' }}>
-            ✅ {successMsg}
+        ) : successMsg ? (
+          <div style={{ padding: '12px 16px', backgroundColor: '#dcfce7', color: '#166534', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+            <span>✅ {successMsg}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessMsg(null)}
+              style={{ background: 'none', border: 'none', color: '#166534', fontWeight: 700, cursor: 'pointer', fontSize: '1rem' }}
+              title="Đóng thông báo"
+            >
+              ✕
+            </button>
           </div>
-        )}
+        ) : null}
 
         {/* Top Action Bar */}
         <div className="round-action-bar">
@@ -290,38 +361,75 @@ const ProjectRoundManagementPage: React.FC = () => {
         <div className="round-two-col-layout">
           {/* Left Column: Rounds List */}
           <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#1e293b' }}>
-              Danh sách Đợt đồ án ({rounds.length})
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, color: '#1e293b' }}>
+                Danh sách Đợt đồ án ({rounds.length})
+              </h3>
+            </div>
+            <p style={{ margin: '0 0 14px 0', fontSize: '0.78rem', color: '#64748b' }}>
+              💡 <em>Chọn đợt để xem chi tiết (chỉ các đợt Bản nháp hoặc Đã đóng mới có thể xóa)</em>
+            </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '700px', overflowY: 'auto' }}>
               {rounds.map((r) => {
                 const badge = getStatusBadge(r.status);
                 const isSelected = selectedRound?.roundId === r.roundId;
+                const isDeletable = canDeleteRound(r.status);
                 return (
                   <div
                     key={r.roundId}
                     onClick={() => loadRoundDetail(r.roundId)}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      handleDoubleClickRound(r);
+                    }}
+                    title={isDeletable ? 'Click 1 lần để xem chi tiết • Bấm nút Xóa để xóa đợt đồ án' : 'Click để xem chi tiết đợt đồ án'}
                     style={{
                       padding: '14px 16px',
                       borderRadius: '8px',
                       cursor: 'pointer',
                       border: isSelected ? '2px solid #0a3273' : '1px solid #e2e8f0',
                       backgroundColor: isSelected ? '#eff6ff' : '#fff',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.2s ease',
+                      userSelect: 'none'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', gap: '6px' }}>
                       <span style={{ fontWeight: 700, color: '#0a3273', fontSize: '0.95rem' }}>{r.roundCode}</span>
-                      <span style={{
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        backgroundColor: badge.bg,
-                        color: badge.color
-                      }}>
-                        {badge.label}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          backgroundColor: badge.bg,
+                          color: badge.color
+                        }}>
+                          {badge.label}
+                        </span>
+                        {isDeletable && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRoundToDelete(r);
+                              setDeleteError(null);
+                            }}
+                            title={`Xóa đợt đồ án ${r.roundCode}`}
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid #fecaca',
+                              backgroundColor: '#fef2f2',
+                              color: '#dc2626',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🗑️ Xóa
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>{r.name}</div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
@@ -409,6 +517,62 @@ const ProjectRoundManagementPage: React.FC = () => {
                         }}
                       >
                         🔒 Đóng đợt
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoading(true);
+                          const updated = await apiService.advanceRoundPhase(selectedRound.roundId);
+                          setSelectedRound(updated);
+                          setSuccessMsg('⚡ Demo: Đã kết thúc giai đoạn và chuyển sang giai đoạn tiếp theo thành công!');
+                          window.dispatchEvent(new CustomEvent('utc-phase-change'));
+                        } catch (err: unknown) {
+                          setError(err instanceof Error ? err.message : 'Lỗi khi chuyển giai đoạn');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      style={{
+                        backgroundColor: '#f59e0b',
+                        color: '#0f172a',
+                        border: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      title="Demo: Kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo"
+                    >
+                      ⚡ Demo: Kết thúc GĐ & Chuyển tiếp
+                    </button>
+                    {canDeleteRound(selectedRound.status) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRoundToDelete(selectedRound);
+                          setDeleteError(null);
+                        }}
+                        style={{
+                          backgroundColor: '#fef2f2',
+                          color: '#dc2626',
+                          border: '1px solid #fecaca',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        title="Xóa đợt đồ án này"
+                      >
+                        🗑️ Xóa đợt
                       </button>
                     )}
                   </div>
@@ -946,6 +1110,158 @@ const ProjectRoundManagementPage: React.FC = () => {
                   }}
                 >
                   {transitionLoading ? 'Đang kiểm tra...' : 'Xác nhận chuyển trạng thái'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Confirm Delete Project Round */}
+        {roundToDelete && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(3px)'
+          }}>
+            <div style={{
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              padding: '28px',
+              width: '540px',
+              maxWidth: '92vw',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fee2e2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.4rem'
+                }}>
+                  🗑️
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: '#991b1b', fontSize: '1.25rem' }}>
+                    Xác nhận xóa đợt đồ án
+                  </h3>
+                  <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    Thao tác này chỉ áp dụng cho đợt đồ án đã kết thúc
+                  </span>
+                </div>
+              </div>
+
+              {deleteError && (
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: '#fee2e2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  color: '#991b1b',
+                  fontSize: '0.875rem',
+                  marginBottom: '16px'
+                }}>
+                  {deleteError}
+                </div>
+              )}
+
+              <p style={{ margin: '0 0 14px 0', fontSize: '0.95rem', color: '#1e293b', lineHeight: 1.5 }}>
+                Bạn có muốn xóa đợt đồ án <strong>(đợt đã kết thúc rồi)</strong> này không?
+              </p>
+
+              <div style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '14px 16px',
+                marginBottom: '18px',
+                fontSize: '0.88rem'
+              }}>
+                <div style={{ marginBottom: '6px' }}>
+                  <span style={{ color: '#64748b' }}>Tên đợt: </span>
+                  <strong style={{ color: '#0f172a' }}>{roundToDelete.name}</strong>
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  <span style={{ color: '#64748b' }}>Mã đợt: </span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0a3273' }}>{roundToDelete.roundCode}</span>
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  <span style={{ color: '#64748b' }}>Năm học - Học kỳ: </span>
+                  <strong>{roundToDelete.academicYear} • {roundToDelete.semester}</strong>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#64748b' }}>Trạng thái: </span>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    backgroundColor: getStatusBadge(roundToDelete.status).bg,
+                    color: getStatusBadge(roundToDelete.status).color
+                  }}>
+                    {getStatusBadge(roundToDelete.status).label}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{
+                backgroundColor: '#fffbeb',
+                border: '1px solid #fef3c7',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '20px',
+                fontSize: '0.82rem',
+                color: '#92400e',
+                lineHeight: 1.4
+              }}>
+                ⚠️ <strong>Lưu ý:</strong> Toàn bộ dữ liệu liên quan đến đợt đồ án này sẽ bị xóa khỏi hệ thống và <strong>không thể phục hồi</strong>.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setRoundToDelete(null)}
+                  disabled={deleteLoading}
+                  style={{
+                    padding: '9px 18px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#fff',
+                    cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                    fontWeight: 600,
+                    color: '#475569'
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteLoading}
+                  onClick={handleConfirmDeleteRound}
+                  style={{
+                    backgroundColor: '#dc2626',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '9px 22px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                    opacity: deleteLoading ? 0.7 : 1,
+                    boxShadow: '0 1px 2px rgba(220, 38, 38, 0.3)'
+                  }}
+                >
+                  {deleteLoading ? 'Đang xóa...' : '🗑️ Xác nhận xóa đợt'}
                 </button>
               </div>
             </div>

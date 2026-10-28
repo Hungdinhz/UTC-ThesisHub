@@ -236,6 +236,12 @@ public class StudentProjectRoundService {
             }
         }
 
+        parsedRows.sort((a, b) -> {
+            String ca = a.getStudentCode() != null ? a.getStudentCode().trim() : "";
+            String cb = b.getStudentCode() != null ? b.getStudentCode().trim() : "";
+            return ca.compareTo(cb);
+        });
+
         return StudentImportPreviewResponseDTO.builder()
                 .roundId(round.getId())
                 .roundCode(round.getRoundCode())
@@ -257,14 +263,25 @@ public class StudentProjectRoundService {
     public StudentImportResultResponseDTO commitImportStudents(Long roundId, StudentImportCommitRequestDTO requestDTO) {
         ProjectRound round = getAndValidateActiveRound(roundId);
 
+        if (requestDTO == null || requestDTO.getRows() == null || requestDTO.getRows().isEmpty()) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Danh sách sinh viên import không được để trống");
+        }
+
         Role studentRole = roleRepository.findByName("ROLE_STUDENT")
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-
-        String defaultEncodedPassword = passwordEncoder.encode("Password@123");
 
         Map<String, Major> majorMap = majorRepository.findAll().stream()
                 .filter(m -> m.getCode() != null)
                 .collect(Collectors.toMap(m -> m.getCode().toUpperCase().trim(), m -> m, (a, b) -> a));
+
+        Long roundTrainingProgramId = null;
+        try {
+            if (round.getTrainingProgram() != null) {
+                roundTrainingProgramId = round.getTrainingProgram().getId();
+            }
+        } catch (Exception e) {
+            log.warn("Không thể truy xuất trainingProgram của round {}: {}", roundId, e.getMessage());
+        }
 
         int totalProcessed = 0;
         int newUsersCreated = 0;
@@ -272,6 +289,7 @@ public class StudentProjectRoundService {
         int enrolledInRound = 0;
         int skipped = 0;
         List<String> messages = new ArrayList<>();
+        Set<Long> processedStudentIdsInBatch = new HashSet<>();
 
         for (StudentImportRowDTO row : requestDTO.getRows()) {
             totalProcessed++;
@@ -283,109 +301,148 @@ public class StudentProjectRoundService {
                 continue;
             }
 
-            String studentCode = row.getStudentCode().trim();
-            String fullName = StringUtils.hasText(row.getFullName())
-                    ? row.getFullName().trim()
-                    : ((row.getLastName() != null ? row.getLastName() : "") + " " + (row.getFirstName() != null ? row.getFirstName() : "")).trim();
-            if (fullName.isEmpty()) {
-                fullName = "Sinh viên " + studentCode;
-            }
-            String email = StringUtils.hasText(row.getEmail())
-                    ? row.getEmail().trim()
-                    : studentCode.toLowerCase() + "@lms.utc.edu.vn";
-
-            // 1. Tìm hoặc tạo User
-            User user = userRepository.findByUsername(studentCode)
-                    .or(() -> userRepository.findByEmail(email))
-                    .orElse(null);
-
-            if (user == null) {
-                user = User.builder()
-                        .username(studentCode)
-                        .fullName(fullName)
-                        .email(email)
-                        .phone(row.getPhone())
-                        .password(passwordEncoder.encode(studentCode))
-                        .role(studentRole)
-                        .isActive(true)
-                        .build();
-                user = userRepository.save(user);
-                newUsersCreated++;
-            } else {
-                if (StringUtils.hasText(fullName)) {
-                    user.setFullName(fullName);
+            try {
+                String studentCode = row.getStudentCode().trim();
+                String fullName = StringUtils.hasText(row.getFullName())
+                        ? row.getFullName().trim()
+                        : ((row.getLastName() != null ? row.getLastName() : "") + " " + (row.getFirstName() != null ? row.getFirstName() : "")).trim();
+                if (fullName.isEmpty()) {
+                    fullName = "Sinh viên " + studentCode;
                 }
-                if (StringUtils.hasText(row.getPhone())) {
-                    user.setPhone(row.getPhone());
-                }
-                user = userRepository.save(user);
-            }
+                String email = StringUtils.hasText(row.getEmail())
+                        ? row.getEmail().trim().toLowerCase()
+                        : studentCode.toLowerCase() + "@lms.utc.edu.vn";
 
-            // 2. Tìm hoặc tạo Student
-            Student student = studentRepository.findByStudentCode(studentCode).orElse(null);
-            String normalizedMajorCode = studentExcelParser.normalizeMajorCode(row.getMajorCode());
-            Major major = majorMap.get(normalizedMajorCode);
-            if (major == null && !majorMap.isEmpty()) {
-                major = majorMap.getOrDefault("CNTT", majorMap.values().iterator().next());
-            }
+                // 1. Tìm hoặc tạo User
+                // Ưu tiên: nếu sinh viên đã có hồ sơ thì lấy User của sinh viên đó
+                Student existingStudent = studentRepository.findByStudentCode(studentCode).orElse(null);
+                User user = null;
+                if (existingStudent != null) {
+                    user = existingStudent.getUser();
+                }
 
-            Long roundTrainingProgramId = round.getTrainingProgram() != null ? round.getTrainingProgram().getId() : null;
+                if (user == null) {
+                    user = userRepository.findByUsername(studentCode).orElse(null);
+                }
 
-            if (student == null) {
-                student = Student.builder()
-                        .user(user)
-                        .studentCode(studentCode)
-                        .className(row.getClassName())
-                        .majorId(major != null ? major.getId() : null)
-                        .trainingProgramId(roundTrainingProgramId)
-                        .debtCredits(0)
-                        .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
-                        .build();
-                student = studentRepository.save(student);
-                newStudentsCreated++;
-            } else {
-                if (StringUtils.hasText(row.getClassName())) {
-                    student.setClassName(row.getClassName());
-                }
-                if (major != null) {
-                    student.setMajorId(major.getId());
-                }
-                if (student.getTrainingProgramId() == null) {
-                    student.setTrainingProgramId(roundTrainingProgramId);
-                }
-                if (row.getGpa() != null) {
-                    student.setGpa(row.getGpa());
-                }
-                student = studentRepository.save(student);
-            }
+                if (user == null) {
+                    // Kiểm tra email xem có bị xung đột với user khác trong hệ thống không
+                    String targetEmail = email;
+                    Optional<User> userWithEmail = userRepository.findByEmail(targetEmail);
+                    if (userWithEmail.isPresent() && !studentCode.equalsIgnoreCase(userWithEmail.get().getUsername())) {
+                        targetEmail = studentCode.toLowerCase() + "@lms.utc.edu.vn";
+                        if (userRepository.findByEmail(targetEmail).isPresent()) {
+                            targetEmail = studentCode.toLowerCase() + "." + System.currentTimeMillis() + "@lms.utc.edu.vn";
+                        }
+                    }
 
-            // 3. Ghi danh vào StudentProjectRound nếu đủ điều kiện
-            Optional<String> eligibilityErr = validateStudentRoundEligibility(student, round);
-            if (eligibilityErr.isPresent()) {
+                    user = User.builder()
+                            .username(studentCode)
+                            .fullName(fullName)
+                            .email(targetEmail)
+                            .phone(row.getPhone())
+                            .password(passwordEncoder.encode("Password@123"))
+                            .role(studentRole)
+                            .isActive(true)
+                            .build();
+                    user = userRepository.save(user);
+                    newUsersCreated++;
+                } else {
+                    if (StringUtils.hasText(fullName)) {
+                        user.setFullName(fullName);
+                    }
+                    if (StringUtils.hasText(row.getPhone())) {
+                        user.setPhone(row.getPhone());
+                    }
+                    if (StringUtils.hasText(email) && !email.equalsIgnoreCase(user.getEmail())) {
+                        Optional<User> otherUser = userRepository.findByEmail(email);
+                        if (otherUser.isEmpty() || otherUser.get().getId().equals(user.getId())) {
+                            user.setEmail(email);
+                        }
+                    }
+                    user = userRepository.save(user);
+                }
+
+                // 2. Tìm hoặc tạo Student
+                Student student = existingStudent;
+                if (student == null) {
+                    student = studentRepository.findByUserId(user.getId()).orElse(null);
+                }
+
+                String normalizedMajorCode = studentExcelParser.normalizeMajorCode(row.getMajorCode());
+                Major major = majorMap.get(normalizedMajorCode);
+                if (major == null && !majorMap.isEmpty()) {
+                    major = majorMap.getOrDefault("CNTT", majorMap.values().iterator().next());
+                }
+
+                if (student == null) {
+                    student = Student.builder()
+                            .user(user)
+                            .studentCode(studentCode)
+                            .className(row.getClassName())
+                            .majorId(major != null ? major.getId() : null)
+                            .trainingProgramId(roundTrainingProgramId)
+                            .debtCredits(0)
+                            .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
+                            .build();
+                    student = studentRepository.save(student);
+                    newStudentsCreated++;
+                } else {
+                    if (student.getUser() == null || !student.getUser().getId().equals(user.getId())) {
+                        student.setUser(user);
+                    }
+                    if (StringUtils.hasText(row.getClassName())) {
+                        student.setClassName(row.getClassName());
+                    }
+                    if (major != null) {
+                        student.setMajorId(major.getId());
+                    }
+                    if (student.getTrainingProgramId() == null && roundTrainingProgramId != null) {
+                        student.setTrainingProgramId(roundTrainingProgramId);
+                    }
+                    if (row.getGpa() != null) {
+                        student.setGpa(row.getGpa());
+                    }
+                    student = studentRepository.save(student);
+                }
+
+                // 3. Ghi danh vào StudentProjectRound nếu đủ điều kiện
+                Optional<String> eligibilityErr = validateStudentRoundEligibility(student, round);
+                if (eligibilityErr.isPresent()) {
+                    skipped++;
+                    continue;
+                }
+
+                if (processedStudentIdsInBatch.contains(student.getId())) {
+                    skipped++;
+                    continue;
+                }
+                processedStudentIdsInBatch.add(student.getId());
+
+                Optional<StudentProjectRound> existingSpr = studentProjectRoundRepository
+                        .findByStudentIdAndProjectRoundId(student.getId(), round.getId());
+
+                if (existingSpr.isEmpty()) {
+                    StudentProjectRound spr = StudentProjectRound.builder()
+                            .student(student)
+                            .projectRound(round)
+                            .status("ELIGIBLE")
+                            .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
+                            .note("Import từ file Excel")
+                            .build();
+                    studentProjectRoundRepository.save(spr);
+                    enrolledInRound++;
+                } else {
+                    if (row.getGpa() != null) {
+                        existingSpr.get().setGpa(row.getGpa());
+                        studentProjectRoundRepository.save(existingSpr.get());
+                    }
+                    skipped++;
+                }
+            } catch (Exception rowEx) {
+                log.error("Lỗi khi import sinh viên MSSV {}: {}", row.getStudentCode(), rowEx.getMessage(), rowEx);
                 skipped++;
-                continue;
-            }
-
-            Optional<StudentProjectRound> existingSpr = studentProjectRoundRepository
-                    .findByStudentIdAndProjectRoundId(student.getId(), round.getId());
-
-            if (existingSpr.isEmpty()) {
-                StudentProjectRound spr = StudentProjectRound.builder()
-                        .student(student)
-                        .projectRound(round)
-                        .status("ELIGIBLE")
-                        .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
-                        .note("Import từ file Excel")
-                        .build();
-                studentProjectRoundRepository.save(spr);
-                enrolledInRound++;
-            } else {
-                if (row.getGpa() != null) {
-                    existingSpr.get().setGpa(row.getGpa());
-                    studentProjectRoundRepository.save(existingSpr.get());
-                }
-                // Đã có trong đợt, bỏ qua không ghi đè
-                skipped++;
+                messages.add("Bỏ qua sinh viên " + (row.getStudentCode() != null ? row.getStudentCode() : ("dòng " + totalProcessed)) + ": " + rowEx.getMessage());
             }
         }
 
@@ -424,18 +481,31 @@ public class StudentProjectRoundService {
         Role studentRole = roleRepository.findByName("ROLE_STUDENT")
                 .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
 
-        // 1. User: username = studentCode, password = studentCode
-        User user = userRepository.findByUsername(studentCode)
-                .or(() -> userRepository.findByEmail(email))
-                .orElse(null);
+        // 1. User: username = studentCode
+        User user = null;
+        if (existingCheckStudent != null) {
+            user = existingCheckStudent.getUser();
+        }
+        if (user == null) {
+            user = userRepository.findByUsername(studentCode).orElse(null);
+        }
 
         if (user == null) {
+            String targetEmail = email;
+            Optional<User> userWithEmail = userRepository.findByEmail(targetEmail);
+            if (userWithEmail.isPresent() && !studentCode.equalsIgnoreCase(userWithEmail.get().getUsername())) {
+                targetEmail = studentCode.toLowerCase() + "@lms.utc.edu.vn";
+                if (userRepository.findByEmail(targetEmail).isPresent()) {
+                    targetEmail = studentCode.toLowerCase() + "." + System.currentTimeMillis() + "@lms.utc.edu.vn";
+                }
+            }
+
             user = User.builder()
                     .username(studentCode)
                     .fullName(fullName)
-                    .email(email)
+                    .email(targetEmail)
                     .phone(dto.getPhone() != null ? dto.getPhone().trim() : null)
-                    .password(passwordEncoder.encode(studentCode))
+                    .password(passwordEncoder.encode("Password@123"))
                     .role(studentRole)
                     .isActive(true)
                     .build();
@@ -445,14 +515,31 @@ public class StudentProjectRoundService {
             if (StringUtils.hasText(dto.getPhone())) {
                 user.setPhone(dto.getPhone().trim());
             }
-            user.setPassword(passwordEncoder.encode(studentCode));
+            if (StringUtils.hasText(email) && !email.equalsIgnoreCase(user.getEmail())) {
+                Optional<User> otherUser = userRepository.findByEmail(email);
+                if (otherUser.isEmpty() || otherUser.get().getId().equals(user.getId())) {
+                    user.setEmail(email);
+                }
+            }
+            user.setPassword(passwordEncoder.encode("Password@123"));
             user = userRepository.save(user);
         }
 
         // 2. Student
-        Long roundTrainingProgramId = round.getTrainingProgram() != null ? round.getTrainingProgram().getId() : null;
+        Long roundTrainingProgramId = null;
+        try {
+            if (round.getTrainingProgram() != null) {
+                roundTrainingProgramId = round.getTrainingProgram().getId();
+            }
+        } catch (Exception ignored) {
+        }
+
         Double manualGpa = dto.getGpa() != null ? dto.getGpa() : 3.20;
-        Student student = studentRepository.findByStudentCode(studentCode).orElse(null);
+        Student student = existingCheckStudent;
+        if (student == null) {
+            student = studentRepository.findByUserId(user.getId()).orElse(null);
+        }
+
         if (student == null) {
             student = Student.builder()
                     .user(user)
@@ -465,13 +552,16 @@ public class StudentProjectRoundService {
                     .build();
             student = studentRepository.save(student);
         } else {
+            if (student.getUser() == null || !student.getUser().getId().equals(user.getId())) {
+                student.setUser(user);
+            }
             if (dto.getClassName() != null) {
                 student.setClassName(dto.getClassName().trim());
             }
             if (dto.getMajorId() != null) {
                 student.setMajorId(dto.getMajorId());
             }
-            if (student.getTrainingProgramId() == null) {
+            if (student.getTrainingProgramId() == null && roundTrainingProgramId != null) {
                 student.setTrainingProgramId(roundTrainingProgramId);
             }
             student.setGpa(manualGpa);
@@ -536,12 +626,20 @@ public class StudentProjectRoundService {
         String normalizedSearch = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase() + "%" : null;
         String normalizedStatus = StringUtils.hasText(status) ? status.trim().toUpperCase() : null;
 
+        Pageable effectivePageable = pageable;
+        if (effectivePageable == null || effectivePageable.getSort().isUnsorted()) {
+            int page = effectivePageable != null ? effectivePageable.getPageNumber() : 0;
+            int size = effectivePageable != null ? effectivePageable.getPageSize() : 20;
+            effectivePageable = org.springframework.data.domain.PageRequest.of(
+                    page, size, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "student.studentCode"));
+        }
+
         Page<StudentProjectRound> sprPage = studentProjectRoundRepository.searchStudentsInRound(
                 roundId,
                 majorId,
                 normalizedStatus,
                 normalizedSearch,
-                pageable);
+                effectivePageable);
 
         Map<Long, Major> majorMap = majorRepository.findAll().stream()
                 .collect(Collectors.toMap(Major::getId, m -> m, (a, b) -> a));
@@ -619,7 +717,16 @@ public class StudentProjectRoundService {
      */
     public byte[] generateTemplate() {
         try {
-            return studentExcelParser.generateTemplate();
+            Set<String> existingCodes = studentRepository != null
+                    ? studentRepository.findAll().stream()
+                            .map(Student::getStudentCode)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toSet())
+                    : Collections.emptySet();
+            if (existingCodes.isEmpty()) {
+                return studentExcelParser.generateTemplate();
+            }
+            return studentExcelParser.generateTemplate(existingCodes);
         } catch (IOException e) {
             log.error("Lỗi khi sinh file Excel mẫu: {}", e.getMessage(), e);
             throw new AppException(ErrorCode.FILE_STORAGE_ERROR);

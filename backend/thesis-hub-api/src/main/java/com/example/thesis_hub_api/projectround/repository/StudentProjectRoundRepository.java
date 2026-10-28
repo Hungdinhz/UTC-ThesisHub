@@ -3,6 +3,7 @@ package com.example.thesis_hub_api.projectround.repository;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,16 +15,20 @@ import java.util.Optional;
 @Repository
 public interface StudentProjectRoundRepository extends JpaRepository<StudentProjectRound, Long> {
 
+    @EntityGraph(attributePaths = {"student", "student.user", "projectRound"})
     Optional<StudentProjectRound> findByStudentIdAndProjectRoundId(Long studentId, Long projectRoundId);
 
     boolean existsByStudentIdAndProjectRoundId(Long studentId, Long projectRoundId);
 
+    @EntityGraph(attributePaths = {"student", "student.user", "projectRound"})
     List<StudentProjectRound> findByStudentId(Long studentId);
 
+    @EntityGraph(attributePaths = {"student", "student.user", "projectRound"})
     List<StudentProjectRound> findByProjectRoundId(Long projectRoundId);
 
     long countByProjectRoundId(Long projectRoundId);
 
+    @EntityGraph(attributePaths = {"student", "student.user", "projectRound"})
     @Query("SELECT spr FROM StudentProjectRound spr " +
            "JOIN spr.student s " +
            "JOIN s.user u " +
@@ -34,7 +39,8 @@ public interface StudentProjectRoundRepository extends JpaRepository<StudentProj
            "     LOWER(s.studentCode) LIKE :search OR " +
            "     LOWER(u.fullName) LIKE :search OR " +
            "     LOWER(u.email) LIKE :search OR " +
-           "     LOWER(s.className) LIKE :search)")
+           "     LOWER(s.className) LIKE :search) " +
+           "ORDER BY s.studentCode ASC")
     Page<StudentProjectRound> searchStudentsInRound(
             @Param("roundId") Long roundId,
             @Param("majorId") Long majorId,

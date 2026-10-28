@@ -9,16 +9,28 @@ export interface CouncilMember {
   confirmed?: boolean;
 }
 
+export interface CouncilStudentDetail {
+  studentId: number;
+  studentName: string;
+  studentCode: string;
+  thesisId: number;
+  thesisTitle: string;
+  advisorId: number;
+  advisorName: string;
+}
+
 export interface DefenseCouncil {
   id: number;
   projectRoundId: number;
   code: string;
   name: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'COMPLETED';
+  status: 'ACTIVE' | 'INACTIVE' | 'FINALIZED' | 'COMPLETED' | string;
   description?: string;
   members: CouncilMember[];
   studentIds: number[];
+  assignedStudents?: CouncilStudentDetail[];
 }
+
 
 export interface CouncilGenerationRequest {
   projectRoundId?: number;
@@ -79,15 +91,21 @@ export interface DefenseSchedule {
   id: number;
   councilId: number;
   councilName: string;
+  councilCode?: string;
+  projectRoundId?: number;
   defenseDate: string; // YYYY-MM-DD
   session: ScheduleSession;
   room: string;
   startTime: string; // HH:mm:ss
   endTime: string;   // HH:mm:ss
   maxStudents: number;
-  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | string;
   notes?: string;
+  members?: CouncilMember[];
+  studentIds?: number[];
+  assignedStudents?: CouncilStudentDetail[];
 }
+
 
 export interface AutoScheduleRequest {
   projectRoundId?: number;

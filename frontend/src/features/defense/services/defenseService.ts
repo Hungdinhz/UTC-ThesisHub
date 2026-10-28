@@ -209,10 +209,22 @@ class DefenseService {
     return mockCouncils;
   }
 
-  async updateCouncilMembers(councilId: number, updatedMembers: CouncilMember[]): Promise<DefenseCouncil> {
+  async finalizeCouncil(councilId: number): Promise<DefenseCouncil> {
+    try {
+      const res = await axios.post(`${API_BASE}/councils/${councilId}/finalize`, {}, { headers: authHeaders() });
+      if (res.data?.data) return res.data.data;
+    } catch {
+      // Fallback
+    }
     const council = mockCouncils.find((c) => c.id === councilId);
-    if (!council) throw new Error('Không tìm thấy hội đồng');
+    if (council) {
+      council.status = 'FINALIZED';
+      return council;
+    }
+    throw new Error('Không tìm thấy hội đồng');
+  }
 
+  async updateCouncilMembers(councilId: number, updatedMembers: CouncilMember[]): Promise<DefenseCouncil> {
     // Validate 1CT - 2TK - 2UV
     const presidents = updatedMembers.filter((m) => m.role === 'PRESIDENT');
     const secretaries = updatedMembers.filter((m) => m.role === 'SECRETARY');
@@ -222,6 +234,18 @@ class DefenseService {
       throw new Error('Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch, 2 Thư ký, 2 Ủy viên!');
     }
 
+    try {
+      const res = await axios.put(`${API_BASE}/councils/${councilId}/members`, updatedMembers, { headers: authHeaders() });
+      if (res.data?.data) return res.data.data;
+    } catch (err: any) {
+      if (err.response?.data?.message) {
+        throw new Error(err.response.data.message);
+      }
+      // Fallback
+    }
+
+    const council = mockCouncils.find((c) => c.id === councilId);
+    if (!council) throw new Error('Không tìm thấy hội đồng');
     council.members = updatedMembers;
     return council;
   }
@@ -247,16 +271,19 @@ class DefenseService {
     };
   }
 
-  async getSchedules(date?: string): Promise<DefenseSchedule[]> {
+  async getSchedules(date?: string, projectRoundId?: number): Promise<DefenseSchedule[]> {
     try {
-      const d = date || new Date().toISOString().split('T')[0];
-      const res = await axios.get(`${API_BASE}/schedules`, { params: { date: d }, headers: authHeaders() });
+      const params: any = {};
+      if (date) params.date = date;
+      if (projectRoundId) params.projectRoundId = projectRoundId;
+      const res = await axios.get(`${API_BASE}/schedules`, { params, headers: authHeaders() });
       if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) return res.data.data;
     } catch {
       // Fallback
     }
     return mockSchedules;
   }
+
 
   async autoGenerateSchedules(request: AutoScheduleRequest): Promise<DefenseSchedule[]> {
     try {

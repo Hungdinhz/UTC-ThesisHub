@@ -287,7 +287,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         size: 15,
       });
 
-      setStudents(res?.content || []);
+      const rawList = res?.content || [];
+      const sortedList = [...rawList].sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setStudents(sortedList);
       setTotalPages(res?.totalPages || 0);
       setTotalElements(res?.totalElements || 0);
     } catch (err: unknown) {
@@ -300,6 +304,20 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   useEffect(() => {
     loadStudents();
   }, [roundId, selectedMajorId, selectedStatus, currentPage]);
+
+  useEffect(() => {
+    if (!error) return;
+    setSuccessMsg(null);
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMsg) return;
+    setError(null);
+    const timer = setTimeout(() => setSuccessMsg(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMsg]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,10 +337,15 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      setSuccessMsg('Đã tải xuống file Excel mẫu chuẩn UTC thành công.');
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } catch (e: unknown) {
-      setError('Lỗi khi tải file template: ' + (e instanceof Error ? e.message : 'Unknown error'));
+      setSuccessMsg('Đã tải xuống file mẫu Excel chuẩn UTC thành công.');
+    } catch {
+      const a = document.createElement('a');
+      a.href = '/mau_import_sinh_vien_utc.xlsx';
+      a.download = 'mau_import_sinh_vien_utc.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setSuccessMsg('Đã tải xuống file mẫu Excel chuẩn UTC thành công.');
     }
   };
 
@@ -346,9 +369,15 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setImportLoading(true);
       setError(null);
       const preview = await apiService.previewImportStudents(roundId, importFile);
+      if (preview && preview.rows) {
+        preview.rows.sort((a, b) =>
+          (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+        );
+      }
       setPreviewData(preview);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi phân tích dữ liệu file Excel');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi phân tích dữ liệu file Excel';
+      setError(msg);
     } finally {
       setImportLoading(false);
     }
@@ -409,7 +438,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         email: emailVal,
       });
 
-      setSuccessMsg(`Thêm sinh viên ${code} thành công. Tài khoản hệ thống đã được cấp: Tên đăng nhập = ${code}, Mật khẩu = ${code}.`);
+      setSuccessMsg(`Thêm sinh viên ${code} thành công. Tài khoản hệ thống đã được cấp: Tên đăng nhập = ${code}, Mật khẩu mặc định = Password@123.`);
       setShowManualModal(false);
       setManualForm({
         studentCode: '',
@@ -426,8 +455,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setManualModalError(null);
       loadStudents();
       setTimeout(() => setSuccessMsg(null), 5000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Lỗi khi thêm sinh viên thủ công vào đợt';
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi thêm sinh viên thủ công vào đợt';
       setError(msg);
       setManualModalError(msg);
     } finally {
@@ -443,21 +472,28 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     }
     if (!previewData || !previewData.rows) return;
 
+    const validRows = previewData.rows.filter((r) => r.isValid);
+    if (validRows.length === 0) {
+      setError('Không có sinh viên hợp lệ nào để nạp vào hệ thống.');
+      return;
+    }
+
     try {
       setImportLoading(true);
       setError(null);
       const result = await apiService.commitImportStudents(roundId, {
-        rows: previewData.rows,
+        rows: validRows,
       });
 
       setImportResultMsg(
-        `Xử lý thành công ${result.totalProcessed} dòng. Tạo mới ${result.newUsersCreated} User, ${result.newStudentsCreated} Sinh viên, ghi danh ${result.enrolledInRound} vào đợt (bỏ qua ${result.skipped}).`
+        `Xử lý thành công ${result.totalProcessed} dòng. Tự động tạo ${result.newUsersCreated} tài khoản sinh viên (Tên đăng nhập = MSSV, Mật khẩu mặc định = Password@123), ${result.newStudentsCreated} Sinh viên, ghi danh ${result.enrolledInRound} vào đợt (bỏ qua ${result.skipped}).`
       );
       setPreviewData(null);
       setImportFile(null);
       loadStudents();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi lưu dữ liệu sinh viên vào hệ thống');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi lưu dữ liệu sinh viên vào hệ thống';
+      setError(msg);
     } finally {
       setImportLoading(false);
     }
@@ -546,16 +582,17 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       )}
 
       {/* Alert Messages */}
-      {error && (
-        <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
-          ⚠️ {error}
+      {error ? (
+        <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <span>⚠️ {error}</span>
+          <button type="button" onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer' }}>✕</button>
         </div>
-      )}
-      {successMsg && (
-        <div style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
-          ✅ {successMsg}
+      ) : successMsg ? (
+        <div style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <span>✅ {successMsg}</span>
+          <button type="button" onClick={() => setSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#16a34a', fontWeight: 700, cursor: 'pointer' }}>✕</button>
         </div>
-      )}
+      ) : null}
 
       {/* Action Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
@@ -570,6 +607,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
+            type="button"
             onClick={handleDownloadTemplate}
             style={{
               backgroundColor: '#f8fafc',
@@ -585,7 +623,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               gap: '6px',
             }}
           >
-            📥 Tải Excel mẫu UTC
+            📥 Tải file mẫu Excel UTC
           </button>
           <button
             disabled={isRoundClosed}
@@ -644,17 +682,17 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
       {/* Filter Bar */}
       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '240px' }}>
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flex: '1 1 240px' }}>
           <input
             type="text"
             placeholder="Tìm MSSV, họ tên, email, lớp..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ flex: 1, padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+            style={{ flex: 1, minWidth: '150px', padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
           />
           <button
             type="submit"
-            style={{ backgroundColor: '#0a3273', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+            style={{ backgroundColor: '#0a3273', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Tìm
           </button>
@@ -666,7 +704,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             setSelectedMajorId(e.target.value ? Number(e.target.value) : undefined);
             setCurrentPage(0);
           }}
-          style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+          style={{ flex: '1 1 180px', minWidth: '150px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
         >
           <option value="">Tất cả ngành</option>
           {majors.map((m) => (
@@ -682,7 +720,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             setSelectedStatus(e.target.value);
             setCurrentPage(0);
           }}
-          style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+          style={{ flex: '1 1 180px', minWidth: '150px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
         >
           <option value="">Tất cả trạng thái</option>
           <option value="ELIGIBLE">Đủ điều kiện (ELIGIBLE)</option>
@@ -699,79 +737,84 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       {loading ? (
         <div style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>Đang tải danh sách sinh viên...</div>
       ) : students.length > 0 ? (
-        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                <th style={{ padding: '10px 12px' }}>STT</th>
-                <th style={{ padding: '10px 12px' }}>MSSV</th>
-                <th style={{ padding: '10px 12px' }}>Họ và tên</th>
-                <th style={{ padding: '10px 12px' }}>Ngành</th>
-                <th style={{ padding: '10px 12px' }}>Lớp</th>
-                <th style={{ padding: '10px 12px' }}>Email & SĐT</th>
-                <th style={{ padding: '10px 12px' }}>GPA</th>
-                <th style={{ padding: '10px 12px' }}>Trạng thái</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((st, idx) => {
-                const badge = getStatusBadge(st.status);
-                return (
-                  <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 12px' }}>{currentPage * 15 + idx + 1}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{st.fullName}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontWeight: 600 }}>
-                        {st.majorCode || 'N/A'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>{st.className || '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>
-                      <div>{st.email}</div>
-                      {st.phone && <div style={{ fontSize: '0.75rem' }}>📞 {st.phone}</div>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
-                        {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
-                        {badge.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      {!isRoundClosed ? (
-                        <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          <button
-                            onClick={() => handleOpenStatusModal(st)}
-                            title="Đổi trạng thái"
-                            style={{ backgroundColor: '#eff6ff', color: '#0a3273', border: '1px solid #bfdbfe', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
-                            title="Xóa khỏi đợt"
-                            style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                          >
-                            Xóa
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Đã khóa</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ width: '100%', minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>💡 Vuốt hoặc cuộn ngang để xem đầy đủ cột thông tin</span>
+          </div>
+          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+            <table style={{ width: '100%', minWidth: '880px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569', whiteSpace: 'nowrap' }}>
+                  <th style={{ padding: '10px 12px', width: '50px' }}>STT</th>
+                  <th style={{ padding: '10px 12px', width: '110px' }}>MSSV</th>
+                  <th style={{ padding: '10px 12px', minWidth: '160px' }}>Họ và tên</th>
+                  <th style={{ padding: '10px 12px', width: '90px' }}>Ngành</th>
+                  <th style={{ padding: '10px 12px', width: '110px' }}>Lớp</th>
+                  <th style={{ padding: '10px 12px', minWidth: '180px' }}>Email & SĐT</th>
+                  <th style={{ padding: '10px 12px', width: '70px' }}>GPA</th>
+                  <th style={{ padding: '10px 12px', width: '130px' }}>Trạng thái</th>
+                  <th style={{ padding: '10px 12px', width: '110px', textAlign: 'center' }}>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((st, idx) => {
+                  const badge = getStatusBadge(st.status);
+                  return (
+                    <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 12px' }}>{currentPage * 15 + idx + 1}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>{st.fullName}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontWeight: 600 }}>
+                          {st.majorCode || 'N/A'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>{st.className || '—'}</td>
+                      <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                        <div>{st.email}</div>
+                        {st.phone && <div style={{ fontSize: '0.75rem' }}>📞 {st.phone}</div>}
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
+                          {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        {!isRoundClosed ? (
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            <button
+                              onClick={() => handleOpenStatusModal(st)}
+                              title="Đổi trạng thái"
+                              style={{ backgroundColor: '#eff6ff', color: '#0a3273', border: '1px solid #bfdbfe', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
+                              title="Xóa khỏi đợt"
+                              style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Đã khóa</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
           {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', padding: '12px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
             <div>
               Trang <strong>{currentPage + 1}</strong> / {totalPages || 1} (Tổng {totalElements} sinh viên)
             </div>
@@ -801,7 +844,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
       {/* Modal Import Excel */}
       {showImportModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
           <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px 32px', width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <div>
@@ -855,9 +898,31 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                 </button>
               </div>
               <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
-                💡 Nếu chưa có file đúng định dạng, hãy bấm <strong>"Tải Excel mẫu UTC"</strong> ở trang quản lý để lấy file mẫu chuẩn gồm 8 cột: STT, Mã sinh viên, Họ đệm, Tên, Ngành, Lớp, SĐT, Email.
-                <br />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+                  <span>
+                    💡 Nếu chưa có file đúng định dạng, hãy bấm <strong>"📥 Tải file mẫu Excel UTC"</strong> để lấy file mẫu chuẩn gồm các cột: STT, Mã sinh viên, Họ đệm, Tên, Ngành, Lớp, SĐT, Email, Điểm GPA.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    style={{
+                      backgroundColor: '#eff6ff',
+                      color: '#0a3273',
+                      border: '1px solid #93c5fd',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontWeight: 600,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    📥 Tải file mẫu Excel UTC
+                  </button>
+                </div>
                 <strong style={{ color: '#0a3273' }}>📌 Quy định dữ liệu:</strong> Kiểm tra đúng định dạng và số lượng của dữ liệu, Mã sinh viên (MSSV) <strong>chỉ có đúng 9 số</strong>.
+                <br />
+                <strong style={{ color: '#16a34a' }}>🔐 Tự động tạo tài khoản:</strong> Khi xác nhận import, hệ thống tự động tạo tài khoản sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu mặc định = Password@123</strong>.
               </div>
             </div>
 
@@ -1031,7 +1096,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             </h3>
             
             <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '0.85rem', color: '#1e40af' }}>
-              🔐 <strong>Cấp tài khoản đăng nhập tự động:</strong> Khi lưu, hệ thống tự động tạo tài khoản Sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu khởi tạo = Mã SV</strong>.
+              🔐 <strong>Cấp tài khoản đăng nhập tự động:</strong> Khi lưu, hệ thống tự động tạo tài khoản Sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu mặc định = Password@123</strong>.
             </div>
 
             {manualModalError && (

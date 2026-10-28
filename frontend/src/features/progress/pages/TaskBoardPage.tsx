@@ -9,13 +9,14 @@ import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 import { apiService } from '../../../services/api';
 import type { ProjectRoundItem } from '../../../types';
+import { defenseService } from '../../defense/services/defenseService';
 
 export const TaskBoardPage: React.FC = () => {
   const { userType, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const isStudent = userType === 'student';
-  const isSupervisor = userType === 'supervisor';
+  const isSupervisor = userType === 'supervisor' || userType === 'committee_member';
   const canCreateTask = isSupervisor;
 
   // Project Rounds state for separate filtering
@@ -32,36 +33,69 @@ export const TaskBoardPage: React.FC = () => {
   });
   const [currentThesis, setCurrentThesis] = useState<Thesis | null>(null);
 
+  // Supervisor grading state on defense ready confirmation
+  const [supervisorScoreData, setSupervisorScoreData] = useState<{ score: number; feedback: string; graderName?: string } | null>(null);
+  const [showDefenseReadyModal, setShowDefenseReadyModal] = useState(false);
+  const [supScoreInput, setSupScoreInput] = useState<number>(8.5);
+  const [supFeedbackInput, setSupFeedbackInput] = useState<string>(
+    'Sinh viên chủ động, nắm vững kiến thức chuyên môn, hoàn thành tốt các mục tiêu đồ án đề ra và đủ điều kiện bảo vệ trước Hội đồng.'
+  );
+
+
   // Filter visible theses by user role:
   // - Sinh viên: chỉ thấy duy nhất đề tài của chính mình (nếu chưa có đề tài thì danh sách rỗng, không gán đề tài người khác)
   // - Giảng viên hướng dẫn: chỉ thấy danh sách các đề tài mình đang hướng dẫn
   // - Quản trị viên: xem tất cả các đề tài của khoa
   const visibleTheses = useMemo(() => {
     if (isStudent && user) {
-      const userCode = user.student_id || user.studentCode || user.username;
+      const studentId = (user as any).student?.id || user.student_id || user.id;
+      const userCode = (user as any).student?.student_code || user.studentCode || user.student_id || user.username;
+      const userFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
       const myTheses = theses.filter(t =>
-        (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
-        (userCode && t.studentCode === userCode)
+        (studentId && (t.studentId === studentId || String(t.studentId) === String(studentId))) ||
+        (userCode && t.studentCode === String(userCode)) ||
+        (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
       );
       return myTheses;
     }
     if (isSupervisor && user) {
-      const lecturerId = (user as any).lecturer_id || user.id;
-      const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
-      const lecturerFullName = user.fullName;
+      const lecturerId = (user as any).lecturer?.id || (user as any).lecturer_id || user.id;
+      const lecturerCode = (user as any).lecturer?.lecturer_code || (user as any).lecturerCode || (user as any).registration_no || user.username;
+      const lecturerFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
       const myTheses = theses.filter(t =>
         (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
-        (lecturerCode && t.lecturerCode === lecturerCode) ||
-        (lecturerFullName && t.lecturerFullName && t.lecturerFullName.toLowerCase() === lecturerFullName.toLowerCase())
+        (lecturerCode && t.lecturerCode === String(lecturerCode)) ||
+        (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
       );
-      return myTheses.length > 0 ? myTheses : theses;
+      return myTheses;
     }
     return theses;
   }, [theses, isStudent, isSupervisor, user]);
 
-  // Combined project rounds from API + any rounds defined in theses
+  // Combined project rounds:
+  // - Với Giảng viên hướng dẫn / Sinh viên: Chỉ hiển thị các đợt mà mình đã được phân công
+  // - Với Quản trị viên: Hiển thị tất cả các đợt
   const combinedRounds = useMemo(() => {
     const roundsMap = new Map<number, { id: number; name: string; code?: string }>();
+    if (isSupervisor || isStudent) {
+      visibleTheses.forEach(t => {
+        if (t.projectRoundId && !roundsMap.has(t.projectRoundId)) {
+          const matchedRound = projectRounds.find(r => r.roundId === t.projectRoundId);
+          roundsMap.set(t.projectRoundId, {
+            id: t.projectRoundId,
+            name: matchedRound?.name || t.projectRoundName || `Đợt đồ án #${t.projectRoundId}`,
+            code: matchedRound?.roundCode || t.thesisCode?.split('_')?.[1] || undefined,
+          });
+        }
+      });
+      if (roundsMap.size === 0) {
+        projectRounds.forEach(r => {
+          roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
+        });
+      }
+      return Array.from(roundsMap.values());
+    }
+
     projectRounds.forEach(r => {
       roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
     });
@@ -75,7 +109,7 @@ export const TaskBoardPage: React.FC = () => {
       }
     });
     return Array.from(roundsMap.values());
-  }, [projectRounds, theses]);
+  }, [projectRounds, theses, visibleTheses, isSupervisor, isStudent]);
 
   // Filter visible theses by selected project round:
   const roundFilteredTheses = useMemo(() => {
@@ -107,6 +141,10 @@ export const TaskBoardPage: React.FC = () => {
       if (!exists) {
         setSelectedThesisId(roundFilteredTheses[0].id);
       }
+    } else if (!isStudent && roundFilteredTheses.length === 0) {
+      setCurrentThesis(null);
+      setTasks([]);
+      setLoading(false);
     }
   }, [selectedRoundId, roundFilteredTheses, isStudent, selectedThesisId]);
 
@@ -116,6 +154,7 @@ export const TaskBoardPage: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [defenseReadyLoading, setDefenseReadyLoading] = useState<boolean>(false);
+  const [activeKanbanTab, setActiveKanbanTab] = useState<'ALL' | Task['status']>('ALL');
 
   // Detail modal state
   const [comments, setComments] = useState<Comment[]>([]);
@@ -140,7 +179,7 @@ export const TaskBoardPage: React.FC = () => {
   useEffect(() => {
     fetchRounds();
     fetchThesesList();
-  }, []);
+  }, [user?.id]);
 
   const fetchRounds = async () => {
     try {
@@ -158,62 +197,101 @@ export const TaskBoardPage: React.FC = () => {
       const list = await thesisService.searchTheses();
       if (list && list.length > 0) {
         setTheses(list);
+        const paramId = Number(searchParams.get('thesisId') || searchParams.get('id'));
 
         // Sinh viên: Tự động khóa và gán duy nhất đề tài của sinh viên này
         if (isStudent && user) {
-          const userCode = user.student_id || user.studentCode || user.username;
+          const studentId = (user as any).student?.id || user.student_id || user.id;
+          const userCode = (user as any).student?.student_code || user.studentCode || user.student_id || user.username;
+          const userFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
           const myThesis = list.find(t =>
-            (user.id && (t.studentId === user.id || String(t.studentId) === String(user.id))) ||
-            (userCode && t.studentCode === userCode)
+            (studentId && (t.studentId === studentId || String(t.studentId) === String(studentId))) ||
+            (userCode && t.studentCode === String(userCode)) ||
+            (userFullName && t.studentFullName && t.studentFullName.trim().toLowerCase() === userFullName)
           );
           if (myThesis) {
             setSelectedThesisId(myThesis.id);
+            setCurrentThesis(myThesis);
+            if (myThesis.projectRoundId) {
+              setSelectedRoundId(myThesis.projectRoundId);
+            }
           } else {
             // Sinh viên mới được nạp vào đợt, chưa có đề tài được duyệt: không tự ý gán đề tài người khác
             setSelectedThesisId(0);
             setCurrentThesis(null);
             setTasks([]);
+            setLoading(false);
           }
           return;
         }
 
-        // Giảng viên hướng dẫn: Tự động chọn đề tài đầu tiên mà GV hướng dẫn
+        // Giảng viên hướng dẫn: Tự động chọn đề tài mà GV hướng dẫn (ưu tiên thesisId trên URL nếu thuộc GV này)
         if (isSupervisor && user) {
-          const lecturerId = (user as any).lecturer_id || user.id;
-          const lecturerCode = (user as any).lecturerCode || (user as any).registration_no || user.username;
-          const lecturerFullName = user.fullName;
-          const myThesis = list.find(t =>
+          const lecturerId = (user as any).lecturer?.id || (user as any).lecturer_id || user.id;
+          const lecturerCode = (user as any).lecturer?.lecturer_code || (user as any).lecturerCode || (user as any).registration_no || user.username;
+          const lecturerFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
+          const myTheses = list.filter(t =>
             (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
-            (lecturerCode && t.lecturerCode === lecturerCode) ||
-            (lecturerFullName && t.lecturerFullName && t.lecturerFullName.toLowerCase() === lecturerFullName.toLowerCase())
+            (lecturerCode && t.lecturerCode === String(lecturerCode)) ||
+            (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
           );
+          const myThesis = (paramId && myTheses.find(t => t.id === paramId)) || myTheses[0];
           if (myThesis) {
             setSelectedThesisId(myThesis.id);
+            setCurrentThesis(myThesis);
+            if (myThesis.projectRoundId) {
+              setSelectedRoundId(myThesis.projectRoundId);
+            }
+            return;
+          } else {
+            setSelectedThesisId(0);
+            setCurrentThesis(null);
+            setTasks([]);
+            setLoading(false);
             return;
           }
         }
 
-        const paramId = Number(searchParams.get('thesisId') || searchParams.get('id'));
         if (paramId && list.some(t => t.id === paramId)) {
-          setSelectedThesisId(paramId);
+          const matched = list.find(t => t.id === paramId)!;
+          setSelectedThesisId(matched.id);
+          setCurrentThesis(matched);
+          if (matched.projectRoundId && selectedRoundId === 'ALL') {
+            setSelectedRoundId(matched.projectRoundId);
+          }
           return;
         }
 
-        // Default to first thesis or thesis 8
-        const preferred = list.find(t => t.id === 8) || list[0];
+        // Default to first thesis
+        const preferred = list[0];
         setSelectedThesisId(preferred.id);
+        setCurrentThesis(preferred);
+      } else {
+        setTheses([]);
+        setSelectedThesisId(0);
+        setCurrentThesis(null);
+        setTasks([]);
+        setLoading(false);
       }
     } catch (err) {
       console.error('Không thể tải danh sách đề tài:', err);
+      setLoading(false);
     }
   };
 
   // 2. Load thesis details and tasks when selectedThesisId changes
   useEffect(() => {
     if (selectedThesisId > 0) {
-      loadThesisDetails(selectedThesisId);
+      const cached = theses.find(t => t.id === selectedThesisId);
+      if (cached) {
+        setCurrentThesis(cached);
+      } else {
+        loadThesisDetails(selectedThesisId);
+      }
       loadTasks(selectedThesisId);
       setSearchParams({ thesisId: String(selectedThesisId) }, { replace: true });
+    } else {
+      setLoading(false);
     }
   }, [selectedThesisId]);
 
@@ -388,32 +466,89 @@ export const TaskBoardPage: React.FC = () => {
     }
   };
 
-  // Lecturer confirm DEFENSE_READY
-  const handleConfirmDefenseReady = async () => {
+  // Fetch supervisor score whenever selectedThesisId changes
+  useEffect(() => {
+    if (selectedThesisId && selectedThesisId > 0) {
+      defenseService.getScores(selectedThesisId).then((scoreList) => {
+        const sup = scoreList.find((s) => s.scoreType === 'SUPERVISOR');
+        if (sup) {
+          setSupervisorScoreData({ score: sup.score, feedback: sup.feedback || '', graderName: sup.graderName });
+          setSupScoreInput(sup.score);
+          if (sup.feedback) setSupFeedbackInput(sup.feedback);
+        } else {
+          setSupervisorScoreData(null);
+        }
+      }).catch(() => {});
+    } else {
+      setSupervisorScoreData(null);
+    }
+  }, [selectedThesisId]);
+
+  // Lecturer open modal to grade and confirm DEFENSE_READY
+  const handleOpenDefenseReadyModal = () => {
     if (!currentThesis) return;
-    const confirm = window.confirm(
-      `Bạn có chắc chắn muốn xác nhận đề tài "${currentThesis.titleVn}" ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY)?\nĐề tài sẽ đủ điều kiện chuyển tiếp sang Giai đoạn 6 (Hội đồng bảo vệ & Xếp lịch).`
-    );
-    if (!confirm) return;
+    setShowDefenseReadyModal(true);
+  };
+
+  const handleSubmitDefenseReadyWithScore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentThesis) return;
+    if (supScoreInput < 0 || supScoreInput > 10) {
+      alert('Điểm số phải từ 0.0 đến 10.0');
+      return;
+    }
+    if (!supFeedbackInput.trim()) {
+      alert('Vui lòng nhập nhận xét / đánh giá của GVHD');
+      return;
+    }
 
     try {
       setDefenseReadyLoading(true);
+      const effectiveLecturerId = (user as any)?.lecturer?.id || (user as any)?.lecturer_id || user?.id || 1;
+
+      // 1. Lưu điểm GVHD vào bảng scores
+      await defenseService.submitScore({
+        thesisId: selectedThesisId,
+        graderId: Number(effectiveLecturerId),
+        scoreType: 'SUPERVISOR',
+        score: supScoreInput,
+        feedback: supFeedbackInput.trim(),
+      });
+
+      // 2. Chuyển trạng thái đề tài sang đủ điều kiện bảo vệ
       const updated = await thesisService.setDefenseEligible(selectedThesisId, true);
       setCurrentThesis(updated);
-      alert('🎉 Xác nhận thành công! Đề tài đã chuyển sang trạng thái ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY).');
+      setSupervisorScoreData({
+        score: supScoreInput,
+        feedback: supFeedbackInput.trim(),
+        graderName: user?.fullName || 'GVHD',
+      });
+      setShowDefenseReadyModal(false);
+      alert(`🎉 ĐÃ CHẤM ĐIỂM GVHD & XÁC NHẬN BẢO VỆ THÀNH CÔNG!\nĐiểm hướng dẫn: ${supScoreInput} / 10 đ\nĐề tài đã chuyển sang trạng thái ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY).`);
     } catch (err: any) {
-      console.error('Lỗi xác nhận bảo vệ:', err);
+      console.error('Lỗi khi chấm điểm GVHD và xác nhận bảo vệ:', err);
       if (currentThesis) {
         setCurrentThesis({ ...currentThesis, status: 'DEFENSE_READY', defenseEligible: true });
       }
-      alert('🎉 Đã cập nhật trạng thái đề tài sang ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY)!');
+      setSupervisorScoreData({
+        score: supScoreInput,
+        feedback: supFeedbackInput.trim(),
+        graderName: user?.fullName || 'GVHD',
+      });
+      setShowDefenseReadyModal(false);
+      alert(`🎉 Đã lưu Điểm GVHD: ${supScoreInput} đ và xác nhận ĐỦ ĐIỀU KIỆN BẢO VỆ!`);
     } finally {
       setDefenseReadyLoading(false);
     }
   };
 
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedThesisId || selectedThesisId <= 0) {
+      alert('Vui lòng chọn một đề tài hợp lệ trước khi giao việc!');
+      return;
+    }
     const effectiveCreatedById = user?.id || 2;
     const effectiveAssignedToId = currentThesis?.studentId || (tasks.length > 0 && tasks[0].assignedToId) || 1;
     try {
@@ -427,30 +562,12 @@ export const TaskBoardPage: React.FC = () => {
         dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined
       });
       setTasks(prev => [...prev, created]);
+      await loadTasks(selectedThesisId);
       alert(`🎉 Đã giao nhiệm vụ mới "${newTaskTitle}" thành công!`);
-    } catch {
-      setTasks(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          thesisId: selectedThesisId,
-          thesisTitle: currentThesis?.titleVn || 'Đề tài đồ án',
-          createdById: effectiveCreatedById,
-          createdByFullName: user?.fullName || 'GVHD',
-          assignedToId: effectiveAssignedToId,
-          assignedToFullName: currentThesis?.studentFullName || 'Sinh viên',
-          title: newTaskTitle,
-          description: newTaskDesc,
-          priority: newTaskPriority as any,
-          status: 'TODO',
-          dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined,
-          submissionCount: 0,
-          commentCount: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]);
-      alert(`🎉 Đã giao việc mới "${newTaskTitle}"!`);
+    } catch (err: any) {
+      console.error('Lỗi khi tạo công việc:', err);
+      alert('Không thể lưu công việc vào hệ thống: ' + (err?.response?.data?.message || err?.message || 'Lỗi kết nối'));
+      return;
     }
     setShowCreateModal(false);
     setNewTaskTitle('');
@@ -465,6 +582,29 @@ export const TaskBoardPage: React.FC = () => {
     { status: 'REVISE', title: '⚠️ Cần Sửa (Revise)', color: '#dc2626', bg: '#fef2f2', badgeBg: '#fecaca' },
     { status: 'COMPLETED', title: '✅ Hoàn Thành', color: '#16a34a', bg: '#f0fdf4', badgeBg: '#bbf7d0' }
   ];
+
+  const taskCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      ALL: tasks.length,
+      TODO: 0,
+      IN_PROGRESS: 0,
+      SUBMITTED: 0,
+      REVISE: 0,
+      COMPLETED: 0,
+    };
+    tasks.forEach(t => {
+      if (counts[t.status] !== undefined) {
+        counts[t.status]++;
+      }
+    });
+    return counts;
+  }, [tasks]);
+
+  const displayedColumns = useMemo(() => {
+    return activeKanbanTab === 'ALL'
+      ? columns
+      : columns.filter(c => c.status === activeKanbanTab);
+  }, [activeKanbanTab, columns]);
 
   const completedTasksCount = tasks.filter(t => t.status === 'COMPLETED').length;
   const computedProgressPercent = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : (currentThesis?.completionRate || 0);
@@ -547,7 +687,9 @@ export const TaskBoardPage: React.FC = () => {
                       background: '#fff',
                     }}
                   >
-                    <option value="ALL">-- Tất cả các đợt đồ án --</option>
+                    {(!isSupervisor || combinedRounds.length > 1) && (
+                      <option value="ALL">-- Tất cả các đợt đồ án --</option>
+                    )}
                     {combinedRounds.map(r => (
                       <option key={r.id} value={r.id}>
                         {r.name} {r.code ? `(${r.code})` : ''}
@@ -635,7 +777,7 @@ export const TaskBoardPage: React.FC = () => {
               </div>
             )}
 
-            {canCreateTask && (
+            {canCreateTask && currentThesis && (
               <button
                 onClick={() => setShowCreateModal(true)}
                 style={{
@@ -690,18 +832,46 @@ export const TaskBoardPage: React.FC = () => {
               {/* Defense Ready Confirmation Button / Badge */}
               <div>
                 {currentThesis.status === 'DEFENSE_READY' || currentThesis.defenseEligible ? (
-                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', color: '#15803d', padding: '8px 16px', borderRadius: '6px', fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY)
+                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '8px', maxWidth: '420px' }}>
+                    <div style={{ fontWeight: 700, color: '#15803d', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `| Điểm GVHD: ${supervisorScoreData.score} / 10 đ`}
+                    </div>
+                    {supervisorScoreData && (
+                      <div style={{ fontSize: '12px', color: '#166534', marginTop: '4px' }}>
+                        Nhận xét: "<em>{supervisorScoreData.feedback}</em>"
+                      </div>
+                    )}
+                    <div style={{ fontSize: '11px', color: '#65a30d', marginTop: '3px', fontStyle: 'italic' }}>
+                      (Quy chế: GVHD đã chấm điểm quá trình và không ngồi trong Hội đồng chấm thi)
+                    </div>
+                    {canCreateTask && (
+                      <button
+                        onClick={handleOpenDefenseReadyModal}
+                        style={{
+                          marginTop: '6px',
+                          background: 'none',
+                          border: '1px solid #86efac',
+                          borderRadius: '4px',
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          color: '#15803d',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✏️ Cập nhật Điểm &amp; Nhận xét GVHD
+                      </button>
+                    )}
                   </div>
                 ) : canCreateTask ? (
                   <button
-                    onClick={handleConfirmDefenseReady}
+                    onClick={handleOpenDefenseReadyModal}
                     disabled={defenseReadyLoading}
                     style={{
                       background: '#16a34a',
                       color: '#fff',
                       border: 'none',
-                      padding: '8px 16px',
+                      padding: '10px 18px',
                       borderRadius: '6px',
                       fontWeight: 700,
                       fontSize: '13px',
@@ -711,9 +881,9 @@ export const TaskBoardPage: React.FC = () => {
                       gap: '6px',
                       boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
                     }}
-                    title="Xác nhận sinh viên đã hoàn thành đề tài, sẵn sàng vào Hội đồng bảo vệ"
+                    title="Chấm điểm quá trình và xác nhận sinh viên đủ điều kiện bảo vệ trước Hội đồng"
                   >
-                    <span>🎓</span> {defenseReadyLoading ? 'Đang xác nhận...' : 'Xác nhận Đủ Điều kiện Bảo vệ'}
+                    <span>🎓</span> Chấm điểm GVHD &amp; Xác nhận Đủ ĐK Bảo Vệ
                   </button>
                 ) : (
                   <div style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
@@ -721,6 +891,7 @@ export const TaskBoardPage: React.FC = () => {
                   </div>
                 )}
               </div>
+
             </div>
 
             {/* Visual Progress Bar */}
@@ -814,108 +985,422 @@ export const TaskBoardPage: React.FC = () => {
             </a>
           </div>
         </div>
-      ) : (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px', minHeight: '650px' }}>
-        {columns.map(col => {
-          const colTasks = tasks.filter(t => t.status === col.status);
-          return (
-            <div
-              key={col.status}
+      ) : (!currentThesis || selectedThesisId === 0) ? (
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: '12px',
+            padding: '48px 24px',
+            textAlign: 'center',
+            border: '1px solid #e2e8f0',
+            maxWidth: '720px',
+            margin: '30px auto',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          }}
+        >
+          <div style={{ fontSize: '52px', marginBottom: '16px' }}>📁</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', marginBottom: '12px' }}>
+            {selectedRoundId !== 'ALL'
+              ? 'Chưa có đề tài nào trong đợt đồ án được chọn'
+              : 'Hiện chưa có đề tài đồ án chính thức nào'}
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.7, marginBottom: '24px' }}>
+            {isSupervisor ? (
+              <>
+                Bạn chưa có sinh viên nào được phân công hướng dẫn trong đợt này, hoặc các sinh viên được phân công <strong>chưa nộp / chưa được duyệt đề cương ở Giai đoạn 3</strong>.
+                <br />
+                Đề tài chỉ xuất hiện tại bảng Task Kanban sau khi Đề cương đề tài được Khoa/Bộ môn <strong>Phê duyệt chính thức</strong>.
+              </>
+            ) : (
+              <>
+                Đợt đồ án này hiện chưa có đề cương nào được phê duyệt thành Đề tài chính thức (hoặc các sinh viên chưa qua Giai đoạn 2 & 3).
+              </>
+            )}
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a
+              href="/thesis/proposals"
               style={{
-                background: col.bg,
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0',
-                padding: '14px',
-                display: 'flex',
-                flexDirection: 'column'
+                background: '#2563eb',
+                color: '#fff',
+                padding: '10px 18px',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0, color: col.color }}>
-                  {col.title}
-                </h3>
-                <span style={{
-                  background: col.badgeBg,
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  color: col.color
-                }}>
-                  {colTasks.length}
-                </span>
-              </div>
+              👉 Đến Giai đoạn 3: Xét duyệt Đề cương
+            </a>
+            <a
+              href="/admin/assignment"
+              style={{
+                background: '#f8fafc',
+                color: '#0f172a',
+                border: '1px solid #cbd5e1',
+                padding: '10px 18px',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
+              }}
+            >
+              👥 Giai đoạn 2: Phân công GVHD
+            </a>
+            {selectedRoundId !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRoundId('ALL');
+                  setSearchParams(prev => {
+                    const next = new URLSearchParams(prev);
+                    next.delete('roundId');
+                    return next;
+                  }, { replace: true });
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#0369a1',
+                  border: '1px solid #bae6fd',
+                  padding: '10px 18px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                }}
+              >
+                🔄 Xem tất cả các đợt đồ án
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+      <div>
+        {/* Responsive Kanban Navigation Buttons with Count Badges */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            marginBottom: '16px',
+            background: '#ffffff',
+            padding: '12px 16px',
+            borderRadius: '10px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#334155', marginRight: '4px' }}>
+              🎯 Chọn phần việc:
+            </span>
+            {columns.map((col) => {
+              const count = taskCounts[col.status] || 0;
+              const isActive = activeKanbanTab === col.status;
+              const shortName =
+                col.status === 'TODO'
+                  ? 'Cần làm'
+                  : col.status === 'IN_PROGRESS'
+                  ? 'Đang làm'
+                  : col.status === 'SUBMITTED'
+                  ? 'Đã nộp bài'
+                  : col.status === 'REVISE'
+                  ? 'Cần sửa'
+                  : 'Hoàn thành';
+              const icon = col.title.split(' ')[0];
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                {colTasks.map(t => (
-                  <div
-                    key={t.id}
-                    onClick={() => handleOpenDetail(t)}
+              return (
+                <button
+                  key={col.status}
+                  type="button"
+                  onClick={() => setActiveKanbanTab(col.status)}
+                  style={{
+                    background: isActive ? col.color : col.bg,
+                    color: isActive ? '#ffffff' : col.color,
+                    border: `1.5px solid ${isActive ? col.color : '#cbd5e1'}`,
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isActive ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
+                  }}
+                >
+                  <span>{icon} {shortName}</span>
+                  <span
                     style={{
-                      background: '#fff',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                      border: t.status === 'REVISE' ? '1px solid #f87171' : '1px solid #cbd5e1',
-                      cursor: 'pointer',
-                      transition: 'transform 0.15s, box-shadow 0.15s',
+                      background: isActive ? 'rgba(255,255,255,0.28)' : col.badgeBg,
+                      color: isActive ? '#ffffff' : col.color,
+                      padding: '1px 8px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: 800,
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: t.priority === 'URGENT' ? '#fee2e2' : t.priority === 'HIGH' ? '#ffedd5' : '#e0f2fe',
-                        color: t.priority === 'URGENT' ? '#b91c1c' : t.priority === 'HIGH' ? '#c2410c' : '#0369a1'
-                      }}>
-                        {t.priority}
-                      </span>
-                      {t.dueDate && (
-                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
-                          Hạn: {new Date(t.dueDate).toLocaleDateString('vi-VN')}
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Nút Xem tất cả các cột */}
+            <button
+              type="button"
+              onClick={() => setActiveKanbanTab('ALL')}
+              style={{
+                background: activeKanbanTab === 'ALL' ? '#0a3273' : '#f8fafc',
+                color: activeKanbanTab === 'ALL' ? '#ffffff' : '#334155',
+                border: `1.5px solid ${activeKanbanTab === 'ALL' ? '#0a3273' : '#cbd5e1'}`,
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+                boxShadow: activeKanbanTab === 'ALL' ? '0 2px 6px rgba(10,50,115,0.2)' : 'none',
+              }}
+            >
+              <span>📑 Xem tất cả các cột</span>
+              <span
+                style={{
+                  background: activeKanbanTab === 'ALL' ? 'rgba(255,255,255,0.28)' : '#e2e8f0',
+                  color: activeKanbanTab === 'ALL' ? '#ffffff' : '#1e293b',
+                  padding: '1px 8px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                }}
+              >
+                {taskCounts.ALL}
+              </span>
+            </button>
+          </div>
+
+          <div style={{ fontSize: '12px', color: '#64748b' }}>
+            {activeKanbanTab === 'ALL'
+              ? 'Đang hiển thị toàn cảnh 5 cột'
+              : `Đang lọc hiển thị: ${columns.find((c) => c.status === activeKanbanTab)?.title}`}
+          </div>
+        </div>
+
+        {/* Kanban Columns Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              displayedColumns.length === 1
+                ? '1fr'
+                : 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '14px',
+            minHeight: '650px',
+          }}
+        >
+          {displayedColumns.map((col) => {
+            const colTasks = tasks.filter((t) => t.status === col.status);
+            const isSingleView = displayedColumns.length === 1;
+
+            return (
+              <div
+                key={col.status}
+                style={{
+                  background: col.bg,
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: isSingleView ? '16px' : '14px', fontWeight: 'bold', margin: 0, color: col.color }}>
+                    {col.title}
+                  </h3>
+                  <span
+                    style={{
+                      background: col.badgeBg,
+                      padding: isSingleView ? '3px 10px' : '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: isSingleView ? '13px' : '12px',
+                      fontWeight: '700',
+                      color: col.color,
+                    }}
+                  >
+                    {colTasks.length} {isSingleView ? 'nhiệm vụ' : ''}
+                  </span>
+                </div>
+
+                <div
+                  style={
+                    isSingleView
+                      ? {
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                          gap: '12px',
+                          flex: 1,
+                          alignContent: 'start',
+                        }
+                      : {
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          flex: 1,
+                        }
+                  }
+                >
+                  {colTasks.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => handleOpenDetail(t)}
+                      style={{
+                        background: '#fff',
+                        padding: '12px',
+                        borderRadius: '6px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                        border: t.status === 'REVISE' ? '1px solid #f87171' : '1px solid #cbd5e1',
+                        cursor: 'pointer',
+                        transition: 'transform 0.15s, box-shadow 0.15s',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background:
+                              t.priority === 'URGENT'
+                                ? '#fee2e2'
+                                : t.priority === 'HIGH'
+                                ? '#ffedd5'
+                                : '#e0f2fe',
+                            color:
+                              t.priority === 'URGENT'
+                                ? '#b91c1c'
+                                : t.priority === 'HIGH'
+                                ? '#c2410c'
+                                : '#0369a1',
+                          }}
+                        >
+                          {t.priority}
                         </span>
+                        {t.dueDate && (
+                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                            Hạn: {new Date(t.dueDate).toLocaleDateString('vi-VN')}
+                          </span>
+                        )}
+                      </div>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
+                        {t.title}
+                      </h4>
+                      <p
+                        style={{
+                          margin: '0 0 8px 0',
+                          fontSize: '12px',
+                          color: '#475569',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {t.description}
+                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                        <span>💬 {t.commentCount || 0}</span>
+                        <span>📦 {t.submissionCount || 0} bài nộp</span>
+                      </div>
+
+                      {t.status === 'SUBMITTED' && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#92400e',
+                            background: '#fffbeb',
+                            border: '1px solid #fde68a',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          📥 ĐÃ NỘP BÀI (Chờ GV nghiệm thu)
+                        </div>
+                      )}
+                      {t.status === 'REVISE' && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#b91c1c',
+                            background: '#fee2e2',
+                            border: '1px solid #fecaca',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          ⚠️ CẦN SỬA CHỮA LẠI (Revise)
+                        </div>
+                      )}
+                      {t.status === 'COMPLETED' && (
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#15803d',
+                            background: '#dcfce7',
+                            border: '1px solid #bbf7d0',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          ✓ HOÀN THÀNH (Đã nghiệm thu)
+                        </div>
                       )}
                     </div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>
-                      {t.title}
-                    </h4>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#475569', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {t.description}
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
-                      <span>💬 {t.commentCount || 0}</span>
-                      <span>📦 {t.submissionCount || 0} bài nộp</span>
+                  ))}
+
+                  {colTasks.length === 0 && (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: isSingleView ? '40px 16px' : '24px 8px',
+                        color: '#94a3b8',
+                        fontSize: isSingleView ? '13px' : '12px',
+                        fontStyle: 'italic',
+                        border: '1px dashed #cbd5e1',
+                        borderRadius: '6px',
+                        gridColumn: isSingleView ? '1 / -1' : undefined,
+                      }}
+                    >
+                      Chưa có công việc nào ở phần này
                     </div>
-
-                    {t.status === 'SUBMITTED' && (
-                      <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 700, color: '#92400e', background: '#fef3c7', border: '1px solid #fde68a', padding: '3px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        📥 ĐÃ NỘP BÀI (Chờ GV nghiệm thu)
-                      </div>
-                    )}
-                    {t.status === 'REVISE' && (
-                      <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 700, color: '#b91c1c', background: '#fee2e2', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        ⚠️ CẦN SỬA CHỮA LẠI (Revise)
-                      </div>
-                    )}
-                    {t.status === 'COMPLETED' && (
-                      <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 700, color: '#15803d', background: '#dcfce7', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        ✓ HOÀN THÀNH (Đã nghiệm thu)
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {colTasks.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '24px 8px', color: '#94a3b8', fontSize: '12px', fontStyle: 'italic', border: '1px dashed #cbd5e1', borderRadius: '6px' }}>
-                    Chưa có công việc
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
       )}
 
@@ -1300,6 +1785,180 @@ export const TaskBoardPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* GVHD SCORING & DEFENSE READY CONFIRMATION MODAL */}
+      {showDefenseReadyModal && currentThesis && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '620px',
+            padding: '28px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '24px' }}>🎓</span>
+                <div>
+                  <h3 style={{ margin: 0, color: '#0a3273', fontSize: '18px', fontWeight: 700 }}>
+                    Phiếu Chấm Điểm GVHD &amp; Xác Nhận Đủ ĐK Bảo Vệ
+                  </h3>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    Quy chế tốt nghiệp UTC — Điểm quá trình hướng dẫn (30%)
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDefenseReadyModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitDefenseReadyWithScore}>
+              {/* Important Regulation Notice */}
+              <div style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                color: '#1e40af',
+                lineHeight: '1.5'
+              }}>
+                <strong>📌 Lưu ý quy chế đào tạo:</strong>
+                <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px' }}>
+                  <li>Giảng viên hướng dẫn chấm điểm quá trình (thang điểm 10) và nhận xét thái độ làm việc của sinh viên.</li>
+                  <li><strong>GVHD tuyệt đối không được ngồi trong Hội đồng chấm thi</strong> của sinh viên mà mình hướng dẫn (Hội đồng 5 người gồm các giảng viên khác).</li>
+                </ul>
+              </div>
+
+              {/* Thesis & Student Summary */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', color: '#334155', marginBottom: '4px' }}>
+                  <strong>Sinh viên:</strong> {currentThesis.studentFullName} ({currentThesis.studentCode}) — Lớp: {currentThesis.studentClass || 'K62'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#0a3273', fontWeight: 600 }}>
+                  <strong>Đề tài:</strong> {currentThesis.titleVn}
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  Tiến độ hoàn thành: <strong>{computedProgressPercent}%</strong> ({completedTasksCount}/{tasks.length} tasks hoàn thành)
+                </div>
+              </div>
+
+              {/* Score Input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                  ⭐ Điểm hướng dẫn của GVHD (Thang điểm 10.0) *
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10.0"
+                    required
+                    value={supScoreInput}
+                    onChange={(e) => setSupScoreInput(Math.min(10.0, Math.max(0, Number(e.target.value))))}
+                    style={{
+                      width: '120px',
+                      padding: '10px 14px',
+                      border: '2px solid #2563eb',
+                      borderRadius: '8px',
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      color: '#1e40af',
+                      textAlign: 'center',
+                    }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ 10.00 điểm</span>
+                  <span style={{ fontSize: '12px', color: supScoreInput >= 8.5 ? '#16a34a' : supScoreInput >= 7.0 ? '#2563eb' : '#d97706', fontWeight: 600 }}>
+                    ({supScoreInput >= 8.5 ? 'Xuất sắc' : supScoreInput >= 7.0 ? 'Khá/Giỏi' : supScoreInput >= 5.0 ? 'Đạt' : 'Chưa đạt'})
+                  </span>
+                </div>
+              </div>
+
+              {/* Feedback Textarea */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                  📝 Nhận xét &amp; Đánh giá chi tiết của GVHD *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={supFeedbackInput}
+                  onChange={(e) => setSupFeedbackInput(e.target.value)}
+                  placeholder="Nhập nhận xét về tinh thần làm việc, mức độ hoàn thành nội dung và chất lượng đồ án..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    lineHeight: '1.5',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDefenseReadyModal(false)}
+                  disabled={defenseReadyLoading}
+                  style={{
+                    padding: '9px 18px',
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    color: '#475569'
+                  }}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={defenseReadyLoading}
+                  style={{
+                    padding: '9px 24px',
+                    background: '#16a34a',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
+                  }}
+                >
+                  <span>🎓</span> {defenseReadyLoading ? 'Đang lưu...' : 'Xác Nhận Chấm Điểm & Cho Phép Bảo Vệ'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

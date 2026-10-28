@@ -25,14 +25,20 @@ export const ThesisEligibilityPage: React.FC = () => {
     fetchRounds();
   }, []);
 
+  useEffect(() => {
+    if (!notification) return;
+    const timer = setTimeout(() => setNotification(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notification]);
+
   const fetchRounds = async () => {
     try {
       const roundList = await apiService.getProjectRounds();
       if (roundList && roundList.length > 0) {
         setRounds(roundList);
         const activeRound =
-          roundList.find((r) => r.status === 'OPEN') ||
           roundList.find((r) => r.status === 'IN_PROGRESS') ||
+          roundList.find((r) => r.status === 'OPEN') ||
           roundList[0];
         if (activeRound?.roundId) {
           setSelectedRoundId(activeRound.roundId);
@@ -56,7 +62,10 @@ export const ThesisEligibilityPage: React.FC = () => {
     try {
       setLoading(true);
       const data = await eligibilityService.getAllStudentsEligibility(roundId ?? selectedRoundId ?? undefined);
-      setStudents(data);
+      const sorted = (data || []).slice().sort((a, b) =>
+        (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
+      );
+      setStudents(sorted);
     } catch (error: any) {
       setNotification({ type: 'error', message: error.message || 'Không thể tải danh sách sinh viên' });
     } finally {

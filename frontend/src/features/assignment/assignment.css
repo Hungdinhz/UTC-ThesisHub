@@ -101,6 +101,16 @@
   background: #e2e8f0;
 }
 
+.btn-generate-algo:disabled,
+.btn-finalize-action:disabled,
+.btn-secondary-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+  filter: grayscale(20%);
+}
+
 /* ==========================================
    Tab Navigation
    ========================================== */

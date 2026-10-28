@@ -10,6 +10,7 @@ import com.example.thesis_hub_api.progress.entity.Task;
 import com.example.thesis_hub_api.progress.repository.TaskRepository;
 import com.example.thesis_hub_api.thesis.entity.Thesis;
 import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
+import com.example.thesis_hub_api.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +30,7 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
     private final ThesisRepository thesisRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -36,14 +38,22 @@ public class TaskServiceImpl implements TaskService {
         Thesis thesis = thesisRepository.findById(request.getThesisId())
                 .orElseThrow(() -> new ResourceNotFoundException("Thesis", request.getThesisId()));
 
-        User createdBy = userRepository.findById(request.getCreatedById())
-                .orElse(thesis.getLecturer() != null ? thesis.getLecturer().getUser() : null);
+        User createdBy = (thesis.getLecturer() != null && thesis.getLecturer().getUser() != null)
+                ? thesis.getLecturer().getUser()
+                : (request.getCreatedById() != null ? userRepository.findById(request.getCreatedById()).orElse(null) : null);
+        if (createdBy == null && request.getCreatedById() != null) {
+            createdBy = userRepository.findById(request.getCreatedById()).orElse(null);
+        }
         if (createdBy == null) {
             throw new ResourceNotFoundException("User", request.getCreatedById());
         }
 
-        User assignedTo = userRepository.findById(request.getAssignedToId())
-                .orElse(thesis.getStudent() != null ? thesis.getStudent().getUser() : null);
+        User assignedTo = (thesis.getStudent() != null && thesis.getStudent().getUser() != null)
+                ? thesis.getStudent().getUser()
+                : (request.getAssignedToId() != null ? userRepository.findById(request.getAssignedToId()).orElse(null) : null);
+        if (assignedTo == null && request.getAssignedToId() != null) {
+            assignedTo = userRepository.findById(request.getAssignedToId()).orElse(null);
+        }
         if (assignedTo == null) {
             throw new ResourceNotFoundException("User", request.getAssignedToId());
         }
@@ -59,7 +69,25 @@ public class TaskServiceImpl implements TaskService {
                 .dueDate(request.getDueDate())
                 .build();
 
-        return mapToResponse(taskRepository.save(task));
+        Task savedTask = taskRepository.save(task);
+
+        // Gửi thông báo nội bộ cho người được giao nhiệm vụ
+        if (assignedTo.getId() != null) {
+            try {
+                String thesisTitle = (thesis.getTitleVn() != null) ? thesis.getTitleVn() : (thesis.getTitleEn() != null ? thesis.getTitleEn() : "Đồ án");
+                notificationService.createNotification(
+                        assignedTo.getId(),
+                        "Nhiệm vụ mới: " + savedTask.getTitle(),
+                        "GVHD đã giao nhiệm vụ mới cho bạn trên đề tài: \"" + thesisTitle + "\".",
+                        "TASK",
+                        "/progress/tasks"
+                );
+            } catch (Exception e) {
+                log.warn("Không thể tạo thông báo cho Task {}: {}", savedTask.getId(), e.getMessage());
+            }
+        }
+
+        return mapToResponse(savedTask);
     }
 
     @Override

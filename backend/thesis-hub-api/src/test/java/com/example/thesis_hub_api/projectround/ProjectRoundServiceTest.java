@@ -36,6 +36,7 @@ import com.example.thesis_hub_api.assignment.entity.ProjectDirection;
 import com.example.thesis_hub_api.assignment.repository.LecturerCapacityRepository;
 import com.example.thesis_hub_api.assignment.repository.LecturerDirectionRepository;
 import com.example.thesis_hub_api.assignment.repository.ProjectDirectionRepository;
+import com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import java.util.Collections;
@@ -70,6 +71,27 @@ class ProjectRoundServiceTest {
 
     @Mock
     private LecturerDirectionRepository lecturerDirectionRepository;
+
+    @Mock
+    private SupervisorAssignmentRepository supervisorAssignmentRepository;
+
+    @Mock
+    private com.example.thesis_hub_api.assignment.repository.DirectionRegistrationRepository directionRegistrationRepository;
+
+    @Mock
+    private com.example.thesis_hub_api.assignment.repository.PreferenceRepository preferenceRepository;
+
+    @Mock
+    private com.example.thesis_hub_api.thesis.repository.ProposalRepository proposalRepository;
+
+    @Mock
+    private com.example.thesis_hub_api.thesis.repository.ThesisRepository thesisRepository;
+
+    @Mock
+    private com.example.thesis_hub_api.organization.repository.StudentRepository studentRepository;
+
+    @Mock
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private ProjectRoundService projectRoundService;
@@ -106,6 +128,13 @@ class ProjectRoundServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "lecturerCapacityRepository", lecturerCapacityRepository);
         org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "projectDirectionRepository", projectDirectionRepository);
         org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "lecturerDirectionRepository", lecturerDirectionRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "supervisorAssignmentRepository", supervisorAssignmentRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "directionRegistrationRepository", directionRegistrationRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "preferenceRepository", preferenceRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "proposalRepository", proposalRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "thesisRepository", thesisRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "studentRepository", studentRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(projectRoundService, "jdbcTemplate", jdbcTemplate);
 
         Instant now = Instant.now();
 
@@ -341,5 +370,155 @@ class ProjectRoundServiceTest {
         ProjectRoundResponseDTO result = projectRoundService.updateRoundStatus(10L, "OPEN");
         assertNotNull(result);
         assertEquals("OPEN", sampleRound.getStatus());
+    }
+
+    @Test
+    @DisplayName("Demo advanceRoundPhase chuyển mốc tiếp theo và cập nhật trạng thái đợt")
+    void advanceRoundPhase_Success() {
+        sampleRound.setStatus("OPEN");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+        when(projectRoundRepository.save(any(ProjectRound.class))).thenReturn(sampleRound);
+
+        TimelineMilestone m1 = TimelineMilestone.builder()
+                .id(1L)
+                .name("GĐ2: Đăng ký")
+                .phaseType("REGISTRATION")
+                .startDate(Instant.now().minus(java.time.Duration.ofDays(1)))
+                .endDate(Instant.now().plus(java.time.Duration.ofDays(5)))
+                .orderIndex(1)
+                .build();
+        TimelineMilestone m2 = TimelineMilestone.builder()
+                .id(2L)
+                .name("GĐ3: Nộp đề cương")
+                .phaseType("PROPOSAL_SUBMISSION")
+                .startDate(Instant.now().plus(java.time.Duration.ofDays(6)))
+                .endDate(Instant.now().plus(java.time.Duration.ofDays(20)))
+                .orderIndex(2)
+                .build();
+
+        List<TimelineMilestone> list = new ArrayList<>(List.of(m1, m2));
+        when(timelineMilestoneRepository.findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(10L))
+                .thenReturn(list);
+        when(timelineMilestoneRepository.saveAll(any())).thenReturn(list);
+
+        // Advance without target: moves from active m1 to next m2 (PROPOSAL_SUBMISSION)
+        ProjectRoundResponseDTO response = projectRoundService.advanceRoundPhase(10L, null);
+        assertNotNull(response);
+        assertEquals("IN_PROGRESS", sampleRound.getStatus());
+        assertTrue(m1.getEndDate().isBefore(Instant.now()));
+        assertTrue(m2.getStartDate().isBefore(Instant.now()));
+        assertTrue(m2.getEndDate().isAfter(Instant.now()));
+    }
+
+    @Test
+    @DisplayName("Demo advanceRoundPhase: Tự động loại sinh viên chưa đăng ký nguyện vọng khi kết thúc GĐ2")
+    void advanceRoundPhase_DropsUnregisteredStudents() {
+        sampleRound.setStatus("OPEN");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+        when(projectRoundRepository.save(any(ProjectRound.class))).thenReturn(sampleRound);
+
+        TimelineMilestone m1 = TimelineMilestone.builder()
+                .id(1L)
+                .name("GĐ2: Đăng ký")
+                .phaseType("REGISTRATION")
+                .startDate(Instant.now().minus(java.time.Duration.ofDays(1)))
+                .endDate(Instant.now().plus(java.time.Duration.ofDays(5)))
+                .orderIndex(1)
+                .build();
+        TimelineMilestone m2 = TimelineMilestone.builder()
+                .id(2L)
+                .name("GĐ3: Nộp đề cương")
+                .phaseType("PROPOSAL_SUBMISSION")
+                .startDate(Instant.now().plus(java.time.Duration.ofDays(6)))
+                .endDate(Instant.now().plus(java.time.Duration.ofDays(20)))
+                .orderIndex(2)
+                .build();
+
+        List<TimelineMilestone> list = new ArrayList<>(List.of(m1, m2));
+        when(timelineMilestoneRepository.findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(10L)).thenReturn(list);
+        when(timelineMilestoneRepository.saveAll(any())).thenReturn(list);
+
+        com.example.thesis_hub_api.organization.entity.Student s1 = com.example.thesis_hub_api.organization.entity.Student.builder().id(101L).studentCode("202160001").build();
+        com.example.thesis_hub_api.organization.entity.Student s2 = com.example.thesis_hub_api.organization.entity.Student.builder().id(102L).studentCode("202160002").build();
+        StudentProjectRound spr1 = StudentProjectRound.builder().id(1L).student(s1).status("ELIGIBLE").build();
+        StudentProjectRound spr2 = StudentProjectRound.builder().id(2L).student(s2).status("ELIGIBLE").build();
+        when(studentProjectRoundRepository.findByProjectRoundId(10L)).thenReturn(List.of(spr1, spr2));
+
+        com.example.thesis_hub_api.assignment.entity.DirectionRegistration reg1 = com.example.thesis_hub_api.assignment.entity.DirectionRegistration.builder().id(1L).studentId(101L).build();
+        when(directionRegistrationRepository.findByProjectRoundId(10L)).thenReturn(List.of(reg1));
+        when(preferenceRepository.findByProjectRoundIdOrderByStudentIdAscPriorityAsc(10L)).thenReturn(Collections.emptyList());
+        when(supervisorAssignmentRepository.findByProjectRoundId(10L)).thenReturn(Collections.emptyList());
+
+        // Tiến vào GĐ3 (PROPOSAL_SUBMISSION)
+        projectRoundService.advanceRoundPhase(10L, "PROPOSAL_SUBMISSION");
+
+        // Sinh viên 1 đạt và được chuyển sang ASSIGNED
+        assertEquals("ASSIGNED", spr1.getStatus());
+        // Sinh viên 2 không đạt và bị loại DROPPED
+        assertEquals("DROPPED", spr2.getStatus());
+        assertTrue(spr2.getNote().contains("Không hoàn thành GĐ2"));
+    }
+
+    @Test
+    @DisplayName("deleteRound - Thành công khi đợt ở trạng thái CLOSED")
+    void deleteRound_success_whenClosed() {
+        sampleRound.setStatus("CLOSED");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        assertDoesNotThrow(() -> projectRoundService.deleteRound(10L));
+        verify(projectRoundRepository, times(1)).delete(sampleRound);
+        verify(jdbcTemplate, atLeastOnce()).update(anyString(), eq(10L));
+    }
+
+    @Test
+    @DisplayName("deleteRound - Thành công khi đợt ở trạng thái ARCHIVED")
+    void deleteRound_success_whenArchived() {
+        sampleRound.setStatus("ARCHIVED");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        assertDoesNotThrow(() -> projectRoundService.deleteRound(10L));
+        verify(projectRoundRepository, times(1)).delete(sampleRound);
+    }
+
+    @Test
+    @DisplayName("deleteRound - Thành công khi đợt ở trạng thái DRAFT")
+    void deleteRound_success_whenDraft() {
+        sampleRound.setStatus("DRAFT");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        assertDoesNotThrow(() -> projectRoundService.deleteRound(10L));
+        verify(projectRoundRepository, times(1)).delete(sampleRound);
+    }
+
+    @Test
+    @DisplayName("deleteRound - Từ chối xóa khi đợt đang ở trạng thái OPEN")
+    void deleteRound_failed_whenOpen() {
+        sampleRound.setStatus("OPEN");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        AppException ex = assertThrows(AppException.class, () -> projectRoundService.deleteRound(10L));
+        assertEquals(ErrorCode.INVALID_STATUS_TRANSITION, ex.getErrorCode());
+        verify(projectRoundRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteRound - Từ chối xóa khi đợt đang ở trạng thái IN_PROGRESS")
+    void deleteRound_failed_whenInProgress() {
+        sampleRound.setStatus("IN_PROGRESS");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        AppException ex = assertThrows(AppException.class, () -> projectRoundService.deleteRound(10L));
+        assertEquals(ErrorCode.INVALID_STATUS_TRANSITION, ex.getErrorCode());
+        verify(projectRoundRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteRound - Ném lỗi RESOURCE_NOT_FOUND khi không tìm thấy đợt")
+    void deleteRound_failed_whenNotFound() {
+        when(projectRoundRepository.findById(999L)).thenReturn(Optional.empty());
+
+        AppException ex = assertThrows(AppException.class, () -> projectRoundService.deleteRound(999L));
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, ex.getErrorCode());
+        verify(projectRoundRepository, never()).delete(any());
     }
 }

@@ -39,35 +39,100 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   const [activeProgram, setActiveProgram] = useState<'CU_NHAN' | 'KY_SU'>(initialProgram);
   const [isRoundFinalized, setIsRoundFinalized] = useState(false);
   const [studentRoundGpa, setStudentRoundGpa] = useState<number | undefined>(undefined);
+  const [isStudentInRound, setIsStudentInRound] = useState<boolean>(true);
+  const [checkingEnrollment, setCheckingEnrollment] = useState<boolean>(true);
 
-  // 1. Load project rounds
+  // 1. Load project rounds & synchronize strictly with the student's enrolled round
   useEffect(() => {
     const fetchRounds = async () => {
       try {
-        const roundList = await apiService.getProjectRounds();
-        setRounds(roundList || []);
+        setCheckingEnrollment(true);
+        const [roundList, myStatus] = await Promise.all([
+          apiService.getProjectRounds().catch(() => [] as ProjectRoundItem[]),
+          apiService.getMyRoundStatus().catch(() => null),
+        ]);
+        const allRounds = roundList || [];
 
-        if (!propRoundId && roundList && roundList.length > 0) {
-          // Find active/open/in-progress round first
-          const activeRound =
-            roundList.find((r) => r.status === 'OPEN') ||
-            roundList.find((r) => r.status === 'IN_PROGRESS') ||
-            roundList.find((r) => r.currentMilestone?.phaseType === 'REGISTRATION') ||
-            roundList[0];
-          setSelectedRoundId(activeRound.roundId);
-          if (activeRound.trainingProgram === 'KY_SU' || activeRound.trainingProgram === 'CU_NHAN') {
-            setActiveProgram(activeRound.trainingProgram);
+        if (propRoundId) {
+          setRounds(allRounds);
+          setSelectedRoundId(propRoundId);
+          setIsStudentInRound(true);
+          return;
+        }
+
+        // 1. Prioritize backend getMyRoundStatus() which resolves student's enrolled round
+        if (myStatus) {
+          if (myStatus.inRound && myStatus.roundId) {
+            const matchedRound = allRounds.find((r) => r.roundId === myStatus.roundId);
+            if (matchedRound) {
+              setRounds([matchedRound]);
+              setSelectedRoundId(matchedRound.roundId);
+              setIsStudentInRound(true);
+              if (matchedRound.trainingProgram === 'KY_SU' || matchedRound.trainingProgram === 'CU_NHAN') {
+                setActiveProgram(matchedRound.trainingProgram);
+              }
+              return;
+            }
+          } else if (myStatus.inRound === false) {
+            setRounds([]);
+            setSelectedRoundId(null);
+            setIsStudentInRound(false);
+            return;
           }
         }
+
+        // 2. Fallback (only if getMyRoundStatus API failed): verify student membership in parallel
+        const userCode =
+          (user as any)?.registration_no ||
+          (user as any)?.studentCode ||
+          (user as any)?.student_code ||
+          user?.username;
+        if (userCode && allRounds.length > 0) {
+          const checks = await Promise.all(
+            allRounds.map(async (r) => {
+              try {
+                const res = await apiService.getStudentsInRound(r.roundId, { search: userCode, size: 10 });
+                const found = res?.content?.find(
+                  (s) =>
+                    s.studentCode?.toLowerCase() === String(userCode).toLowerCase() ||
+                    (effectiveStudentId && s.studentId === effectiveStudentId)
+                );
+                return found ? { round: r, found } : null;
+              } catch {
+                return null;
+              }
+            })
+          );
+          const match = checks.find((c) => c !== null);
+          if (match) {
+            setRounds([match.round]);
+            setSelectedRoundId(match.round.roundId);
+            setIsStudentInRound(true);
+            if (match.found.gpa !== undefined && match.found.gpa !== null) {
+              setStudentRoundGpa(Number(match.found.gpa));
+            }
+            if (match.round.trainingProgram === 'KY_SU' || match.round.trainingProgram === 'CU_NHAN') {
+              setActiveProgram(match.round.trainingProgram);
+            }
+            return;
+          }
+        }
+
+        // If student is not enrolled in any project round
+        setRounds([]);
+        setSelectedRoundId(null);
+        setIsStudentInRound(false);
       } catch (err) {
         console.error('Failed to load project rounds:', err);
-        if (!selectedRoundId) setSelectedRoundId(1);
+        setIsStudentInRound(false);
+      } finally {
+        setCheckingEnrollment(false);
       }
     };
     fetchRounds();
-  }, [propRoundId]);
+  }, [propRoundId, user, effectiveStudentId]);
 
-  const effectiveRoundId = selectedRoundId || propRoundId || 1;
+  const effectiveRoundId = selectedRoundId || propRoundId || 0;
   const currentRound = rounds.find((r) => r.roundId === effectiveRoundId);
 
   // 2. Load directions, capacities, registrations, preferences, assignments for effective round
@@ -142,10 +207,10 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   };
 
   useEffect(() => {
-    if (effectiveRoundId) {
+    if (effectiveRoundId && effectiveRoundId > 0 && isStudentInRound) {
       loadData(effectiveRoundId);
     }
-  }, [effectiveRoundId, effectiveStudentId]);
+  }, [effectiveRoundId, effectiveStudentId, isStudentInRound]);
 
   // Synchronize student program automatically from profile or round (student cannot manually change)
   useEffect(() => {
@@ -213,6 +278,31 @@ export const StudentAssignmentPage: React.FC<Props> = ({
     // Reload data for this round
     await loadData(effectiveRoundId);
   };
+
+  if (checkingEnrollment) {
+    return (
+      <div className="assignment-container">
+        <div style={{ padding: '32px', textAlign: 'center', backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>
+          ⏳ Đang đồng bộ thông tin đợt đồ án của sinh viên...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isStudentInRound || !effectiveRoundId) {
+    return (
+      <div className="assignment-container">
+        <div style={{ padding: '28px', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', color: '#92400e' }}>
+          <h3 style={{ margin: '0 0 8px 0', color: '#b45309', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            ⚠️ Sinh viên chưa thuộc đợt đồ án nào
+          </h3>
+          <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6 }}>
+            Tài khoản của bạn hiện chưa có trong danh sách sinh viên tham gia đợt đồ án nào. Theo quy định đồng bộ dữ liệu, sinh viên thuộc đợt đồ án nào thì chỉ được phép đăng ký nguyện vọng và thực hiện đồ án tại đợt đó. Vui lòng liên hệ Giáo vụ Khoa để được thêm vào đợt đồ án của bạn.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="assignment-container">

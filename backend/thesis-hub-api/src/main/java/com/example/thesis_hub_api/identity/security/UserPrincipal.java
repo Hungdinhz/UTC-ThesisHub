@@ -8,6 +8,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +29,11 @@ public class UserPrincipal implements UserDetails {
 
     public static UserPrincipal create(User user) {
         String roleName = user.getRole() != null ? user.getRole().getName() : "ROLE_STUDENT";
-        List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(roleName));
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority(roleName));
+        if ("ROLE_COMMITTEE".equalsIgnoreCase(roleName)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_LECTURER"));
+        }
 
         return UserPrincipal.builder()
                 .id(user.getId())
