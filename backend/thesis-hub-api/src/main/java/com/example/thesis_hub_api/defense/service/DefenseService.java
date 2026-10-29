@@ -1400,24 +1400,82 @@ public class DefenseService {
         return enrichGraduationResultDTO(entity);
     }
 
+    @Transactional(readOnly = true)
+    public List<GraduationResultResponseDTO> getGraduationResultsByRound(Long roundId) {
+        if (roundId == null || thesisRepository == null) {
+            return Collections.emptyList();
+        }
+        List<Thesis> roundTheses = thesisRepository.findByProjectRoundId(roundId);
+        if (roundTheses.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> thesisIds = roundTheses.stream().map(Thesis::getId).toList();
+        List<GraduationResult> allResults = graduationResultRepository != null
+                ? graduationResultRepository.findAll().stream()
+                    .filter(gr -> gr.getThesisId() != null && thesisIds.contains(gr.getThesisId()))
+                    .toList()
+                : Collections.emptyList();
+
+        Map<Long, Thesis> thesisMap = roundTheses.stream()
+                .collect(Collectors.toMap(Thesis::getId, t -> t, (t1, t2) -> t1));
+
+        return allResults.stream().map(gr -> {
+            Thesis t = thesisMap.get(gr.getThesisId());
+            String thesisCode = t != null ? t.getThesisCode() : null;
+            String thesisTitle = t != null ? t.getTitleVn() : null;
+            String studentCode = (t != null && t.getStudent() != null) ? t.getStudent().getStudentCode() : null;
+            String studentClass = (t != null && t.getStudent() != null) ? t.getStudent().getClassName() : null;
+            String studentName = (t != null && t.getStudent() != null && t.getStudent().getUser() != null)
+                    ? t.getStudent().getUser().getFullName() : null;
+            String advisorName = null;
+            if (t != null && t.getLecturer() != null) {
+                advisorName = t.getLecturer().getUser() != null
+                        ? t.getLecturer().getUser().getFullName()
+                        : resolveLecturerName(t.getLecturer().getId());
+            }
+            String roundStatus = (t != null && t.getProjectRound() != null)
+                    ? t.getProjectRound().getStatus() : null;
+
+            return GraduationResultResponseDTO.builder()
+                    .id(gr.getId())
+                    .thesisId(gr.getThesisId())
+                    .thesisCode(thesisCode)
+                    .thesisTitle(thesisTitle)
+                    .studentCode(studentCode)
+                    .studentName(studentName)
+                    .studentClass(studentClass)
+                    .advisorName(advisorName)
+                    .roundStatus(roundStatus)
+                    .supervisorScore(gr.getSupervisorScore())
+                    .reviewerScore(gr.getReviewerScore())
+                    .councilScore(gr.getCouncilScore())
+                    .finalScore(gr.getFinalScore())
+                    .grade(gr.getGrade())
+                    .finalResult(gr.getFinalResult())
+                    .publishedAt(gr.getPublishedAt())
+                    .notes(gr.getNotes())
+                    .build();
+        }).toList();
+    }
+
     @Transactional
     public List<GraduationResultResponseDTO> finalizeAndPublishRound(Long roundId) {
         if (thesisRepository == null) {
             return Collections.emptyList();
         }
         List<Thesis> roundTheses = thesisRepository.findByProjectRoundId(roundId);
-        List<GraduationResultResponseDTO> published = new ArrayList<>();
 
+        // 1. Synthesize thesis results (once) for eligible theses that have scores
         for (Thesis t : roundTheses) {
             if (!isThesisDefenseEligible(t)) continue;
             if (!canSynthesizeResult(t.getId())) continue;
             try {
                 synthesizeResult(t.getId());
             } catch (Exception ignored) {
-                // Skip theses that do not yet have all 3 score components
             }
         }
 
+        // 2. Close round and publish notifications/results
         if (projectRoundService != null && projectRoundRepository != null) {
             ProjectRound round = projectRoundRepository.findById(roundId)
                     .orElseThrow(() -> new NoSuchElementException("Không tìm thấy đợt đồ án ID: " + roundId));
@@ -1428,13 +1486,8 @@ public class DefenseService {
             }
         }
 
-        for (Thesis t : roundTheses) {
-            GraduationResultResponseDTO dto = getGraduationResultByThesis(t.getId());
-            if (dto != null) {
-                published.add(dto);
-            }
-        }
-        return published;
+        // 3. Return batch results directly
+        return getGraduationResultsByRound(roundId);
     }
 
     private GraduationResultResponseDTO enrichGraduationResultDTO(GraduationResult entity) {

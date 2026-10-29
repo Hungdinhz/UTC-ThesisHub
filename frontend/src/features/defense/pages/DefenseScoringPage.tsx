@@ -166,13 +166,19 @@ export const DefenseScoringPage: React.FC = () => {
 
   const handleOpenFinalExportModal = async () => {
     setShowFinalExportModal(true);
-    const items = await Promise.all(
-      scoringTheses.map(async (t) => {
-        const res = await defenseService.getGraduationResult(t.thesisId).catch(() => null);
-        return { thesis: t, result: res };
-      })
-    );
-    setRoundExportResults(items);
+    try {
+      const results = selectedRoundId
+        ? await defenseService.getResultsByRound(selectedRoundId).catch(() => [])
+        : [];
+      const resultMap = new Map(results.map((r) => [r.thesisId, r]));
+      const items = scoringTheses.map((t) => ({
+        thesis: t,
+        result: resultMap.get(t.thesisId) || null,
+      }));
+      setRoundExportResults(items);
+    } catch {
+      setRoundExportResults(scoringTheses.map((t) => ({ thesis: t, result: null })));
+    }
   };
 
   const handleFinalizeAndPublishRound = async () => {

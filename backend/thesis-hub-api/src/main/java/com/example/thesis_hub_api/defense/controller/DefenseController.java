@@ -248,6 +248,14 @@ public class DefenseController {
     /**
      * Ký xuất Dữ liệu, công bố kết quả cho toàn bộ Sinh viên và hoàn tất đóng đợt đồ án (#25)
      */
+    @GetMapping("/rounds/{roundId}/results")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'LECTURER', 'COMMITTEE')")
+    public ResponseEntity<ApiResponse<List<GraduationResultResponseDTO>>> getResultsByRound(
+            @PathVariable Long roundId) {
+        List<GraduationResultResponseDTO> result = defenseService.getGraduationResultsByRound(roundId);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
     @PostMapping("/rounds/{roundId}/finalize-and-publish")
     @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
     public ResponseEntity<ApiResponse<List<GraduationResultResponseDTO>>> finalizeAndPublishRound(

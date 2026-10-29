@@ -162,8 +162,8 @@ const LoginPage: React.FC = () => {
       const roleLandingMap: Record<string, string> = {
         admin: '/admin/dashboard',
         student: '/student/assignment',
-        supervisor: '/admin/assignments',
-        committee_member: '/admin/assignments',
+        supervisor: '/thesis/proposals',
+        committee_member: '/thesis/proposals',
         external_examiner: '/external_examiner/dashboard',
       };
       navigate(roleLandingMap[resolvedUserType] || '/login');

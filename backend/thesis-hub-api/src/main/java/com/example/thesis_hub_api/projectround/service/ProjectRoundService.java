@@ -418,13 +418,15 @@ public class ProjectRoundService {
             if (thesis.getId() == null) {
                 continue;
             }
-            if (defenseService != null && defenseService.canSynthesizeResult(thesis.getId())) {
-                try {
-                    defenseService.synthesizeResult(thesis.getId());
-                } catch (Exception ignored) {}
-            }
             if (graduationResultRepository != null) {
-                graduationResultRepository.findByThesisId(thesis.getId()).ifPresent(gr -> {
+                java.util.Optional<com.example.thesis_hub_api.defense.entity.GraduationResult> grOpt = graduationResultRepository.findByThesisId(thesis.getId());
+                if (grOpt.isEmpty() && defenseService != null && defenseService.canSynthesizeResult(thesis.getId())) {
+                    try {
+                        defenseService.synthesizeResult(thesis.getId());
+                        grOpt = graduationResultRepository.findByThesisId(thesis.getId());
+                    } catch (Exception ignored) {}
+                }
+                grOpt.ifPresent(gr -> {
                     gr.setPublishedAt(Instant.now());
                     graduationResultRepository.save(gr);
 

@@ -23,7 +23,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public NotificationResponseDTO createNotification(Long userId, String title, String content, String type, String referenceUrl) {
         Notification notification = Notification.builder()
                 .userId(userId)

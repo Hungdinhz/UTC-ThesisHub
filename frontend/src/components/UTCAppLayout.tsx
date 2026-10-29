@@ -77,10 +77,10 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         return '/student/assignment';
       case 'supervisor':
       case 'lecturer':
-        return '/admin/assignments';
+        return '/thesis/proposals';
       case 'committee_member':
       case 'committee':
-        return '/admin/assignments';
+        return '/thesis/proposals';
       default:
         return '/';
     }
@@ -539,15 +539,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           {(currentRole === 'supervisor' || currentRole === 'lecturer') && (
             <>
               <div
-                className={`utc-nav-item ${activeTab === 'assignments' ? 'active' : ''} ${isStageLocked(2) ? 'utc-nav-locked' : ''}`}
-                onClick={() => handleNavClick('/admin/assignments', true, 2)}
-              >
-                <span className="utc-nav-icon">👥</span>
-                <span className="utc-nav-label">GĐ2: Phân công &amp; Duyệt NV</span>
-                {renderStageBadge(2)}
-              </div>
-
-              <div
                 className={`utc-nav-item ${activeTab === 'proposals' ? 'active' : ''} ${isStageLocked(3) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/thesis/proposals', true, 3)}
               >
@@ -605,15 +596,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           {/* MENU DÀNH CHO HỘI ĐỒNG (COMMITTEE MEMBER) (#26 bỏ Tổng quan, #28 thêm Nhóm Chat) */}
           {(currentRole === 'committee_member' || currentRole === 'committee') && (
             <>
-              <div
-                className={`utc-nav-item ${activeTab === 'assignments' ? 'active' : ''} ${isStageLocked(2) ? 'utc-nav-locked' : ''}`}
-                onClick={() => handleNavClick('/admin/assignments', true, 2)}
-              >
-                <span className="utc-nav-icon">👥</span>
-                <span className="utc-nav-label">GĐ2: Phân công &amp; Duyệt NV</span>
-                {renderStageBadge(2)}
-              </div>
-
               <div
                 className={`utc-nav-item ${activeTab === 'proposals' ? 'active' : ''} ${isStageLocked(3) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/thesis/proposals', true, 3)}
