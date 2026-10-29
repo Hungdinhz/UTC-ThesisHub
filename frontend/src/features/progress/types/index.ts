@@ -11,6 +11,7 @@ export interface Task {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   status: 'TODO' | 'IN_PROGRESS' | 'SUBMITTED' | 'REVISE' | 'COMPLETED' | 'CANCELLED';
   dueDate?: string;
+  fileUrl?: string;
   completedAt?: string;
   submissionCount: number;
   latestSubmissionStatus?: string;
@@ -27,6 +28,7 @@ export interface CreateTaskPayload {
   description?: string;
   priority?: string;
   dueDate?: string;
+  fileUrl?: string;
 }
 
 export interface Submission {

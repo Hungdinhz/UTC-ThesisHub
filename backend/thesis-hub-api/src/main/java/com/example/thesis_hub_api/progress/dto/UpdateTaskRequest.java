@@ -17,4 +17,5 @@ public class UpdateTaskRequest {
     private String status;   // TODO, IN_PROGRESS, SUBMITTED, REVISE, COMPLETED, CANCELLED
     private Instant dueDate;
     private Instant completedAt;
+    private String fileUrl;
 }

@@ -70,6 +70,7 @@ public class TaskServiceImpl implements TaskService {
                 .priority(request.getPriority() != null ? request.getPriority() : "MEDIUM")
                 .status("TODO")
                 .dueDate(request.getDueDate())
+                .fileUrl(request.getFileUrl())
                 .build();
 
         Task savedTask = taskRepository.save(task);
@@ -110,6 +111,7 @@ public class TaskServiceImpl implements TaskService {
         }
         if (request.getDueDate() != null) task.setDueDate(request.getDueDate());
         if (request.getCompletedAt() != null) task.setCompletedAt(request.getCompletedAt());
+        if (request.getFileUrl() != null) task.setFileUrl(request.getFileUrl().trim());
 
         Task saved = taskRepository.save(task);
         syncThesisCompletionRate(saved.getThesis());
@@ -185,6 +187,7 @@ public class TaskServiceImpl implements TaskService {
                 .status(task.getStatus())
                 .dueDate(task.getDueDate())
                 .completedAt(task.getCompletedAt())
+                .fileUrl(task.getFileUrl())
                 .submissionCount(subCount)
                 .latestSubmissionStatus(latestSubStatus)
                 .commentCount(task.getComments() != null ? task.getComments().size() : 0)

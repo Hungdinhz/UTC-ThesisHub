@@ -189,6 +189,7 @@ export const TaskBoardPage: React.FC = () => {
   const [newTaskDesc, setNewTaskDesc] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState('MEDIUM');
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
+  const [newTaskFileUrl, setNewTaskFileUrl] = useState('');
 
   // 1. Fetch available project rounds and theses
   useEffect(() => {
@@ -686,7 +687,8 @@ export const TaskBoardPage: React.FC = () => {
         title: newTaskTitle,
         description: newTaskDesc,
         priority: newTaskPriority,
-        dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined
+        dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined,
+        fileUrl: newTaskFileUrl.trim() || undefined
       });
       setTasks(prev => [...prev, created]);
       await loadTasks(selectedThesisId);
@@ -699,6 +701,8 @@ export const TaskBoardPage: React.FC = () => {
     setShowCreateModal(false);
     setNewTaskTitle('');
     setNewTaskDesc('');
+    setNewTaskFileUrl('');
+    setNewTaskDueDate('');
   };
 
   // 5 Kanban Columns matching Step 5 specification
@@ -1547,8 +1551,15 @@ export const TaskBoardPage: React.FC = () => {
                       >
                         {t.description}
                       </p>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
-                        <span>💬 {t.commentCount || 0}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span>💬 {t.commentCount || 0}</span>
+                          {t.fileUrl && (
+                            <span title="Có tài liệu đính kèm từ GVHD" style={{ color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                              📎 File GV
+                            </span>
+                          )}
+                        </div>
                         <span>📦 {t.submissionCount || 0} bài nộp</span>
                       </div>
 
@@ -1757,6 +1768,53 @@ export const TaskBoardPage: React.FC = () => {
             <p style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', fontSize: '13px', color: '#334155', lineHeight: 1.5 }}>
               {selectedTask.description || 'Chưa có mô tả chi tiết.'}
             </p>
+
+            {selectedTask.fileUrl && (
+              <div style={{
+                marginTop: '12px',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  <span style={{ fontSize: '24px' }}>{getFileIcon(selectedTask.fileUrl)}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      📎 Tài liệu / Đề bài từ Giảng viên
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={extractFileName(selectedTask.fileUrl)}>
+                      {extractFileName(selectedTask.fileUrl)}
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={resolveFileUrl(selectedTask.fileUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: '7px 14px',
+                    backgroundColor: '#16a34a',
+                    color: '#fff',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <span>⬇️</span> Mở / Tải file
+                </a>
+              </div>
+            )}
 
             {/* Submissions Section */}
             <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
@@ -2163,6 +2221,18 @@ export const TaskBoardPage: React.FC = () => {
                 </div>
               </div>
 
+              <div style={{ marginBottom: '16px' }}>
+                <FileUploadInput
+                  label="📎 Tài liệu / Đề bài / File hướng dẫn đính kèm (Tùy chọn)"
+                  value={newTaskFileUrl}
+                  onChange={(url) => setNewTaskFileUrl(url)}
+                  helperText="Giảng viên có thể tải lên tài liệu mô tả yêu cầu, biểu mẫu, file mẫu (PDF, Word, ZIP...) để sinh viên tải về"
+                  placeholder="Tải lên tài liệu đính kèm..."
+                />
+              </div>
+
+
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button
                   type="button"
@@ -2312,6 +2382,8 @@ export const TaskBoardPage: React.FC = () => {
               </div>
 
               {/* Actions */}
+
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button
                   type="button"
