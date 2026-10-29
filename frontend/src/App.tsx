@@ -254,7 +254,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin/councils"
         element={
-          <ProtectedRoute allowedTypes={['admin', 'committee_member', 'supervisor']}>
+          <ProtectedRoute allowedTypes={['admin']}>
             <LayoutPageWrapper activeTab="councils" pageTitle="Giai đoạn 5: Thành lập Hội đồng (1CT-2TK-2UV) & Phân công Phản biện">
               <CouncilManagementPage />
             </LayoutPageWrapper>

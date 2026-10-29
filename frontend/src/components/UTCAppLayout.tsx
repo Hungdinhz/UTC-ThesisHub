@@ -568,20 +568,20 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               </div>
 
               <div
-                className={`utc-nav-item ${activeTab === 'defense-scoring' ? 'active' : ''} ${isStageLocked(5) ? 'utc-nav-locked' : ''}`}
-                onClick={() => handleNavClick('/admin/defense-scoring', true, 5)}
-              >
-                <span className="utc-nav-icon">🏆</span>
-                <span className="utc-nav-label">GĐ5: Chấm điểm &amp; Biên bản PDF</span>
-                {renderStageBadge(5)}
-              </div>
-
-              <div
                 className={`utc-nav-item ${activeTab === 'defense-schedules' ? 'active' : ''} ${isStageLocked(5) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/admin/defense-schedules', true, 5)}
               >
                 <span className="utc-nav-icon">📅</span>
                 <span className="utc-nav-label">Lịch hội đồng bảo vệ</span>
+                {renderStageBadge(5)}
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'defense-scoring' ? 'active' : ''} ${isStageLocked(5) ? 'utc-nav-locked' : ''}`}
+                onClick={() => handleNavClick('/admin/defense-scoring', true, 5)}
+              >
+                <span className="utc-nav-icon">🏆</span>
+                <span className="utc-nav-label">GĐ5: Chấm điểm &amp; Biên bản PDF</span>
                 {renderStageBadge(5)}
               </div>
 

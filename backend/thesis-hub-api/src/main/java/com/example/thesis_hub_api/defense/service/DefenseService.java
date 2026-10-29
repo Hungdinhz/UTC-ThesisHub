@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -1268,15 +1269,39 @@ public class DefenseService {
         return getMinutesSignatures(thesisId);
     }
 
+    @Transactional(readOnly = true)
+    public boolean canSynthesizeResult(Long thesisId) {
+        if (thesisId == null || scoreRepository == null) {
+            return false;
+        }
+        List<Score> scores = scoreRepository.findByThesisId(thesisId);
+        if (scores == null || scores.isEmpty()) {
+            return false;
+        }
+        boolean hasSupervisor = false;
+        boolean hasReviewer = false;
+        boolean hasCouncil = false;
+        for (Score s : scores) {
+            if ("SUPERVISOR".equalsIgnoreCase(s.getScoreType()) && s.getScore() != null) {
+                hasSupervisor = true;
+            } else if ("REVIEWER".equalsIgnoreCase(s.getScoreType()) && s.getScore() != null) {
+                hasReviewer = true;
+            } else if ("COUNCIL".equalsIgnoreCase(s.getScoreType()) && s.getScore() != null) {
+                hasCouncil = true;
+            }
+        }
+        return hasSupervisor && hasReviewer && hasCouncil;
+    }
+
     /**
      * 5. API Tổng hợp điểm, xuất kết quả tốt nghiệp cuối kỳ (#24, #25)
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = {IllegalArgumentException.class})
     public GraduationResultResponseDTO synthesizeResult(Long thesisId) {
         return synthesizeResult(SynthesizeResultRequestDTO.builder().thesisId(thesisId).build());
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = {IllegalArgumentException.class})
     public GraduationResultResponseDTO synthesizeResult(SynthesizeResultRequestDTO request) {
         Long thesisId = request.getThesisId();
         List<Score> scores = scoreRepository.findByThesisId(thesisId);
@@ -1378,6 +1403,7 @@ public class DefenseService {
 
         for (Thesis t : roundTheses) {
             if (!isThesisDefenseEligible(t)) continue;
+            if (!canSynthesizeResult(t.getId())) continue;
             try {
                 synthesizeResult(t.getId());
             } catch (Exception ignored) {

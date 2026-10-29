@@ -280,14 +280,7 @@ const LoginPage: React.FC = () => {
               className={`utc-role-tab ${userType === 'supervisor' ? 'active' : ''}`}
               onClick={() => handleUserTypeChange('supervisor')}
             >
-              {t('roles.supervisor', 'Giảng viên HD')}
-            </button>
-            <button
-              type="button"
-              className={`utc-role-tab ${userType === 'committee_member' ? 'active' : ''}`}
-              onClick={() => handleUserTypeChange('committee_member')}
-            >
-              {t('roles.committee_member', 'Hội đồng')}
+              {t('roles.supervisor', 'Giảng viên')}
             </button>
             <button
               type="button"

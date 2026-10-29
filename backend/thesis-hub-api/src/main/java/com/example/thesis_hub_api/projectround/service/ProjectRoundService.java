@@ -405,7 +405,7 @@ public class ProjectRoundService {
             if (thesis.getId() == null) {
                 continue;
             }
-            if (defenseService != null) {
+            if (defenseService != null && defenseService.canSynthesizeResult(thesis.getId())) {
                 try {
                     defenseService.synthesizeResult(thesis.getId());
                 } catch (Exception ignored) {}

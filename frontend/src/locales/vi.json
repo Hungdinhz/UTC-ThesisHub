@@ -20,7 +20,7 @@
   "roles": {
     "admin": "Quản Trị Viên",
     "student": "Sinh Viên UTC",
-    "supervisor": "Giảng Viên Hướng Dẫn",
+    "supervisor": "Giảng Viên",
     "committee_member": "Thành Viên Hội Đồng",
     "external_examiner": "Cán Bộ Phản Biện / Chấm Ngoài"
   },
