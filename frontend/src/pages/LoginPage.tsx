@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
@@ -162,7 +162,7 @@ const LoginPage: React.FC = () => {
 
       login(accessToken, refreshToken, resolvedUserType);
       const roleLandingMap: Record<string, string> = {
-        admin: '/admin/project-rounds',
+        admin: '/admin/dashboard',
         student: '/student/assignment',
         supervisor: '/admin/assignments',
         committee_member: '/admin/councils',

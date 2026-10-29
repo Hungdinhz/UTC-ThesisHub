@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import utcLogo from '../assets/images/utc_logo.webp';
 import { useTranslation } from 'react-i18next';
@@ -72,7 +72,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   const getRoleHomeRoute = () => {
     switch (currentRole) {
       case 'admin':
-        return '/admin/project-rounds';
+        return '/admin/dashboard';
       case 'student':
         return '/student/assignment';
       case 'supervisor':
@@ -376,9 +376,16 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         </div>
 
         <nav className="utc-sidebar-nav">
-          {/* MENU DÀNH CHO ADMIN (#26 bỏ Tổng quan, #27 bỏ Bảo lưu) */}
+          {/* MENU DÀNH CHO ADMIN */}
           {currentRole === 'admin' && (
             <>
+              <div
+                className={`utc-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/admin/dashboard', true)}
+              >
+                <span className="utc-nav-icon">🏠</span>
+                <span className="utc-nav-label">Trang chủ</span>
+              </div>
               <div
                 className={`utc-nav-item ${activeTab === 'project-rounds' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/admin/project-rounds', true)}

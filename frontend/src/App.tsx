@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import UTCAppLayout from './components/UTCAppLayout';
 import LoginPage from './pages/LoginPage';
 import AdminRegisterPage from './pages/AdminRegisterPage';
+import AdminDashboard from './pages/AdminDashboard';
 import ExternalDashboard from './pages/ExternalDashboard';
 import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import ProjectRoundManagementPage from './pages/ProjectRoundManagementPage';
@@ -26,7 +27,7 @@ import './App.css';
 const getDefaultRouteForRole = (role?: string | null): string => {
   switch (role) {
     case 'admin':
-      return '/admin/project-rounds';
+      return '/admin/dashboard';
     case 'student':
       return '/student/assignment';
     case 'supervisor':
@@ -115,7 +116,14 @@ const AppRoutes: React.FC = () => {
       />
 
       {/* Redirect removed Overview dashboards directly to functional pages (#26) */}
-      <Route path="/admin/dashboard" element={<Navigate to="/admin/project-rounds" replace />} />
+      <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/student/dashboard" element={<Navigate to="/student/assignment" replace />} />
       <Route path="/supervisor/dashboard" element={<Navigate to="/admin/assignments" replace />} />
       <Route path="/committee_member/dashboard" element={<Navigate to="/admin/councils" replace />} />
@@ -282,7 +290,7 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      <Route path="/admin" element={<Navigate to="/admin/project-rounds" replace />} />
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/student" element={<Navigate to="/student/assignment" replace />} />
       <Route path="/supervisor" element={<Navigate to="/admin/assignments" replace />} />
       <Route path="/committee" element={<Navigate to="/admin/councils" replace />} />
