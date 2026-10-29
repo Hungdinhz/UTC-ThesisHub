@@ -1,4 +1,4 @@
-﻿package com.example.thesis_hub_api.eligibility.service;
+package com.example.thesis_hub_api.eligibility.service;
 
 import com.example.thesis_hub_api.defense.entity.Score;
 import com.example.thesis_hub_api.defense.repository.ReviewerAssignmentRepository;

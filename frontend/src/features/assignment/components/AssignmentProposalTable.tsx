@@ -128,7 +128,6 @@ export const AssignmentProposalTable: React.FC<Props> = ({
               <th>Giảng viên hướng dẫn</th>
               <th>Học vị & Bộ môn</th>
               <th>Kết quả ghép</th>
-              <th>Điểm Match</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
@@ -136,7 +135,7 @@ export const AssignmentProposalTable: React.FC<Props> = ({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={11} className="empty-row">
+                <td colSpan={10} className="empty-row">
                   Chưa có kết quả phân công nào phù hợp với bộ lọc
                 </td>
               </tr>
@@ -197,9 +196,6 @@ export const AssignmentProposalTable: React.FC<Props> = ({
                     {item.isOverridden && (
                       <span className="badge-overridden-flag">Manual Override</span>
                     )}
-                  </td>
-                  <td className="font-semibold text-indigo">
-                    {item.matchScore ? item.matchScore.toFixed(1) : '—'}
                   </td>
                   <td>
                     <span

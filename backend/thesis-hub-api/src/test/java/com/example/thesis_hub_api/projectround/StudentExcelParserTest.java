@@ -1,4 +1,4 @@
-﻿package com.example.thesis_hub_api.projectround;
+package com.example.thesis_hub_api.projectround;
 
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportRowDTO;
 import com.example.thesis_hub_api.projectround.util.StudentExcelParser;
