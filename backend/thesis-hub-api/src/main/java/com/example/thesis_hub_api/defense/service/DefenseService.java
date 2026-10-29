@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -1077,7 +1078,7 @@ public class DefenseService {
                 throw new IllegalStateException("Đợt đồ án đã kết thúc và khóa sổ điểm, không thể chỉnh sửa điểm!");
             }
 
-            if (!isThesisDefenseEligible(thesis)) {
+            if (!"SUPERVISOR".equals(scoreType) && !isThesisDefenseEligible(thesis)) {
                 throw new IllegalArgumentException("Sinh viên của đề tài này chưa đủ điều kiện bảo vệ nên chưa thể chấm điểm GĐ5!");
             }
 
@@ -1268,15 +1269,36 @@ public class DefenseService {
         return getMinutesSignatures(thesisId);
     }
 
+    @Transactional(readOnly = true)
+    public boolean canSynthesizeResult(Long thesisId) {
+        if (thesisId == null || scoreRepository == null) {
+            return false;
+        }
+        List<Score> scores = scoreRepository.findByThesisId(thesisId);
+        if (scores == null || scores.isEmpty()) {
+            return false;
+        }
+        boolean hasSupervisor = false;
+        boolean hasCouncil = false;
+        for (Score s : scores) {
+            if ("SUPERVISOR".equalsIgnoreCase(s.getScoreType()) && s.getScore() != null) {
+                hasSupervisor = true;
+            } else if ("COUNCIL".equalsIgnoreCase(s.getScoreType()) && s.getScore() != null) {
+                hasCouncil = true;
+            }
+        }
+        return hasSupervisor && hasCouncil;
+    }
+
     /**
      * 5. API Tổng hợp điểm, xuất kết quả tốt nghiệp cuối kỳ (#24, #25)
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = {IllegalArgumentException.class})
     public GraduationResultResponseDTO synthesizeResult(Long thesisId) {
         return synthesizeResult(SynthesizeResultRequestDTO.builder().thesisId(thesisId).build());
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = {IllegalArgumentException.class})
     public GraduationResultResponseDTO synthesizeResult(SynthesizeResultRequestDTO request) {
         Long thesisId = request.getThesisId();
         List<Score> scores = scoreRepository.findByThesisId(thesisId);
@@ -1307,7 +1329,6 @@ public class DefenseService {
             }
             List<String> missing = new ArrayList<>();
             if (supervisorScore == null) missing.add("Điểm GVHD");
-            if (reviewerScore == null) missing.add("Điểm GVPB");
             if (councilScores.isEmpty()) missing.add("Điểm Hội đồng");
             if (!missing.isEmpty()) {
                 throw new IllegalArgumentException("Đề tài còn thiếu đầu điểm bắt buộc (" + String.join(", ", missing) + "), vui lòng hoàn tất chấm điểm trước khi tổng hợp!");
@@ -1315,16 +1336,27 @@ public class DefenseService {
         } else {
             // Standalone unit-test fallback only when ThesisRepository is not wired
             if (supervisorScore == null) supervisorScore = BigDecimal.valueOf(8.0);
-            if (reviewerScore == null) reviewerScore = BigDecimal.valueOf(7.5);
             if (councilScores.isEmpty()) avgCouncilScore = BigDecimal.valueOf(8.0);
         }
 
-        double wSup = request.getSupervisorWeight() != null ? request.getSupervisorWeight() : 0.3;
-        double wRev = request.getReviewerWeight() != null ? request.getReviewerWeight() : 0.2;
-        double wCou = request.getCouncilWeight() != null ? request.getCouncilWeight() : 0.5;
+        // Trọng số chuẩn UTC: 40% GVHD + 60% Hội đồng
+        double wSup;
+        double wRev = 0.0;
+        double wCou;
+
+        if (request.getReviewerWeight() != null && request.getReviewerWeight() > 0 && reviewerScore != null) {
+            wSup = request.getSupervisorWeight() != null ? request.getSupervisorWeight() : 0.4;
+            wRev = request.getReviewerWeight();
+            wCou = request.getCouncilWeight() != null ? request.getCouncilWeight() : (1.0 - wSup - wRev);
+        } else {
+            wSup = (request.getSupervisorWeight() != null && (request.getReviewerWeight() == null || request.getReviewerWeight() == 0))
+                    ? request.getSupervisorWeight() : 0.4;
+            wCou = (request.getCouncilWeight() != null && (request.getReviewerWeight() == null || request.getReviewerWeight() == 0))
+                    ? request.getCouncilWeight() : 0.6;
+        }
 
         double finalVal = (supervisorScore.doubleValue() * wSup)
-                + (reviewerScore.doubleValue() * wRev)
+                + (reviewerScore != null ? reviewerScore.doubleValue() * wRev : 0.0)
                 + (avgCouncilScore.doubleValue() * wCou);
         BigDecimal finalScore = BigDecimal.valueOf(finalVal).setScale(2, RoundingMode.HALF_UP);
 
@@ -1378,6 +1410,7 @@ public class DefenseService {
 
         for (Thesis t : roundTheses) {
             if (!isThesisDefenseEligible(t)) continue;
+            if (!canSynthesizeResult(t.getId())) continue;
             try {
                 synthesizeResult(t.getId());
             } catch (Exception ignored) {

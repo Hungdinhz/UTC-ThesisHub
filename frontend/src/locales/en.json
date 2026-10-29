@@ -20,7 +20,7 @@
   "roles": {
     "admin": "Administrator",
     "student": "UTC Student",
-    "supervisor": "Academic Supervisor",
+    "supervisor": "Lecturer",
     "committee_member": "Committee Member",
     "external_examiner": "External Reviewer / Examiner"
   },

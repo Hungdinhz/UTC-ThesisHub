@@ -30,10 +30,9 @@ const UTCEvaluationSheetModal: React.FC<UTCEvaluationSheetModalProps> = ({
   if (!isOpen) return null;
 
   const supScore = groupData.supervisorScore ?? 8.5;
-  const revScore = groupData.reviewerScore ?? 8.0;
   const comScore = groupData.committeeScore ?? 8.7;
 
-  const result = calculateUTCWeightedScore(supScore, revScore, comScore);
+  const result = calculateUTCWeightedScore(supScore, comScore);
 
   const handlePrint = () => {
     window.print();
@@ -150,15 +149,8 @@ const UTCEvaluationSheetModal: React.FC<UTCEvaluationSheetModalProps> = ({
                 <td>-</td>
               </tr>
               <tr>
-                <td style={{ textAlign: 'left' }}>2. Điểm Cán bộ Phản biện / Chấm ngoài</td>
-                <td>20%</td>
-                <td><strong>{revScore.toFixed(1)}</strong></td>
-                <td>-</td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td style={{ textAlign: 'left' }}>3. Điểm Hội đồng Bảo vệ UTC</td>
-                <td>40%</td>
+                <td style={{ textAlign: 'left' }}>2. Điểm Hội đồng Bảo vệ UTC</td>
+                <td>60%</td>
                 <td><strong>{comScore.toFixed(1)}</strong></td>
                 <td>-</td>
                 <td>-</td>
@@ -211,10 +203,6 @@ const UTCEvaluationSheetModal: React.FC<UTCEvaluationSheetModalProps> = ({
             <div className="utc-sig-box">
               <div className="utc-sig-title">GIẢNG VIÊN HƯỚNG DẪN</div>
               <div className="utc-sig-name">{groupData.supervisorName || 'TS. Nguyễn Văn Minh'}</div>
-            </div>
-            <div className="utc-sig-box">
-              <div className="utc-sig-title">CÁN BỘ PHẢN BIỆN</div>
-              <div className="utc-sig-name">{groupData.reviewerName || 'PGS.TS. Trần Thị Mai'}</div>
             </div>
             <div className="utc-sig-box">
               <div className="utc-sig-title">CHỦ TỊCH HỘI ĐỒNG UTC</div>

@@ -286,4 +286,73 @@ class AssignmentAlgorithmTest {
         assertEquals(102L, results.get(0).getLecturerId());
         assertEquals(0, results.get(0).getMatchedPriority());
     }
+
+    @Test
+    @DisplayName("Case 7: Student registered lecturer full -> assigned to lecturer with most remaining capacity and any direction")
+    void testCase7_RegisteredLecturerFull_AssignedToLecturerWithMostRemainingCapacityAndAnyDirection() {
+        // L1 is in Direction 10, capacity 1
+        LecturerAssignmentInput l1 = LecturerAssignmentInput.builder()
+                .lecturerId(101L)
+                .academicDegree("TIEN_SI")
+                .effectiveCapacity(1)
+                .currentAssigned(0)
+                .directionIds(Collections.singletonList(10L))
+                .build();
+
+        // L2 is in Direction 10, remaining capacity 1
+        LecturerAssignmentInput l2 = LecturerAssignmentInput.builder()
+                .lecturerId(102L)
+                .academicDegree("TIEN_SI")
+                .effectiveCapacity(2)
+                .currentAssigned(1) // remaining = 1
+                .directionIds(Collections.singletonList(10L))
+                .build();
+
+        // L3 is in Direction 20, remaining capacity 5 (nhiều chỉ tiêu nhất)
+        LecturerAssignmentInput l3 = LecturerAssignmentInput.builder()
+                .lecturerId(103L)
+                .academicDegree("TIEN_SI")
+                .effectiveCapacity(5)
+                .currentAssigned(0) // remaining = 5
+                .directionIds(Collections.singletonList(20L))
+                .build();
+
+        // S1 has GPA 3.8, picks L1
+        StudentAssignmentInput s1 = StudentAssignmentInput.builder()
+                .studentId(1L)
+                .directionId(10L)
+                .trainingProgramCode("CU_NHAN")
+                .gpa(3.8)
+                .preferences(Collections.singletonList(new StudentAssignmentInput.PreferenceEntry(1, 101L)))
+                .build();
+
+        // S2 has GPA 3.2, picks L1 (hết chỉ tiêu vì S1 lấy rồi)
+        StudentAssignmentInput s2 = StudentAssignmentInput.builder()
+                .studentId(2L)
+                .directionId(10L)
+                .trainingProgramCode("CU_NHAN")
+                .gpa(3.2)
+                .preferences(Collections.singletonList(new StudentAssignmentInput.PreferenceEntry(1, 101L)))
+                .build();
+
+        List<AssignmentMatchResult> results = algorithm.executeMatching(
+                Arrays.asList(s1, s2),
+                Arrays.asList(l1, l2, l3)
+        );
+
+        Map<Long, AssignmentMatchResult> map = new HashMap<>();
+        results.forEach(r -> map.put(r.getStudentId(), r));
+
+        // S1 gets L1 via NV1
+        assertEquals(101L, map.get(1L).getLecturerId());
+        assertEquals(10L, map.get(1L).getDirectionId());
+        assertEquals(1, map.get(1L).getMatchedPriority());
+
+        // S2 misses L1 (hết chỉ tiêu), gets L3 who has most remaining capacity (5 > 1), and assigned direction 20 (hướng bất kì)
+        assertEquals(103L, map.get(2L).getLecturerId());
+        assertEquals(20L, map.get(2L).getDirectionId());
+        assertEquals(0, map.get(2L).getMatchedPriority());
+        assertEquals("PROPOSED", map.get(2L).getStatus());
+        assertTrue(map.get(2L).getNotes().contains("hướng bất kì"));
+    }
 }

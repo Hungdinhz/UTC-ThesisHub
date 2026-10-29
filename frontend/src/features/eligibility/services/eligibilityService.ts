@@ -355,8 +355,8 @@ class EligibilityService {
           studentCode: d.studentCode || params.studentCode || `SV${d.studentId || params.studentId || 101}`,
           studentName: d.studentName || `Sinh viên #${d.studentId || params.studentId || 101}`,
           supervisorScore: Number(d.supervisorScore ?? 8.5),
-          reviewerScore: Number(d.reviewerScore ?? 8.0),
-          plagiarismRate: Number(d.plagiarismRate ?? 10.5),
+          reviewerScore: 0,
+          plagiarismRate: 0,
           allProgressStagesCompleted:
             d.allProgressStagesCompleted !== undefined
               ? Boolean(d.allProgressStagesCompleted)
@@ -380,15 +380,14 @@ class EligibilityService {
       studentCode: params.studentCode || `SV202100${sId}`,
       studentName: 'Nguyễn Văn An',
       supervisorScore: isOk ? 8.5 : 4.5,
-      reviewerScore: isOk ? 8.0 : 6.0,
-      plagiarismRate: isOk ? 11.5 : 26.2,
+      reviewerScore: 0,
+      plagiarismRate: 0,
       allProgressStagesCompleted: isOk,
       eligibleForDefense: isOk,
       reasons: isOk
         ? ['Đã hoàn thành toàn bộ các yêu cầu bảo vệ cuối kỳ']
         : [
             'Điểm GVHD dưới 5.0 (yêu cầu >= 5.0)',
-            'Tỷ lệ tương đồng đạo văn vượt ngưỡng cho phép 26.2% (> 20.0%)',
           ],
     };
   }

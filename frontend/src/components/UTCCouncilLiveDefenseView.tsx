@@ -134,7 +134,7 @@ export const UTCCouncilLiveDefenseView: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-base text-slate-100">Danh sách Sinh viên bảo vệ trong Hội đồng</h3>
-          <span className="text-xs text-slate-400">Trọng số tính điểm: 40% GVHD + 20% GVPB + 40% Hội đồng</span>
+          <span className="text-xs text-slate-400">Trọng số tính điểm: 40% GVHD + 60% Hội đồng</span>
         </div>
 
         <div className="space-y-3">
@@ -157,7 +157,7 @@ export const UTCCouncilLiveDefenseView: React.FC = () => {
 
                   <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 pt-1">
                     <span>GVHD: <b className="text-slate-300">{p.supervisor?.full_name}</b> ({p.supervisor_score !== null ? `${p.supervisor_score}đ` : 'Chưa điểm'})</span>
-                    <span>GVPB: <b className="text-slate-300">{p.reviewer?.full_name}</b> ({p.reviewer_score !== null ? `${p.reviewer_score}đ` : 'Chưa điểm'})</span>
+                    
                     {p.final_grade?.final_score_10 !== null && (
                       <span className="text-amber-400 font-bold">
                         Điểm Tổng kết: {p.final_grade.final_score_10}đ ({p.final_grade.final_letter_grade})

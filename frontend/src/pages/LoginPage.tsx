@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
@@ -150,10 +150,8 @@ const LoginPage: React.FC = () => {
       let resolvedUserType: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' = userType;
       if (backendRole === 'ROLE_ADMIN' || backendRole === 'ROLE_FACULTY_ADMIN') {
         resolvedUserType = 'admin';
-      } else if (backendRole === 'ROLE_LECTURER') {
+      } else if (backendRole === 'ROLE_LECTURER' || backendRole === 'ROLE_COMMITTEE') {
         resolvedUserType = 'supervisor';
-      } else if (backendRole === 'ROLE_COMMITTEE') {
-        resolvedUserType = 'committee_member';
       } else if (backendRole === 'ROLE_STUDENT') {
         resolvedUserType = 'student';
       } else if (backendRole === 'ROLE_EXTERNAL') {
@@ -162,10 +160,10 @@ const LoginPage: React.FC = () => {
 
       login(accessToken, refreshToken, resolvedUserType);
       const roleLandingMap: Record<string, string> = {
-        admin: '/admin/project-rounds',
+        admin: '/admin/dashboard',
         student: '/student/assignment',
         supervisor: '/admin/assignments',
-        committee_member: '/admin/councils',
+        committee_member: '/admin/assignments',
         external_examiner: '/external_examiner/dashboard',
       };
       navigate(roleLandingMap[resolvedUserType] || '/login');
@@ -280,14 +278,7 @@ const LoginPage: React.FC = () => {
               className={`utc-role-tab ${userType === 'supervisor' ? 'active' : ''}`}
               onClick={() => handleUserTypeChange('supervisor')}
             >
-              {t('roles.supervisor', 'Giảng viên HD')}
-            </button>
-            <button
-              type="button"
-              className={`utc-role-tab ${userType === 'committee_member' ? 'active' : ''}`}
-              onClick={() => handleUserTypeChange('committee_member')}
-            >
-              {t('roles.committee_member', 'Hội đồng')}
+              {t('roles.supervisor', 'Giảng viên')}
             </button>
             <button
               type="button"

@@ -823,12 +823,29 @@ public class AssignmentServiceImpl implements AssignmentService {
         Long roundId = request.getProjectRoundId();
         ProjectRound round = getAndValidateActiveRound(roundId);
 
+        if (Boolean.TRUE.equals(round.getSupplementaryOpen())) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED,
+                    "Đợt đồ án đang mở đăng ký bổ sung. Vui lòng bấm \"Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt\" trước khi chạy thuật toán phân công!");
+        }
+
         log.info("Executing supervisor allocation algorithm for round: {}", round.getRoundCode());
 
         // Nếu reassignAll = true, xóa các đề xuất phân công cũ (status = 'PROPOSED')
         if (request.getReassignAll() != null && request.getReassignAll()) {
             assignmentRepository.deleteByProjectRoundIdAndStatus(roundId, "PROPOSED");
         }
+
+        // Lấy danh sách các phân công đã chốt (FINALIZED) nếu không reassignAll
+        List<SupervisorAssignment> existingAssignments = assignmentRepository.findByProjectRoundId(roundId);
+        Set<Long> finalizedStudentIds = existingAssignments.stream()
+                .filter(a -> "FINALIZED".equalsIgnoreCase(a.getStatus()))
+                .map(SupervisorAssignment::getStudentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, Integer> finalizedCountPerLecturer = existingAssignments.stream()
+                .filter(a -> "FINALIZED".equalsIgnoreCase(a.getStatus()) && a.getLecturerId() != null)
+                .collect(Collectors.groupingBy(SupervisorAssignment::getLecturerId, Collectors.reducing(0, e -> 1, Integer::sum)));
 
         // Đảm bảo các giảng viên đã có bản ghi capacity trong đợt nếu chưa khởi tạo
         List<LecturerCapacity> existingRoundCaps = capacityRepository.findByProjectRoundIdAndIsActiveTrue(roundId);
@@ -858,6 +875,11 @@ public class AssignmentServiceImpl implements AssignmentService {
         for (DirectionRegistration reg : registrations) {
             Student s = studentMap.get(reg.getStudentId());
             if (s == null) continue;
+
+            // Nếu reassignAll = false thì giữ nguyên SV đã FINALIZED, không đưa vào danh sách phân công lại
+            if (Boolean.FALSE.equals(request.getReassignAll()) && finalizedStudentIds.contains(s.getId())) {
+                continue;
+            }
 
             String tpCode = (s.getTrainingProgramId() != null && tpMap.get(s.getTrainingProgramId()) != null)
                     ? tpMap.get(s.getTrainingProgramId()).getCode()
@@ -895,6 +917,10 @@ public class AssignmentServiceImpl implements AssignmentService {
                     .map(LecturerDirection::getDirectionId)
                     .collect(Collectors.toList());
 
+            int initialAssigned = Boolean.FALSE.equals(request.getReassignAll())
+                    ? finalizedCountPerLecturer.getOrDefault(l.getId(), 0)
+                    : 0;
+
             algorithmLecturers.add(LecturerAssignmentInput.builder()
                     .lecturerId(l.getId())
                     .lecturerCode(l.getLecturerCode())
@@ -903,7 +929,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                     .maxQuota(cap.getMaxQuota())
                     .capacityFactor(cap.getCapacityFactor())
                     .effectiveCapacity(cap.getEffectiveCapacity())
-                    .currentAssigned(0) // Start fresh for algorithm allocation
+                    .currentAssigned(initialAssigned) // Đã tính các SV đã FINALIZED nếu không reassignAll
                     .directionIds(dIds)
                     .build());
         }
@@ -1228,6 +1254,11 @@ public class AssignmentServiceImpl implements AssignmentService {
         if (!Boolean.TRUE.equals(round.getSupplementaryOpen())) {
             throw new AppException(ErrorCode.VALIDATION_FAILED, "Đợt đăng ký bổ sung chưa được mở nên không thể thực hiện kết thúc đợt bổ sung!");
         }
+
+        // Đóng cờ supplementaryOpen trước khi phân công để thỏa mãn validation
+        round.setSupplementaryOpen(false);
+        projectRoundRepository.save(round);
+
         // Chạy thuật toán gán cho các sinh viên mới đăng ký bổ sung (reassignAll = false để giữ nguyên các SV đã FINALIZED)
         try {
             AssignmentGenerateRequestDTO genReq = new AssignmentGenerateRequestDTO();

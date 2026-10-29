@@ -101,10 +101,16 @@ export function convertScoreToUTCGrade(score10: number): UTCGradeResult {
  */
 export function calculateUTCWeightedScore(
   supervisorScore: number,
-  reviewerScore: number,
-  committeeScore: number
+  committeeScoreOrReviewer: number,
+  committeeScore?: number
 ): UTCGradeResult {
-  const weightedTotal =
-    supervisorScore * 0.4 + reviewerScore * 0.2 + committeeScore * 0.4;
+  let weightedTotal: number;
+  if (committeeScore !== undefined) {
+    // Legacy 3 components fallback: 40% GVHD + 20% GVPB + 40% Committee
+    weightedTotal = supervisorScore * 0.4 + committeeScoreOrReviewer * 0.2 + committeeScore * 0.4;
+  } else {
+    // Standard UTC rule: 40% GVHD + 60% Committee
+    weightedTotal = supervisorScore * 0.4 + committeeScoreOrReviewer * 0.6;
+  }
   return convertScoreToUTCGrade(weightedTotal);
 }

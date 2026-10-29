@@ -82,17 +82,22 @@ export const TaskBoardPage: React.FC = () => {
       visibleTheses.forEach(t => {
         if (t.projectRoundId && !roundsMap.has(t.projectRoundId)) {
           const matchedRound = projectRounds.find(r => r.roundId === t.projectRoundId);
-          roundsMap.set(t.projectRoundId, {
-            id: t.projectRoundId,
-            name: matchedRound?.name || t.projectRoundName || `Đợt đồ án #${t.projectRoundId}`,
-            code: matchedRound?.roundCode || t.thesisCode?.split('_')?.[1] || undefined,
-          });
+          // Với Giảng viên hướng dẫn: Chỉ hiện những đợt đồ án đang mở (OPEN, IN_PROGRESS)
+          if (!isSupervisor || (matchedRound && (matchedRound.status === 'OPEN' || matchedRound.status === 'IN_PROGRESS'))) {
+            roundsMap.set(t.projectRoundId, {
+              id: t.projectRoundId,
+              name: matchedRound?.name || t.projectRoundName || `Đợt đồ án #${t.projectRoundId}`,
+              code: matchedRound?.roundCode || t.thesisCode?.split('_')?.[1] || undefined,
+            });
+          }
         }
       });
       if (roundsMap.size === 0) {
-        projectRounds.forEach(r => {
-          roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
-        });
+        projectRounds
+          .filter(r => !isSupervisor || r.status === 'OPEN' || r.status === 'IN_PROGRESS')
+          .forEach(r => {
+            roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
+          });
       }
       return Array.from(roundsMap.values());
     }
@@ -473,13 +478,17 @@ export const TaskBoardPage: React.FC = () => {
 
   const handleStatusChange = async (taskId: number, newStatus: Task['status']) => {
     try {
-      await progressService.updateTask(taskId, { status: newStatus });
-    } catch {
-      // ignore
-    }
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-    if (selectedTask && selectedTask.id === taskId) {
-      setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
+      const updated = await progressService.updateTask(taskId, { status: newStatus });
+      setTasks(prev => prev.map(t => t.id === taskId ? (updated || { ...t, status: newStatus }) : t));
+      if (selectedTask && selectedTask.id === taskId) {
+        setSelectedTask(prev => prev ? (updated || { ...prev, status: newStatus }) : null);
+      }
+    } catch (err: any) {
+      console.error('Lỗi khi cập nhật trạng thái công việc:', err);
+      alert('Không thể cập nhật trạng thái công việc: ' + (err?.response?.data?.message || err?.message || 'Lỗi kết nối'));
+      if (selectedThesisId) {
+        progressService.getTasksByThesis(selectedThesisId).then(setTasks).catch(() => {});
+      }
     }
   };
 
@@ -588,13 +597,29 @@ export const TaskBoardPage: React.FC = () => {
     try {
       setDefenseReadyLoading(true);
       const updated = await thesisService.setDefenseEligible(selectedThesisId, false);
+      setCurrentThesis({ ...updated, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' });
+      setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' } : t));
+      alert(`❌ Đã xác nhận sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp.`);
+    } catch (err: any) {
+      console.error('Lỗi khi cập nhật trạng thái không đủ điều kiện bảo vệ:', err);
+      setCurrentThesis({ ...currentThesis, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' });
+      setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' } : t));
+      alert(`❌ Đã cập nhật trạng thái: CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ cho sinh viên ${currentThesis.studentFullName}.`);
+    } finally {
+      setDefenseReadyLoading(false);
+    }
+  };
+
+  const handleResetToInProgress = async () => {
+    if (!currentThesis) return;
+    try {
+      setDefenseReadyLoading(true);
+      const updated = await thesisService.updateThesis(selectedThesisId, { status: 'IN_PROGRESS' as any });
       setCurrentThesis({ ...updated, defenseEligible: false, status: 'IN_PROGRESS' });
       setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'IN_PROGRESS' } : t));
-      alert(`❌ Đã xác nhận sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp.`);
-    } catch {
-      setCurrentThesis({ ...currentThesis, defenseEligible: false, status: 'IN_PROGRESS' });
-      setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'IN_PROGRESS' } : t));
-      alert(`❌ Đã cập nhật trạng thái: CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ cho sinh viên ${currentThesis.studentFullName}.`);
+      alert(`Đã mở lại trạng thái ĐANG THỰC HIỆN (IN_PROGRESS) cho sinh viên ${currentThesis.studentFullName}.`);
+    } catch (err: any) {
+      alert('Không thể cập nhật trạng thái: ' + (err?.message || 'Lỗi'));
     } finally {
       setDefenseReadyLoading(false);
     }
@@ -933,7 +958,7 @@ export const TaskBoardPage: React.FC = () => {
 
               {/* Defense Ready Confirmation Button / Badge */}
               <div>
-                {currentThesis.defenseEligible ? (
+                {currentThesis.defenseEligible || currentThesis.status === 'DEFENSE_READY' ? (
                   <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '8px', maxWidth: '450px' }}>
                     <div style={{ fontWeight: 700, color: '#15803d', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `| Điểm GVHD: ${supervisorScoreData.score} / 10 đ`}
@@ -979,8 +1004,58 @@ export const TaskBoardPage: React.FC = () => {
                             fontWeight: 600,
                           }}
                         >
-                          ❌ Chưa đủ điều kiện bảo vệ
+                          ❌ Đổi thành Chưa đủ điều kiện
                         </button>
+                      </div>
+                    )}
+                  </div>
+                ) : currentThesis.status === 'DEFENSE_NOT_ELIGIBLE' ? (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '10px 14px', borderRadius: '8px', maxWidth: '450px' }}>
+                    <div style={{ fontWeight: 700, color: '#b91c1c', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>❌</span> ĐÃ XÁC NHẬN: CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#991b1b', marginTop: '4px' }}>
+                      Sinh viên chưa đạt yêu cầu để tham gia bảo vệ đồ án tốt nghiệp đợt này.
+                    </div>
+                    {canCreateTask ? (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={handleOpenDefenseReadyModal}
+                          style={{
+                            background: '#16a34a',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '4px 10px',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >
+                          🎓 Chấm điểm &amp; Đổi thành Đủ ĐK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleResetToInProgress}
+                          disabled={defenseReadyLoading}
+                          style={{
+                            background: '#fff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '4px',
+                            padding: '4px 10px',
+                            fontSize: '11px',
+                            color: '#475569',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >
+                          🔄 Mở lại trạng thái Đang làm
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#b91c1c', marginTop: '3px', fontStyle: 'italic' }}>
+                        (Vui lòng liên hệ Giảng viên hướng dẫn để được hướng dẫn thêm)
                       </div>
                     )}
                   </div>

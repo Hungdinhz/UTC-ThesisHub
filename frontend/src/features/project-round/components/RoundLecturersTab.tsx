@@ -13,6 +13,7 @@ interface RoundLecturersTabProps {
   roundName: string;
   roundCode: string;
   isRoundClosed?: boolean;
+  onRefresh?: () => void;
 }
 
 export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
@@ -20,6 +21,7 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
   roundName,
   roundCode,
   isRoundClosed,
+  onRefresh,
 }) => {
   const [capacities, setCapacities] = useState<LecturerCapacity[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -156,32 +158,12 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
       setSuccessMsg(`Đã thêm thành công ${selectedLecturerIds.length} giảng viên vào đợt đồ án!`);
       setShowAddModal(false);
       await loadData();
+      onRefresh?.();
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Lỗi khi thêm giảng viên vào đợt');
     } finally {
       setAddLoading(false);
-    }
-  };
-
-  // Init all lecturers
-  const handleInitAll = async () => {
-    if (isRoundClosed) return;
-    if (!window.confirm(`Bạn có chắc chắn muốn khởi tạo danh sách giảng viên và phân bổ chỉ tiêu tự động theo số lượng sinh viên trong đợt [${roundCode}]?`)) {
-      return;
-    }
-    try {
-      setLoading(true);
-      setError(null);
-      await assignmentService.initCapacities(roundId, 5);
-      setSuccessMsg('Đã khởi tạo danh sách giảng viên và phân bổ chỉ tiêu thành công theo số lượng sinh viên trong đợt!');
-      await loadData();
-      setTimeout(() => setSuccessMsg(null), 5000);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Lỗi khi khởi tạo chỉ tiêu';
-      setError(msg);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -203,6 +185,7 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
       await assignmentService.deleteCapacity(c.id, roundId, c.lecturerId);
       setSuccessMsg(`Đã xóa giảng viên ${c.fullName} khỏi đợt đồ án thành công.`);
       await loadData();
+      onRefresh?.();
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Lỗi khi xóa giảng viên khỏi đợt';
@@ -309,43 +292,30 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
           </button>
 
           <button
-            disabled={isRoundClosed}
-            onClick={handleInitAll}
-            title="Tự động phân bổ số lượng giảng viên và chỉ tiêu theo số sinh viên trong đợt (Tiến sĩ x1.5, PGS x2.0, tối thiểu 4 SV/GV)"
-            style={{
-              backgroundColor: isRoundClosed ? '#94a3b8' : '#16a34a',
-              color: '#fff',
-              border: 'none',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: isRoundClosed ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
+            onClick={async () => {
+              await loadData();
+              setSuccessMsg('Đã làm mới danh sách giảng viên thành công!');
+              onRefresh?.();
             }}
-          >
-            ⚡ Khởi tạo nhanh toàn bộ GV
-          </button>
-
-          <button
-            onClick={loadData}
+            disabled={loading}
             style={{
               backgroundColor: '#f8fafc',
               color: '#475569',
               border: '1px solid #cbd5e1',
-              padding: '8px 12px',
+              padding: '8px 14px',
               borderRadius: '6px',
               fontWeight: 600,
               fontSize: '0.85rem',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
+              opacity: loading ? 0.7 : 1,
             }}
+            title="Tải lại danh sách giảng viên trong đợt"
           >
-            🔄 Tải lại
+            <span style={{ display: 'inline-block' }}>🔄</span>
+            {loading ? 'Đang tải lại...' : 'Tải lại'}
           </button>
         </div>
       </div>

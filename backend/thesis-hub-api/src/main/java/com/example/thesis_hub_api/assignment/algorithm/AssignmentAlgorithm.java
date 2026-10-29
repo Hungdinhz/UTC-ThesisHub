@@ -132,13 +132,32 @@ public class AssignmentAlgorithm {
                 continue;
             }
 
-            // Find eligible lecturers in the same direction who satisfy degree and have capacity
+            // Tìm giảng viên còn chỉ tiêu và thỏa mãn điều kiện học vị (KY_SU phải từ Tiến sĩ trở lên)
             List<LecturerAssignmentInput> eligibleLecturers = lecturers.stream()
                     .filter(l -> l.getRemainingCapacity() > 0)
                     .filter(l -> constraints.checkDegreeConstraint(student.getTrainingProgramCode(), l.getAcademicDegree()))
-                    .filter(l -> constraints.checkDirectionConstraint(student.getDirectionId(), l.getDirectionIds()))
-                    .sorted(Comparator.comparingDouble(LecturerAssignmentInput::getLoadRatio)
-                            .thenComparing(Comparator.comparingInt(LecturerAssignmentInput::getRemainingCapacity).reversed()))
+                    .sorted((l1, l2) -> {
+                        // 1. Giảng viên đang có nhiều chỉ tiêu nhất (remainingCapacity DESC)
+                        int cmpCapacity = Integer.compare(l2.getRemainingCapacity(), l1.getRemainingCapacity());
+                        if (cmpCapacity != 0) {
+                            return cmpCapacity;
+                        }
+
+                        // 2. Ưu tiên cùng hướng đồ án nếu chỉ tiêu còn lại bằng nhau
+                        boolean l1SameDir = l1.getDirectionIds() != null && l1.getDirectionIds().contains(student.getDirectionId());
+                        boolean l2SameDir = l2.getDirectionIds() != null && l2.getDirectionIds().contains(student.getDirectionId());
+                        if (l1SameDir != l2SameDir) {
+                            return l1SameDir ? -1 : 1;
+                        }
+
+                        // 3. Cân bằng tải: loadRatio ASC
+                        int cmpLoad = Double.compare(l1.getLoadRatio(), l2.getLoadRatio());
+                        if (cmpLoad != 0) {
+                            return cmpLoad;
+                        }
+
+                        return Long.compare(l1.getLecturerId(), l2.getLecturerId());
+                    })
                     .collect(Collectors.toList());
 
             if (!eligibleLecturers.isEmpty()) {
@@ -146,22 +165,36 @@ public class AssignmentAlgorithm {
                 chosen.setCurrentAssigned(chosen.getCurrentAssigned() + 1);
                 unassignedStudentIds.remove(student.getStudentId());
 
+                // Xác định hướng đồ án: nếu giảng viên có cùng hướng thì giữ hướng đó,
+                // ngược lại phân bổ sang 1 hướng bất kì của giảng viên được chọn
+                Long assignedDirectionId = student.getDirectionId();
+                boolean isSameDirection = chosen.getDirectionIds() != null && chosen.getDirectionIds().contains(student.getDirectionId());
+                if (!isSameDirection) {
+                    if (chosen.getDirectionIds() != null && !chosen.getDirectionIds().isEmpty()) {
+                        assignedDirectionId = chosen.getDirectionIds().get(0); // 1 hướng bất kì của giảng viên
+                    }
+                }
+
                 double score = constraints.calculateMatchingScore(null, student.getGpa(), chosen.getLoadRatio());
+
+                String note = isSameDirection
+                        ? "Phân công tự động cho GV còn nhiều chỉ tiêu nhất (" + chosen.getRemainingCapacity() + " chỉ tiêu còn lại)"
+                        : "Phân công sang GV còn nhiều chỉ tiêu nhất (" + chosen.getRemainingCapacity() + " chỉ tiêu còn lại) và 1 hướng bất kì do GV/hướng đăng ký đã hết chỉ tiêu";
 
                 AssignmentMatchResult result = AssignmentMatchResult.builder()
                         .studentId(student.getStudentId())
                         .lecturerId(chosen.getLecturerId())
-                        .directionId(student.getDirectionId())
+                        .directionId(assignedDirectionId)
                         .matchedPriority(0)
                         .matchScore(score)
                         .status("PROPOSED")
                         .assignmentMethod("ALGORITHM")
-                        .notes("Phân công fallback tự động theo cân bằng tải hướng đề tài")
+                        .notes(note)
                         .build();
 
                 assignments.put(student.getStudentId(), result);
             } else {
-                // Cannot allocate
+                // Không còn giảng viên nào còn chỉ tiêu hoặc thỏa mãn học vị
                 AssignmentMatchResult unassignedResult = AssignmentMatchResult.builder()
                         .studentId(student.getStudentId())
                         .lecturerId(null)
@@ -170,7 +203,7 @@ public class AssignmentAlgorithm {
                         .matchScore(0.0)
                         .status("UNASSIGNED")
                         .assignmentMethod("ALGORITHM")
-                        .notes("Không tìm thấy giảng viên còn chỉ tiêu hoặc thỏa mãn học vị trong hướng đồ án đã chọn")
+                        .notes("Không tìm thấy giảng viên nào còn chỉ tiêu hoặc thỏa mãn học vị trong đợt đồ án")
                         .build();
 
                 assignments.put(student.getStudentId(), unassignedResult);

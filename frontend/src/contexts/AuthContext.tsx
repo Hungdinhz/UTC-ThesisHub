@@ -51,14 +51,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const apiRole = currentUser?.role;
 
         let detectedType: UserType | null = null;
-        if (apiUserType) {
+        if (apiUserType === 'committee_member') {
+          detectedType = 'supervisor';
+        } else if (apiUserType) {
           detectedType = apiUserType as UserType;
         } else if (apiRole === 'ROLE_ADMIN') {
           detectedType = 'admin';
-        } else if (apiRole === 'ROLE_LECTURER') {
+        } else if (apiRole === 'ROLE_LECTURER' || apiRole === 'ROLE_COMMITTEE') {
           detectedType = 'supervisor';
-        } else if (apiRole === 'ROLE_COMMITTEE') {
-          detectedType = 'committee_member';
         } else if (apiRole === 'ROLE_STUDENT') {
           detectedType = 'student';
         } else if (apiRole === 'ROLE_EXTERNAL') {
@@ -89,7 +89,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userData = await apiService.getSupervisorProfile();
           break;
         case 'committee_member':
-          userData = await apiService.getCommitteeMemberProfile();
+          try {
+            userData = await apiService.getSupervisorProfile();
+          } catch {
+            userData = await apiService.getCommitteeMemberProfile();
+          }
           break;
         case 'external_examiner':
           userData = await apiService.getExternalProfile();

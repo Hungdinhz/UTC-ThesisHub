@@ -105,7 +105,7 @@ public class ThesisServiceImpl implements ThesisService {
                 thesis.setStatus("DEFENSE_READY");
             }
         } else {
-            thesis.setStatus("IN_PROGRESS");
+            thesis.setStatus("DEFENSE_NOT_ELIGIBLE");
             if (jdbcTemplate != null) {
                 try {
                     jdbcTemplate.update("DELETE FROM defense_schedule_theses WHERE thesis_id = ?", id);

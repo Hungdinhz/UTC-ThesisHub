@@ -287,7 +287,7 @@ public class UserService {
         String userType = switch (roleName) {
             case "ROLE_ADMIN" -> "admin";
             case "ROLE_LECTURER" -> "supervisor";
-            case "ROLE_COMMITTEE" -> "committee_member";
+            case "ROLE_COMMITTEE" -> "supervisor";
             default -> "student";
         };
 

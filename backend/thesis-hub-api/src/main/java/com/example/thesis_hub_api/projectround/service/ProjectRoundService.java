@@ -149,12 +149,12 @@ public class ProjectRoundService {
 
         if (currentUser != null && currentUser.getAuthorities() != null) {
             boolean isAdmin = currentUser.getAuthorities().stream()
-                    .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()) || "ROLE_COMMITTEE".equalsIgnoreCase(a.getAuthority()));
+                    .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()) || "ROLE_FACULTY_ADMIN".equalsIgnoreCase(a.getAuthority()));
             if (!isAdmin) {
                 boolean isStudent = currentUser.getAuthorities().stream()
                         .anyMatch(a -> "ROLE_STUDENT".equalsIgnoreCase(a.getAuthority()));
                 boolean isLecturer = currentUser.getAuthorities().stream()
-                        .anyMatch(a -> "ROLE_LECTURER".equalsIgnoreCase(a.getAuthority()));
+                        .anyMatch(a -> "ROLE_LECTURER".equalsIgnoreCase(a.getAuthority()) || "ROLE_COMMITTEE".equalsIgnoreCase(a.getAuthority()));
 
                 if (isStudent && studentRepository != null && studentProjectRoundRepository != null) {
                     Student student = studentRepository.findByUserId(currentUser.getId()).orElse(null);
@@ -231,11 +231,24 @@ public class ProjectRoundService {
                                 });
                             }
                         }
-                        list = list.stream()
-                                .filter(r -> assignedRoundIds.contains(r.getId()) && !"DRAFT".equalsIgnoreCase(r.getStatus()))
-                                .toList();
+                        // Giảng viên hướng dẫn: chỉ hiện những đợt đồ án đang mở (OPEN, IN_PROGRESS)
+                        final List<ProjectRound> candidateList = list;
+                        Set<Long> openAssignedIds = assignedRoundIds.stream()
+                                .filter(id -> candidateList.stream().anyMatch(r -> r.getId().equals(id) && ("OPEN".equalsIgnoreCase(r.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(r.getStatus()))))
+                                .collect(Collectors.toSet());
+                        if (!openAssignedIds.isEmpty()) {
+                            list = list.stream()
+                                    .filter(r -> openAssignedIds.contains(r.getId()))
+                                    .toList();
+                        } else {
+                            list = list.stream()
+                                    .filter(r -> "OPEN".equalsIgnoreCase(r.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(r.getStatus()))
+                                    .toList();
+                        }
                     } else {
-                        list = List.of();
+                        list = list.stream()
+                                .filter(r -> "OPEN".equalsIgnoreCase(r.getStatus()) || "IN_PROGRESS".equalsIgnoreCase(r.getStatus()))
+                                .toList();
                     }
                 }
             }
@@ -405,7 +418,7 @@ public class ProjectRoundService {
             if (thesis.getId() == null) {
                 continue;
             }
-            if (defenseService != null) {
+            if (defenseService != null && defenseService.canSynthesizeResult(thesis.getId())) {
                 try {
                     defenseService.synthesizeResult(thesis.getId());
                 } catch (Exception ignored) {}
@@ -424,7 +437,7 @@ public class ProjectRoundService {
                     if (studentProjectRoundRepository != null && thesis.getStudent() != null && thesis.getStudent().getId() != null) {
                         studentProjectRoundRepository.findByStudentIdAndProjectRoundId(thesis.getStudent().getId(), round.getId())
                                 .ifPresent(spr -> {
-                                    spr.setStatus(passed ? "COMPLETED" : "FAILED");
+                                    spr.setStatus(passed ? "DEFENDED" : "DROPPED");
                                     spr.setNote("Kết quả bảo vệ: " + (gr.getFinalScore() != null ? gr.getFinalScore() : "--") + "/10 (" + (passed ? "ĐẠT" : "KHÔNG ĐẠT") + ")");
                                     studentProjectRoundRepository.save(spr);
                                 });

@@ -95,7 +95,7 @@ export interface Thesis {
   objectives?: string;
   scope?: string;
   technologies?: string;
-  status: 'DRAFT' | 'APPROVED' | 'IN_PROGRESS' | 'UNDER_REVIEW' | 'DEFENSE_READY' | 'COMPLETED' | 'CANCELLED';
+  status: 'DRAFT' | 'APPROVED' | 'IN_PROGRESS' | 'UNDER_REVIEW' | 'DEFENSE_READY' | 'DEFENSE_NOT_ELIGIBLE' | 'COMPLETED' | 'CANCELLED';
   completionRate: number;
   defenseEligible: boolean;
   createdAt: string;

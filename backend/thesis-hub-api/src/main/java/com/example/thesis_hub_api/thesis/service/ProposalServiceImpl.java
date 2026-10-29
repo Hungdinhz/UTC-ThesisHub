@@ -258,6 +258,11 @@ public class ProposalServiceImpl implements ProposalService {
         Proposal proposal = proposalRepository.findById(proposalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Proposal", proposalId));
 
+        if (("REVISE_REQUIRED".equalsIgnoreCase(request.getStatus()) || "REJECTED".equalsIgnoreCase(request.getStatus()))
+                && (request.getEvaluationNotes() == null || request.getEvaluationNotes().trim().isEmpty())) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Nhận xét chi tiết là bắt buộc khi yêu cầu chỉnh sửa hoặc từ chối đề cương.");
+        }
+
         java.util.List<ProposalReviewAssignment> existingAssignments = reviewAssignmentRepository.findByProposalId(proposalId);
         ProposalReviewAssignment assignment;
         if (!existingAssignments.isEmpty()) {
@@ -311,7 +316,11 @@ public class ProposalServiceImpl implements ProposalService {
         // Gửi thông báo kết quả xét duyệt đề cương cho Sinh viên
         if (savedProposal.getStudent() != null && savedProposal.getStudent().getUser() != null && savedProposal.getStudent().getUser().getId() != null) {
             try {
-                String decisionText = "APPROVED".equalsIgnoreCase(request.getStatus()) ? "ĐÃ ĐƯỢC PHÊ DUYỆT" : "YÊU CẦU CHỈNH SỬA";
+                String decisionText = "APPROVED".equalsIgnoreCase(request.getStatus())
+                        ? "ĐÃ ĐƯỢC PHÊ DUYỆT"
+                        : "REJECTED".equalsIgnoreCase(request.getStatus())
+                        ? "ĐÃ BỊ TỪ CHỐI"
+                        : "YÊU CẦU CHỈNH SỬA";
                 String note = (request.getEvaluationNotes() != null && !request.getEvaluationNotes().isBlank())
                         ? (": " + request.getEvaluationNotes())
                         : ".";

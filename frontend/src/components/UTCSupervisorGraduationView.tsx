@@ -157,8 +157,7 @@ export const UTCSupervisorGraduationView: React.FC = () => {
           { key: 'outlines', label: '2. Duyệt Đề cương', icon: '📝' },
           { key: 'weekly', label: '3. Báo cáo tuần & Đánh giá', icon: '📅' },
           { key: 'eval', label: '4. Đánh giá sơ khảo GVHD', icon: '⭐' },
-          { key: 'reviewer', label: `5. Đồ án Phản biện (${reviewerProjects.length})`, icon: '🔍' },
-        ].map((tab) => (
+                  ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}

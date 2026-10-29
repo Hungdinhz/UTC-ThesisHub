@@ -4,11 +4,14 @@ import { eligibilityService } from '../services/eligibilityService';
 import { thesisService } from '../../thesis/services/thesisService';
 import type { Thesis } from '../../thesis/types';
 import { apiService } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import type { FinalDefenseEligibilityResponse } from '../types';
 import type { ProjectRoundItem, StudentProjectRoundItem } from '../../../types';
 import './EligibilityPages.css';
 
 export const FinalDefenseEligibilityPage: React.FC = () => {
+  const { userType } = useAuth();
+  const isAdmin = userType === 'admin';
   // Navigation sub-tabs: 'check' | 'students'
   const [activeTab, setActiveTab] = useState<'check' | 'students'>('check');
 
@@ -199,7 +202,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Xét điều kiện bảo vệ đồ án tốt nghiệp cuối kỳ</h1>
           <p className="feature-page-subtitle">
-            Giai đoạn 5: Kiểm tra tiêu chí xét duyệt bảo vệ đồ án tốt nghiệp cuối kỳ (GVHD đồng ý ≥ 5.0, GVPB đồng ý ≥ 5.0, Tỷ lệ đạo văn ≤ 20%, Hoàn thành tiến độ).
+            Giai đoạn 5: Kiểm tra tiêu chí xét duyệt bảo vệ đồ án tốt nghiệp cuối kỳ (Hoàn thành 100% tiến độ thực hiện đồ án, GVHD đánh giá đạt ≥ 5.0 và đồng ý cho phép bảo vệ).
           </p>
         </div>
       </div>
@@ -239,7 +242,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
               minWidth: '280px',
             }}
           >
-            {rounds.map((r) => (
+            {(isAdmin ? rounds : rounds.filter((r) => r.status === 'OPEN' || r.status === 'IN_PROGRESS')).map((r) => (
               <option key={r.roundId} value={r.roundId}>
                 {r.name} ({r.roundCode}) — {r.semester} {r.academicYear}
               </option>
@@ -410,58 +413,31 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Criteria Checklist Grid */}
+              {/* Criteria Checklist Grid - 2 real criteria according to UTC yeucau.md */}
               <div className="criteria-grid">
-                {/* Criteria 1: Supervisor */}
-                <div className={`criteria-item-card ${result.supervisorScore >= 5.0 ? 'pass' : 'fail'}`}>
-                  <div className="criteria-header">
-                    <span className="criteria-title">1. Điểm Giảng viên Hướng dẫn (GVHD)</span>
-                    <span className="criteria-status-icon">{result.supervisorScore >= 5.0 ? '✅ Đạt' : '❌ Không đạt'}</span>
-                  </div>
-                  <div className="criteria-score-box">
-                    <span className="score-value">{result.supervisorScore.toFixed(1)}</span>
-                    <span className="score-scale">/ 10.0</span>
-                  </div>
-                  <p className="criteria-desc">Yêu cầu tối thiểu: ≥ 5.0 và đồng ý cho phép bảo vệ</p>
-                </div>
-
-                {/* Criteria 2: Reviewer */}
-                <div className={`criteria-item-card ${result.reviewerScore >= 5.0 ? 'pass' : 'fail'}`}>
-                  <div className="criteria-header">
-                    <span className="criteria-title">2. Điểm Giảng viên Phản biện (GVPB)</span>
-                    <span className="criteria-status-icon">{result.reviewerScore >= 5.0 ? '✅ Đạt' : '❌ Không đạt'}</span>
-                  </div>
-                  <div className="criteria-score-box">
-                    <span className="score-value">{result.reviewerScore.toFixed(1)}</span>
-                    <span className="score-scale">/ 10.0</span>
-                  </div>
-                  <p className="criteria-desc">Yêu cầu tối thiểu: ≥ 5.0 và xác nhận đề tài đạt chất lượng</p>
-                </div>
-
-                {/* Criteria 3: Plagiarism */}
-                <div className={`criteria-item-card ${result.plagiarismRate <= 20.0 ? 'pass' : 'fail'}`}>
-                  <div className="criteria-header">
-                    <span className="criteria-title">3. Tỷ lệ tương đồng Đạo văn</span>
-                    <span className="criteria-status-icon">{result.plagiarismRate <= 20.0 ? '✅ Hợp lệ' : '❌ Vi phạm'}</span>
-                  </div>
-                  <div className="criteria-score-box">
-                    <span className={`score-value ${result.plagiarismRate > 20.0 ? 'text-danger' : 'text-success'}`}>
-                      {result.plagiarismRate.toFixed(1)}%
-                    </span>
-                  </div>
-                  <p className="criteria-desc">Yêu cầu kiểm định Turnitin/Kiểm duyệt: ≤ 20.0%</p>
-                </div>
-
-                {/* Criteria 4: Stages */}
+                {/* Criteria 1: Stages Progress */}
                 <div className={`criteria-item-card ${result.allProgressStagesCompleted ? 'pass' : 'fail'}`}>
                   <div className="criteria-header">
-                    <span className="criteria-title">4. Tiến độ thực hiện các giai đoạn</span>
+                    <span className="criteria-title">1. Tiến độ thực hiện các giai đoạn</span>
                     <span className="criteria-status-icon">{result.allProgressStagesCompleted ? '✅ Hoàn tất' : '❌ Thiếu nợ'}</span>
                   </div>
                   <div className="criteria-score-box">
                     <span className="score-status-text">{result.allProgressStagesCompleted ? '100% Hoàn thành' : 'Chưa hoàn tất'}</span>
                   </div>
                   <p className="criteria-desc">Bắt buộc nộp đủ Scope, SRS, SDD và Báo cáo tổng kết đồ án</p>
+                </div>
+
+                {/* Criteria 2: Supervisor Evaluation */}
+                <div className={`criteria-item-card ${result.supervisorScore >= 5.0 ? 'pass' : 'fail'}`}>
+                  <div className="criteria-header">
+                    <span className="criteria-title">2. Đánh giá của Giảng viên Hướng dẫn (GVHD)</span>
+                    <span className="criteria-status-icon">{result.supervisorScore >= 5.0 ? '✅ Đạt' : '❌ Không đạt'}</span>
+                  </div>
+                  <div className="criteria-score-box">
+                    <span className="score-value">{result.supervisorScore.toFixed(1)}</span>
+                    <span className="score-scale">/ 10.0</span>
+                  </div>
+                  <p className="criteria-desc">Yêu cầu tối thiểu: Điểm thành phần ≥ 5.0 và đồng ý cho phép bảo vệ</p>
                 </div>
               </div>
 
