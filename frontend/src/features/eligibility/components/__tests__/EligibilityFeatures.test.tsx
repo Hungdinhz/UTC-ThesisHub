@@ -120,15 +120,16 @@ describe('Eligibility Feature Component & Page Tests', () => {
 
     expect(screen.getByText('Xét điều kiện bảo vệ đồ án tốt nghiệp cuối kỳ')).toBeInTheDocument();
 
+    const input = screen.getByPlaceholderText(/Nhập mã sinh viên/i);
+    fireEvent.change(input, { target: { value: '201200101' } });
+
     const checkBtn = screen.getByText(/Kiểm tra điều kiện/i);
     fireEvent.click(checkBtn);
 
     await waitFor(() => {
       expect(screen.getByText('ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ')).toBeInTheDocument();
-      expect(screen.getByText('1. Điểm Giảng viên Hướng dẫn (GVHD)')).toBeInTheDocument();
-      expect(screen.getByText('2. Điểm Giảng viên Phản biện (GVPB)')).toBeInTheDocument();
-      expect(screen.getByText('3. Tỷ lệ tương đồng Đạo văn')).toBeInTheDocument();
-      expect(screen.getByText('4. Tiến độ thực hiện các giai đoạn')).toBeInTheDocument();
+      expect(screen.getByText('1. Tiến độ thực hiện các giai đoạn')).toBeInTheDocument();
+      expect(screen.getByText('2. Đánh giá của Giảng viên Hướng dẫn (GVHD)')).toBeInTheDocument();
     });
   });
 });

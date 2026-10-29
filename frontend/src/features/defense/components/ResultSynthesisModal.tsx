@@ -15,14 +15,14 @@ export const ResultSynthesisModal: React.FC<ResultSynthesisModalProps> = ({
   thesisId,
   onSynthesize,
 }) => {
-  const [supervisorWeight, setSupervisorWeight] = useState(0.3);
-  const [reviewerWeight, setReviewerWeight] = useState(0.2);
-  const [councilWeight, setCouncilWeight] = useState(0.5);
+  const [supervisorWeight, setSupervisorWeight] = useState(0.4);
+  const reviewerWeight = 0.0;
+  const [councilWeight, setCouncilWeight] = useState(0.6);
   const [notes, setNotes] = useState('Tổng hợp kết quả tốt nghiệp chính thức');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const totalWeight = Number((supervisorWeight + reviewerWeight + councilWeight).toFixed(2));
+  const totalWeight = Number((supervisorWeight + councilWeight).toFixed(2));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +59,7 @@ export const ResultSynthesisModal: React.FC<ResultSynthesisModalProps> = ({
         <div className="synthesis-formula-info">
           <h4>Quy chế tính điểm đồ án tốt nghiệp:</h4>
           <p>
-            <code>Điểm tổng kết = (GVHD × w1) + (GVPB × w2) + (Hội đồng trung bình × w3)</code>
+            <code>Điểm tổng kết = (GVHD × 40%) + (Hội đồng trung bình × 60%)</code>
           </p>
         </div>
 
@@ -76,24 +76,10 @@ export const ResultSynthesisModal: React.FC<ResultSynthesisModalProps> = ({
             onChange={(e) => setSupervisorWeight(Number(e.target.value))}
             required
           />
-          <small className="form-hint">Mặc định: 0.3 (30%)</small>
+          <small className="form-hint">Mặc định: 0.4 (40%)</small>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="wRev">Trọng số Giảng viên Phản biện (GVPB):</label>
-          <input
-            id="wRev"
-            type="number"
-            step="0.05"
-            min="0"
-            max="1.0"
-            className="form-control"
-            value={reviewerWeight}
-            onChange={(e) => setReviewerWeight(Number(e.target.value))}
-            required
-          />
-          <small className="form-hint">Mặc định: 0.2 (20%)</small>
-        </div>
+
 
         <div className="form-group">
           <label htmlFor="wCou">Trọng số Hội đồng chấm bảo vệ:</label>
@@ -108,7 +94,7 @@ export const ResultSynthesisModal: React.FC<ResultSynthesisModalProps> = ({
             onChange={(e) => setCouncilWeight(Number(e.target.value))}
             required
           />
-          <small className="form-hint">Mặc định: 0.5 (50%)</small>
+          <small className="form-hint">Mặc định: 0.6 (60%)</small>
         </div>
 
         <div className="weight-check-box">

@@ -12,10 +12,10 @@ import lombok.NoArgsConstructor;
 public class SynthesizeResultRequestDTO {
     private Long thesisId;
     @Builder.Default
-    private Double supervisorWeight = 0.3;
+    private Double supervisorWeight = 0.4;
     @Builder.Default
-    private Double reviewerWeight = 0.2;
+    private Double reviewerWeight = 0.0;
     @Builder.Default
-    private Double councilWeight = 0.5;
+    private Double councilWeight = 0.6;
     private String notes;
 }

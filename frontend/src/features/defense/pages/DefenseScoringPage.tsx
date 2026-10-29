@@ -283,7 +283,7 @@ export const DefenseScoringPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Chấm điểm và Tổng hợp Kết quả Tốt nghiệp</h1>
           <p className="feature-page-subtitle">
-            Cơ cấu điểm chuẩn UTC: GVHD (30%), GVPB (20%), Hội đồng 5 thành viên (50% - 1CT-2TK-2UV). Phân quyền nghiêm ngặt theo vai trò được giao.
+            Cơ cấu điểm chuẩn UTC: GVHD (40%), Hội đồng 5 thành viên (60% - 1CT-2TK-2UV). Phân quyền nghiêm ngặt theo vai trò được giao.
           </p>
         </div>
 
@@ -535,7 +535,7 @@ export const DefenseScoringPage: React.FC = () => {
                     Theo quy định phân quyền đào tạo, <strong>Admin không trực tiếp nhập điểm chấm hoặc ký biên bản Hội đồng</strong>.
                   </p>
                   <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', color: '#1e3a8a', lineHeight: 1.7 }}>
-                    <li>Điểm GVHD (30%), GVPB (20%) và 5 thành viên Hội đồng (50%) do từng giảng viên đăng nhập bằng tài khoản cá nhân để chấm.</li>
+                    <li>Điểm GVHD (40%) và 5 thành viên Hội đồng (60%) do từng giảng viên đăng nhập bằng tài khoản cá nhân để chấm.</li>
                     <li>Sau khi đủ 3 đầu điểm, Admin bấm <strong>"🎯 Tổng hợp kết quả tốt nghiệp"</strong> hoặc <strong>"📦 Xuất Dữ liệu Cuối kỳ &amp; Hoàn tất Đợt"</strong> để công bố điểm cho sinh viên.</li>
                   </ul>
                 </div>
@@ -761,16 +761,14 @@ export const DefenseScoringPage: React.FC = () => {
               <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: '6px', margin: '12px 0 20px 0', fontWeight: 600, fontSize: '13.5px' }}>
                 {graduationResult ? (
                   <>
-                    Điểm GVHD (30%): {Number(graduationResult.supervisorScore).toFixed(2)} | Điểm GVPB (20%):{' '}
-                    {Number(graduationResult.reviewerScore).toFixed(2)} | TB Hội đồng (50%):{' '}
+                    Điểm GVHD (40%): {Number(graduationResult.supervisorScore).toFixed(2)} | TB Hội đồng (60%):{' '}
                     {Number(graduationResult.councilScore).toFixed(2)} ⇒ ĐIỂM TỔNG KẾT:{' '}
                     {Number(graduationResult.finalScore).toFixed(2)} ({graduationResult.grade} -{' '}
                     {graduationResult.finalResult === 'PASSED' ? 'ĐẠT' : 'KHÔNG ĐẠT'})
                   </>
                 ) : (
                   <>
-                    Điểm GVHD (30%): {supervisorScoreItem ? supervisorScoreItem.score.toFixed(2) : '—'} | Điểm GVPB (20%):{' '}
-                    {reviewerScoreItem ? reviewerScoreItem.score.toFixed(2) : '—'} | TB Hội đồng hiện tại:{' '}
+                    Điểm GVHD (40%): {supervisorScoreItem ? supervisorScoreItem.score.toFixed(2) : '—'} | TB Hội đồng hiện tại:{' '}
                     {liveCouncilAvg !== null ? liveCouncilAvg.toFixed(2) : '—'} (Đang chờ tổng hợp cuối kỳ)
                   </>
                 )}

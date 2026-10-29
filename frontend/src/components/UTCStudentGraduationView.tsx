@@ -602,27 +602,22 @@ export const UTCStudentGraduationView: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6 shadow-xl max-w-3xl">
           <div>
             <h3 className="text-lg font-bold text-slate-100">Bảng Điểm Tổng kết Đồ án Tốt nghiệp</h3>
-            <p className="text-xs text-slate-400">Tính toán tự động theo Quy chế tín chỉ UTC (40% GVHD + 20% GVPB + 40% Hội đồng)</p>
+            <p className="text-xs text-slate-400">Tính toán tự động theo Quy chế tín chỉ UTC (40% GVHD + 60% Hội đồng)</p>
           </div>
 
           {projectData?.final_grade ? (
             <div className="space-y-6">
               {/* Component Scores */}
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-2 gap-4 text-center">
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <span className="text-xs text-slate-400">Điểm GVHD (40%)</span>
                   <p className="text-2xl font-bold text-emerald-400 mt-1">
                     {projectData.final_grade.supervisor_score !== null ? projectData.final_grade.supervisor_score : '-'}
                   </p>
                 </div>
+
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <span className="text-xs text-slate-400">Điểm GVPB (20%)</span>
-                  <p className="text-2xl font-bold text-indigo-400 mt-1">
-                    {projectData.final_grade.reviewer_score !== null ? projectData.final_grade.reviewer_score : '-'}
-                  </p>
-                </div>
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <span className="text-xs text-slate-400">Điểm Hội đồng (40%)</span>
+                  <span className="text-xs text-slate-400">Điểm Hội đồng (60%)</span>
                   <p className="text-2xl font-bold text-blue-400 mt-1">
                     {projectData.final_grade.council_avg_score !== null ? projectData.final_grade.council_avg_score : '-'}
                   </p>

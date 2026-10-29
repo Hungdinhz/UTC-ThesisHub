@@ -384,15 +384,12 @@ export const DefenseSchedulePage: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
             <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVHD (30%)</div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVHD (40%)</div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(myGraduationResult.supervisorScore || 0).toFixed(2)}</div>
             </div>
+
             <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVPB (20%)</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(myGraduationResult.reviewerScore || 0).toFixed(2)}</div>
-            </div>
-            <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>TB Hội đồng (50%)</div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>TB Hội đồng (60%)</div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(myGraduationResult.councilScore || 0).toFixed(2)}</div>
             </div>
             <div style={{ background: '#0a3273', padding: '12px', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>

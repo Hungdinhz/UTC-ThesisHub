@@ -1279,18 +1279,15 @@ public class DefenseService {
             return false;
         }
         boolean hasSupervisor = false;
-        boolean hasReviewer = false;
         boolean hasCouncil = false;
         for (Score s : scores) {
             if ("SUPERVISOR".equalsIgnoreCase(s.getScoreType()) && s.getScore() != null) {
                 hasSupervisor = true;
-            } else if ("REVIEWER".equalsIgnoreCase(s.getScoreType()) && s.getScore() != null) {
-                hasReviewer = true;
             } else if ("COUNCIL".equalsIgnoreCase(s.getScoreType()) && s.getScore() != null) {
                 hasCouncil = true;
             }
         }
-        return hasSupervisor && hasReviewer && hasCouncil;
+        return hasSupervisor && hasCouncil;
     }
 
     /**
@@ -1332,7 +1329,6 @@ public class DefenseService {
             }
             List<String> missing = new ArrayList<>();
             if (supervisorScore == null) missing.add("Điểm GVHD");
-            if (reviewerScore == null) missing.add("Điểm GVPB");
             if (councilScores.isEmpty()) missing.add("Điểm Hội đồng");
             if (!missing.isEmpty()) {
                 throw new IllegalArgumentException("Đề tài còn thiếu đầu điểm bắt buộc (" + String.join(", ", missing) + "), vui lòng hoàn tất chấm điểm trước khi tổng hợp!");
@@ -1340,16 +1336,27 @@ public class DefenseService {
         } else {
             // Standalone unit-test fallback only when ThesisRepository is not wired
             if (supervisorScore == null) supervisorScore = BigDecimal.valueOf(8.0);
-            if (reviewerScore == null) reviewerScore = BigDecimal.valueOf(7.5);
             if (councilScores.isEmpty()) avgCouncilScore = BigDecimal.valueOf(8.0);
         }
 
-        double wSup = request.getSupervisorWeight() != null ? request.getSupervisorWeight() : 0.3;
-        double wRev = request.getReviewerWeight() != null ? request.getReviewerWeight() : 0.2;
-        double wCou = request.getCouncilWeight() != null ? request.getCouncilWeight() : 0.5;
+        // Trọng số chuẩn UTC: 40% GVHD + 60% Hội đồng
+        double wSup;
+        double wRev = 0.0;
+        double wCou;
+
+        if (request.getReviewerWeight() != null && request.getReviewerWeight() > 0 && reviewerScore != null) {
+            wSup = request.getSupervisorWeight() != null ? request.getSupervisorWeight() : 0.4;
+            wRev = request.getReviewerWeight();
+            wCou = request.getCouncilWeight() != null ? request.getCouncilWeight() : (1.0 - wSup - wRev);
+        } else {
+            wSup = (request.getSupervisorWeight() != null && (request.getReviewerWeight() == null || request.getReviewerWeight() == 0))
+                    ? request.getSupervisorWeight() : 0.4;
+            wCou = (request.getCouncilWeight() != null && (request.getReviewerWeight() == null || request.getReviewerWeight() == 0))
+                    ? request.getCouncilWeight() : 0.6;
+        }
 
         double finalVal = (supervisorScore.doubleValue() * wSup)
-                + (reviewerScore.doubleValue() * wRev)
+                + (reviewerScore != null ? reviewerScore.doubleValue() * wRev : 0.0)
                 + (avgCouncilScore.doubleValue() * wCou);
         BigDecimal finalScore = BigDecimal.valueOf(finalVal).setScale(2, RoundingMode.HALF_UP);
 

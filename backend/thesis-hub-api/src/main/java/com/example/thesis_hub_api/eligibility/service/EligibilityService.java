@@ -460,23 +460,17 @@ public class EligibilityService {
         }
 
         BigDecimal supervisorScore = null;
-        BigDecimal reviewerScore = null;
         boolean reviewerAssigned = false;
 
         if (thesisId != null) {
-            reviewerAssigned = reviewerAssignmentRepository.existsByThesisId(thesisId);
-            // In real DB workflow, if GVHD approved defenseEligible, do not block solely on separate reviewer assignment
-            if (!reviewerAssigned && dbThesisOpt.isEmpty()) {
-                eligible = false;
-                reasons.add("Đề tài chưa được phân công Giảng viên phản biện");
+            if (reviewerAssignmentRepository != null) {
+                reviewerAssigned = reviewerAssignmentRepository.existsByThesisId(thesisId);
             }
 
             List<Score> scores = scoreRepository.findByThesisId(thesisId);
             for (Score s : scores) {
                 if ("SUPERVISOR".equalsIgnoreCase(s.getScoreType())) {
                     supervisorScore = s.getScore();
-                } else if ("REVIEWER".equalsIgnoreCase(s.getScoreType())) {
-                    reviewerScore = s.getScore();
                 }
             }
 
@@ -484,18 +478,10 @@ public class EligibilityService {
                 eligible = false;
                 reasons.add("Điểm đánh giá của GVHD dưới 5.0 (Điểm: " + supervisorScore + ")");
             }
-
-            if (reviewerScore != null && reviewerScore.compareTo(BigDecimal.valueOf(5.0)) < 0) {
-                eligible = false;
-                reasons.add("Điểm đánh giá của GVPB dưới 5.0 (Điểm: " + reviewerScore + ")");
-            }
         }
 
         if (supervisorScore == null) {
             supervisorScore = supervisorApproved ? BigDecimal.valueOf(8.5) : BigDecimal.valueOf(4.5);
-        }
-        if (reviewerScore == null) {
-            reviewerScore = supervisorApproved ? BigDecimal.valueOf(8.0) : BigDecimal.valueOf(6.0);
         }
 
         if (eligible) {
@@ -514,8 +500,8 @@ public class EligibilityService {
                 .supervisorApproved(supervisorApproved)
                 .supervisorScore(supervisorScore)
                 .reviewerAssigned(reviewerAssigned)
-                .reviewerScore(reviewerScore)
-                .plagiarismRate(eligible ? 8.5 : 22.0)
+                .reviewerScore(null)
+                .plagiarismRate(0.0)
                 .reasons(reasons)
                 .build();
     }

@@ -353,7 +353,7 @@ export const ThesisDetailPage: React.FC = () => {
                   KẾT QUẢ CHÍNH THỨC BẢO VỆ ĐỒ ÁN TỐT NGHIỆP
                 </h2>
                 <div style={{ fontSize: '12px', color: '#475569' }}>
-                  Công thức quy chế UTC: 0.3 × GVHD + 0.2 × GVPB + 0.5 × Hội đồng
+                  Công thức quy chế UTC: 0.4 × GVHD + 0.6 × Hội đồng
                 </div>
               </div>
             </div>
@@ -375,15 +375,12 @@ export const ThesisDetailPage: React.FC = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
             <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVHD (30%)</div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVHD (40%)</div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(graduationResult.supervisorScore || 0).toFixed(2)}</div>
             </div>
+
             <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm GVPB (20%)</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(graduationResult.reviewerScore || 0).toFixed(2)}</div>
-            </div>
-            <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm TB Hội đồng (50%)</div>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>Điểm TB Hội đồng (60%)</div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{Number(graduationResult.councilScore || 0).toFixed(2)}</div>
             </div>
             <div style={{ background: '#0a3273', padding: '12px', borderRadius: '8px', color: '#fff', textAlign: 'center' }}>
