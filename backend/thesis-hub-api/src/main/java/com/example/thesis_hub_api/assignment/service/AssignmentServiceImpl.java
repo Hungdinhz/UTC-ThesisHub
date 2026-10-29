@@ -1,4 +1,4 @@
-package com.example.thesis_hub_api.assignment.service;
+﻿package com.example.thesis_hub_api.assignment.service;
 
 import com.example.thesis_hub_api.assignment.algorithm.*;
 import com.example.thesis_hub_api.assignment.dto.*;
@@ -427,6 +427,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         // Xóa nguyện vọng cũ của sinh viên trong đợt này và lưu nguyện vọng mới
         preferenceRepository.deleteByStudentIdAndProjectRoundId(studentId, request.getProjectRoundId());
 
+        Double effectiveGpa = request.getGpa() != null ? request.getGpa() : student.getGpa();
         List<Preference> savedPreferences = new ArrayList<>();
         for (PreferenceItemDTO item : items) {
             Preference pref = Preference.builder()
@@ -434,7 +435,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                     .projectRoundId(request.getProjectRoundId())
                     .lecturerId(item.getLecturerId())
                     .priority(item.getPriority())
-                    .gpa(request.getGpa())
+                    .gpa(effectiveGpa)
                     .prioritizationCriteria(request.getPrioritizationCriteria())
                     .status("PENDING")
                     .build();
@@ -886,7 +887,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                     : "CU_NHAN";
 
             List<Preference> pList = studentPrefs.getOrDefault(s.getId(), Collections.emptyList());
-            Double gpa = pList.stream().map(Preference::getGpa).filter(Objects::nonNull).findFirst().orElse(3.0);
+            Double gpa = pList.stream().map(Preference::getGpa).filter(Objects::nonNull).findFirst().orElseGet(() -> s.getGpa() != null ? s.getGpa() : 0.0);
 
             List<StudentAssignmentInput.PreferenceEntry> pEntries = pList.stream()
                     .map(p -> StudentAssignmentInput.PreferenceEntry.builder()

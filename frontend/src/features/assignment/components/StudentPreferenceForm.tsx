@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { isLecturerAssignedToDirection, type ProjectDirection, type LecturerCapacity } from '../types';
 
 interface Props {
@@ -52,7 +52,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   const [nv1, setNv1] = useState<number | ''>(initialValues?.nv1LecturerId || '');
   const [nv2, setNv2] = useState<number | ''>(initialValues?.nv2LecturerId || '');
   const [nv3, setNv3] = useState<number | ''>(initialValues?.nv3LecturerId || '');
-  const [gpa, setGpa] = useState<string>(initialValues?.gpa !== undefined ? String(initialValues.gpa) : '3.2');
+  const [gpa, setGpa] = useState<string>(initialValues?.gpa !== undefined && initialValues.gpa !== null ? String(initialValues.gpa) : '');
   const [criteria, setCriteria] = useState<string>(initialValues?.prioritizationCriteria || '');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');

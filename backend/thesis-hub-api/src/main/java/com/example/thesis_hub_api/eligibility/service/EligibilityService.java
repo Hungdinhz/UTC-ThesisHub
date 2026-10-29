@@ -1,4 +1,4 @@
-package com.example.thesis_hub_api.eligibility.service;
+﻿package com.example.thesis_hub_api.eligibility.service;
 
 import com.example.thesis_hub_api.defense.entity.Score;
 import com.example.thesis_hub_api.defense.repository.ReviewerAssignmentRepository;
@@ -106,6 +106,16 @@ public class EligibilityService {
                 }
                 if (s.getUser() != null && s.getUser().getFullName() != null && !s.getUser().getFullName().isBlank()) {
                     mockRecord.setFullName(s.getUser().getFullName());
+                }
+                if (s.getGpa() != null) {
+                    mockRecord.setGpa(s.getGpa());
+                }
+            });
+        }
+        if (studentProjectRoundRepository != null && studentId != null && projectRoundId != null) {
+            studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId).ifPresent(spr -> {
+                if (spr.getGpa() != null) {
+                    mockRecord.setGpa(spr.getGpa());
                 }
             });
         }

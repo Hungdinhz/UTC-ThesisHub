@@ -1,4 +1,4 @@
-package com.example.thesis_hub_api.projectround.dto.request;
+﻿package com.example.thesis_hub_api.projectround.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -28,8 +28,7 @@ public class CreateRoundStudentManualDTO {
 
     private String phone;
 
-    @Builder.Default
-    private Double gpa = 3.20;
+    private Double gpa;
 
     @Builder.Default
     private String status = "ELIGIBLE";

@@ -1,4 +1,4 @@
-package com.example.thesis_hub_api.organization.entity;
+﻿package com.example.thesis_hub_api.organization.entity;
 
 import com.example.thesis_hub_api.identity.entity.User;
 import jakarta.persistence.*;
@@ -49,8 +49,7 @@ public class Student {
     private Integer debtCredits = 0;
 
     @Column(name = "gpa")
-    @Builder.Default
-    private Double gpa = 3.20;
+    private Double gpa;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
