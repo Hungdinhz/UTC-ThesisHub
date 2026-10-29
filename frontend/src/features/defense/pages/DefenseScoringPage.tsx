@@ -22,6 +22,7 @@ export const DefenseScoringPage: React.FC = () => {
 
   const [rounds, setRounds] = useState<any[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<number | undefined>(undefined);
+  const visibleRounds = isAdmin ? rounds : rounds.filter((r: any) => r.status === 'OPEN' || r.status === 'IN_PROGRESS');
 
   const [scoringTheses, setScoringTheses] = useState<MyScoringThesis[]>([]);
   const [selectedThesisId, setSelectedThesisId] = useState<number>(0);
@@ -287,7 +288,7 @@ export const DefenseScoringPage: React.FC = () => {
         </div>
 
         <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {rounds.length > 0 && (
+          {visibleRounds.length > 0 && (
             <select
               value={selectedRoundId || ''}
               onChange={handleRoundChange}
@@ -301,7 +302,7 @@ export const DefenseScoringPage: React.FC = () => {
                 background: '#fff',
               }}
             >
-              {rounds.map((r: any) => {
+              {visibleRounds.map((r: any) => {
                 const rid = r.roundId || r.id;
                 return (
                   <option key={rid} value={rid}>

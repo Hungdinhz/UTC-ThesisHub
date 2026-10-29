@@ -4,11 +4,14 @@ import { eligibilityService } from '../services/eligibilityService';
 import { thesisService } from '../../thesis/services/thesisService';
 import type { Thesis } from '../../thesis/types';
 import { apiService } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import type { FinalDefenseEligibilityResponse } from '../types';
 import type { ProjectRoundItem, StudentProjectRoundItem } from '../../../types';
 import './EligibilityPages.css';
 
 export const FinalDefenseEligibilityPage: React.FC = () => {
+  const { userType } = useAuth();
+  const isAdmin = userType === 'admin';
   // Navigation sub-tabs: 'check' | 'students'
   const [activeTab, setActiveTab] = useState<'check' | 'students'>('check');
 
@@ -239,7 +242,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
               minWidth: '280px',
             }}
           >
-            {rounds.map((r) => (
+            {(isAdmin ? rounds : rounds.filter((r) => r.status === 'OPEN' || r.status === 'IN_PROGRESS')).map((r) => (
               <option key={r.roundId} value={r.roundId}>
                 {r.name} ({r.roundCode}) — {r.semester} {r.academicYear}
               </option>

@@ -6,11 +6,14 @@ import { ForceApproveModal } from '../components/ForceApproveModal';
 import { DisqualifyModal } from '../components/DisqualifyModal';
 import { eligibilityService } from '../services/eligibilityService';
 import { apiService } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import type { ProjectRoundItem } from '../../../types';
 import type { EligibilityCheckResponse } from '../types';
 import './EligibilityPages.css';
 
 export const ThesisEligibilityPage: React.FC = () => {
+  const { userType } = useAuth();
+  const isAdmin = userType === 'admin';
   const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
   const [students, setStudents] = useState<EligibilityCheckResponse[]>([]);
@@ -256,7 +259,7 @@ export const ThesisEligibilityPage: React.FC = () => {
             onChange={(e) => setSelectedRoundId(e.target.value ? Number(e.target.value) : null)}
           >
             <option value="">-- Tất cả các đợt --</option>
-            {rounds.map((r) => (
+            {(isAdmin ? rounds : rounds.filter((r) => r.status === 'OPEN' || r.status === 'IN_PROGRESS')).map((r) => (
               <option key={r.roundId} value={r.roundId}>
                 {r.name} ({r.roundCode})
               </option>

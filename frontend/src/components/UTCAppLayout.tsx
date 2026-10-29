@@ -80,7 +80,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         return '/admin/assignments';
       case 'committee_member':
       case 'committee':
-        return '/admin/councils';
+        return '/admin/assignments';
       default:
         return '/';
     }

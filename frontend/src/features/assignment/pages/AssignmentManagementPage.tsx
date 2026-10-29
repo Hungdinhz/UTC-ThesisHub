@@ -57,11 +57,13 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
         const roundList = await apiService.getProjectRounds();
         setRounds(roundList || []);
         if (!propRoundId && roundList && roundList.length > 0) {
+          const selectableList = isAdmin ? roundList : roundList.filter((r) => r.status === 'OPEN' || r.status === 'IN_PROGRESS');
+          const listToPick = selectableList.length > 0 ? selectableList : roundList;
           const activeRound =
-            roundList.find((r) => r.status === 'OPEN') ||
-            roundList.find((r) => r.status === 'IN_PROGRESS') ||
-            roundList.find((r) => r.currentMilestone?.phaseType === 'REGISTRATION') ||
-            roundList[0];
+            listToPick.find((r) => r.status === 'OPEN') ||
+            listToPick.find((r) => r.status === 'IN_PROGRESS') ||
+            listToPick.find((r) => r.currentMilestone?.phaseType === 'REGISTRATION') ||
+            listToPick[0];
           setSelectedRoundId(activeRound.roundId);
         }
       } catch (err) {
@@ -75,6 +77,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
   }, [propRoundId]);
 
   const effectiveRoundId = selectedRoundId || propRoundId || 1;
+  const visibleRounds = isAdmin ? rounds : rounds.filter((r) => r.status === 'OPEN' || r.status === 'IN_PROGRESS');
   const currentRound = rounds.find((r) => r.roundId === effectiveRoundId);
   const isRoundClosed = currentRound?.status === 'CLOSED' || currentRound?.status === 'ARCHIVED';
   const isSupplementaryOpen = Boolean(stats?.supplementaryOpen ?? currentRound?.supplementaryOpen);
@@ -489,7 +492,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
           <label htmlFor="admin-round-select" className="round-select-label">
             Chọn đợt đồ án cần phân công:
           </label>
-          {rounds.length > 0 ? (
+          {visibleRounds.length > 0 ? (
             <select
               id="admin-round-select"
               className="round-select-dropdown"
@@ -499,7 +502,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
                 setSelectedRoundId(newRoundId);
               }}
             >
-              {rounds.map((r) => (
+              {visibleRounds.map((r) => (
                 <option key={r.roundId} value={r.roundId}>
                   [{r.roundCode}] {r.name} ({r.academicYear || '2026-2027'} - {r.semester || 'HK1'})
                 </option>

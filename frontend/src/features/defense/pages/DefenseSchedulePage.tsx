@@ -22,6 +22,7 @@ export const DefenseSchedulePage: React.FC = () => {
 
   const [rounds, setRounds] = useState<any[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<number>(10);
+  const visibleRounds = canManageSchedule ? rounds : rounds.filter((r: any) => r.status === 'OPEN' || r.status === 'IN_PROGRESS');
 
   const [schedules, setSchedules] = useState<DefenseSchedule[]>([]);
   const [councils, setCouncils] = useState<DefenseCouncil[]>([]);
@@ -274,7 +275,7 @@ export const DefenseSchedulePage: React.FC = () => {
         </div>
 
         <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {rounds.length > 0 && (
+          {visibleRounds.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '6px' }}>
               <label htmlFor="roundSelectSchedule" style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
                 📁 Đợt đồ án:
@@ -293,7 +294,7 @@ export const DefenseSchedulePage: React.FC = () => {
                   background: '#fff',
                 }}
               >
-                {rounds.map((r: any) => {
+                {visibleRounds.map((r: any) => {
                   const rid = r.roundId || r.id;
                   return (
                     <option key={rid} value={rid}>

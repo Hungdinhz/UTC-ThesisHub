@@ -7,6 +7,14 @@ import { DefenseScoringPage } from '../../pages/DefenseScoringPage';
 import { CouncilMemberCard } from '../CouncilMemberCard';
 import { ScoreEntryForm } from '../ScoreEntryForm';
 
+vi.mock('../../../../services/api', () => ({
+  apiService: {
+    getProjectRounds: vi.fn().mockResolvedValue([
+      { roundId: 10, name: 'Đợt 1 2026-2027', roundCode: 'D1_2627', status: 'IN_PROGRESS' },
+    ]),
+  },
+}));
+
 vi.mock('../../../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 1, username: 'admin', fullName: 'Admin' },

@@ -31,9 +31,8 @@ const getDefaultRouteForRole = (role?: string | null): string => {
     case 'student':
       return '/student/assignment';
     case 'supervisor':
-      return '/admin/assignments';
     case 'committee_member':
-      return '/admin/councils';
+      return '/admin/assignments';
     case 'external_examiner':
       return '/external_examiner/dashboard';
     default:
@@ -126,7 +125,7 @@ const AppRoutes: React.FC = () => {
       />
       <Route path="/student/dashboard" element={<Navigate to="/student/assignment" replace />} />
       <Route path="/supervisor/dashboard" element={<Navigate to="/admin/assignments" replace />} />
-      <Route path="/committee_member/dashboard" element={<Navigate to="/admin/councils" replace />} />
+      <Route path="/committee_member/dashboard" element={<Navigate to="/admin/assignments" replace />} />
 
       <Route
         path="/external_examiner/dashboard"
@@ -293,8 +292,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/student" element={<Navigate to="/student/assignment" replace />} />
       <Route path="/supervisor" element={<Navigate to="/admin/assignments" replace />} />
-      <Route path="/committee" element={<Navigate to="/admin/councils" replace />} />
-      <Route path="/committee_member" element={<Navigate to="/admin/councils" replace />} />
+      <Route path="/committee" element={<Navigate to="/admin/assignments" replace />} />
+      <Route path="/committee_member" element={<Navigate to="/admin/assignments" replace />} />
       <Route path="/" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
       <Route path="*" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
     </Routes>

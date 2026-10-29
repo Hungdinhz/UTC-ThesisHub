@@ -153,10 +153,12 @@ export const ProposalManagementPage: React.FC = () => {
               if (id !== null) assignedRoundIds.add(id);
             });
 
+            const openRounds = roundList.filter((r) => r.status === 'IN_PROGRESS' || r.status === 'OPEN');
             if (assignedRoundIds.size > 0) {
-              visibleRoundList = roundList.filter((r) => assignedRoundIds.has(r.roundId));
+              const assignedOpen = openRounds.filter((r) => assignedRoundIds.has(r.roundId));
+              visibleRoundList = assignedOpen.length > 0 ? assignedOpen : openRounds;
             } else {
-              visibleRoundList = roundList.filter((r) => r.status === 'IN_PROGRESS' || r.status === 'OPEN');
+              visibleRoundList = openRounds;
             }
           } catch {
             visibleRoundList = roundList.filter((r) => r.status === 'IN_PROGRESS' || r.status === 'OPEN');

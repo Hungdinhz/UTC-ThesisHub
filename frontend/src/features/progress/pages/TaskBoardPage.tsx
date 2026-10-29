@@ -82,17 +82,22 @@ export const TaskBoardPage: React.FC = () => {
       visibleTheses.forEach(t => {
         if (t.projectRoundId && !roundsMap.has(t.projectRoundId)) {
           const matchedRound = projectRounds.find(r => r.roundId === t.projectRoundId);
-          roundsMap.set(t.projectRoundId, {
-            id: t.projectRoundId,
-            name: matchedRound?.name || t.projectRoundName || `Đợt đồ án #${t.projectRoundId}`,
-            code: matchedRound?.roundCode || t.thesisCode?.split('_')?.[1] || undefined,
-          });
+          // Với Giảng viên hướng dẫn: Chỉ hiện những đợt đồ án đang mở (OPEN, IN_PROGRESS)
+          if (!isSupervisor || (matchedRound && (matchedRound.status === 'OPEN' || matchedRound.status === 'IN_PROGRESS'))) {
+            roundsMap.set(t.projectRoundId, {
+              id: t.projectRoundId,
+              name: matchedRound?.name || t.projectRoundName || `Đợt đồ án #${t.projectRoundId}`,
+              code: matchedRound?.roundCode || t.thesisCode?.split('_')?.[1] || undefined,
+            });
+          }
         }
       });
       if (roundsMap.size === 0) {
-        projectRounds.forEach(r => {
-          roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
-        });
+        projectRounds
+          .filter(r => !isSupervisor || r.status === 'OPEN' || r.status === 'IN_PROGRESS')
+          .forEach(r => {
+            roundsMap.set(r.roundId, { id: r.roundId, name: r.name, code: r.roundCode });
+          });
       }
       return Array.from(roundsMap.values());
     }
