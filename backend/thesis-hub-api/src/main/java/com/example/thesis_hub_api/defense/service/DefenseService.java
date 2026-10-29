@@ -1077,7 +1077,7 @@ public class DefenseService {
                 throw new IllegalStateException("Đợt đồ án đã kết thúc và khóa sổ điểm, không thể chỉnh sửa điểm!");
             }
 
-            if (!isThesisDefenseEligible(thesis)) {
+            if (!"SUPERVISOR".equals(scoreType) && !isThesisDefenseEligible(thesis)) {
                 throw new IllegalArgumentException("Sinh viên của đề tài này chưa đủ điều kiện bảo vệ nên chưa thể chấm điểm GĐ5!");
             }
 

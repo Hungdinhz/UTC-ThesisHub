@@ -140,6 +140,14 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       return;
     }
 
+    if (isSupplementaryOpen) {
+      setAlert({
+        type: 'warning',
+        message: 'Đợt đồ án đang mở đăng ký bổ sung. Vui lòng bấm "Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt" trước khi chạy thuật toán phân công!',
+      });
+      return;
+    }
+
     if (isFinalized) {
       if (!window.confirm('Đợt đồ án này đã được chốt phân công. Bạn có chắc muốn chạy lại thuật toán phân công đề xuất?')) {
         return;
@@ -398,10 +406,17 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
               <button
                 className="btn-generate-algo"
                 onClick={handleGenerate}
-                disabled={actionLoading || loading || isRoundClosed}
-                title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể chạy phân công' : undefined}
+                disabled={actionLoading || loading || isRoundClosed || isSupplementaryOpen}
+                style={isSupplementaryOpen ? { opacity: 0.65, cursor: 'not-allowed', backgroundColor: '#94a3b8' } : undefined}
+                title={
+                  isSupplementaryOpen
+                    ? 'Đang mở đăng ký bổ sung - Vui lòng bấm "Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt" trước khi chạy thuật toán'
+                    : isRoundClosed
+                    ? 'Đợt đồ án đã đóng - Không thể chạy phân công'
+                    : undefined
+                }
               >
-                ⚡ {actionLoading ? 'Đang tính toán...' : 'Chạy thuật toán phân công'}
+                ⚡ {actionLoading ? 'Đang tính toán...' : isSupplementaryOpen ? 'Chạy thuật toán (Khóa: Đang mở ĐK bổ sung)' : 'Chạy thuật toán phân công'}
               </button>
 
               <button
@@ -524,24 +539,54 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
             backgroundColor: '#fff7ed',
             border: '2px solid #fb923c',
             borderRadius: '10px',
-            padding: '14px 20px',
+            padding: '16px 20px',
             marginBottom: '16px',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
             gap: '14px',
             color: '#9a3412',
             boxShadow: '0 2px 10px rgba(234, 88, 12, 0.12)',
           }}
         >
-          <span style={{ fontSize: '1.7rem' }}>🔔</span>
-          <div style={{ flex: 1 }}>
-            <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>
-              ĐỢT ĐĂNG KÝ NGUYỆN VỌNG BỔ SUNG ĐANG MỞ
-            </strong>
-            <span style={{ fontSize: '0.9rem' }}>
-              Hệ thống đã gửi thông báo cho các sinh viên chưa đăng ký vào hoàn tất nguyện vọng. Trong thời gian mở đăng ký bổ sung, chức năng <strong>Chốt đợt / Chuyển giai đoạn</strong> tạm khóa cho đến khi Khoa bấm <strong>"🔒 Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt"</strong>.
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '280px' }}>
+            <span style={{ fontSize: '1.8rem' }}>🔔</span>
+            <div>
+              <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>
+                ĐỢT ĐĂNG KÝ NGUYỆN VỌNG BỔ SUNG ĐANG MỞ
+              </strong>
+              <span style={{ fontSize: '0.9rem', lineHeight: '1.4', display: 'block' }}>
+                Hệ thống đã mở đăng ký bổ sung cho các sinh viên chưa đăng ký. Trong thời gian này, nút <strong>Chạy thuật toán phân công</strong> và <strong>Chốt đợt</strong> tạm thời bị khóa. Vui lòng bấm nút bên phải để kết thúc đợt bổ sung và xóa các sinh viên không đăng ký.
+              </span>
+            </div>
           </div>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleFinalizeSupplementary}
+              disabled={actionLoading || loading}
+              style={{
+                padding: '10px 18px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: '#dc2626',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
+                whiteSpace: 'nowrap',
+              }}
+              title="Chốt danh sách đăng ký bổ sung, gán GVHD cho SV đăng ký bổ sung và xóa vĩnh viễn các SV không đăng ký khỏi đợt"
+            >
+              🔒 Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt
+            </button>
+          )}
         </div>
       )}
 

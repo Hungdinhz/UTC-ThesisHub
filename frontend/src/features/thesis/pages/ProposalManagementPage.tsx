@@ -17,9 +17,8 @@ export const ProposalManagementPage: React.FC = () => {
   const isSupervisor = userType === 'supervisor' || userType === 'committee_member';
   const isAdmin = userType === 'admin';
 
-  // Quyền duyệt: Giảng viên hướng dẫn xác nhận đề cương, Khoa (Admin/Tiểu ban) phê duyệt chính thức
-  const canSupervisorApprove = isSupervisor || isAdmin;
-  const canReview = isSupervisor || isAdmin;
+  // Quyền duyệt: Giảng viên hướng dẫn xác nhận đề cương (SUBMITTED)
+  const canSupervisorApprove = isSupervisor && !isAdmin;
 
   const hasValidUploadedFile = (url?: string | null): boolean => {
     if (!url || !url.trim()) return false;
@@ -38,6 +37,7 @@ export const ProposalManagementPage: React.FC = () => {
   const [reviewModal, setReviewModal] = useState<boolean>(false);
   const [reviewStatus, setReviewStatus] = useState<string>('APPROVED');
   const [reviewNotes, setReviewNotes] = useState<string>('');
+  const [reviewNotesError, setReviewNotesError] = useState<string>('');
   const [pdfPreviewProposal, setPdfPreviewProposal] = useState<Proposal | null>(null);
   const [bannerMsg, setBannerMsg] = useState<string | null>(null);
 
@@ -404,16 +404,9 @@ export const ProposalManagementPage: React.FC = () => {
 
   const handleSupervisorConfirm = async (proposal: Proposal) => {
     try {
-      const comment = isAdmin
-        ? 'Quản trị viên Khoa xác nhận thay GVHD, chuyển xét duyệt đề tài.'
-        : 'GVHD đồng ý xác nhận đề tài, chuyển Khoa/Ban duyệt.';
-      await thesisService.supervisorApprove(proposal.id, true, comment);
+      await thesisService.supervisorApprove(proposal.id, true, 'GVHD đồng ý xác nhận đề tài, chuyển Khoa/Ban duyệt.');
       await loadProposals();
-      setBannerMsg(
-        isAdmin
-          ? `Quản trị viên đã duyệt xác nhận (thay GVHD) đề tài của SV ${proposal.studentFullName} thành công!`
-          : `GVHD đã xác nhận đề tài của SV ${proposal.studentFullName} thành công!`
-      );
+      setBannerMsg(`GVHD đã xác nhận đề tài của SV ${proposal.studentFullName} thành công!`);
     } catch (err: any) {
       alert('Lỗi xác nhận: ' + (err?.response?.data?.message || err?.message));
     }
@@ -433,16 +426,29 @@ export const ProposalManagementPage: React.FC = () => {
 
   const handleReview = async () => {
     if (!selectedProposal) return;
+
+    // Khi admin lựa chọn sửa đổi hoặc từ chối thì viết nhận xét là bắt buộc, còn thông qua thì không bắt buộc
+    const isNotesRequired = reviewStatus === 'REVISE_REQUIRED' || reviewStatus === 'REJECTED';
+    if (isNotesRequired && !reviewNotes.trim()) {
+      const actionName = reviewStatus === 'REJECTED' ? 'từ chối' : 'yêu cầu sửa đổi';
+      setReviewNotesError(`Vui lòng nhập nhận xét chi tiết khi ${actionName} đề cương.`);
+      return;
+    }
+
     try {
-      await thesisService.reviewProposal(selectedProposal.id, 1, reviewStatus, reviewNotes);
+      await thesisService.reviewProposal(selectedProposal.id, 1, reviewStatus, reviewNotes.trim());
       await loadProposals();
-      setBannerMsg(
+      const statusText =
         reviewStatus === 'APPROVED'
           ? `Khoa/Ban đã PHÊ DUYỆT đề tài của SV ${selectedProposal.studentFullName}. Hệ thống đã tự động tạo Đề tài tốt nghiệp chính thức!`
-          : `Khoa/Ban yêu cầu chỉnh sửa lại đề tài của SV ${selectedProposal.studentFullName}.`
-      );
+          : reviewStatus === 'REJECTED'
+          ? `Khoa/Ban đã TỪ CHỐI đề cương của SV ${selectedProposal.studentFullName}.`
+          : `Khoa/Ban đã YÊU CẦU CHỈNH SỬA lại đề cương của SV ${selectedProposal.studentFullName}.`;
+      setBannerMsg(statusText);
       setReviewModal(false);
       setSelectedProposal(null);
+      setReviewNotes('');
+      setReviewNotesError('');
     } catch (err: any) {
       alert('Lỗi đánh giá đề cương: ' + (err?.response?.data?.message || err?.message));
     }
@@ -731,6 +737,12 @@ export const ProposalManagementPage: React.FC = () => {
             ⚠ CẦN SỬA ĐỔI
           </span>
         );
+      case 'REJECTED':
+        return (
+          <span style={{ padding: '4px 8px', borderRadius: '4px', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold' }}>
+            ✕ TỪ CHỐI (REJECTED)
+          </span>
+        );
       case 'DRAFT':
         return <span style={{ padding: '4px 8px', borderRadius: '4px', background: '#f1f3f4', color: '#5f6368' }}>📝 BẢN NHÁP</span>;
       default:
@@ -882,7 +894,7 @@ export const ProposalManagementPage: React.FC = () => {
         )}
         {isAdmin && (
           <span style={{ fontSize: '13px', color: '#475569', background: '#f1f5f9', padding: '4px 10px', borderRadius: '4px', fontWeight: 500 }}>
-            ⚖️ Quản trị viên (Quản lý, duyệt thay GVHD & Khoa phê duyệt đề tài)
+            ⚖️ Quản trị viên (Quản lý & Khoa phê duyệt đề tài)
           </span>
         )}
       </div>
@@ -931,6 +943,7 @@ export const ProposalManagementPage: React.FC = () => {
           <option value="UNDER_REVIEW">Chờ Khoa/Ban duyệt (UNDER_REVIEW)</option>
           <option value="APPROVED">Đã phê duyệt (APPROVED)</option>
           <option value="REVISE_REQUIRED">Yêu cầu sửa đổi (REVISE)</option>
+          <option value="REJECTED">Từ chối (REJECTED)</option>
         </select>
         {isStudent && (
           <div
@@ -1097,7 +1110,8 @@ export const ProposalManagementPage: React.FC = () => {
                         </button>
                       )}
 
-                      {canSupervisorApprove && !p.supervisorApproved && p.status !== 'APPROVED' && p.status !== 'REJECTED' && (
+                      {/* GVHD xác nhận đề tài (SUBMITTED -> UNDER_REVIEW) - Admin không duyệt thay */}
+                      {canSupervisorApprove && p.status === 'SUBMITTED' && !p.supervisorApproved && (
                         <button
                           onClick={() => handleSupervisorConfirm(p)}
                           style={{
@@ -1111,10 +1125,12 @@ export const ProposalManagementPage: React.FC = () => {
                             fontWeight: 600,
                           }}
                         >
-                          {isAdmin ? '✓ Duyệt thay GVHD' : '✓ Phê duyệt đề cương (GVHD)'}
+                          ✓ Phê duyệt đề cương (GVHD)
                         </button>
                       )}
-                      {isSupervisor && !isAdmin && (p.status === 'SUBMITTED' || p.status === 'UNDER_REVIEW') && (
+
+                      {/* GVHD yêu cầu sửa đổi khi đề cương ở trạng thái SUBMITTED (chờ GVHD xác nhận). Khi đã chuyển sang UNDER_REVIEW (chờ khoa duyệt) thì không còn nút yêu cầu sửa nữa */}
+                      {canSupervisorApprove && p.status === 'SUBMITTED' && (
                         <button
                           onClick={() => handleSupervisorRequestRevise(p)}
                           style={{
@@ -1131,16 +1147,21 @@ export const ProposalManagementPage: React.FC = () => {
                           ⚠️ Yêu cầu sửa đổi
                         </button>
                       )}
-                      {canReview && p.status !== 'APPROVED' && (
+
+                      {/* Khoa/Ban phê duyệt đề tài: Chỉ hiển thị cho Admin khi đề cương ở trạng thái UNDER_REVIEW (Chờ khoa duyệt). Bỏ nút đánh giá bên giảng viên. Ở trạng thái SUBMITTED hoặc REJECTED thì không hiển thị */}
+                      {isAdmin && p.status === 'UNDER_REVIEW' && (
                         <button
                           onClick={() => {
                             setSelectedProposal(p);
+                            setReviewStatus('APPROVED');
+                            setReviewNotes('');
+                            setReviewNotesError('');
                             setReviewModal(true);
                           }}
                           style={{
-                            background: isAdmin ? '#ecfdf5' : '#f1f5f9',
-                            color: isAdmin ? '#065f46' : '#334155',
-                            border: `1px solid ${isAdmin ? '#a7f3d0' : '#cbd5e1'}`,
+                            background: '#ecfdf5',
+                            color: '#065f46',
+                            border: '1px solid #a7f3d0',
                             padding: '6px 10px',
                             borderRadius: '4px',
                             cursor: 'pointer',
@@ -1148,7 +1169,7 @@ export const ProposalManagementPage: React.FC = () => {
                             fontWeight: 600,
                           }}
                         >
-                          {isAdmin ? '⚖️ Khoa Duyệt Đề Tài' : 'Đánh Giá'}
+                          ⚖️ Khoa Duyệt Đề Tài
                         </button>
                       )}
                       {isStudent && p.status === 'APPROVED' && !p.studentSigned && isCurrentStudentProposal(p) && (
@@ -1233,7 +1254,7 @@ export const ProposalManagementPage: React.FC = () => {
       </div>
 
       {/* Review Modal */}
-      {canReview && reviewModal && selectedProposal && (
+      {isAdmin && reviewModal && selectedProposal && (
         <div
           style={{
             position: 'fixed',
@@ -1260,7 +1281,10 @@ export const ProposalManagementPage: React.FC = () => {
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Kết quả đánh giá của Khoa/Ban:</label>
               <select
                 value={reviewStatus}
-                onChange={(e) => setReviewStatus(e.target.value)}
+                onChange={(e) => {
+                  setReviewStatus(e.target.value);
+                  setReviewNotesError('');
+                }}
                 style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
               >
                 <option value="APPROVED">Thông qua đề cương (APPROVED - Tự động khởi tạo Đề tài & Đề cương PDF)</option>
@@ -1270,20 +1294,50 @@ export const ProposalManagementPage: React.FC = () => {
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Nhận xét chi tiết của tiểu ban:</label>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>
+                Nhận xét chi tiết của tiểu ban:
+                {(reviewStatus === 'REVISE_REQUIRED' || reviewStatus === 'REJECTED') ? (
+                  <span style={{ color: '#dc2626', marginLeft: '6px', fontWeight: 600 }}>* (Bắt buộc)</span>
+                ) : (
+                  <span style={{ color: '#64748b', fontWeight: 'normal', marginLeft: '6px' }}>(Không bắt buộc)</span>
+                )}
+              </label>
               <textarea
                 rows={4}
                 value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder="Nhập nội dung nhận xét hoặc các điểm cần sửa đổi..."
-                style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                onChange={(e) => {
+                  setReviewNotes(e.target.value);
+                  if (e.target.value.trim()) setReviewNotesError('');
+                }}
+                placeholder={
+                  reviewStatus === 'REJECTED'
+                    ? 'Bắt buộc nhập lý do từ chối đề cương...'
+                    : reviewStatus === 'REVISE_REQUIRED'
+                    ? 'Bắt buộc nhập các điểm cần sinh viên chỉnh sửa đề cương...'
+                    : 'Nhập nội dung nhận xét hoặc các điểm cần sửa đổi...'
+                }
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: reviewNotesError ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  boxSizing: 'border-box',
+                }}
               />
+              {reviewNotesError && (
+                <div style={{ color: '#dc2626', fontSize: '13px', marginTop: '6px', fontWeight: 500 }}>
+                  ⚠️ {reviewNotesError}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button
                 type="button"
-                onClick={() => setReviewModal(false)}
+                onClick={() => {
+                  setReviewModal(false);
+                  setReviewNotesError('');
+                }}
                 style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
               >
                 Hủy

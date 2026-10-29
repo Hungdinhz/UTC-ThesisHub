@@ -104,6 +104,11 @@ export const thesisService = {
     return res.data.data;
   },
 
+  async updateThesis(id: number, payload: Partial<Thesis>): Promise<Thesis> {
+    const res = await apiClient.put(`/theses/${id}`, payload);
+    return res.data.data;
+  },
+
   async setDefenseEligible(id: number, eligible: boolean): Promise<Thesis> {
     const res = await apiClient.patch(`/theses/${id}/defense-eligible`, null, {
       params: { eligible }

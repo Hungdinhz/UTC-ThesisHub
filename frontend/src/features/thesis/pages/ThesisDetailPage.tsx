@@ -297,9 +297,9 @@ export const ThesisDetailPage: React.FC = () => {
           </div>
           <div>
             <span style={{
-              background: thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#dcfce7' : '#e0f2fe',
-              color: thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#15803d' : '#0369a1',
-              border: `1px solid ${thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#86efac' : '#bae6fd'}`,
+              background: thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#dcfce7' : thesis.status === 'DEFENSE_NOT_ELIGIBLE' ? '#fee2e2' : '#e0f2fe',
+              color: thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#15803d' : thesis.status === 'DEFENSE_NOT_ELIGIBLE' ? '#b91c1c' : '#0369a1',
+              border: `1px solid ${thesis.status === 'COMPLETED' || thesis.defenseEligible ? '#86efac' : thesis.status === 'DEFENSE_NOT_ELIGIBLE' ? '#fca5a5' : '#bae6fd'}`,
               padding: '6px 12px',
               borderRadius: '20px',
               fontWeight: 'bold',
@@ -307,6 +307,8 @@ export const ThesisDetailPage: React.FC = () => {
             }}>
               {thesis.status === 'COMPLETED'
                 ? '✓ ĐÃ BẢO VỆ HOÀN THÀNH'
+                : thesis.status === 'DEFENSE_NOT_ELIGIBLE'
+                ? '❌ CHƯA ĐỦ ĐK BẢO VỆ (DEFENSE_NOT_ELIGIBLE)'
                 : thesis.defenseEligible
                 ? '🎓 ĐỦ ĐK BẢO VỆ (DEFENSE_READY)'
                 : '⏳ ĐANG THỰC HIỆN (IN_PROGRESS)'}

@@ -669,6 +669,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                     roundName={selectedRound.name}
                     roundCode={selectedRound.roundCode}
                     isRoundClosed={selectedRound.status === 'CLOSED' || selectedRound.status === 'ARCHIVED'}
+                    onRefresh={loadRounds}
                   />
                 ) : (
                   <div>
