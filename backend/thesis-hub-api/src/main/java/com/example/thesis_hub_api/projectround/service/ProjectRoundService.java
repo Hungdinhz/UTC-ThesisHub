@@ -424,7 +424,7 @@ public class ProjectRoundService {
                     if (studentProjectRoundRepository != null && thesis.getStudent() != null && thesis.getStudent().getId() != null) {
                         studentProjectRoundRepository.findByStudentIdAndProjectRoundId(thesis.getStudent().getId(), round.getId())
                                 .ifPresent(spr -> {
-                                    spr.setStatus(passed ? "COMPLETED" : "FAILED");
+                                    spr.setStatus(passed ? "DEFENDED" : "DROPPED");
                                     spr.setNote("Kết quả bảo vệ: " + (gr.getFinalScore() != null ? gr.getFinalScore() : "--") + "/10 (" + (passed ? "ĐẠT" : "KHÔNG ĐẠT") + ")");
                                     studentProjectRoundRepository.save(spr);
                                 });

@@ -207,13 +207,12 @@ export const DefenseScoringPage: React.FC = () => {
     if (!selectedThesis || isAdmin) return [];
     const list: ScoreType[] = [];
     if (selectedThesis.canScoreCouncil) list.push('COUNCIL');
-    if (selectedThesis.canScoreReviewer) list.push('REVIEWER');
+    
     if (selectedThesis.canScoreSupervisor) list.push('SUPERVISOR');
     return list;
   }, [selectedThesis, isAdmin]);
 
   const supervisorScoreItem = scores.find((s) => s.scoreType === 'SUPERVISOR');
-  const reviewerScoreItem = scores.find((s) => s.scoreType === 'REVIEWER');
   const councilScoreItems = scores.filter((s) => s.scoreType === 'COUNCIL');
   const liveCouncilAvg =
     councilScoreItems.length > 0
@@ -372,7 +371,7 @@ export const DefenseScoringPage: React.FC = () => {
           <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
             {isAdmin
               ? 'Danh sách đề tài tại GĐ5 sẽ hiển thị ngay khi Giảng viên hướng dẫn xác nhận sinh viên Đủ điều kiện bảo vệ ở GĐ4.'
-              : 'Hệ thống chỉ hiển thị những đề tài mà bạn là Giảng viên hướng dẫn, Giảng viên phản biện hoặc nằm trong 5 thành viên Hội đồng chấm bảo vệ.'}
+              : 'Hệ thống chỉ hiển thị những đề tài mà bạn là Giảng viên hướng dẫn hoặc nằm trong 5 thành viên Hội đồng chấm bảo vệ.'}
           </p>
         </div>
       ) : (
@@ -391,7 +390,7 @@ export const DefenseScoringPage: React.FC = () => {
               {scoringTheses.map((t) => {
                 const roleTags: string[] = [];
                 if (t.canScoreCouncil || t.isCouncilMember) roleTags.push('Hội đồng');
-                if (t.canScoreReviewer) roleTags.push('GVPB');
+                
                 if (t.canScoreSupervisor) roleTags.push('GVHD');
                 const suffix = roleTags.length > 0 ? ` — [Vai trò: ${roleTags.join(', ')}]` : '';
                 return (
@@ -414,15 +413,11 @@ export const DefenseScoringPage: React.FC = () => {
                 <p className="summary-thesis-title">{displayThesisTitle}</p>
                 <div className="scores-breakdown-row">
                   <div className="sub-score-item">
-                    <span className="sub-score-lbl">Điểm GVHD (30%):</span>
+                    <span className="sub-score-lbl">Điểm GVHD (40%):</span>
                     <span className="sub-score-val">{Number(graduationResult.supervisorScore || 0).toFixed(2)}</span>
                   </div>
                   <div className="sub-score-item">
-                    <span className="sub-score-lbl">Điểm GVPB (20%):</span>
-                    <span className="sub-score-val">{Number(graduationResult.reviewerScore || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="sub-score-item">
-                    <span className="sub-score-lbl">TB Hội đồng (50%):</span>
+                    <span className="sub-score-lbl">TB Hội đồng (60%):</span>
                     <span className="sub-score-val">{Number(graduationResult.councilScore || 0).toFixed(2)}</span>
                   </div>
                 </div>
@@ -488,26 +483,19 @@ export const DefenseScoringPage: React.FC = () => {
                   [{selectedThesis.thesisCode}] {selectedThesis.titleVn}
                 </div>
                 <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '6px' }}>
-                  GVHD: <strong>{selectedThesis.advisorName || '—'}</strong> &nbsp;|&nbsp; GVPB:{' '}
-                  <strong>{selectedThesis.reviewerName || 'Chưa phân công'}</strong>
+                  GVHD: <strong>{selectedThesis.advisorName || '—'}</strong>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', color: '#64748b' }}>GVHD (30%)</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>GVHD (40%)</div>
                   <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
                     {supervisorScoreItem ? supervisorScoreItem.score.toFixed(2) : 'Chưa chấm'}
                   </div>
                 </div>
                 <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', color: '#64748b' }}>GVPB (20%)</div>
-                  <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
-                    {reviewerScoreItem ? reviewerScoreItem.score.toFixed(2) : 'Chưa chấm'}
-                  </div>
-                </div>
-                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', color: '#64748b' }}>TB Hội đồng ({councilScoreItems.length}/5)</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>TB Hội đồng (60% - {councilScoreItems.length}/5)</div>
                   <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
                     {liveCouncilAvg !== null ? liveCouncilAvg.toFixed(2) : 'Chưa chấm'}
                   </div>
@@ -720,7 +708,7 @@ export const DefenseScoringPage: React.FC = () => {
                 <strong>3. Giảng viên hướng dẫn:</strong> {selectedThesis.advisorName || '—'}
               </p>
               <p style={{ margin: '10px 0 6px 0' }}>
-                <strong>4. Kết quả chấm điểm của GVHD, GVPB và Hội đồng (1 Chủ tịch - 2 Thư ký - 2 Ủy viên):</strong>
+                <strong>4. Kết quả chấm điểm của GVHD và Hội đồng (1 Chủ tịch - 2 Thư ký - 2 Ủy viên):</strong>
               </p>
 
               <div style={{ width: '100%', overflowX: 'auto' }}>

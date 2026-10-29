@@ -369,7 +369,7 @@ const StudentDashboard: React.FC = () => {
               className={`tab ${activeTab === 'external' ? 'active' : ''}`}
               onClick={() => setActiveTab('external')}
             >
-              {t('nav.externalManagement', 'Hội Đồng & Chấm Phản Biện')}
+              {t('nav.externalManagement', 'Hội Đồng & Lịch Bảo Vệ')}
             </button>
           )}
         </div>

@@ -86,7 +86,7 @@ public class StudentProjectRoundService {
                 String roundStatus = prev.getProjectRound().getStatus() != null ? prev.getProjectRound().getStatus().toUpperCase() : "";
 
                 // Đã bảo vệ thành công hoặc đã tốt nghiệp đợt trước -> Không được đăng ký đợt mới
-                if ("DEFENDED".equals(prevStatus)) {
+                if ("DEFENDED".equals(prevStatus) || "COMPLETED".equals(prevStatus) || "PASSED".equals(prevStatus)) {
                     return Optional.of("Sinh viên (MSSV: " + student.getStudentCode() + ") đã hoàn thành và bảo vệ đồ án ở đợt trước (" + prev.getProjectRound().getName() + "), không thuộc diện đăng ký lại.");
                 }
 

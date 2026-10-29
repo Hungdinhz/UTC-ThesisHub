@@ -232,13 +232,7 @@ export const UTCStudentGraduationView: React.FC = () => {
                   <p className="text-xs text-slate-400">Email: {projectData.supervisor?.email || 'N/A'}</p>
                 </div>
 
-                <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-1">
-                  <span className="text-xs text-slate-400 font-medium">Giảng viên phản biện (GVPB)</span>
-                  <p className="text-base font-bold text-indigo-400">
-                    {projectData.reviewer?.full_name || <span className="text-slate-500 italic">Đang phân bổ...</span>}
-                  </p>
-                  <p className="text-xs text-slate-400">Bộ môn: {projectData.reviewer?.department || 'Khoa CNTT'}</p>
-                </div>
+
 
                 <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-1">
                   <span className="text-xs text-slate-400 font-medium">Hội đồng bảo vệ</span>
@@ -256,7 +250,7 @@ export const UTCStudentGraduationView: React.FC = () => {
                   <li>Nộp và duyệt Đề cương chi tiết (Tuần 1 - 3).</li>
                   <li>Báo cáo tiến độ tuần thường xuyên cho GVHD (Tuần 1 - 15).</li>
                   <li>GVHD chấm sơ khảo và đánh giá đủ điều kiện bảo vệ.</li>
-                  <li>GVPB chấm nhận xét độc lập và Hội đồng chấm bảo vệ trực tiếp.</li>
+                  <li>Hội đồng chấm bảo vệ trực tiếp và công bố điểm tổng kết cuối kỳ.</li>
                 </ol>
               </div>
             </>
