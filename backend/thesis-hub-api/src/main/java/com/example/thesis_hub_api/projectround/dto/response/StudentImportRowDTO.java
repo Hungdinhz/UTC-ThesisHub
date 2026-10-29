@@ -1,4 +1,4 @@
-﻿package com.example.thesis_hub_api.projectround.dto.response;
+package com.example.thesis_hub_api.projectround.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, StatusBadge } from '../../../components/ui';
 import { eligibilityService } from '../services/eligibilityService';
 import { thesisService } from '../../thesis/services/thesisService';

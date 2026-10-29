@@ -1,4 +1,4 @@
-﻿package com.example.thesis_hub_api.assignment.service;
+package com.example.thesis_hub_api.assignment.service;
 
 import com.example.thesis_hub_api.assignment.algorithm.*;
 import com.example.thesis_hub_api.assignment.dto.*;

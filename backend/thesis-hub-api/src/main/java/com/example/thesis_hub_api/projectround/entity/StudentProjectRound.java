@@ -1,4 +1,4 @@
-﻿package com.example.thesis_hub_api.projectround.entity;
+package com.example.thesis_hub_api.projectround.entity;
 
 import com.example.thesis_hub_api.organization.entity.Student;
 import jakarta.persistence.*;
