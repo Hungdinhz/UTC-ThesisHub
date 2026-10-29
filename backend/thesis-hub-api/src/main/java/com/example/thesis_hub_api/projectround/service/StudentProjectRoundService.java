@@ -385,7 +385,7 @@ public class StudentProjectRoundService {
                             .majorId(major != null ? major.getId() : null)
                             .trainingProgramId(roundTrainingProgramId)
                             .debtCredits(0)
-                            .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
+                            .gpa(row.getGpa())
                             .build();
                     student = studentRepository.save(student);
                     newStudentsCreated++;
@@ -429,7 +429,7 @@ public class StudentProjectRoundService {
                             .student(student)
                             .projectRound(round)
                             .status("ELIGIBLE")
-                            .gpa(row.getGpa() != null ? row.getGpa() : 3.20)
+                            .gpa(row.getGpa())
                             .note("Import từ file Excel")
                             .build();
                     studentProjectRoundRepository.save(spr);
@@ -781,7 +781,7 @@ public class StudentProjectRoundService {
                 .trainingProgram(tp != null ? tp.getName() : null)
                 .status(spr.getStatus())
                 .debtCredits(student != null ? student.getDebtCredits() : 0)
-                .gpa(spr.getGpa() != null ? spr.getGpa() : (student != null && student.getGpa() != null ? student.getGpa() : 3.20))
+                .gpa(spr.getGpa() != null ? spr.getGpa() : (student != null ? student.getGpa() : null))
                 .note(spr.getNote())
                 .accountActive(user != null && Boolean.TRUE.equals(user.getIsActive()))
                 .enrolledAt(spr.getCreatedAt())

@@ -36,23 +36,25 @@ class StudentExcelParserTest {
         // Kiểm tra dòng đầu tiên (An)
         StudentImportRowDTO row1 = parsedRows.get(0);
         assertEquals(1, row1.getStt());
-        assertEquals("201200101", row1.getStudentCode());
-        assertEquals("Nguyễn Văn", row1.getLastName());
-        assertEquals("An", row1.getFirstName());
-        assertEquals("Nguyễn Văn An", row1.getFullName());
+        assertEquals("250200001", row1.getStudentCode());
+        assertEquals("Nguyễn Tuấn", row1.getLastName());
+        assertEquals("Anh", row1.getFirstName());
+        assertEquals("Nguyễn Tuấn Anh", row1.getFullName());
         assertEquals("CNTT", row1.getMajorCode());
-        assertEquals("CNTT 1 - K62", row1.getClassName());
-        assertEquals("0912345671", row1.getPhone());
-        assertEquals("201200101@lms.utc.edu.vn", row1.getEmail());
+        assertEquals("CNTT 1 - K65", row1.getClassName());
+        assertEquals(3.28, row1.getGpa(), 0.001);
+        assertEquals("0983000001", row1.getPhone());
+        assertEquals("250200001@lms.utc.edu.vn", row1.getEmail());
         assertTrue(row1.isValid());
         assertTrue(row1.getErrors().isEmpty());
 
         // Kiểm tra dòng thứ 3 (Cường - KHMT)
         StudentImportRowDTO row3 = parsedRows.get(2);
         assertEquals(3, row3.getStt());
-        assertEquals("201200103", row3.getStudentCode());
+        assertEquals("250200003", row3.getStudentCode());
         assertEquals("KHMT", row3.getMajorCode());
-        assertEquals("KHMT 1 - K62", row3.getClassName());
+        assertEquals("KHMT 1 - K65", row3.getClassName());
+        assertEquals(2.61, row3.getGpa(), 0.001);
         assertTrue(row3.isValid());
     }
 }

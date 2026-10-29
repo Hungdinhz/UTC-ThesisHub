@@ -544,7 +544,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                         </td>
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
-                            {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
+                            {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '—'}
                           </span>
                         </td>
                         <td style={{ padding: '10px 12px' }}>

@@ -28,8 +28,7 @@ public class CreateRoundStudentManualDTO {
 
     private String phone;
 
-    @Builder.Default
-    private Double gpa = 3.20;
+    private Double gpa;
 
     @Builder.Default
     private String status = "ELIGIBLE";

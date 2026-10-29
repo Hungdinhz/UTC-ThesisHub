@@ -31,4 +31,6 @@ public class CreateTaskRequest {
     private String priority = "MEDIUM"; // LOW, MEDIUM, HIGH, URGENT
 
     private Instant dueDate;
+
+    private String fileUrl;
 }

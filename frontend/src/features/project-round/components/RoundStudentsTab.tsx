@@ -53,7 +53,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     className: '',
     majorId: 0,
     phone: '',
-    gpa: 3.2,
+    gpa: '' as any,
     status: 'ELIGIBLE',
     note: '',
   });
@@ -758,7 +758,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
-                          {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '3.20'}
+                          {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '—'}
                         </span>
                       </td>
                       <td style={{ padding: '10px 12px' }}>
@@ -885,7 +885,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
                   <span>
-                    💡 Nếu chưa có file đúng định dạng, hãy bấm <strong>"📥 Tải file mẫu Excel UTC"</strong> để lấy file mẫu chuẩn gồm các cột: STT, Mã sinh viên, Họ đệm, Tên, Ngành, Lớp, SĐT, Email, Điểm GPA.
+                    💡 Nếu chưa có file đúng định dạng, hãy bấm <strong>"📥 Tải file mẫu Excel UTC"</strong> để lấy file mẫu chuẩn gồm các cột: STT, Mã sinh viên, Họ đệm, Tên, Ngành, Lớp, GPA, Số điện thoại, Email.
                   </span>
                   <button
                     type="button"
@@ -937,9 +937,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                         <th style={{ padding: '8px' }}>Họ tên</th>
                         <th style={{ padding: '8px' }}>Ngành</th>
                         <th style={{ padding: '8px' }}>Lớp</th>
-                        <th style={{ padding: '8px' }}>Email</th>
-                        <th style={{ padding: '8px' }}>Số ĐT</th>
                         <th style={{ padding: '8px' }}>GPA</th>
+                        <th style={{ padding: '8px' }}>Số ĐT</th>
+                        <th style={{ padding: '8px' }}>Email</th>
                         <th style={{ padding: '8px' }}>Trạng thái / Lỗi</th>
                       </tr>
                     </thead>
@@ -957,11 +957,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                           <td style={{ padding: '8px' }}>{row.fullName}</td>
                           <td style={{ padding: '8px' }}>{row.majorCode}</td>
                           <td style={{ padding: '8px' }}>{row.className}</td>
-                          <td style={{ padding: '8px' }}>{row.email}</td>
-                          <td style={{ padding: '8px' }}>{row.phone || '—'}</td>
                           <td style={{ padding: '8px', fontWeight: 700, color: '#0a3273' }}>
-                            {row.gpa !== undefined && row.gpa !== null ? Number(row.gpa).toFixed(2) : '3.20'}
+                            {row.gpa !== undefined && row.gpa !== null ? Number(row.gpa).toFixed(2) : '—'}
                           </td>
+                          <td style={{ padding: '8px' }}>{row.phone || '—'}</td>
+                          <td style={{ padding: '8px' }}>{row.email}</td>
                           <td style={{ padding: '8px' }}>
                             {row.isValid ? (
                               <span style={{ color: '#16a34a', fontWeight: 600 }}>✔ Hợp lệ</span>

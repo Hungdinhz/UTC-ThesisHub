@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -32,7 +32,7 @@ const getDefaultRouteForRole = (role?: string | null): string => {
       return '/student/assignment';
     case 'supervisor':
     case 'committee_member':
-      return '/admin/assignments';
+      return '/thesis/proposals';
     case 'external_examiner':
       return '/external_examiner/dashboard';
     default:
@@ -158,7 +158,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin/assignments"
         element={
-          <ProtectedRoute allowedTypes={['admin', 'supervisor', 'committee_member']}>
+          <ProtectedRoute allowedTypes={['admin']}>
             <LayoutPageWrapper activeTab="assignments" pageTitle="Giai đoạn 2: Phân công Giảng viên Hướng dẫn & Duyệt Nguyện vọng">
               <AssignmentManagementPage />
             </LayoutPageWrapper>
@@ -291,9 +291,9 @@ const AppRoutes: React.FC = () => {
 
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/student" element={<Navigate to="/student/assignment" replace />} />
-      <Route path="/supervisor" element={<Navigate to="/admin/assignments" replace />} />
-      <Route path="/committee" element={<Navigate to="/admin/assignments" replace />} />
-      <Route path="/committee_member" element={<Navigate to="/admin/assignments" replace />} />
+      <Route path="/supervisor" element={<Navigate to="/thesis/proposals" replace />} />
+      <Route path="/committee" element={<Navigate to="/thesis/proposals" replace />} />
+      <Route path="/committee_member" element={<Navigate to="/thesis/proposals" replace />} />
       <Route path="/" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
       <Route path="*" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
     </Routes>

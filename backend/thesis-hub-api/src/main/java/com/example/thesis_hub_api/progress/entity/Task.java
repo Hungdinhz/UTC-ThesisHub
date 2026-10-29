@@ -63,6 +63,9 @@ public class Task {
     @Column(name = "due_date")
     private Instant dueDate;
 
+    @Column(name = "file_url", length = 500)
+    private String fileUrl;
+
     @Column(name = "completed_at")
     private Instant completedAt;
 

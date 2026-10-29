@@ -426,6 +426,19 @@ class DefenseService {
     }
   }
 
+  async getResultsByRound(roundId: number): Promise<GraduationResult[]> {
+    try {
+      const res = await axios.get(`${API_BASE}/rounds/${roundId}/results`, { headers: authHeaders() });
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
+    } catch {
+      if (!IS_TEST_ENV) {
+        return [];
+      }
+      return mockResults;
+    }
+  }
+
   async finalizeAndPublishRound(roundId: number): Promise<GraduationResult[]> {
     try {
       const res = await axios.post(`${API_BASE}/rounds/${roundId}/finalize-and-publish`, {}, { headers: authHeaders() });

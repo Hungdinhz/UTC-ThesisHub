@@ -36,8 +36,7 @@ public class StudentProjectRound {
     private String status = "ELIGIBLE"; // ELIGIBLE, REGISTERED, ASSIGNED, IN_PROGRESS, DROPPED, DEFENDED, RESERVED
 
     @Column(name = "gpa")
-    @Builder.Default
-    private Double gpa = 3.20;
+    private Double gpa;
 
     @Column(columnDefinition = "TEXT")
     private String note;

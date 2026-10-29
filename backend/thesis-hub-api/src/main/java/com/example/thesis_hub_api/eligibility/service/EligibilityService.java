@@ -107,6 +107,16 @@ public class EligibilityService {
                 if (s.getUser() != null && s.getUser().getFullName() != null && !s.getUser().getFullName().isBlank()) {
                     mockRecord.setFullName(s.getUser().getFullName());
                 }
+                if (s.getGpa() != null) {
+                    mockRecord.setGpa(s.getGpa());
+                }
+            });
+        }
+        if (studentProjectRoundRepository != null && studentId != null && projectRoundId != null) {
+            studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId).ifPresent(spr -> {
+                if (spr.getGpa() != null) {
+                    mockRecord.setGpa(spr.getGpa());
+                }
             });
         }
         return mockRecord;

@@ -25,6 +25,7 @@ public class TaskResponse {
     private String status;
     private Instant dueDate;
     private Instant completedAt;
+    private String fileUrl;
     private int submissionCount;
     private String latestSubmissionStatus;
     private int commentCount;

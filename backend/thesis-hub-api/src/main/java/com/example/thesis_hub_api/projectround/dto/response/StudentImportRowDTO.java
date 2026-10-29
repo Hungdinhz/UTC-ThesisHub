@@ -26,8 +26,7 @@ public class StudentImportRowDTO {
     private String className;  // Lớp sinh hoạt (VD: CNTT 1 - K62)
     private String phone;      // Số điện thoại
     private String email;      // Email
-    @Builder.Default
-    private Double gpa = 3.20; // Điểm GPA tích lũy
+    private Double gpa; // Điểm GPA tích lũy
 
     @JsonProperty("isValid")
     @JsonAlias({"valid", "isValid"})

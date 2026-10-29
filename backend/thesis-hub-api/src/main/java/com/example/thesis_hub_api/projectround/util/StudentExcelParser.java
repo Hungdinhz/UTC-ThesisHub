@@ -30,9 +30,9 @@ public class StudentExcelParser {
         public int colFullName = -1;
         public int colMajor = 4;
         public int colClass = 5;
-        public int colPhone = 6;
-        public int colEmail = 7;
-        public int colGpa = 8;
+        public int colGpa = 6;
+        public int colPhone = 7;
+        public int colEmail = 8;
         public boolean combinedFullNameMode = false;
     }
 
@@ -150,9 +150,9 @@ public class StudentExcelParser {
             mapping.colFirstName = 3;
             mapping.colMajor = 4;
             mapping.colClass = 5;
-            mapping.colPhone = 6;
-            mapping.colEmail = 7;
-            mapping.colGpa = 8;
+            mapping.colGpa = 6;
+            mapping.colPhone = 7;
+            mapping.colEmail = 8;
             mapping.combinedFullNameMode = false;
         }
 
@@ -295,8 +295,8 @@ public class StudentExcelParser {
             errors.add("Email không đúng định dạng chuẩn: " + email);
         }
 
-        // Đọc điểm GPA tích lũy
-        Double gpa = 3.20;
+        // Đọc điểm GPA tích lũy từ cột Excel
+        Double gpa = null;
         if (mapping.colGpa >= 0 && mapping.colGpa < row.getLastCellNum()) {
             Cell gpaCell = row.getCell(mapping.colGpa);
             if (gpaCell != null) {
@@ -323,6 +323,10 @@ public class StudentExcelParser {
                     }
                 }
             }
+        }
+
+        if (gpa == null) {
+            errors.add("Điểm GPA không được để trống (nhập số hệ 4.0 từ 0.0 đến 4.0)");
         }
 
         boolean isValid = errors.isEmpty();
@@ -439,9 +443,9 @@ public class StudentExcelParser {
                     "Tên *",
                     "Ngành (CNTT/KHMT) *",
                     "Lớp sinh hoạt *",
+                    "GPA",
                     "Số điện thoại",
-                    "Email",
-                    "Điểm GPA (Hệ 4.0) *"
+                    "Email"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -467,11 +471,11 @@ public class StudentExcelParser {
 
             // Dữ liệu mẫu chuẩn từ ảnh UTC của người dùng kèm điểm GPA
             Object[][] sampleData = {
-                    {1, sampleCodes.get(0), "Nguyễn Văn", "An", "CNTT", "CNTT 1 - K62", "0912345671", sampleCodes.get(0) + "@lms.utc.edu.vn", 3.45},
-                    {2, sampleCodes.get(1), "Trần Thị", "Bình", "CNTT", "CNTT 2 - K62", "0912345672", sampleCodes.get(1) + "@lms.utc.edu.vn", 3.20},
-                    {3, sampleCodes.get(2), "Lê Hoàng", "Cường", "KHMT", "KHMT 1 - K62", "0912345673", sampleCodes.get(2) + "@lms.utc.edu.vn", 3.65},
-                    {4, sampleCodes.get(3), "Phạm Ngọc", "Dung", "CNTT", "CNTT Việt Anh - K62", "0912345674", sampleCodes.get(3) + "@lms.utc.edu.vn", 3.10},
-                    {5, sampleCodes.get(4), "Hoàng Minh", "Đức", "KHMT", "KHMT 2 - K62", "0912345675", sampleCodes.get(4) + "@lms.utc.edu.vn", 3.50}
+                    {1, "250200001", "Nguyễn Tuấn", "Anh", "CNTT", "CNTT 1 - K65", 3.28, "0983000001", "250200001@lms.utc.edu.vn"},
+                    {2, "250200002", "Trần Phương", "Thảo", "CNTT", "CNTT 2 - K65", 2.15, "0983000002", "250200002@lms.utc.edu.vn"},
+                    {3, "250200003", "Lê Hoàng", "Long", "KHMT", "KHMT 1 - K65", 2.61, "0983000003", "250200003@lms.utc.edu.vn"},
+                    {4, "250200004", "Phạm Minh", "Quân", "CNTT", "CNTT Việt Anh - K65", 2.51, "0983000004", "250200004@lms.utc.edu.vn"},
+                    {5, "250200005", "Hoàng Thu", "Trang", "KHMT", "KHMT 2 - K65", 3.46, "0983000005", "250200005@lms.utc.edu.vn"}
             };
 
             int rowIdx = 1;
@@ -505,9 +509,9 @@ public class StudentExcelParser {
             sheet.setColumnWidth(3, 14 * 256);  // Tên
             sheet.setColumnWidth(4, 22 * 256);  // Ngành
             sheet.setColumnWidth(5, 24 * 256);  // Lớp
-            sheet.setColumnWidth(6, 18 * 256);  // SĐT
-            sheet.setColumnWidth(7, 30 * 256);  // Email
-            sheet.setColumnWidth(8, 22 * 256);  // Điểm GPA
+            sheet.setColumnWidth(6, 14 * 256);  // GPA
+            sheet.setColumnWidth(7, 18 * 256);  // SĐT
+            sheet.setColumnWidth(8, 30 * 256);  // Email
 
             workbook.write(out);
             return out.toByteArray();
