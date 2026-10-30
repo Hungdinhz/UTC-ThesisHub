@@ -67,18 +67,6 @@ export const AssignmentStatsOverview: React.FC<Props> = ({ stats, loading }) => 
         </div>
       </div>
 
-      <div className="stat-card stat-purple">
-        <div className="stat-icon">⚖️</div>
-        <div className="stat-info">
-          <span className="stat-label">Cân bằng tải giảng viên</span>
-          <div className="stat-value-group">
-            <span className="stat-value">{Math.round(stats.averageLoadRatio * 100)}%</span>
-            <span className="stat-badge badge-purple">{stats.totalLecturers} GV</span>
-          </div>
-          <span className="stat-sub">Tổng năng lực hướng dẫn: {stats.totalCapacity} SV</span>
-        </div>
-      </div>
-
       <div className="stat-card stat-danger">
         <div className="stat-icon">⚠️</div>
         <div className="stat-info">
