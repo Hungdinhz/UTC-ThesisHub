@@ -77,6 +77,18 @@ public class Proposal {
     @Column(name = "supervisor_comment", columnDefinition = "TEXT")
     private String supervisorComment;
 
+    @Column(name = "rebuttal_notes", columnDefinition = "TEXT")
+    private String rebuttalNotes;
+
+    @Column(name = "revision_checklist", columnDefinition = "TEXT")
+    private String revisionChecklist;
+
+    @Column(name = "council_comment", columnDefinition = "TEXT")
+    private String councilComment;
+
+    @Column(name = "revision_deadline")
+    private Instant revisionDeadline;
+
     @Column(nullable = false)
     @Builder.Default
     private Integer version = 1;

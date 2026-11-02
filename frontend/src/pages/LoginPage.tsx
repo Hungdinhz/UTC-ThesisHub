@@ -38,10 +38,6 @@ const LoginPage: React.FC = () => {
   }, [location.state]);
 
 
-  const toggleLanguage = () => {
-    const nextLng = i18n.language.startsWith('vi') ? 'en' : 'vi';
-    i18n.changeLanguage(nextLng);
-  };
 
   // Field validation rules
   const validateFields = (type: string, regNoVal: string, emailVal: string, passVal: string) => {
@@ -198,9 +194,7 @@ const LoginPage: React.FC = () => {
               <span className="utc-school-name-sub">{t('portal.schoolSub', 'UNIVERSITY OF TRANSPORT AND COMMUNICATIONS')}</span>
             </div>
           </div>
-          <button onClick={toggleLanguage} className="utc-lang-btn">
-            {i18n.language.startsWith('vi') ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
-          </button>
+
         </div>
 
         <div className="utc-portal-title-block">

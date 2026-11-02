@@ -41,6 +41,35 @@ export const ProposalManagementPage: React.FC = () => {
   const [pdfPreviewProposal, setPdfPreviewProposal] = useState<Proposal | null>(null);
   const [bannerMsg, setBannerMsg] = useState<string | null>(null);
 
+  // Revision & Rebuttal states (Giai đoạn 1 nâng cấp phản hồi đề cương)
+  const [reviseModalOpen, setReviseModalOpen] = useState<boolean>(false);
+  const [targetProposalForRevise, setTargetProposalForRevise] = useState<Proposal | null>(null);
+  const [reviseComment, setReviseComment] = useState<string>('');
+  const [reviseChecklist, setReviseChecklist] = useState<string[]>([]);
+  const [reviseDeadlineDays, setReviseDeadlineDays] = useState<number>(5);
+  const [reviseError, setReviseError] = useState<string>('');
+  const [viewRebuttalProposal, setViewRebuttalProposal] = useState<Proposal | null>(null);
+  const [rebuttalNotes, setRebuttalNotes] = useState<string>('');
+  const [reviewChecklist, setReviewChecklist] = useState<string[]>([]);
+  const [reviewDeadlineDays, setReviewDeadlineDays] = useState<number>(5);
+
+  const CHECKLIST_OPTIONS = [
+    { id: 'TITLE', label: 'Tên đề tài chưa rõ ràng, chưa sát chuyên ngành hoặc quá chung chung' },
+    { id: 'OBJECTIVES', label: 'Mục tiêu & phạm vi nghiên cứu quá rộng hoặc chưa cụ thể' },
+    { id: 'METHODOLOGY', label: 'Phương pháp / công nghệ kỹ thuật chưa phù hợp hoặc chưa giải trình rõ' },
+    { id: 'PLAN', label: 'Kế hoạch thực hiện theo các tuần sơ sài, thiếu phân rã công việc' },
+    { id: 'RESULTS', label: 'Kết quả dự kiến chưa định lượng / chưa có sản phẩm bàn giao cụ thể' },
+    { id: 'FORMAT', label: 'Bố cục văn bản chưa chuẩn mẫu quy định / file đính kèm thiếu nội dung' },
+  ];
+
+  const QUICK_TEMPLATES = [
+    'Đề nghị thu hẹp phạm vi đề tài, tập trung giải quyết bài toán cốt lõi trong thời gian làm đồ án.',
+    'Cần bổ sung chi tiết kiến trúc hệ thống và danh sách công nghệ chính (Backend, Frontend, DB, AI...).',
+    'Kế hoạch các tuần cần ghi rõ đầu ra (deliverables) cụ thể của từng giai đoạn để tiện theo dõi.',
+    'Cần chuẩn hóa lại câu từ, quy cách trình bày và thuật ngữ chuyên ngành CNTT.',
+    'Bổ sung thêm tài liệu tham khảo khoa học uy tín (bài báo IEEE, ACM hoặc tài liệu chính thức).'
+  ];
+
   // Round and assignment integration
   const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
   const [mySupervisorAssignment, setMySupervisorAssignment] = useState<SupervisorAssignment | null>(null);
@@ -318,6 +347,7 @@ export const ProposalManagementPage: React.FC = () => {
     setObjectives('');
     setExpectedResults('');
     setFileUrl('');
+    setRebuttalNotes('');
     setShowModal(true);
   };
 
@@ -332,6 +362,7 @@ export const ProposalManagementPage: React.FC = () => {
     setObjectives(proposal.objectives || '');
     setExpectedResults(proposal.expectedResults || '');
     setFileUrl(hasValidUploadedFile(proposal.fileUrl) ? proposal.fileUrl || '' : '');
+    setRebuttalNotes(proposal.rebuttalNotes || '');
     setShowModal(true);
   };
 
@@ -347,6 +378,7 @@ export const ProposalManagementPage: React.FC = () => {
           objectives,
           expectedResults,
           fileUrl: cleanFileUrl,
+          rebuttalNotes: rebuttalNotes.trim(),
         });
         setBannerMsg(`Đã cập nhật và nộp lại đề cương "${titleVn}" thành công! Đang chờ GVHD / Khoa xét duyệt lại.`);
       } else {
@@ -378,6 +410,7 @@ export const ProposalManagementPage: React.FC = () => {
       setObjectives('');
       setExpectedResults('');
       setFileUrl('');
+      setRebuttalNotes('');
       await loadProposals();
     } catch (err: any) {
       console.error('Lỗi lưu đề cương:', err);
@@ -414,13 +447,48 @@ export const ProposalManagementPage: React.FC = () => {
     }
   };
 
-  const handleSupervisorRequestRevise = async (proposal: Proposal) => {
-    const reason = window.prompt('Nhập nội dung yêu cầu sinh viên chỉnh sửa đề cương:', proposal.supervisorComment || '');
-    if (reason === null) return;
+  const handleOpenReviseModal = (proposal: Proposal) => {
+    setTargetProposalForRevise(proposal);
+    setReviseComment(proposal.supervisorComment || '');
+    if (proposal.revisionChecklist) {
+      setReviseChecklist(
+        proposal.revisionChecklist
+          .split(';\n')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      );
+    } else {
+      setReviseChecklist([]);
+    }
+    setReviseDeadlineDays(5);
+    setReviseError('');
+    setReviseModalOpen(true);
+  };
+
+  const handleSubmitSupervisorRevise = async () => {
+    if (!targetProposalForRevise) return;
+    if (!reviseComment.trim()) {
+      setReviseError('Vui lòng nhập nhận xét chi tiết yêu cầu sinh viên chỉnh sửa.');
+      return;
+    }
+
     try {
-      await thesisService.supervisorApprove(proposal.id, false, reason || 'Yêu cầu chỉnh sửa lại nội dung đề cương.');
+      const checklistStr = reviseChecklist.length > 0 ? reviseChecklist.join(';\n') : undefined;
+      const deadlineDate = new Date();
+      deadlineDate.setDate(deadlineDate.getDate() + reviseDeadlineDays);
+      const deadlineStr = deadlineDate.toISOString();
+
+      await thesisService.supervisorApprove(
+        targetProposalForRevise.id,
+        false,
+        reviseComment.trim(),
+        checklistStr,
+        deadlineStr
+      );
+      setBannerMsg(`Đã gửi yêu cầu chỉnh sửa đề cương cho SV ${targetProposalForRevise.studentFullName} (Hạn nộp lại: ${reviseDeadlineDays} ngày).`);
+      setReviseModalOpen(false);
+      setTargetProposalForRevise(null);
       await loadProposals();
-      setBannerMsg(`Đã gửi yêu cầu chỉnh sửa đề cương cho SV ${proposal.studentFullName}.`);
     } catch (err: any) {
       alert('Lỗi gửi yêu cầu chỉnh sửa: ' + (err?.response?.data?.message || err?.message));
     }
@@ -438,7 +506,23 @@ export const ProposalManagementPage: React.FC = () => {
     }
 
     try {
-      await thesisService.reviewProposal(selectedProposal.id, 1, reviewStatus, reviewNotes.trim());
+      const isRevise = reviewStatus === 'REVISE_REQUIRED';
+      const checklistStr = isRevise && reviewChecklist.length > 0 ? reviewChecklist.join(';\n') : undefined;
+      let deadlineStr: string | undefined = undefined;
+      if (isRevise) {
+        const d = new Date();
+        d.setDate(d.getDate() + reviewDeadlineDays);
+        deadlineStr = d.toISOString();
+      }
+
+      await thesisService.reviewProposal(
+        selectedProposal.id,
+        1,
+        reviewStatus,
+        reviewNotes.trim(),
+        checklistStr,
+        deadlineStr
+      );
       await loadProposals();
       const statusText =
         reviewStatus === 'APPROVED'
@@ -451,6 +535,7 @@ export const ProposalManagementPage: React.FC = () => {
       setSelectedProposal(null);
       setReviewNotes('');
       setReviewNotesError('');
+      setReviewChecklist([]);
     } catch (err: any) {
       alert('Lỗi đánh giá đề cương: ' + (err?.response?.data?.message || err?.message));
     }
@@ -718,7 +803,7 @@ export const ProposalManagementPage: React.FC = () => {
       case 'APPROVED':
         return (
           <span style={{ padding: '4px 8px', borderRadius: '4px', background: '#e6f4ea', color: '#137333', fontWeight: 'bold' }}>
-            ✓ ĐÃ DUYỆT (APPROVED)
+            ✓ ĐÃ PHÊ DUYỆT
           </span>
         );
       case 'UNDER_REVIEW':
@@ -730,19 +815,19 @@ export const ProposalManagementPage: React.FC = () => {
       case 'SUBMITTED':
         return (
           <span style={{ padding: '4px 8px', borderRadius: '4px', background: '#fef7e0', color: '#b06000', fontWeight: 'bold' }}>
-            📤 CHỜ GVHD XÁC NHẬN
+            📤 CHỜ GVHD DUYỆT
           </span>
         );
       case 'REVISE_REQUIRED':
         return (
           <span style={{ padding: '4px 8px', borderRadius: '4px', background: '#fce8e6', color: '#c5221f', fontWeight: 'bold' }}>
-            ⚠ CẦN SỬA ĐỔI
+            ⚠ YÊU CẦU SỬA ĐỔI
           </span>
         );
       case 'REJECTED':
         return (
           <span style={{ padding: '4px 8px', borderRadius: '4px', background: '#fee2e2', color: '#991b1b', fontWeight: 'bold' }}>
-            ✕ TỪ CHỐI (REJECTED)
+            ✕ ĐÃ TỪ CHỐI
           </span>
         );
       case 'DRAFT':
@@ -940,12 +1025,12 @@ export const ProposalManagementPage: React.FC = () => {
           style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px' }}
         >
           <option value="ALL">Tất cả trạng thái</option>
-          <option value="DRAFT">Bản nháp (DRAFT)</option>
-          <option value="SUBMITTED">Đã nộp - Chờ GVHD (SUBMITTED)</option>
-          <option value="UNDER_REVIEW">Chờ Khoa/Ban duyệt (UNDER_REVIEW)</option>
-          <option value="APPROVED">Đã phê duyệt (APPROVED)</option>
-          <option value="REVISE_REQUIRED">Yêu cầu sửa đổi (REVISE)</option>
-          <option value="REJECTED">Từ chối (REJECTED)</option>
+          <option value="DRAFT">Bản nháp</option>
+          <option value="SUBMITTED">Đã nộp - Chờ GVHD duyệt</option>
+          <option value="UNDER_REVIEW">Chờ Khoa/Ban phê duyệt</option>
+          <option value="APPROVED">Đã phê duyệt</option>
+          <option value="REVISE_REQUIRED">Yêu cầu sửa đổi</option>
+          <option value="REJECTED">Đã từ chối</option>
         </select>
         {isStudent && (
           <div
@@ -1065,6 +1150,59 @@ export const ProposalManagementPage: React.FC = () => {
                         📌 Đã ký nộp & Khoa lưu hồ sơ
                       </div>
                     )}
+
+                    {/* Hiển thị nhận xét yêu cầu chỉnh sửa nổi bật */}
+                    {p.status === 'REVISE_REQUIRED' && (p.supervisorComment || p.councilComment) && (
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          padding: '6px 10px',
+                          background: '#fff7ed',
+                          border: '1px solid #fed7aa',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          color: '#c2410c',
+                        }}
+                      >
+                        <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>💬</span> Cần sửa đổi:
+                        </div>
+                        <div style={{ marginTop: '2px', color: '#9a3412', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                          {p.supervisorComment || p.councilComment}
+                        </div>
+                        {p.revisionDeadline && (
+                          <div style={{ marginTop: '4px', fontSize: '11px', color: '#b45309', fontWeight: 600 }}>
+                            ⏰ Hạn nộp lại: {new Date(p.revisionDeadline).toLocaleDateString('vi-VN')}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Badge xem bản giải trình của sinh viên nếu có */}
+                    {p.rebuttalNotes && (
+                      <div style={{ marginTop: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setViewRebuttalProposal(p)}
+                          style={{
+                            background: '#f0fdf4',
+                            color: '#166534',
+                            border: '1px solid #bbf7d0',
+                            borderRadius: '4px',
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title="Xem bản giải trình tiếp thu ý kiến của SV"
+                        >
+                          <span>📝</span> Xem Giải Trình (v{p.version})
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     {p.lecturerFullName} <br />
@@ -1134,7 +1272,7 @@ export const ProposalManagementPage: React.FC = () => {
                       {/* GVHD yêu cầu sửa đổi khi đề cương ở trạng thái SUBMITTED (chờ GVHD xác nhận). Khi đã chuyển sang UNDER_REVIEW (chờ khoa duyệt) thì không còn nút yêu cầu sửa nữa */}
                       {canSupervisorApprove && p.status === 'SUBMITTED' && (
                         <button
-                          onClick={() => handleSupervisorRequestRevise(p)}
+                          onClick={() => handleOpenReviseModal(p)}
                           style={{
                             background: '#fff7ed',
                             color: '#c2410c',
@@ -1145,6 +1283,7 @@ export const ProposalManagementPage: React.FC = () => {
                             fontSize: '12px',
                             fontWeight: 600,
                           }}
+                          title="Mở bảng phân tích tiêu chí & gửi yêu cầu chỉnh sửa đề cương cho sinh viên"
                         >
                           ⚠️ Yêu cầu sửa đổi
                         </button>
@@ -1332,6 +1471,64 @@ export const ProposalManagementPage: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Tiêu chí checklist bổ sung cho Khoa khi yêu cầu sửa */}
+            {reviewStatus === 'REVISE_REQUIRED' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#334155' }}>
+                  📋 Tiêu chí tiểu ban yêu cầu hoàn thiện (Checklist):
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#fafaf9', padding: '10px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', maxHeight: '140px', overflowY: 'auto' }}>
+                  {CHECKLIST_OPTIONS.map((opt) => (
+                    <label key={opt.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#44403c', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={reviewChecklist.includes(opt.label)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setReviewChecklist([...reviewChecklist, opt.label]);
+                          } else {
+                            setReviewChecklist(reviewChecklist.filter((item) => item !== opt.label));
+                          }
+                        }}
+                        style={{ marginTop: '2px' }}
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#334155' }}>
+                    ⏰ Thời hạn sinh viên phải nộp lại:
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {[3, 5, 7, 10].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setReviewDeadlineDays(d)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          border: reviewDeadlineDays === d ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                          background: reviewDeadlineDays === d ? '#eff6ff' : '#fff',
+                          color: reviewDeadlineDays === d ? '#1d4ed8' : '#334155',
+                          fontWeight: reviewDeadlineDays === d ? 600 : 'normal',
+                        }}
+                      >
+                        {d} ngày
+                      </button>
+                    ))}
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      (Hạn: {new Date(Date.now() + reviewDeadlineDays * 86400000).toLocaleDateString('vi-VN')})
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button
@@ -1596,10 +1793,56 @@ export const ProposalManagementPage: React.FC = () => {
                 }}
               >
                 {editingProposal.status === 'REVISE_REQUIRED' ? (
-                  <>
-                    <strong style={{ display: 'block', marginBottom: '4px' }}>⚠️ Yêu Cầu Chỉnh Sửa:</strong>
-                    <div>Sinh viên sửa đổi trực tiếp trên đề cương này theo yêu cầu của Khoa/Hội đồng. Sau khi nhấn <strong>Lưu Thay Đổi Đề Cương</strong>, sinh viên bấm <strong>"Nộp Lại"</strong> ngoài danh sách để gửi xét duyệt lại.</div>
-                  </>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong style={{ color: '#991b1b', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>⚠️</span> YÊU CẦU CHỈNH SỬA TỪ GIẢNG VIÊN / KHOA
+                      </strong>
+                      {editingProposal.revisionDeadline && (
+                        <span style={{ fontSize: '11px', background: '#fee2e2', color: '#b91c1c', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                          ⏰ Hạn nộp lại: {new Date(editingProposal.revisionDeadline).toLocaleDateString('vi-VN')}
+                        </span>
+                      )}
+                    </div>
+
+                    {editingProposal.supervisorComment && (
+                      <div style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: '6px', padding: '10px 12px', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#c2410c', marginBottom: '4px' }}>
+                          👨‍🏫 Nhận xét của GVHD ({editingProposal.lecturerFullName}):
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#1e293b', whiteSpace: 'pre-line' }}>
+                          {editingProposal.supervisorComment}
+                        </div>
+                      </div>
+                    )}
+
+                    {editingProposal.councilComment && (
+                      <div style={{ background: '#fff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 12px', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#1d4ed8', marginBottom: '4px' }}>
+                          ⚖️ Nhận xét của Hội đồng / Khoa:
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#1e293b', whiteSpace: 'pre-line' }}>
+                          {editingProposal.councilComment}
+                        </div>
+                      </div>
+                    )}
+
+                    {editingProposal.revisionChecklist && (
+                      <div style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: '6px', padding: '8px 12px', marginTop: '6px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#9a3412', marginBottom: '4px' }}>
+                          📋 Các tiêu chí được yêu cầu hoàn thiện:
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {editingProposal.revisionChecklist.split(';\n').map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#7c2d12' }}>
+                              <span>🔸</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <>
                     <strong style={{ display: 'block', marginBottom: '4px' }}>💡 Đang Chỉnh Sửa Bản Nháp (DRAFT):</strong>
@@ -1805,15 +2048,7 @@ export const ProposalManagementPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Tên đề tài (Tiếng Anh)</label>
-                <input
-                  type="text"
-                  value={titleEn}
-                  onChange={(e) => setTitleEn(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                />
-              </div>
+
 
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Mô tả tóm tắt</label>
@@ -1845,6 +2080,26 @@ export const ProposalManagementPage: React.FC = () => {
                 />
               </div>
 
+              {/* Ô nhập bản giải trình của Sinh viên khi sửa đề cương */}
+              {editingProposal && editingProposal.status === 'REVISE_REQUIRED' && (
+                <div style={{ marginBottom: '14px', background: '#f0fdf4', padding: '14px', borderRadius: '6px', border: '1px solid #86efac' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#166534', marginBottom: '4px' }}>
+                    📝 Bản giải trình tiếp thu ý kiến chỉnh sửa của Giảng viên / Khoa (*)
+                  </label>
+                  <div style={{ fontSize: '12px', color: '#15803d', marginBottom: '8px' }}>
+                    Vui lòng tóm tắt cụ thể những nội dung bạn đã chỉnh sửa theo phản hồi (VD: <em>Em đã thu hẹp mục tiêu, bổ sung công nghệ ở mục 3, cập nhật sơ đồ tiến độ tuần 4-8...</em>).
+                  </div>
+                  <textarea
+                    rows={3}
+                    required
+                    value={rebuttalNotes}
+                    onChange={(e) => setRebuttalNotes(e.target.value)}
+                    placeholder="Nhập nội dung giải trình tiếp thu ý kiến của bạn..."
+                    style={{ width: '100%', padding: '8px', border: '1px solid #86efac', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+
               <FileUploadInput
                 label="Tập tin đề cương đồ án"
                 value={fileUrl}
@@ -1870,6 +2125,276 @@ export const ProposalManagementPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Yêu Cầu Chỉnh Sửa Đề Cương Chuyên Nghiệp Dành Cho GVHD */}
+      {reviseModalOpen && targetProposalForRevise && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '640px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#c2410c', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⚠️</span> Yêu Cầu Chỉnh Sửa Đề Cương
+                </h3>
+                <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+                  Sinh viên: <strong>{targetProposalForRevise.studentFullName}</strong> ({targetProposalForRevise.studentCode}) - Lớp: {targetProposalForRevise.studentClass}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setReviseModalOpen(false);
+                  setTargetProposalForRevise(null);
+                }}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '16px', fontSize: '13px' }}>
+              <span style={{ color: '#64748b' }}>Tên đề tài:</span> <strong>{targetProposalForRevise.titleVn}</strong>
+            </div>
+
+            {/* Checklist tiêu chí */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>
+                📋 1. Chọn các tiêu chí cần sinh viên khắc phục (Checklist):
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fafaf9', padding: '12px', borderRadius: '8px', border: '1px solid #e7e5e4' }}>
+                {CHECKLIST_OPTIONS.map((opt) => {
+                  const isChecked = reviseChecklist.includes(opt.label);
+                  return (
+                    <label key={opt.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#44403c', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setReviseChecklist([...reviseChecklist, opt.label]);
+                          } else {
+                            setReviseChecklist(reviseChecklist.filter((item) => item !== opt.label));
+                          }
+                        }}
+                        style={{ marginTop: '2px' }}
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Templates */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
+                💡 2. Gợi ý nhận xét nhanh (Click để chèn vào nội dung):
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {QUICK_TEMPLATES.map((tmpl, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setReviseComment((prev) => (prev ? `${prev}\n- ${tmpl}` : `- ${tmpl}`));
+                      setReviseError('');
+                    }}
+                    style={{
+                      fontSize: '12px',
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    + {tmpl.slice(0, 48)}...
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Textarea comment */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
+                ✍️ 3. Nhận xét & Hướng dẫn chỉnh sửa chi tiết <span style={{ color: '#dc2626' }}>*</span>
+              </label>
+              <textarea
+                rows={4}
+                value={reviseComment}
+                onChange={(e) => {
+                  setReviseComment(e.target.value);
+                  if (e.target.value.trim()) setReviseError('');
+                }}
+                placeholder="Nhập nội dung nhận xét, chỉ ra cụ thể sinh viên cần bổ sung, chỉnh sửa những gì..."
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: reviseError ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {reviseError && (
+                <div style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
+                  ⚠️ {reviseError}
+                </div>
+              )}
+            </div>
+
+            {/* Revision deadline */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
+                ⏰ 4. Thời hạn hoàn thành nộp lại:
+              </label>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {[3, 5, 7, 10].map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => setReviseDeadlineDays(days)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      border: reviseDeadlineDays === days ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                      background: reviseDeadlineDays === days ? '#eff6ff' : '#fff',
+                      color: reviseDeadlineDays === days ? '#1d4ed8' : '#475569',
+                      fontWeight: reviseDeadlineDays === days ? 'bold' : 'normal',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                    }}
+                  >
+                    {days} ngày
+                  </button>
+                ))}
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  (Hạn chót: {new Date(Date.now() + reviseDeadlineDays * 86400000).toLocaleDateString('vi-VN')})
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setReviseModalOpen(false);
+                  setTargetProposalForRevise(null);
+                }}
+                style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitSupervisorRevise}
+                style={{
+                  padding: '8px 18px',
+                  background: '#ea580c',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>⚠️</span> Gửi Yêu Cầu Chỉnh Sửa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xem Bản Giải Trình của Sinh viên */}
+      {viewRebuttalProposal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '10px',
+              width: '100%',
+              maxWidth: '560px',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#047857', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📝</span> Bản Giải Trình Tiếp Thu Ý Kiến (Phiên bản {viewRebuttalProposal.version})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setViewRebuttalProposal(null)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                &times;
+              </button>
+            </div>
+            <div style={{ fontSize: '13px', color: '#475569', marginBottom: '12px' }}>
+              Sinh viên: <strong>{viewRebuttalProposal.studentFullName} ({viewRebuttalProposal.studentCode})</strong>
+            </div>
+            <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Đề tài:</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{viewRebuttalProposal.titleVn}</div>
+            </div>
+            <div style={{ background: '#f0fdf4', padding: '14px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#166534', marginBottom: '6px' }}>
+                Nội dung giải trình của Sinh viên:
+              </div>
+              <div style={{ fontSize: '13px', color: '#14532d', whiteSpace: 'pre-line', lineHeight: '1.6' }}>
+                {viewRebuttalProposal.rebuttalNotes || 'Sinh viên không để lại ghi chú giải trình.'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setViewRebuttalProposal(null)}
+                style={{ padding: '8px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

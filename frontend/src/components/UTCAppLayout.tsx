@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import utcLogo from '../assets/images/utc_logo.webp';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordModal from './ChangePasswordModal';
 import NotificationDropdown from './NotificationDropdown';
@@ -34,8 +33,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   hideHeroBanner = false,
   pageTitle,
 }) => {
-  const { t, i18n } = useTranslation();
-  const { toggleTheme, isDark } = useTheme();
+  const { t } = useTranslation();
   const { user: authUser, userType: authUserType, logout: authLogout } = useAuth();
   const navigate = useNavigate();
 
@@ -88,11 +86,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (i18n.language.startsWith('en')) {
-      if (hour < 12) return 'Good morning,';
-      if (hour < 18) return 'Good afternoon,';
-      return 'Good evening,';
-    }
     if (hour < 12) return 'Chào buổi sáng,';
     if (hour < 18) return 'Chào buổi trưa,';
     return 'Chào buổi tối,';
@@ -100,20 +93,12 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const getCurrentDateString = () => {
     const now = new Date();
-    if (i18n.language.startsWith('en')) {
-      return now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    }
     const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
     const dayName = days[now.getDay()];
     const date = now.getDate().toString().padStart(2, '0');
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
     return `${dayName}, ngày ${date}/${month}/${year}`;
-  };
-
-  const toggleLanguage = () => {
-    const nextLng = i18n.language.startsWith('vi') ? 'en' : 'vi';
-    i18n.changeLanguage(nextLng);
   };
 
   const getUserDisplayName = () => {
@@ -695,14 +680,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           </div>
 
           <div className="utc-topbar-right">
-            <button className="utc-top-btn" onClick={toggleLanguage} title="Language">
-              {i18n.language.startsWith('vi') ? '🇻🇳 VI' : '🇬🇧 EN'}
-            </button>
-
-            <button className="utc-top-btn" onClick={toggleTheme} title="Theme">
-              {isDark ? '☀️' : '🌙'}
-            </button>
-
             <NotificationDropdown onNavigate={handleNotificationNavigate} />
 
             <div className="utc-user-profile-menu">

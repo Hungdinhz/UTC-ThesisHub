@@ -13,6 +13,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+
 @RestController
 @RequestMapping("/api/v1/proposals")
 @RequiredArgsConstructor
@@ -46,9 +48,11 @@ public class ProposalController {
     public ApiResponse<ProposalResponse> supervisorApprove(
             @PathVariable Long id,
             @RequestParam boolean approved,
-            @RequestParam(required = false) String comment) {
+            @RequestParam(required = false) String comment,
+            @RequestParam(required = false) String checklist,
+            @RequestParam(required = false) Instant deadline) {
         return ApiResponse.success("Phê duyệt đề cương bởi GVHD thành công",
-                proposalService.supervisorApprove(id, approved, comment));
+                proposalService.supervisorApprove(id, approved, comment, checklist, deadline));
     }
 
     @PostMapping("/{id}/assign-review-group")

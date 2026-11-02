@@ -33,6 +33,10 @@ public class ProposalResponse {
     private String status;
     private Boolean supervisorApproved;
     private String supervisorComment;
+    private String rebuttalNotes;
+    private String revisionChecklist;
+    private String councilComment;
+    private Instant revisionDeadline;
     private Integer version;
     private Instant submittedAt;
     private Boolean studentSigned;

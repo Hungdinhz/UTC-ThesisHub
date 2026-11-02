@@ -20,6 +20,10 @@ export interface Proposal {
   status: 'DRAFT' | 'SUBMITTED' | 'ASSIGNED' | 'UNDER_REVIEW' | 'APPROVED' | 'REVISE_REQUIRED' | 'REJECTED';
   supervisorApproved: boolean;
   supervisorComment?: string;
+  rebuttalNotes?: string;
+  revisionChecklist?: string;
+  councilComment?: string;
+  revisionDeadline?: string;
   version: number;
   submittedAt?: string;
   studentSigned?: boolean;
@@ -39,6 +43,7 @@ export interface CreateProposalPayload {
   expectedResults?: string;
   researchContent?: string;
   fileUrl?: string;
+  rebuttalNotes?: string;
 }
 
 export interface UpdateProposalPayload {
@@ -49,6 +54,7 @@ export interface UpdateProposalPayload {
   expectedResults?: string;
   researchContent?: string;
   fileUrl?: string;
+  rebuttalNotes?: string;
 }
 
 export interface ReviewGroupMember {
