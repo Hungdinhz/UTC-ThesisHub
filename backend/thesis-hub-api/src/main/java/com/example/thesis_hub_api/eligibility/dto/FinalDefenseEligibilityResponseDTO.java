@@ -27,4 +27,15 @@ public class FinalDefenseEligibilityResponseDTO {
     private BigDecimal reviewerScore;
     private double plagiarismRate;
     private List<String> reasons;
+
+    // Reservation & Round status tracking
+    private boolean hasPendingReservation;
+    private Long reservationId;
+    private String reservationStatus;
+    private String reservationCategory;
+    private String reservationReason;
+    private String studentRoundStatus;
+    private Integer completedCredits;
+    private Integer missingPrerequisiteCount;
+    private Boolean tuitionDebt;
 }

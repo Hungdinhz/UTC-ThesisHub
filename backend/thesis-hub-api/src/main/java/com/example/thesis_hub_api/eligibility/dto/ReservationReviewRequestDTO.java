@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ReservationReviewRequestDTO {
     /**
-     * APPROVED or REJECTED
+     * Target review status: APPROVED or REJECTED
      */
     private String status;
     private Long reviewedBy;

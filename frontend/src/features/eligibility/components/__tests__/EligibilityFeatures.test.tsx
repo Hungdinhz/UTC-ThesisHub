@@ -5,12 +5,21 @@ import { ReservationManagementPage } from '../../pages/ReservationManagementPage
 import { FinalDefenseEligibilityPage } from '../../pages/FinalDefenseEligibilityPage';
 import { EligibilitySummaryCard } from '../EligibilitySummaryCard';
 import { ForceApproveModal } from '../ForceApproveModal';
+import { ReservationSubmitModal } from '../ReservationSubmitModal';
+import { AdminCreateReservationModal } from '../AdminCreateReservationModal';
 
 vi.mock('../../../../services/api', () => ({
   apiService: {
     getProjectRounds: vi.fn().mockResolvedValue([
       { roundId: 10, name: 'Đợt 1 2026-2027', roundCode: 'D1_2627', status: 'IN_PROGRESS' },
     ]),
+    getStudentsInRound: vi.fn().mockResolvedValue({
+      content: [
+        { studentId: 101, studentCode: 'SV2021001', fullName: 'Nguyễn Văn An', gpa: 3.45, status: 'ELIGIBLE' },
+        { studentId: 102, studentCode: 'SV2021002', fullName: 'Trần Thị Bích', gpa: 2.15, status: 'INELIGIBLE' },
+      ],
+      totalElements: 2,
+    }),
   },
 }));
 
@@ -109,6 +118,84 @@ describe('Eligibility Feature Component & Page Tests', () => {
     });
   });
 
+  it('renders ReservationSubmitModal with category selector and submits', async () => {
+    const onSubmitMock = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ReservationSubmitModal
+        isOpen={true}
+        onClose={() => {}}
+        onSubmit={onSubmitMock}
+        defaultStudentId={102}
+        defaultThesisId={5}
+        projectRoundId={10}
+        defaultCategory="INSUFFICIENT_CREDITS"
+      />
+    );
+
+    expect(screen.getByText('Nộp đơn xin bảo lưu đồ án tốt nghiệp')).toBeInTheDocument();
+    expect(screen.getByText(/Quy định giai đoạn bảo lưu/i)).toBeInTheDocument();
+
+    // Check category selector
+    const categorySelect = screen.getByLabelText(/Phân loại lý do/i);
+    expect(categorySelect).toBeInTheDocument();
+
+    // Enter reason
+    const reasonInput = screen.getByLabelText(/Chi tiết giải trình/i);
+    fireEvent.change(reasonInput, { target: { value: 'Đề tài đã xong nhưng còn nợ môn Khai phá dữ liệu' } });
+
+    const submitBtn = screen.getByText('Gửi đơn bảo lưu');
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(onSubmitMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          studentId: 102,
+          reasonCategory: 'INSUFFICIENT_CREDITS',
+          reason: 'Đề tài đã xong nhưng còn nợ môn Khai phá dữ liệu',
+        })
+      );
+    });
+  });
+
+  it('renders AdminCreateReservationModal and confirms', async () => {
+    const onConfirmMock = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AdminCreateReservationModal
+        isOpen={true}
+        onClose={() => {}}
+        student={{
+          studentId: 105,
+          studentCode: 'SV2021005',
+          studentName: 'Hoàng Văn Em',
+          thesisId: 105,
+          thesisTitle: 'Phân tích dữ liệu học tập',
+          defaultCategory: 'INSUFFICIENT_CREDITS',
+          defaultReason: 'Khoa lập bảo lưu do sinh viên thiếu 4 tín chỉ tốt nghiệp',
+        }}
+        projectRoundId={10}
+        onConfirm={onConfirmMock}
+      />
+    );
+
+    expect(screen.getByText('Lập quyết định bảo lưu đồ án cho sinh viên')).toBeInTheDocument();
+    expect(screen.getByText('Hoàng Văn Em')).toBeInTheDocument();
+
+    const confirmBtn = screen.getByText('Xác nhận lập bảo lưu');
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(onConfirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          studentId: 105,
+          reasonCategory: 'INSUFFICIENT_CREDITS',
+          autoApprove: true,
+        })
+      );
+    });
+  });
+
   it('renders ReservationManagementPage and displays reservations', async () => {
     render(<ReservationManagementPage />);
 
@@ -120,24 +207,25 @@ describe('Eligibility Feature Component & Page Tests', () => {
 
     // Check filter tab buttons
     expect(screen.getByText('Tất cả đơn')).toBeInTheDocument();
-    expect(screen.getByText(/Đang chờ duyệt/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Chờ duyệt/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Đã chấp thuận/i)).toBeInTheDocument();
   });
 
   it('renders FinalDefenseEligibilityPage and checks criteria', async () => {
     render(<FinalDefenseEligibilityPage />);
 
-    expect(screen.getByText('Xét điều kiện bảo vệ đồ án tốt nghiệp cuối kỳ')).toBeInTheDocument();
+    expect(screen.getByText(/Xét điều kiện bảo vệ đồ án/i)).toBeInTheDocument();
 
     const input = screen.getByPlaceholderText(/Nhập mã sinh viên/i);
     fireEvent.change(input, { target: { value: '201200101' } });
 
-    const checkBtn = screen.getByText(/Kiểm tra điều kiện/i);
+    const checkBtn = screen.getByText(/Kiểm tra điều kiện theo MSSV/i);
     fireEvent.click(checkBtn);
 
     await waitFor(() => {
       expect(screen.getByText('ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ')).toBeInTheDocument();
-      expect(screen.getByText('1. Tiến độ thực hiện các giai đoạn')).toBeInTheDocument();
-      expect(screen.getByText('2. Đánh giá của Giảng viên Hướng dẫn (GVHD)')).toBeInTheDocument();
+      expect(screen.getByText(/1\. Tiến độ thực hiện/i)).toBeInTheDocument();
+      expect(screen.getByText(/2\. Giảng viên Hướng dẫn/i)).toBeInTheDocument();
     });
   });
 });
