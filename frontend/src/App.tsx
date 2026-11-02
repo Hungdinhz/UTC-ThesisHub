@@ -18,6 +18,7 @@ import { TaskBoardPage } from './features/progress/pages/TaskBoardPage';
 import { ProgressReportPage } from './features/progress/pages/ProgressReportPage';
 import { ThesisEligibilityPage } from './features/eligibility/pages/ThesisEligibilityPage';
 import { FinalDefenseEligibilityPage } from './features/eligibility/pages/FinalDefenseEligibilityPage';
+import { ReservationManagementPage } from './features/eligibility/pages/ReservationManagementPage';
 import { CouncilManagementPage } from './features/defense/pages/CouncilManagementPage';
 import { DefenseSchedulePage } from './features/defense/pages/DefenseSchedulePage';
 import { DefenseScoringPage } from './features/defense/pages/DefenseScoringPage';
@@ -254,9 +255,27 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Redirect removed Reservation routes (#27) */}
-      <Route path="/admin/reservations" element={<Navigate to="/admin/project-rounds" replace />} />
-      <Route path="/student/reservation" element={<Navigate to="/student/assignment" replace />} />
+      {/* Phase 5: Reservation Management */}
+      <Route
+        path="/admin/reservations"
+        element={
+          <ProtectedRoute allowedTypes={['admin', 'supervisor']}>
+            <LayoutPageWrapper activeTab="reservations" pageTitle="Giai đoạn 5: Quản lý & Phê duyệt Đơn bảo lưu">
+              <ReservationManagementPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/reservation"
+        element={
+          <ProtectedRoute allowedTypes={['student']}>
+            <LayoutPageWrapper activeTab="student-reservation" pageTitle="Giai đoạn 5: Đơn xin bảo lưu đồ án tốt nghiệp">
+              <ReservationManagementPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/admin/councils"

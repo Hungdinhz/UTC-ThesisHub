@@ -73,7 +73,14 @@ public class DefenseService {
     private ProjectRoundService projectRoundService;
 
     private boolean isThesisDefenseEligible(Thesis t) {
-        return t != null && (Boolean.TRUE.equals(t.getDefenseEligible()) || "COMPLETED".equalsIgnoreCase(t.getStatus()));
+        if (t == null) return false;
+        if ("RESERVED".equalsIgnoreCase(t.getStatus())
+                || "DEFENSE_NOT_ELIGIBLE".equalsIgnoreCase(t.getStatus())
+                || "CANCELLED".equalsIgnoreCase(t.getStatus())
+                || "CANCELED".equalsIgnoreCase(t.getStatus())) {
+            return false;
+        }
+        return Boolean.TRUE.equals(t.getDefenseEligible()) || "COMPLETED".equalsIgnoreCase(t.getStatus());
     }
 
     private String resolveLecturerName(Long lecturerId) {

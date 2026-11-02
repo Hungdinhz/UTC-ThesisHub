@@ -25,4 +25,12 @@ public interface ReservationRequestRepository extends JpaRepository<ReservationR
     List<ReservationRequest> findByProjectRoundIdAndStatus(Long projectRoundId, String status);
 
     Optional<ReservationRequest> findByThesisId(Long thesisId);
+
+    Optional<ReservationRequest> findFirstByStudentIdOrderByCreatedAtDesc(Long studentId);
+
+    Optional<ReservationRequest> findFirstByThesisIdOrderByCreatedAtDesc(Long thesisId);
+
+    Optional<ReservationRequest> findFirstByStudentIdAndProjectRoundIdOrderByCreatedAtDesc(Long studentId, Long projectRoundId);
+
+    List<ReservationRequest> findByProjectRoundIdAndReasonCategory(Long projectRoundId, String reasonCategory);
 }

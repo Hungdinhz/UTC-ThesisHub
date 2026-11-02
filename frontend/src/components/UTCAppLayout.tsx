@@ -427,11 +427,11 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               </div>
 
               <div
-                className={`utc-nav-item ${activeTab === 'final-eligibility' ? 'active' : ''}`}
+                className={`utc-nav-item ${activeTab === 'final-eligibility' || activeTab === 'reservations' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/admin/final-eligibility', true)}
               >
                 <span className="utc-nav-icon">🔍</span>
-                <span className="utc-nav-label">GĐ5: Xét ĐK Bảo vệ Cuối</span>
+                <span className="utc-nav-label">GĐ5: Xét ĐK Bảo vệ &amp; Bảo lưu</span>
               </div>
 
               <div
@@ -488,6 +488,15 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 <span className="utc-nav-icon">📋</span>
                 <span className="utc-nav-label">GĐ4: Nhận Task &amp; Nộp kết quả</span>
                 {renderStageBadge(4)}
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'student-reservation' || activeTab === 'final-eligibility' ? 'active' : ''} ${isStageLocked(5) ? 'utc-nav-locked' : ''}`}
+                onClick={() => handleNavClick('/student/reservation', true, 5)}
+              >
+                <span className="utc-nav-icon">⏸️</span>
+                <span className="utc-nav-label">GĐ5: ĐK Bảo vệ &amp; Đơn bảo lưu</span>
+                {renderStageBadge(5)}
               </div>
 
               <div

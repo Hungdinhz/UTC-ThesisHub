@@ -6,6 +6,10 @@ import com.example.thesis_hub_api.eligibility.dto.*;
 import com.example.thesis_hub_api.eligibility.entity.ReservationRequest;
 import com.example.thesis_hub_api.eligibility.repository.ReservationRequestRepository;
 import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockService;
+import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import com.example.thesis_hub_api.thesis.entity.Thesis;
+import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +17,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,8 +42,20 @@ class EligibilityServiceTest {
     @Mock
     private ReviewerAssignmentRepository reviewerAssignmentRepository;
 
+    @Mock
+    private ThesisRepository thesisRepository;
+
+    @Mock
+    private StudentProjectRoundRepository studentProjectRoundRepository;
+
     @InjectMocks
     private EligibilityService eligibilityService;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(eligibilityService, "thesisRepository", thesisRepository);
+        ReflectionTestUtils.setField(eligibilityService, "studentProjectRoundRepository", studentProjectRoundRepository);
+    }
 
     @Test
     void testCheckThesisEligibility_Eligible() {
@@ -101,6 +120,7 @@ class EligibilityServiceTest {
                 .studentId(101L)
                 .thesisId(1L)
                 .projectRoundId(10L)
+                .reasonCategory("HEALTH_REASONS")
                 .reason("Bận lý do sức khỏe cần bảo lưu 1 kỳ")
                 .build();
 
@@ -109,6 +129,30 @@ class EligibilityServiceTest {
         assertNotNull(response);
         assertEquals("PENDING", response.getStatus());
         assertEquals(101L, response.getStudentId());
+        assertEquals("HEALTH_REASONS", response.getReasonCategory());
+    }
+
+    @Test
+    void testSubmitReservation_InsufficientCredits_Success() {
+        when(reservationRepository.findByStudentIdAndStatus(102L, "PENDING")).thenReturn(Optional.empty());
+        when(reservationRepository.save(any(ReservationRequest.class))).thenAnswer(i -> {
+            ReservationRequest req = i.getArgument(0);
+            req.setId(2L);
+            return req;
+        });
+
+        ReservationSubmitRequestDTO request = ReservationSubmitRequestDTO.builder()
+                .studentId(102L)
+                .projectRoundId(10L)
+                .reasonCategory("INSUFFICIENT_CREDITS")
+                .reason("Chưa trả đủ tín chỉ tốt nghiệp, xin bảo lưu kết quả đồ án")
+                .build();
+
+        ReservationResponseDTO response = eligibilityService.submitReservation(request);
+
+        assertNotNull(response);
+        assertEquals("PENDING", response.getStatus());
+        assertEquals("INSUFFICIENT_CREDITS", response.getReasonCategory());
     }
 
     @Test
@@ -124,20 +168,36 @@ class EligibilityServiceTest {
     }
 
     @Test
-    void testReviewReservation_Approve() {
+    void testReviewReservation_Approve_UpdatesThesisAndStudentStatusToReserved() {
         ReservationRequest entity = ReservationRequest.builder()
                 .id(1L)
                 .studentId(101L)
+                .thesisId(5L)
+                .projectRoundId(10L)
+                .reasonCategory("INSUFFICIENT_CREDITS")
                 .status("PENDING")
+                .build();
+
+        Thesis thesis = Thesis.builder()
+                .id(5L)
+                .status("IN_PROGRESS")
+                .defenseEligible(true)
+                .build();
+
+        StudentProjectRound spr = StudentProjectRound.builder()
+                .id(1L)
+                .status("IN_PROGRESS")
                 .build();
 
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(entity));
         when(reservationRepository.save(any(ReservationRequest.class))).thenAnswer(i -> i.getArgument(0));
+        when(thesisRepository.findById(5L)).thenReturn(Optional.of(thesis));
+        when(studentProjectRoundRepository.findByStudentIdAndProjectRoundId(101L, 10L)).thenReturn(Optional.of(spr));
 
         ReservationReviewRequestDTO request = ReservationReviewRequestDTO.builder()
                 .status("APPROVED")
                 .reviewedBy(999L)
-                .note("Đã chấp nhận đơn")
+                .note("Đã chấp thuận bảo lưu đồ án")
                 .build();
 
         ReservationResponseDTO response = eligibilityService.reviewReservation(1L, request);
@@ -146,17 +206,75 @@ class EligibilityServiceTest {
         assertEquals("APPROVED", response.getStatus());
         assertEquals(999L, response.getReviewedBy());
         assertNotNull(response.getReviewedAt());
+
+        // Verify status updates
+        assertEquals("RESERVED", thesis.getStatus());
+        assertFalse(thesis.getDefenseEligible());
+        assertEquals("RESERVED", spr.getStatus());
+        verify(thesisRepository).save(thesis);
+        verify(studentProjectRoundRepository).save(spr);
     }
 
     @Test
-    void testCheckFinalDefenseEligibility() {
-        when(reviewerAssignmentRepository.existsByThesisId(1L)).thenReturn(true);
+    void testCreateReservationByAdmin_AutoApprove() {
+        Thesis thesis = Thesis.builder().id(10L).status("IN_PROGRESS").build();
+        StudentProjectRound spr = StudentProjectRound.builder().id(20L).status("IN_PROGRESS").build();
+
+        when(thesisRepository.findById(10L)).thenReturn(Optional.of(thesis));
+        when(studentProjectRoundRepository.findByStudentIdAndProjectRoundId(105L, 10L)).thenReturn(Optional.of(spr));
+        when(reservationRepository.save(any(ReservationRequest.class))).thenAnswer(i -> {
+            ReservationRequest req = i.getArgument(0);
+            req.setId(99L);
+            return req;
+        });
+
+        AdminCreateReservationRequestDTO request = AdminCreateReservationRequestDTO.builder()
+                .studentId(105L)
+                .thesisId(10L)
+                .projectRoundId(10L)
+                .reasonCategory("INSUFFICIENT_CREDITS")
+                .reason("Khoa bảo lưu theo đơn giấy do chưa trả nợ môn")
+                .autoApprove(true)
+                .reviewedBy(888L)
+                .build();
+
+        ReservationResponseDTO response = eligibilityService.createReservationByAdmin(request);
+
+        assertNotNull(response);
+        assertEquals("APPROVED", response.getStatus());
+        assertEquals("RESERVED", thesis.getStatus());
+        assertEquals("RESERVED", spr.getStatus());
+    }
+
+    @Test
+    void testCheckFinalDefenseEligibility_ApprovedReservation_NotEligibleForDefense() {
+        ReservationRequest reservation = ReservationRequest.builder()
+                .id(15L)
+                .studentId(101L)
+                .status("APPROVED")
+                .reasonCategory("INSUFFICIENT_CREDITS")
+                .reason("Bảo lưu kết quả chờ trả nợ tín chỉ")
+                .build();
+
+        when(reservationRepository.findFirstByStudentIdOrderByCreatedAtDesc(101L)).thenReturn(Optional.of(reservation));
 
         FinalDefenseEligibilityResponseDTO response = eligibilityService.checkFinalDefenseEligibility(1L, 101L);
 
         assertNotNull(response);
-        assertTrue(response.isEligibleForDefense());
-        assertTrue(response.isSupervisorApproved());
-        assertTrue(response.isReviewerAssigned());
+        assertFalse(response.isEligibleForDefense());
+        assertEquals("APPROVED", response.getReservationStatus());
+        assertTrue(response.getReasons().stream().anyMatch(r -> r.contains("BẢO LƯU")));
+    }
+
+    @Test
+    void testCheckFinalDefenseEligibility_SupervisorApprovedButLacksCredits() {
+        // Student 102 has < 110 credits in mock service
+        when(reviewerAssignmentRepository.existsByThesisId(2L)).thenReturn(false);
+
+        FinalDefenseEligibilityResponseDTO response = eligibilityService.checkFinalDefenseEligibility(2L, 102L);
+
+        assertNotNull(response);
+        assertFalse(response.isEligibleForDefense());
+        assertTrue(response.getReasons().stream().anyMatch(r -> r.contains("CHƯA TRẢ ĐỦ TÍN CHỈ") || r.contains("tín chỉ")));
     }
 }
