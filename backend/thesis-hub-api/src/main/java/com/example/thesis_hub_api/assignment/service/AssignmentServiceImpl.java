@@ -1129,6 +1129,18 @@ public class AssignmentServiceImpl implements AssignmentService {
                     spr.setNote("Chưa đăng ký nguyện vọng đồ án khi đã chốt phân công - Bị loại khỏi đợt");
                     studentProjectRoundRepository.save(spr);
                     droppedCount++;
+
+                    if (notificationService != null && spr.getStudent().getUser() != null && spr.getStudent().getUser().getId() != null) {
+                        try {
+                            notificationService.createNotification(
+                                    spr.getStudent().getUser().getId(),
+                                    "Thông báo bị loại khỏi đợt đồ án tốt nghiệp",
+                                    "Bạn đã bị loại khỏi đợt đồ án tốt nghiệp do không đăng ký nguyện vọng theo thời hạn quy định của Khoa.",
+                                    "ASSIGNMENT",
+                                    "/student/assignment"
+                            );
+                        } catch (Exception ignored) {}
+                    }
                 }
             }
             log.info("Chốt phân công đợt {}: Đã loại {} sinh viên chưa đăng ký khỏi đợt đồ án", roundId, droppedCount);

@@ -19,6 +19,8 @@ import com.example.thesis_hub_api.projectround.repository.AcademicRecordReposito
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.util.AcademicRecordExcelParser;
+import com.example.thesis_hub_api.notification.service.NotificationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -44,6 +46,9 @@ public class AcademicRecordService {
     private final StudentProjectRoundRepository studentProjectRoundRepository;
     private final MajorRepository majorRepository;
     private final AcademicRecordExcelParser academicRecordExcelParser;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     private ProjectRound getAndValidateActiveRound(Long roundId) {
         ProjectRound round = projectRoundRepository.findById(roundId)
@@ -179,6 +184,18 @@ public class AcademicRecordService {
             }
 
             academicRecordRepository.save(record);
+
+            if (record.getDebtCredits() != null && record.getDebtCredits() >= 10 && notificationService != null && student.getUser() != null) {
+                try {
+                    notificationService.createNotification(
+                            student.getUser().getId(),
+                            "Cảnh báo học vụ: Không đủ điều kiện làm đồ án",
+                            "Hệ thống ghi nhận bạn đang nợ " + record.getDebtCredits() + " tín chỉ (>= 10 tín chỉ quy định). Bạn không đủ điều kiện nhận đề tài đồ án tốt nghiệp đợt này. Vui lòng liên hệ Giáo vụ Khoa để được hướng dẫn.",
+                            "ACADEMIC",
+                            "/student/profile"
+                    );
+                } catch (Exception ignored) {}
+            }
         }
 
         messages.add(String.format("Lưu trữ thành công %d kết quả học vụ (Thêm mới: %d, Cập nhật: %d, Bỏ qua: %d).",

@@ -10,6 +10,7 @@ import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockS
 import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockService.StudentAcademicRecord;
 import com.example.thesis_hub_api.identity.entity.User;
 import com.example.thesis_hub_api.identity.repository.UserRepository;
+import com.example.thesis_hub_api.notification.service.NotificationService;
 import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
@@ -58,6 +59,9 @@ public class EligibilityService {
 
     @Autowired(required = false)
     private UserRepository userRepository;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     /** Nhận đồ án: nợ tín chỉ phải < ngưỡng này (mặc định 10). */
     @Value("${app.eligibility.max-debt-credits-to-start:10}")
@@ -402,6 +406,34 @@ public class EligibilityService {
                 .build();
 
         ReservationRequest saved = reservationRepository.save(entity);
+        if (notificationService != null) {
+            if (studentRepository != null && saved.getStudentId() != null) {
+                studentRepository.findById(saved.getStudentId()).ifPresent(st -> {
+                    if (st.getUser() != null && st.getUser().getId() != null) {
+                        try {
+                            notificationService.createNotification(
+                                    st.getUser().getId(),
+                                    "Yêu cầu bảo lưu đồ án tốt nghiệp",
+                                    "Hệ thống đã tiếp nhận đơn xin bảo lưu đồ án của bạn (Đơn #" + saved.getId() + "). Đơn đang chờ Khoa và GVHD xem xét.",
+                                    "RESERVATION",
+                                    "/student/reservations"
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+            if (thesisOpt.isPresent() && thesisOpt.get().getLecturer() != null && thesisOpt.get().getLecturer().getUser() != null) {
+                try {
+                    notificationService.createNotification(
+                            thesisOpt.get().getLecturer().getUser().getId(),
+                            "Sinh viên gửi đơn xin bảo lưu đồ án",
+                            "Sinh viên thực hiện đề tài [" + thesisOpt.get().getTitleVn() + "] đã nộp đơn xin bảo lưu đồ án (Lý do: " + saved.getReason() + "). Vui lòng kiểm tra và phản hồi ý kiến.",
+                            "RESERVATION",
+                            "/supervisor/dashboard"
+                    );
+                } catch (Exception ignored) {}
+            }
+        }
         return mapToReservationResponse(saved);
     }
 
@@ -446,6 +478,22 @@ public class EligibilityService {
         if (autoApprove) {
             applyApprovedReservationEffects(saved);
         }
+        if (notificationService != null && studentRepository != null && saved.getStudentId() != null) {
+            studentRepository.findById(saved.getStudentId()).ifPresent(st -> {
+                if (st.getUser() != null && st.getUser().getId() != null) {
+                    try {
+                        String stDesc = autoApprove ? "ĐÃ ĐƯỢC PHÊ DUYỆT" : "ĐANG CHỜ DUYỆT";
+                        notificationService.createNotification(
+                                st.getUser().getId(),
+                                "Quyết định bảo lưu đồ án tốt nghiệp",
+                                "Khoa đã lập quyết định bảo lưu đồ án tốt nghiệp cho bạn (" + stDesc + "). Lý do: " + saved.getReason(),
+                                "RESERVATION",
+                                "/student/reservations"
+                        );
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
 
         return mapToReservationResponse(saved);
     }
@@ -462,6 +510,22 @@ public class EligibilityService {
         entity.setSupervisorComment(feedback.getComment());
 
         ReservationRequest updated = reservationRepository.save(entity);
+        if (notificationService != null && studentRepository != null && entity.getStudentId() != null) {
+            studentRepository.findById(entity.getStudentId()).ifPresent(st -> {
+                if (st.getUser() != null && st.getUser().getId() != null) {
+                    try {
+                        String supStatus = Boolean.TRUE.equals(feedback.getApproved()) ? "ĐỒNG Ý" : "KHÔNG ĐỒNG Ý";
+                        notificationService.createNotification(
+                                st.getUser().getId(),
+                                "Ý kiến của GVHD về đơn bảo lưu đồ án",
+                                "GVHD đã cho ý kiến về đơn xin bảo lưu của bạn: " + supStatus + (feedback.getComment() != null ? " (Ghi chú: " + feedback.getComment() + ")" : "") + ".",
+                                "RESERVATION",
+                                "/student/reservations"
+                        );
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
         return mapToReservationResponse(updated);
     }
 
@@ -531,6 +595,44 @@ public class EligibilityService {
         }
 
         ReservationRequest updated = reservationRepository.save(entity);
+        if (notificationService != null) {
+            if (studentRepository != null && entity.getStudentId() != null) {
+                studentRepository.findById(entity.getStudentId()).ifPresent(st -> {
+                    if (st.getUser() != null && st.getUser().getId() != null) {
+                        try {
+                            boolean isApproved = "APPROVED".equalsIgnoreCase(targetStatus);
+                            String title = isApproved ? "Đơn bảo lưu đồ án đã được PHÊ DUYỆT" : "Đơn bảo lưu đồ án bị TỪ CHỐI";
+                            String msg = isApproved
+                                    ? "Đơn xin bảo lưu đồ án tốt nghiệp của bạn đã được Khoa phê duyệt. Đề tài hiện tại được tạm dừng bảo lưu sang đợt sau."
+                                    : "Đơn xin bảo lưu đồ án tốt nghiệp của bạn không được phê duyệt. Lý do: " + (request.getRejectionReason() != null ? request.getRejectionReason() : "Không đáp ứng quy chế bảo lưu") + ". Bạn tiếp tục thực hiện đồ án theo kế hoạch.";
+                            notificationService.createNotification(
+                                    st.getUser().getId(),
+                                    title,
+                                    msg,
+                                    "RESERVATION",
+                                    "/student/reservations"
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+            if (thesisRepository != null && entity.getThesisId() != null) {
+                thesisRepository.findById(entity.getThesisId()).ifPresent(th -> {
+                    if (th.getLecturer() != null && th.getLecturer().getUser() != null) {
+                        try {
+                            String stText = "APPROVED".equalsIgnoreCase(targetStatus) ? "CHẤP THUẬN" : "TỪ CHỐI";
+                            notificationService.createNotification(
+                                    th.getLecturer().getUser().getId(),
+                                    "Kết quả xét duyệt đơn bảo lưu của sinh viên",
+                                    "Khoa đã " + stText + " đơn xin bảo lưu đồ án của sinh viên thực hiện đề tài [" + th.getTitleVn() + "].",
+                                    "RESERVATION",
+                                    "/supervisor/dashboard"
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+        }
         return mapToReservationResponse(updated);
     }
 
