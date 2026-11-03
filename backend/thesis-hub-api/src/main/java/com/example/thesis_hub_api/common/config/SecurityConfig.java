@@ -65,6 +65,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/v1/defense/**").permitAll()
                         .requestMatchers("/api/v1/eligibility/**").permitAll()
+                        .requestMatchers("/api/v1/academic-staff/**").authenticated()
                         .requestMatchers("/api/v1/users/**").authenticated()
                         .requestMatchers("/api/v1/lecturers/me/**").authenticated()
                         .requestMatchers("/api/v1/students/profile/**", "/api/v1/students/profile").authenticated()

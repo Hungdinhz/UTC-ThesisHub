@@ -192,6 +192,15 @@ export const PROJECT_ROUNDS = {
 } as const;
 
 // ─── Academic Records (Contract 4) ────────────────────────────────
+// ─── Academic Staff (Giáo vụ khoa) ─────
+export const ACADEMIC_STAFF = {
+  eligibleStudents:       (roundId: number) => `/academic-staff/rounds/${roundId}/eligible-students` as const,
+  eligibleStudentsExport: (roundId: number) => `/academic-staff/rounds/${roundId}/eligible-students/export` as const,
+  classes:                (roundId: number) => `/academic-staff/rounds/${roundId}/classes` as const,
+  grades:                 (roundId: number) => `/academic-staff/rounds/${roundId}/grades` as const,
+  gradesExport:           (roundId: number) => `/academic-staff/rounds/${roundId}/grades/export` as const,
+} as const;
+
 export const ACADEMIC_RECORDS = {
   TEMPLATE:                '/project-rounds/academic-records/template',
   roundRecords:     (roundId: number) => `/project-rounds/${roundId}/academic-records` as const,

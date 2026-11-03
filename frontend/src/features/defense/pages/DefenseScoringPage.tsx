@@ -6,6 +6,7 @@ import { ScoreEntryForm } from '../components/ScoreEntryForm';
 import { ResultSynthesisModal } from '../components/ResultSynthesisModal';
 import { defenseService } from '../services/defenseService';
 import { apiService } from '../../../services/api';
+import { getCouncilRoleLabel } from '../types';
 import type {
   ScoreItem,
   ScoreType,
@@ -289,7 +290,7 @@ export const DefenseScoringPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Chấm điểm và Tổng hợp Kết quả Tốt nghiệp</h1>
           <p className="feature-page-subtitle">
-            Cơ cấu điểm chuẩn UTC: GVHD (40%), Hội đồng 5 thành viên (60% - 1CT-2TK-2UV). Phân quyền nghiêm ngặt theo vai trò được giao.
+            Cơ cấu điểm chuẩn UTC: GVHD (40%), Hội đồng 5 thành viên (60% - 1CT-1TK-1PB1-1PB2-1UV). Phân quyền nghiêm ngặt theo vai trò được giao.
           </p>
         </div>
 
@@ -396,7 +397,7 @@ export const DefenseScoringPage: React.FC = () => {
             >
               {scoringTheses.map((t) => {
                 const roleTags: string[] = [];
-                if (t.canScoreCouncil || t.isCouncilMember) roleTags.push('Hội đồng');
+                if (t.canScoreCouncil || t.isCouncilMember) roleTags.push(getCouncilRoleLabel(t.myCouncilRole, 'Hội đồng'));
                 
                 if (t.canScoreSupervisor) roleTags.push('GVHD');
                 const suffix = roleTags.length > 0 ? ` — [Vai trò: ${roleTags.join(', ')}]` : '';
@@ -651,8 +652,8 @@ export const DefenseScoringPage: React.FC = () => {
                   {signingMinutes
                     ? 'Đang ký số...'
                     : mySignatureItem?.signed
-                    ? `✓ Đã ký (${mySignatureItem.slotLabel})`
-                    : `✍️ Ký xác nhận biên bản (${mySignatureItem?.slotLabel || 'Thành viên HĐ'})`}
+                    ? `✓ Đã ký (${getCouncilRoleLabel(mySignatureItem.role, mySignatureItem.slotLabel)})`
+                    : `✍️ Ký xác nhận biên bản (${getCouncilRoleLabel(mySignatureItem?.role, mySignatureItem?.slotLabel || 'Thành viên HĐ')})`}
                 </button>
                 <button
                   onClick={() => window.print()}
@@ -715,7 +716,7 @@ export const DefenseScoringPage: React.FC = () => {
                 <strong>3. Giảng viên hướng dẫn:</strong> {selectedThesis.advisorName || '—'}
               </p>
               <p style={{ margin: '10px 0 6px 0' }}>
-                <strong>4. Kết quả chấm điểm của GVHD và Hội đồng (1 Chủ tịch - 2 Thư ký - 2 Ủy viên):</strong>
+                <strong>4. Kết quả chấm điểm của GVHD và Hội đồng (1CT - 1TK - 1PB1 - 1PB2 - 1UV):</strong>
               </p>
 
               <div style={{ width: '100%', overflowX: 'auto' }}>
@@ -793,7 +794,7 @@ export const DefenseScoringPage: React.FC = () => {
                     }}
                   >
                     <div style={{ fontWeight: 700, fontSize: '12.5px', color: '#0a3273', textTransform: 'uppercase' }}>
-                      {sig.slotLabel}
+                      {getCouncilRoleLabel(sig.role, sig.slotLabel)}
                     </div>
                     <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#0f172a', margin: '6px 0' }}>
                       {sig.lecturerName}

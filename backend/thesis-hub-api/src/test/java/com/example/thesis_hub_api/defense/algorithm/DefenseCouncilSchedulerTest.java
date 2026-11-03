@@ -29,10 +29,10 @@ class DefenseCouncilSchedulerTest {
         s1.setAdvisorId("lec_advisor");
 
         LecturerInfo l1 = createLecturer("lec1", true, false, false, 2); // President
-        LecturerInfo l2 = createLecturer("lec2", false, true, false, 1); // Secretary 1
-        LecturerInfo l3 = createLecturer("lec3", false, true, false, 3); // Secretary 2
-        LecturerInfo l4 = createLecturer("lec4", false, false, true, 0); // Member 1
-        LecturerInfo l5 = createLecturer("lec5", false, false, true, 0); // Member 2
+        LecturerInfo l2 = createLecturer("lec2", false, true, false, 1); // Secretary
+        LecturerInfo l3 = createLecturer("lec3", false, false, true, 3); // Reviewer 1
+        LecturerInfo l4 = createLecturer("lec4", false, false, true, 0); // Reviewer 2
+        LecturerInfo l5 = createLecturer("lec5", false, false, true, 0); // Member
         LecturerInfo lAdvisor = createLecturer("lec_advisor", true, true, true, 0); // Advisor, should be excluded
 
         CouncilSchedulingRequestDTO request = new CouncilSchedulingRequestDTO();
@@ -48,13 +48,14 @@ class DefenseCouncilSchedulerTest {
 
         CouncilSchedulingResultDTO.CouncilResult council = result.getCouncils().get(0);
         assertEquals("lec1", council.getPresidentId());
+        assertEquals("lec2", council.getSecretaryId());
         
         // Assert advisor is not in the council
         assertNotEquals("lec_advisor", council.getPresidentId());
-        assertNotEquals("lec_advisor", council.getSecretary1Id());
-        assertNotEquals("lec_advisor", council.getSecretary2Id());
-        assertNotEquals("lec_advisor", council.getMember1Id());
-        assertNotEquals("lec_advisor", council.getMember2Id());
+        assertNotEquals("lec_advisor", council.getSecretaryId());
+        assertNotEquals("lec_advisor", council.getReviewer1Id());
+        assertNotEquals("lec_advisor", council.getReviewer2Id());
+        assertNotEquals("lec_advisor", council.getMemberId());
 
         assertTrue(council.getStudentIds().contains("student1"));
     }
@@ -97,7 +98,7 @@ class DefenseCouncilSchedulerTest {
         LecturerInfo pLowLoad = createLecturer("p_low", true, false, false, 1);
         
         LecturerInfo l2 = createLecturer("lec2", false, true, false, 1);
-        LecturerInfo l3 = createLecturer("lec3", false, true, false, 3);
+        LecturerInfo l3 = createLecturer("lec3", false, false, true, 3);
         LecturerInfo l4 = createLecturer("lec4", false, false, true, 0);
         LecturerInfo l5 = createLecturer("lec5", false, false, true, 0);
 

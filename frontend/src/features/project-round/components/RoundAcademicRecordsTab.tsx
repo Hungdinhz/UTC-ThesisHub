@@ -54,6 +54,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
     tuitionDebt: false,
     underDisciplinaryAction: false,
     missingPrerequisiteCount: 0,
+    debtCredits: 0,
     note: '',
   });
   const [manualErrors, setManualErrors] = useState<Record<string, string>>({});
@@ -85,6 +86,12 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
         if (isNaN(num) || num < 0) return 'Số môn tiên quyết còn nợ phải >= 0';
         return '';
       }
+      case 'debtCredits': {
+        if (value === '' || value === undefined || value === null) return '';
+        const num = Number(value);
+        if (isNaN(num) || num < 0) return 'Số tín chỉ nợ phải >= 0';
+        return '';
+      }
       default:
         return '';
     }
@@ -110,6 +117,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       tuitionDebt: false,
       underDisciplinaryAction: false,
       missingPrerequisiteCount: 0,
+      debtCredits: 0,
       note: '',
     });
     setManualErrors({});
@@ -161,6 +169,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
         completedCredits: Number(manualForm.completedCredits),
         gpa: Number(manualForm.gpa),
         missingPrerequisiteCount: Number(manualForm.missingPrerequisiteCount),
+        debtCredits: Number(manualForm.debtCredits ?? 0),
       });
       setShowManualModal(false);
       setSuccessMsg(`Lưu dữ liệu học vụ cho sinh viên ${manualForm.studentCode} thành công!`);
@@ -466,6 +475,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
                 <th style={{ padding: '10px 12px', textAlign: 'center' }}>Học phí</th>
                 <th style={{ padding: '10px 12px', textAlign: 'center' }}>Kỷ luật</th>
                 <th style={{ padding: '10px 12px', textAlign: 'center' }}>Nợ tiên quyết</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center' }}>Tín chỉ nợ</th>
                 <th style={{ padding: '10px 12px' }}>Ghi chú</th>
               </tr>
             </thead>
@@ -480,7 +490,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{r.majorName}</div>
                   </td>
                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                    <span style={{ fontWeight: 700, color: r.completedCredits >= 110 ? '#15803d' : '#dc2626' }}>
+                    <span style={{ fontWeight: 700, color: '#1e293b' }}>
                       {r.completedCredits}
                     </span>
                   </td>
@@ -514,6 +524,11 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                     <span style={{ fontWeight: 700, color: r.missingPrerequisiteCount > 0 ? '#dc2626' : '#15803d' }}>
                       {r.missingPrerequisiteCount}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    <span style={{ fontWeight: 700, color: (r.debtCredits ?? 0) >= 10 ? '#dc2626' : '#15803d' }}>
+                      {r.debtCredits ?? 0}
                     </span>
                   </td>
                   <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.8rem' }}>
@@ -642,6 +657,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
                         <th style={{ padding: '8px' }}>Học phí</th>
                         <th style={{ padding: '8px' }}>Kỷ luật</th>
                         <th style={{ padding: '8px' }}>Nợ môn</th>
+                        <th style={{ padding: '8px' }}>Nợ tín</th>
                         <th style={{ padding: '8px' }}>Trạng thái / Lỗi</th>
                       </tr>
                     </thead>
@@ -662,6 +678,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
                           <td style={{ padding: '8px' }}>{row.tuitionDebt ? 'Nợ HP' : 'Đã đóng'}</td>
                           <td style={{ padding: '8px' }}>{row.underDisciplinaryAction ? 'Bị kỷ luật' : 'Không'}</td>
                           <td style={{ padding: '8px' }}>{row.missingPrerequisiteCount}</td>
+                          <td style={{ padding: '8px', fontWeight: 600 }}>{row.debtCredits ?? 0}</td>
                           <td style={{ padding: '8px' }}>
                             {row.isValid ? (
                               <span style={{ color: '#16a34a', fontWeight: 600 }}>✔ Hợp lệ</span>
@@ -899,6 +916,34 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
                 {manualTouched.missingPrerequisiteCount && manualErrors.missingPrerequisiteCount && (
                   <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px' }}>
                     {manualErrors.missingPrerequisiteCount}
+                  </div>
+                )}
+              </div>
+
+              {/* Số tín chỉ nợ */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Số tín chỉ nợ (nhận đồ án khi nợ &lt; 10 tín)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="VD: 0"
+                  value={manualForm.debtCredits ?? ''}
+                  onChange={(e) => handleManualChange('debtCredits', e.target.value)}
+                  onBlur={() => handleManualBlur('debtCredits')}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: manualTouched.debtCredits && manualErrors.debtCredits ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {manualTouched.debtCredits && manualErrors.debtCredits && (
+                  <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px' }}>
+                    {manualErrors.debtCredits}
                   </div>
                 )}
               </div>

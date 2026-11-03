@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,4 +25,6 @@ public class ReviewProposalRequest {
     private String status;
 
     private String evaluationNotes;
+    private String revisionChecklist;
+    private Instant revisionDeadline;
 }

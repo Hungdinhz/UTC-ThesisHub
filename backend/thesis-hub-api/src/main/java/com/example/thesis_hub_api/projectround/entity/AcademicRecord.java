@@ -51,6 +51,10 @@ public class AcademicRecord {
     @Builder.Default
     private Integer missingPrerequisiteCount = 0;
 
+    @Column(name = "debt_credits", nullable = false)
+    @Builder.Default
+    private Integer debtCredits = 0;
+
     @Column(columnDefinition = "TEXT")
     private String note;
 

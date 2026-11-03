@@ -18,10 +18,13 @@ import { TaskBoardPage } from './features/progress/pages/TaskBoardPage';
 import { ProgressReportPage } from './features/progress/pages/ProgressReportPage';
 import { ThesisEligibilityPage } from './features/eligibility/pages/ThesisEligibilityPage';
 import { FinalDefenseEligibilityPage } from './features/eligibility/pages/FinalDefenseEligibilityPage';
+import { ReservationManagementPage } from './features/eligibility/pages/ReservationManagementPage';
 import { CouncilManagementPage } from './features/defense/pages/CouncilManagementPage';
 import { DefenseSchedulePage } from './features/defense/pages/DefenseSchedulePage';
 import { DefenseScoringPage } from './features/defense/pages/DefenseScoringPage';
 import { ChatGroupPage } from './features/chat/pages/ChatGroupPage';
+import { EligibleStudentsPage } from './features/academic-staff/pages/EligibleStudentsPage';
+import { ClassGradeReportPage } from './features/academic-staff/pages/ClassGradeReportPage';
 import './App.css';
 
 const getDefaultRouteForRole = (role?: string | null): string => {
@@ -35,6 +38,8 @@ const getDefaultRouteForRole = (role?: string | null): string => {
       return '/thesis/proposals';
     case 'external_examiner':
       return '/external_examiner/dashboard';
+    case 'academic_staff':
+      return '/academic-staff/eligible-students';
     default:
       return '/login';
   }
@@ -254,15 +259,33 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Redirect removed Reservation routes (#27) */}
-      <Route path="/admin/reservations" element={<Navigate to="/admin/project-rounds" replace />} />
-      <Route path="/student/reservation" element={<Navigate to="/student/assignment" replace />} />
+      {/* Phase 5: Reservation Management */}
+      <Route
+        path="/admin/reservations"
+        element={
+          <ProtectedRoute allowedTypes={['admin', 'supervisor']}>
+            <LayoutPageWrapper activeTab="reservations" pageTitle="Giai đoạn 5: Quản lý & Phê duyệt Đơn bảo lưu">
+              <ReservationManagementPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/reservation"
+        element={
+          <ProtectedRoute allowedTypes={['student']}>
+            <LayoutPageWrapper activeTab="student-reservation" pageTitle="Giai đoạn 5: Đơn xin bảo lưu đồ án tốt nghiệp">
+              <ReservationManagementPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/admin/councils"
         element={
           <ProtectedRoute allowedTypes={['admin']}>
-            <LayoutPageWrapper activeTab="councils" pageTitle="Giai đoạn 5: Thành lập Hội đồng (1CT-2TK-2UV)">
+            <LayoutPageWrapper activeTab="councils" pageTitle="Giai đoạn 5: Thành lập Hội đồng (1CT-1TK-2PB-1UV)">
               <CouncilManagementPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
@@ -284,6 +307,28 @@ const AppRoutes: React.FC = () => {
           <ProtectedRoute allowedTypes={['admin', 'committee_member', 'supervisor']}>
             <LayoutPageWrapper activeTab="defense-scoring" pageTitle="Giai đoạn 5: Chấm điểm, Tổng hợp, Xuất Biên bản PDF & Dữ liệu Cuối kỳ">
               <DefenseScoringPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Giáo vụ khoa: DS đủ điều kiện nhận đồ án & in điểm đồ án theo lớp */}
+      <Route
+        path="/academic-staff/eligible-students"
+        element={
+          <ProtectedRoute allowedTypes={['academic_staff', 'admin']}>
+            <LayoutPageWrapper activeTab="staff-eligible" pageTitle="Giáo vụ: Danh sách sinh viên đủ điều kiện nhận đồ án">
+              <EligibleStudentsPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/academic-staff/class-grades"
+        element={
+          <ProtectedRoute allowedTypes={['academic_staff', 'admin']}>
+            <LayoutPageWrapper activeTab="staff-grades" pageTitle="Giáo vụ: In danh sách điểm đồ án theo lớp">
+              <ClassGradeReportPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
         }

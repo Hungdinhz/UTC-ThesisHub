@@ -62,14 +62,37 @@ public class EligibilityController {
     }
 
     /**
-     * API gửi đơn bảo lưu (Sinh viên)
+     * API gửi đơn bảo lưu (Sinh viên hoặc Admin)
      */
     @PostMapping("/reservations")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'FACULTY_ADMIN')")
     public ResponseEntity<ApiResponse<ReservationResponseDTO>> submitReservation(
             @RequestBody ReservationSubmitRequestDTO request) {
         ReservationResponseDTO result = eligibilityService.submitReservation(request);
         return ResponseEntity.ok(ApiResponse.success("Gửi đơn bảo lưu thành công", result));
+    }
+
+    /**
+     * API Khoa/Admin trực tiếp lập quyết định bảo lưu cho sinh viên (khi nộp đơn giấy hoặc thiếu tín chỉ)
+     */
+    @PostMapping("/reservations/admin")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<ReservationResponseDTO>> createReservationByAdmin(
+            @RequestBody AdminCreateReservationRequestDTO request) {
+        ReservationResponseDTO result = eligibilityService.createReservationByAdmin(request);
+        return ResponseEntity.ok(ApiResponse.success("Lập quyết định bảo lưu cho sinh viên thành công", result));
+    }
+
+    /**
+     * API Giảng viên hướng dẫn xác nhận/góp ý kiến cho đơn bảo lưu
+     */
+    @PutMapping("/reservations/{id}/supervisor-feedback")
+    @PreAuthorize("hasAnyRole('LECTURER', 'SUPERVISOR', 'ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<ReservationResponseDTO>> submitSupervisorFeedback(
+            @PathVariable Long id,
+            @RequestBody SupervisorReservationFeedbackDTO feedback) {
+        ReservationResponseDTO result = eligibilityService.submitSupervisorFeedback(id, feedback);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật ý kiến GVHD thành công", result));
     }
 
     /**
@@ -91,8 +114,9 @@ public class EligibilityController {
     public ResponseEntity<ApiResponse<List<ReservationResponseDTO>>> getReservations(
             @RequestParam(required = false) Long studentId,
             @RequestParam(required = false) Long projectRoundId,
-            @RequestParam(required = false) String status) {
-        List<ReservationResponseDTO> result = eligibilityService.getReservations(studentId, projectRoundId, status);
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String category) {
+        List<ReservationResponseDTO> result = eligibilityService.getReservations(studentId, projectRoundId, status, category);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 

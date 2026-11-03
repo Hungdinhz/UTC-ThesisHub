@@ -288,6 +288,7 @@ public class UserService {
             case "ROLE_ADMIN" -> "admin";
             case "ROLE_LECTURER" -> "supervisor";
             case "ROLE_COMMITTEE" -> "supervisor";
+            case "ROLE_ACADEMIC_STAFF" -> "academic_staff";
             default -> "student";
         };
 

@@ -1,4 +1,4 @@
-export type UserType = 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin';
+export type UserType = 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' | 'academic_staff';
 
 export interface AdminUser {
   id: number;
@@ -893,6 +893,7 @@ export interface AcademicRecordImportRow {
   tuitionDebt: boolean;
   underDisciplinaryAction: boolean;
   missingPrerequisiteCount: number;
+  debtCredits?: number;
   note?: string;
   isValid: boolean;
   errors: string[];
@@ -934,6 +935,7 @@ export interface AcademicRecordItem {
   tuitionDebt: boolean;
   underDisciplinaryAction: boolean;
   missingPrerequisiteCount: number;
+  debtCredits?: number;
   note?: string;
   importedAt: string;
 }
@@ -946,7 +948,69 @@ export interface CreateAcademicRecordManualPayload {
   tuitionDebt?: boolean;
   underDisciplinaryAction?: boolean;
   missingPrerequisiteCount?: number;
+  debtCredits?: number;
   note?: string;
+}
+
+// ─── Academic Staff (Giáo vụ khoa) Types ─────
+export interface EligibleStudentRow {
+  studentId: number;
+  studentCode: string;
+  fullName?: string;
+  className?: string;
+  majorName?: string;
+  completedCredits?: number | null;
+  debtCredits?: number | null;
+  gpa?: number | null;
+  status: string; // ELIGIBLE, FORCE_APPROVED, INELIGIBLE, RESERVED, DISQUALIFIED, NO_DATA
+  eligible: boolean;
+  reasons: string[];
+}
+
+export interface EligibleStudentListResponse {
+  roundId: number;
+  roundCode: string;
+  roundName: string;
+  maxDebtCredits: number;
+  totalStudents: number;
+  eligibleCount: number;
+  ineligibleCount: number;
+  noDataCount: number;
+  students: EligibleStudentRow[];
+}
+
+export interface ClassGradeRow {
+  thesisId: number;
+  thesisCode?: string;
+  thesisTitle?: string;
+  studentCode?: string;
+  studentName?: string;
+  studentClass?: string;
+  advisorName?: string;
+  supervisorScore?: number | null;
+  reviewerScore?: number | null;
+  councilScore?: number | null;
+  finalScore?: number | null;
+  grade?: string;
+  finalResult?: string; // PASSED, FAILED
+}
+
+export interface ClassGradeGroup {
+  className: string;
+  totalStudents: number;
+  passedCount: number;
+  failedCount: number;
+  averageScore?: number | null;
+  rows: ClassGradeRow[];
+}
+
+export interface ClassGradeReportResponse {
+  roundId: number;
+  roundCode: string;
+  roundName: string;
+  roundStatus?: string;
+  totalStudents: number;
+  classes: ClassGradeGroup[];
 }
 
 

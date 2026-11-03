@@ -5,6 +5,7 @@ export * from './components/ForceApproveModal';
 export * from './components/DisqualifyModal';
 export * from './components/ReservationReviewModal';
 export * from './components/ReservationSubmitModal';
+export * from './components/AdminCreateReservationModal';
 export * from './pages/ThesisEligibilityPage';
 export * from './pages/ReservationManagementPage';
 export * from './pages/FinalDefenseEligibilityPage';

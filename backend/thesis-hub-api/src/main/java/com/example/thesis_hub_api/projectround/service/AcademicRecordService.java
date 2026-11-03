@@ -158,6 +158,7 @@ public class AcademicRecordService {
                 record.setTuitionDebt(row.getTuitionDebt());
                 record.setUnderDisciplinaryAction(row.getUnderDisciplinaryAction());
                 record.setMissingPrerequisiteCount(row.getMissingPrerequisiteCount());
+                record.setDebtCredits(row.getDebtCredits() != null ? row.getDebtCredits() : 0);
                 record.setNote(row.getNote());
                 record.setImportedAt(Instant.now());
                 recordsUpdated++;
@@ -170,6 +171,7 @@ public class AcademicRecordService {
                         .tuitionDebt(row.getTuitionDebt())
                         .underDisciplinaryAction(row.getUnderDisciplinaryAction())
                         .missingPrerequisiteCount(row.getMissingPrerequisiteCount())
+                        .debtCredits(row.getDebtCredits() != null ? row.getDebtCredits() : 0)
                         .note(row.getNote())
                         .importedAt(Instant.now())
                         .build();
@@ -293,6 +295,7 @@ public class AcademicRecordService {
             record.setTuitionDebt(dto.getTuitionDebt() != null ? dto.getTuitionDebt() : false);
             record.setUnderDisciplinaryAction(dto.getUnderDisciplinaryAction() != null ? dto.getUnderDisciplinaryAction() : false);
             record.setMissingPrerequisiteCount(dto.getMissingPrerequisiteCount() != null ? dto.getMissingPrerequisiteCount() : 0);
+            record.setDebtCredits(dto.getDebtCredits() != null ? dto.getDebtCredits() : 0);
             record.setNote(dto.getNote());
             record.setImportedAt(Instant.now());
         } else {
@@ -304,6 +307,7 @@ public class AcademicRecordService {
                     .tuitionDebt(dto.getTuitionDebt() != null ? dto.getTuitionDebt() : false)
                     .underDisciplinaryAction(dto.getUnderDisciplinaryAction() != null ? dto.getUnderDisciplinaryAction() : false)
                     .missingPrerequisiteCount(dto.getMissingPrerequisiteCount() != null ? dto.getMissingPrerequisiteCount() : 0)
+                    .debtCredits(dto.getDebtCredits() != null ? dto.getDebtCredits() : 0)
                     .note(dto.getNote())
                     .importedAt(Instant.now())
                     .build();
@@ -340,6 +344,7 @@ public class AcademicRecordService {
                 .tuitionDebt(r.getTuitionDebt())
                 .underDisciplinaryAction(r.getUnderDisciplinaryAction())
                 .missingPrerequisiteCount(r.getMissingPrerequisiteCount())
+                .debtCredits(r.getDebtCredits())
                 .note(r.getNote())
                 .importedAt(r.getImportedAt())
                 .build();

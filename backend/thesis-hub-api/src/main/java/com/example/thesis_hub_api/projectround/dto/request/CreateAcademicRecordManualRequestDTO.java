@@ -38,5 +38,9 @@ public class CreateAcademicRecordManualRequestDTO {
     @Min(value = 0, message = "Số môn tiên quyết còn thiếu phải >= 0")
     private Integer missingPrerequisiteCount = 0;
 
+    @Builder.Default
+    @Min(value = 0, message = "Số tín chỉ nợ phải >= 0")
+    private Integer debtCredits = 0;
+
     private String note;
 }

@@ -8,7 +8,7 @@ import utcLogo from '../assets/images/utc_logo.webp';
 
 const LoginPage: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const [userType, setUserType] = useState<'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin'>('student');
+  const [userType, setUserType] = useState<'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' | 'academic_staff'>('student');
   const [registrationNo, setRegistrationNo] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,10 +38,6 @@ const LoginPage: React.FC = () => {
   }, [location.state]);
 
 
-  const toggleLanguage = () => {
-    const nextLng = i18n.language.startsWith('vi') ? 'en' : 'vi';
-    i18n.changeLanguage(nextLng);
-  };
 
   // Field validation rules
   const validateFields = (type: string, regNoVal: string, emailVal: string, passVal: string) => {
@@ -88,7 +84,7 @@ const LoginPage: React.FC = () => {
     setFieldErrors(errors);
   };
 
-  const handleUserTypeChange = (newRole: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin') => {
+  const handleUserTypeChange = (newRole: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' | 'academic_staff') => {
     setUserType(newRole);
     const currentIdent = registrationNo || email;
     setRegistrationNo(currentIdent);
@@ -99,7 +95,7 @@ const LoginPage: React.FC = () => {
   };
 
   const handleQuickFill = (
-    role: 'student' | 'supervisor' | 'committee_member' | 'admin',
+    role: 'student' | 'supervisor' | 'committee_member' | 'admin' | 'academic_staff',
     account: string,
     pass: string
   ) => {
@@ -139,6 +135,8 @@ const LoginPage: React.FC = () => {
         response = await apiService.committeeMemberLogin(identifier, password);
       } else if (userType === 'admin') {
         response = await apiService.adminLogin(identifier, password);
+      } else if (userType === 'academic_staff') {
+        response = await apiService.login(identifier, password);
       } else {
         response = await apiService.externalExaminerLogin(identifier, password);
       }
@@ -147,7 +145,7 @@ const LoginPage: React.FC = () => {
       const refreshToken = response?.refresh || (response as any)?.refreshToken || '';
 
       const backendRole = response?.role || (response as any)?.data?.role;
-      let resolvedUserType: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' = userType;
+      let resolvedUserType: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' | 'academic_staff' = userType;
       if (backendRole === 'ROLE_ADMIN' || backendRole === 'ROLE_FACULTY_ADMIN') {
         resolvedUserType = 'admin';
       } else if (backendRole === 'ROLE_LECTURER' || backendRole === 'ROLE_COMMITTEE') {
@@ -156,6 +154,8 @@ const LoginPage: React.FC = () => {
         resolvedUserType = 'student';
       } else if (backendRole === 'ROLE_EXTERNAL') {
         resolvedUserType = 'external_examiner';
+      } else if (backendRole === 'ROLE_ACADEMIC_STAFF') {
+        resolvedUserType = 'academic_staff';
       }
 
       login(accessToken, refreshToken, resolvedUserType);
@@ -165,6 +165,7 @@ const LoginPage: React.FC = () => {
         supervisor: '/thesis/proposals',
         committee_member: '/thesis/proposals',
         external_examiner: '/external_examiner/dashboard',
+        academic_staff: '/academic-staff/eligible-students',
       };
       navigate(roleLandingMap[resolvedUserType] || '/login');
     } catch (err: any) {
@@ -198,9 +199,7 @@ const LoginPage: React.FC = () => {
               <span className="utc-school-name-sub">{t('portal.schoolSub', 'UNIVERSITY OF TRANSPORT AND COMMUNICATIONS')}</span>
             </div>
           </div>
-          <button onClick={toggleLanguage} className="utc-lang-btn">
-            {i18n.language.startsWith('vi') ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
-          </button>
+
         </div>
 
         <div className="utc-portal-title-block">
@@ -287,6 +286,13 @@ const LoginPage: React.FC = () => {
             >
               👑 Quản trị viên
             </button>
+            <button
+              type="button"
+              className={`utc-role-tab ${userType === 'academic_staff' ? 'active' : ''}`}
+              onClick={() => handleUserTypeChange('academic_staff')}
+            >
+              📋 Giáo vụ
+            </button>
           </div>
 
           <div className="utc-demo-accounts-box">
@@ -303,6 +309,16 @@ const LoginPage: React.FC = () => {
               >
                 <span className="demo-role">👑 Quản trị viên</span>
                 <span className="demo-cred">admin | Password@123</span>
+              </button>
+              <button
+                type="button"
+                className="utc-demo-btn"
+                onClick={() => handleQuickFill('academic_staff', 'giaovu', 'Password@123')}
+                title="Click để điền tài khoản Giáo vụ khoa"
+                style={{ width: '100%' }}
+              >
+                <span className="demo-role">📋 Giáo vụ khoa</span>
+                <span className="demo-cred">giaovu | Password@123</span>
               </button>
             </div>
           </div>

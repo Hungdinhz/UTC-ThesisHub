@@ -70,7 +70,7 @@ public class Thesis {
 
     /**
      * Status lifecycle:
-     * DRAFT, APPROVED, IN_PROGRESS, UNDER_REVIEW, DEFENSE_READY, COMPLETED, CANCELLED
+     * DRAFT, APPROVED, IN_PROGRESS, UNDER_REVIEW, DEFENSE_READY, DEFENSE_NOT_ELIGIBLE, RESERVED, COMPLETED, CANCELLED
      */
     @Column(nullable = false, length = 50)
     @Builder.Default

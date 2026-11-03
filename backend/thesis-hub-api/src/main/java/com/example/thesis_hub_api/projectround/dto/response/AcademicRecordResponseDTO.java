@@ -26,6 +26,7 @@ public class AcademicRecordResponseDTO {
     private Boolean tuitionDebt;
     private Boolean underDisciplinaryAction;
     private Integer missingPrerequisiteCount;
+    private Integer debtCredits;
     private String note;
     private Instant importedAt;
 }

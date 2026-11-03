@@ -23,4 +23,5 @@ public class UpdateProposalRequest {
     private String expectedResults;
     private String researchContent;
     private String fileUrl;
+    private String rebuttalNotes;
 }
