@@ -134,6 +134,11 @@ public class EligibilityService {
                 if (s.getGpa() != null) {
                     mockRecord.setGpa(s.getGpa());
                 }
+                // For real students who have no imported academic records in DB, do not fake 120 completed credits or approved defense
+                mockRecord.setCompletedCredits(0);
+                mockRecord.setDebtCredits(s.getDebtCredits() != null ? s.getDebtCredits() : 0);
+                mockRecord.setThesisProgressPercentage(0.0);
+                mockRecord.setSupervisorApprovedForDefense(false);
             });
         }
         if (studentProjectRoundRepository != null && studentId != null && projectRoundId != null) {
@@ -313,12 +318,11 @@ public class EligibilityService {
         if (thesisRepository == null) {
             return Optional.empty();
         }
-        if (explicitThesisId != null) {
+        if (explicitThesisId != null && explicitThesisId > 0) {
             return thesisRepository.findById(explicitThesisId);
         }
         if (studentId != null && projectRoundId != null) {
-            Optional<Thesis> tOpt = thesisRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
-            if (tOpt.isPresent()) return tOpt;
+            return thesisRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
         }
         if (studentId != null) {
             return thesisRepository.findAll().stream()
@@ -588,8 +592,8 @@ public class EligibilityService {
         String studentRoundStatus = null;
 
         // 1. Resolve student by studentCode or studentId
+        Optional<Student> dbStudentOpt = Optional.empty();
         if (studentRepository != null) {
-            Optional<Student> dbStudentOpt = Optional.empty();
             if (resolvedStudentCode != null && !resolvedStudentCode.isEmpty()) {
                 dbStudentOpt = studentRepository.findByStudentCode(resolvedStudentCode);
                 if (dbStudentOpt.isEmpty()) {
@@ -615,23 +619,40 @@ public class EligibilityService {
             }
         }
 
-        // 2. Resolve round status if available
-        if (studentProjectRoundRepository != null && studentId != null && projectRoundId != null) {
-            Optional<StudentProjectRound> sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
+        // 2. Resolve round status and note if available
+        String studentRoundNote = null;
+        if (studentProjectRoundRepository != null && studentId != null) {
+            Optional<StudentProjectRound> sprOpt = Optional.empty();
+            if (projectRoundId != null) {
+                sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
+            }
+            if (sprOpt.isEmpty()) {
+                List<StudentProjectRound> list = studentProjectRoundRepository.findByStudentId(studentId);
+                if (list != null && !list.isEmpty()) {
+                    sprOpt = Optional.of(list.get(list.size() - 1));
+                }
+            }
             if (sprOpt.isPresent()) {
-                studentRoundStatus = sprOpt.get().getStatus();
+                StudentProjectRound spr = sprOpt.get();
+                studentRoundStatus = spr.getStatus();
+                studentRoundNote = spr.getNote();
+                if (projectRoundId == null && spr.getProjectRound() != null) {
+                    projectRoundId = spr.getProjectRound().getId();
+                }
             }
         }
 
         // 3. Resolve thesis by thesisId or studentId + projectRoundId
         Optional<Thesis> dbThesisOpt = resolveStudentThesis(studentId, projectRoundId, thesisId);
-        if (dbThesisOpt.isPresent()) {
+        boolean hasRealThesis = dbThesisOpt.isPresent();
+        if (hasRealThesis) {
             Thesis t = dbThesisOpt.get();
             thesisId = t.getId();
             resolvedThesisTitle = t.getTitleVn();
             progressPercentage = t.getCompletionRate() != null ? t.getCompletionRate().doubleValue() : 0.0;
             supervisorApproved = Boolean.TRUE.equals(t.getDefenseEligible())
-                    || "COMPLETED".equalsIgnoreCase(t.getStatus());
+                    || "COMPLETED".equalsIgnoreCase(t.getStatus())
+                    || "DEFENSE_READY".equalsIgnoreCase(t.getStatus());
             if (t.getStudent() != null) {
                 studentId = t.getStudent().getId();
                 if (resolvedStudentCode == null) {
@@ -644,7 +665,15 @@ public class EligibilityService {
             if (supervisorApproved && progressPercentage < 100.0) {
                 progressPercentage = 100.0;
             }
+        } else if (dbStudentOpt.isPresent() || (studentProjectRoundRepository != null && studentRoundStatus != null)) {
+            // Real student in database who DOES NOT have an approved thesis in this round
+            progressPercentage = 0.0;
+            supervisorApproved = false;
+            if (resolvedThesisTitle == null) {
+                resolvedThesisTitle = "Chưa có đề tài chính thức trong đợt này";
+            }
         } else {
+            // Mock fallback (for isolated unit tests without database)
             StudentAcademicRecord record = academicMockService.getRecord(studentId != null ? studentId : 101L);
             progressPercentage = record.getThesisProgressPercentage();
             supervisorApproved = record.isSupervisorApprovedForDefense();
@@ -691,12 +720,38 @@ public class EligibilityService {
         List<String> reasons = new ArrayList<>();
         boolean eligible = true;
 
-        // Check if student has already APPROVED reservation
+        // Check if student was DROPPED, DISQUALIFIED, INELIGIBLE, CANCELLED, or FAILED in the round
+        boolean isTerminatedInRound = "DROPPED".equalsIgnoreCase(studentRoundStatus)
+                || "DISQUALIFIED".equalsIgnoreCase(studentRoundStatus)
+                || "INELIGIBLE".equalsIgnoreCase(studentRoundStatus)
+                || "FAILED".equalsIgnoreCase(studentRoundStatus)
+                || "CANCELLED".equalsIgnoreCase(studentRoundStatus);
+
         boolean isReserved = "APPROVED".equalsIgnoreCase(reservationStatus) || "RESERVED".equalsIgnoreCase(studentRoundStatus);
-        if (isReserved) {
+
+        if (isTerminatedInRound) {
+            eligible = false;
+            supervisorApproved = false;
+            progressPercentage = 0.0;
+            String statusDesc = "DROPPED".equalsIgnoreCase(studentRoundStatus) ? "BỊ LOẠI KHỎI ĐỢT"
+                    : "DISQUALIFIED".equalsIgnoreCase(studentRoundStatus) ? "BỊ ĐÌNH CHỈ / BỊ LOẠI"
+                    : "INELIGIBLE".equalsIgnoreCase(studentRoundStatus) ? "KHÔNG ĐỦ ĐIỀU KIỆN"
+                    : "FAILED".equalsIgnoreCase(studentRoundStatus) ? "KHÔNG ĐẠT"
+                    : "ĐÃ HỦY THAM GIA";
+            String noteDetail = (studentRoundNote != null && !studentRoundNote.isBlank())
+                    ? " (Lý do: " + studentRoundNote + ")"
+                    : "";
+            reasons.add("Sinh viên đã ở trạng thái " + statusDesc + noteDetail + ". Không đủ điều kiện tham gia Hội đồng bảo vệ đồ án tốt nghiệp.");
+        } else if (isReserved) {
             eligible = false;
             reasons.add("Sinh viên đã được phê duyệt BẢO LƯU đồ án tốt nghiệp sang đợt sau (Đơn #" + (reservationId != null ? reservationId : "") + "). Đề tài được đóng băng và không xếp lịch bảo vệ đợt này.");
         } else {
+            // Check if student has no real thesis assigned
+            if (!hasRealThesis && (dbStudentOpt.isPresent() || studentRoundStatus != null)) {
+                eligible = false;
+                reasons.add("Sinh viên chưa có đề tài tốt nghiệp chính thức hoặc chưa được GVHD phê duyệt đề tài trong đợt này.");
+            }
+
             // Evaluated by Supervisor
             if (progressPercentage < 100.0) {
                 eligible = false;
@@ -712,7 +767,7 @@ public class EligibilityService {
             BigDecimal supervisorScore = null;
             boolean reviewerAssigned = false;
 
-            if (thesisId != null) {
+            if (thesisId != null && thesisId > 0) {
                 if (reviewerAssignmentRepository != null) {
                     reviewerAssigned = reviewerAssignmentRepository.existsByThesisId(thesisId);
                 }
@@ -734,7 +789,7 @@ public class EligibilityService {
                 supervisorScore = supervisorApproved ? BigDecimal.valueOf(8.5) : BigDecimal.valueOf(4.5);
             }
 
-            // Academic Condition Check: Credits / Prerequisites / Tuition
+            // Academic Condition Check: Credits / Prerequisites / Tuition / Discipline
             if (creditsLacking) {
                 eligible = false;
                 if (supervisorApproved && progressPercentage >= 100.0) {
@@ -752,6 +807,11 @@ public class EligibilityService {
                 reasons.add("Sinh viên còn nợ học phí chưa thanh toán theo dữ liệu đào tạo.");
             }
 
+            if (academicRecord.isUnderDisciplinaryAction()) {
+                eligible = false;
+                reasons.add("Sinh viên đang trong thời gian thi hành kỷ luật theo hồ sơ đào tạo.");
+            }
+
             if (hasPendingReservation) {
                 reasons.add("Đang có đơn xin bảo lưu chờ Khoa phê duyệt (Đơn #" + reservationId + " - Lý do: " + reservationReason + ").");
             }
@@ -762,7 +822,7 @@ public class EligibilityService {
         }
 
         BigDecimal supervisorScoreOutput = null;
-        if (thesisId != null) {
+        if (thesisId != null && thesisId > 0) {
             List<Score> scores = scoreRepository.findByThesisId(thesisId);
             for (Score s : scores) {
                 if ("SUPERVISOR".equalsIgnoreCase(s.getScoreType())) {
@@ -771,7 +831,7 @@ public class EligibilityService {
             }
         }
         if (supervisorScoreOutput == null) {
-            supervisorScoreOutput = supervisorApproved ? BigDecimal.valueOf(8.5) : BigDecimal.valueOf(4.5);
+            supervisorScoreOutput = supervisorApproved ? BigDecimal.valueOf(8.5) : (isTerminatedInRound ? BigDecimal.ZERO : BigDecimal.valueOf(4.5));
         }
 
         boolean reviewerAssigned = (thesisId != null && reviewerAssignmentRepository != null)
@@ -782,7 +842,7 @@ public class EligibilityService {
                 .studentCode(resolvedStudentCode != null ? resolvedStudentCode : ("SV" + (studentId != null ? studentId : 101)))
                 .studentName(resolvedStudentName != null ? resolvedStudentName : ("Sinh viên #" + (studentId != null ? studentId : 101)))
                 .thesisId(thesisId != null ? thesisId : 0L)
-                .thesisTitle(resolvedThesisTitle != null ? resolvedThesisTitle : "Đề tài đồ án tốt nghiệp")
+                .thesisTitle(isTerminatedInRound ? "Không có đề tài (Đã bị loại khỏi đợt)" : (resolvedThesisTitle != null ? resolvedThesisTitle : "Đề tài đồ án tốt nghiệp"))
                 .eligibleForDefense(eligible)
                 .thesisProgressPercentage(progressPercentage)
                 .allProgressStagesCompleted(progressPercentage >= 100.0)

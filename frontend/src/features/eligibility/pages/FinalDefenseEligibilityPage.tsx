@@ -463,6 +463,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   <h2 className="result-main-title">
                     {result.reservationStatus === 'APPROVED'
                       ? '🟣 ĐÃ BẢO LƯU ĐỒ ÁN SANG ĐỢT SAU (RESERVED)'
+                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED'
+                      ? '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN'
                       : result.eligibleForDefense
                       ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ'
                       : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}
@@ -472,6 +474,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   <span className="result-badge">
                     {result.reservationStatus === 'APPROVED'
                       ? 'BẢO LƯU'
+                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED'
+                      ? 'BỊ LOẠI'
                       : result.eligibleForDefense
                       ? 'ĐỦ ĐIỀU KIỆN'
                       : 'KHÔNG ĐỦ ĐIỀU KIỆN'}
@@ -503,7 +507,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
               )}
 
               {/* Recommendation for Reservation if not eligible */}
-              {!result.eligibleForDefense && result.reservationStatus !== 'APPROVED' && !result.hasPendingReservation && isAdmin && (
+              {!result.eligibleForDefense && result.reservationStatus !== 'APPROVED' && result.studentRoundStatus !== 'DROPPED' && result.studentRoundStatus !== 'DISQUALIFIED' && !result.hasPendingReservation && isAdmin && (
                 <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '14px', borderRadius: '8px', margin: '16px 20px 0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <strong style={{ color: '#5b21b6' }}>💡 Hỗ trợ bảo lưu đồ án tốt nghiệp:</strong>
@@ -589,16 +593,16 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   </div>
 
                   {/* Criteria 3: Điều kiện Học vụ / Tín chỉ */}
-                  <div className={`criteria-card ${!(result.completedCredits && result.completedCredits < 110) ? 'card-ok' : 'card-fail'}`}>
+                  <div className={`criteria-card ${result.completedCredits !== undefined && result.completedCredits !== null && result.completedCredits >= 110 && !result.missingPrerequisiteCount ? 'card-ok' : 'card-fail'}`}>
                     <div className="card-top">
-                      <span className="card-icon">{!(result.completedCredits && result.completedCredits < 110) ? '✅' : '❌'}</span>
+                      <span className="card-icon">{result.completedCredits !== undefined && result.completedCredits !== null && result.completedCredits >= 110 && !result.missingPrerequisiteCount ? '✅' : '❌'}</span>
                       <span className="card-heading">3. Tín chỉ &amp; Môn tiên quyết</span>
                     </div>
                     <div className="card-desc">
                       Tích lũy tối thiểu 110 tín chỉ và không nợ môn tiên quyết.
                     </div>
                     <div className="card-metric">
-                      Tín chỉ tích lũy: <strong>{result.completedCredits ?? 110}/110</strong>
+                      Tín chỉ tích lũy: <strong>{result.completedCredits !== undefined && result.completedCredits !== null ? `${result.completedCredits}/110` : 'Chưa có dữ liệu'}</strong>
                       {result.missingPrerequisiteCount ? ` (Nợ ${result.missingPrerequisiteCount} môn)` : ''}
                     </div>
                   </div>
@@ -692,8 +696,10 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     const reservation = findStudentReservation(st.studentId, st.studentCode);
                     const isReserved = st.status === 'RESERVED' || thesis?.status === 'RESERVED' || reservation?.status === 'APPROVED';
                     const hasPendingRes = reservation?.status === 'PENDING';
+                    const isDropped = st.status === 'DROPPED' || st.status === 'DISQUALIFIED';
                     const isEligibleForDefense = Boolean(
                       !isReserved &&
+                      !isDropped &&
                       thesis &&
                         (thesis.defenseEligible ||
                           thesis.status === 'COMPLETED')

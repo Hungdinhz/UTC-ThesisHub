@@ -277,4 +277,42 @@ class EligibilityServiceTest {
         assertFalse(response.isEligibleForDefense());
         assertTrue(response.getReasons().stream().anyMatch(r -> r.contains("CHƯA TRẢ ĐỦ TÍN CHỈ") || r.contains("tín chỉ")));
     }
+
+    @Test
+    void testCheckFinalDefenseEligibility_DroppedStudent_NotEligible() {
+        StudentProjectRound spr = StudentProjectRound.builder()
+                .id(99L)
+                .status("DROPPED")
+                .note("Tự động loại do không nộp nguyện vọng")
+                .build();
+
+        when(studentProjectRoundRepository.findByStudentIdAndProjectRoundId(101L, 10L)).thenReturn(Optional.of(spr));
+
+        FinalDefenseEligibilityResponseDTO response = eligibilityService.checkFinalDefenseEligibility(null, 101L, "SV101", 10L);
+
+        assertNotNull(response);
+        assertFalse(response.isEligibleForDefense());
+        assertEquals("DROPPED", response.getStudentRoundStatus());
+        assertFalse(response.isSupervisorApproved());
+        assertEquals(0.0, response.getThesisProgressPercentage());
+        assertTrue(response.getReasons().stream().anyMatch(r -> r.contains("BỊ LOẠI KHỎI ĐỢT")));
+    }
+
+    @Test
+    void testCheckFinalDefenseEligibility_DisqualifiedStudent_NotEligible() {
+        StudentProjectRound spr = StudentProjectRound.builder()
+                .id(100L)
+                .status("DISQUALIFIED")
+                .note("Vi phạm kỷ luật học phần")
+                .build();
+
+        when(studentProjectRoundRepository.findByStudentIdAndProjectRoundId(101L, 10L)).thenReturn(Optional.of(spr));
+
+        FinalDefenseEligibilityResponseDTO response = eligibilityService.checkFinalDefenseEligibility(null, 101L, "SV101", 10L);
+
+        assertNotNull(response);
+        assertFalse(response.isEligibleForDefense());
+        assertEquals("DISQUALIFIED", response.getStudentRoundStatus());
+        assertTrue(response.getReasons().stream().anyMatch(r -> r.contains("BỊ ĐÌNH CHỈ / BỊ LOẠI")));
+    }
 }
