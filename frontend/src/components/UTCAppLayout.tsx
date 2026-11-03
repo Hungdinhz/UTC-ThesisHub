@@ -71,6 +71,8 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     switch (currentRole) {
       case 'admin':
         return '/admin/dashboard';
+      case 'academic_staff':
+        return '/academic-staff/eligible-students';
       case 'student':
         return '/student/assignment';
       case 'supervisor':
@@ -120,6 +122,8 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     switch (currentRole) {
       case 'admin':
         return 'Quản trị viên Khoa (ADMIN)';
+      case 'academic_staff':
+        return 'Giáo vụ khoa (ACADEMIC STAFF)';
       case 'student':
         return 'Sinh viên (STUDENT)';
       case 'supervisor':
@@ -424,7 +428,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/councils', true)}
               >
                 <span className="utc-nav-icon">⚖️</span>
-                <span className="utc-nav-label">GĐ5: Hội đồng (1CT-2TK-2UV)</span>
+                <span className="utc-nav-label">GĐ5: Hội đồng (1CT-1TK-2PB-1UV)</span>
               </div>
 
               <div
@@ -441,6 +445,26 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               >
                 <span className="utc-nav-icon">🏆</span>
                 <span className="utc-nav-label">GĐ5: Chấm điểm &amp; Tổng hợp</span>
+              </div>
+            </>
+          )}
+
+          {/* MENU DÀNH CHO GIÁO VỤ KHOA */}
+          {currentRole === 'academic_staff' && (
+            <>
+              <div
+                className={`utc-nav-item ${activeTab === 'staff-eligible' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/academic-staff/eligible-students', true)}
+              >
+                <span className="utc-nav-icon">📋</span>
+                <span className="utc-nav-label">GĐ1: DS đủ điều kiện nhận đồ án</span>
+              </div>
+              <div
+                className={`utc-nav-item ${activeTab === 'staff-grades' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/academic-staff/class-grades', true)}
+              >
+                <span className="utc-nav-icon">🖨️</span>
+                <span className="utc-nav-label">GĐ5: In điểm đồ án theo lớp</span>
               </div>
             </>
           )}
@@ -622,7 +646,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/councils', true)}
               >
                 <span className="utc-nav-icon">⚖️</span>
-                <span className="utc-nav-label">GĐ5: Hội đồng chấm (1CT-2TK-2UV)</span>
+                <span className="utc-nav-label">GĐ5: Hội đồng chấm (1CT-1TK-2PB-1UV)</span>
               </div>
 
               <div

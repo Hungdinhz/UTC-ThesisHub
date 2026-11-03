@@ -22,6 +22,7 @@ import com.example.thesis_hub_api.thesis.entity.Thesis;
 import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +58,18 @@ public class EligibilityService {
 
     @Autowired(required = false)
     private UserRepository userRepository;
+
+    /** Nhận đồ án: nợ tín chỉ phải < ngưỡng này (mặc định 10). */
+    @Value("${app.eligibility.max-debt-credits-to-start:10}")
+    private int maxDebtCreditsToStart = 10;
+
+    /** Bảo vệ: nợ tín chỉ phải <= ngưỡng này (mặc định 0 = trả hết nợ). */
+    @Value("${app.eligibility.max-debt-credits-to-defend:0}")
+    private int maxDebtCreditsToDefend = 0;
+
+    public int getMaxDebtCreditsToStart() {
+        return maxDebtCreditsToStart;
+    }
 
     // Track overrides in-memory for testing and decoupling
     private final Map<String, String> statusOverrides = new ConcurrentHashMap<>();
@@ -102,6 +115,7 @@ public class EligibilityService {
                         .tuitionDebt(Boolean.TRUE.equals(ar.getTuitionDebt()))
                         .underDisciplinaryAction(Boolean.TRUE.equals(ar.getUnderDisciplinaryAction()))
                         .missingPrerequisiteCount(ar.getMissingPrerequisiteCount() != null ? ar.getMissingPrerequisiteCount() : 0)
+                        .debtCredits(ar.getDebtCredits() != null ? ar.getDebtCredits() : 0)
                         .thesisProgressPercentage(100.0)
                         .supervisorApprovedForDefense(true)
                         .build();
@@ -177,9 +191,9 @@ public class EligibilityService {
         List<String> reasons = new ArrayList<>();
         boolean eligible = true;
 
-        if (record.getCompletedCredits() < 110) {
+        if (record.getDebtCredits() >= maxDebtCreditsToStart) {
             eligible = false;
-            reasons.add("Số tín chỉ tích lũy chưa đạt chuẩn (Yêu cầu >= 110 tín chỉ, hiện có: " + record.getCompletedCredits() + ")");
+            reasons.add("Số tín chỉ nợ vượt mức cho phép (Yêu cầu nợ < " + maxDebtCreditsToStart + " tín chỉ, hiện nợ: " + record.getDebtCredits() + ")");
         }
         if (record.getGpa() < 2.0) {
             eligible = false;
@@ -240,6 +254,8 @@ public class EligibilityService {
                 .status(finalStatus)
                 .completedCredits(record.getCompletedCredits())
                 .requiredCredits(110)
+                .debtCredits(record.getDebtCredits())
+                .maxDebtCredits(maxDebtCreditsToStart)
                 .gpa(record.getGpa())
                 .requiredGpa(2.0)
                 .tuitionDebt(record.isTuitionDebt())
@@ -642,7 +658,7 @@ public class EligibilityService {
 
         // 4. Resolve Academic Records (Credits, prerequisites, tuition debt)
         StudentAcademicRecord academicRecord = resolveAcademicRecord(studentId, projectRoundId);
-        boolean creditsLacking = academicRecord.getCompletedCredits() < 110 || academicRecord.getMissingPrerequisiteCount() > 0;
+        boolean creditsLacking = academicRecord.getDebtCredits() > maxDebtCreditsToDefend || academicRecord.getMissingPrerequisiteCount() > 0;
         boolean tuitionDebt = academicRecord.isTuitionDebt();
 
         // 5. Check Reservation status
@@ -722,12 +738,12 @@ public class EligibilityService {
             if (creditsLacking) {
                 eligible = false;
                 if (supervisorApproved && progressPercentage >= 100.0) {
-                    reasons.add("Đồ án đã được GVHD duyệt đạt yêu cầu, nhưng sinh viên CHƯA TRẢ ĐỦ TÍN CHỈ (Tích lũy: " +
-                            academicRecord.getCompletedCredits() + "/110 tín chỉ" +
+                    reasons.add("Đồ án đã được GVHD duyệt đạt yêu cầu, nhưng sinh viên CHƯA TRẢ HẾT NỢ TÍN CHỈ (Còn nợ: " +
+                            academicRecord.getDebtCredits() + " tín chỉ" +
                             (academicRecord.getMissingPrerequisiteCount() > 0 ? ", nợ " + academicRecord.getMissingPrerequisiteCount() + " môn tiên quyết" : "") +
                             "). Sinh viên ĐƯỢC BẢO LƯU kết quả đồ án để bảo vệ đợt sau khi hoàn thành tín chỉ.");
                 } else {
-                    reasons.add("Chưa hoàn thành đủ số tín chỉ quy định (" + academicRecord.getCompletedCredits() + "/110 tín chỉ).");
+                    reasons.add("Chưa trả hết nợ tín chỉ (Còn nợ: " + academicRecord.getDebtCredits() + " tín chỉ).");
                 }
             }
 

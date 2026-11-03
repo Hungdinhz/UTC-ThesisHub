@@ -41,16 +41,11 @@ public class DefenseCouncilScheduler {
             int end = Math.min(i + maxStudents, students.size());
             List<StudentInfo> batch = students.subList(i, end);
 
-            // Collect excluded advisors and reviewers
+            // Collect excluded advisors
             Set<String> excludedLecturers = new HashSet<>();
             for (StudentInfo student : batch) {
                 if (student.getAdvisorId() != null) {
                     excludedLecturers.add(student.getAdvisorId());
-                }
-                if (student.getReviewerId() != null) {
-                    // Usually reviewer is also excluded or maybe they SHOULD be in the council?
-                    // The rule: "GVPB KHÔNG ĐƯỢC TRÙNG với GVHD của đề tài: GVPB ≠ GVHD". It doesn't strictly say GVPB is excluded from Council.
-                    // However, we exclude GVHD explicitly. Let's just exclude GVHD as requested.
                 }
             }
 
@@ -60,10 +55,10 @@ public class DefenseCouncilScheduler {
                 result.getCouncils().add(council);
                 // Update loads greedy
                 incrementLoad(mutableLecturers, council.getPresidentId());
-                incrementLoad(mutableLecturers, council.getSecretary1Id());
-                incrementLoad(mutableLecturers, council.getSecretary2Id());
-                incrementLoad(mutableLecturers, council.getMember1Id());
-                incrementLoad(mutableLecturers, council.getMember2Id());
+                incrementLoad(mutableLecturers, council.getSecretaryId());
+                incrementLoad(mutableLecturers, council.getReviewer1Id());
+                incrementLoad(mutableLecturers, council.getReviewer2Id());
+                incrementLoad(mutableLecturers, council.getMemberId());
             } else {
                 batch.forEach(s -> result.getUnassignedStudentIds().add(s.getStudentId()));
             }
@@ -99,39 +94,36 @@ public class DefenseCouncilScheduler {
         List<LecturerInfo> secretaries = validLecturers.stream().filter(LecturerInfo::isSecretaryEligible).collect(Collectors.toList());
         List<LecturerInfo> members = validLecturers.stream().filter(LecturerInfo::isMemberEligible).collect(Collectors.toList());
 
-        // Backtracking: 1 President, 2 Secretaries, 2 Members
+        // Backtracking: 1 Chủ tịch, 1 Thư ký, 1 Phản biện 1, 1 Phản biện 2, 1 Ủy viên thông thường
         for (LecturerInfo p : presidents) {
-            for (int i = 0; i < secretaries.size(); i++) {
-                for (int j = i + 1; j < secretaries.size(); j++) {
-                    LecturerInfo s1 = secretaries.get(i);
-                    LecturerInfo s2 = secretaries.get(j);
-
-                    if (s1.getLecturerId().equals(p.getLecturerId()) || s2.getLecturerId().equals(p.getLecturerId())) {
-                        continue;
-                    }
-
-                    for (int m1i = 0; m1i < members.size(); m1i++) {
-                        for (int m2i = m1i + 1; m2i < members.size(); m2i++) {
-                            LecturerInfo m1 = members.get(m1i);
-                            LecturerInfo m2 = members.get(m2i);
+            for (LecturerInfo s : secretaries) {
+                if (s.getLecturerId().equals(p.getLecturerId())) {
+                    continue;
+                }
+                for (int r1i = 0; r1i < members.size(); r1i++) {
+                    LecturerInfo r1 = members.get(r1i);
+                    for (int r2i = r1i + 1; r2i < members.size(); r2i++) {
+                        LecturerInfo r2 = members.get(r2i);
+                        for (int mi = 0; mi < members.size(); mi++) {
+                            if (mi == r1i || mi == r2i) continue;
+                            LecturerInfo m = members.get(mi);
 
                             Set<String> selectedIds = new HashSet<>(Arrays.asList(
                                     p.getLecturerId(),
-                                    s1.getLecturerId(),
-                                    s2.getLecturerId(),
-                                    m1.getLecturerId(),
-                                    m2.getLecturerId()
+                                    s.getLecturerId(),
+                                    r1.getLecturerId(),
+                                    r2.getLecturerId(),
+                                    m.getLecturerId()
                             ));
 
                             if (selectedIds.size() == 5) {
-                                // Found valid combination
                                 CouncilResult cr = new CouncilResult();
                                 cr.setStudentIds(batch.stream().map(StudentInfo::getStudentId).collect(Collectors.toList()));
                                 cr.setPresidentId(p.getLecturerId());
-                                cr.setSecretary1Id(s1.getLecturerId());
-                                cr.setSecretary2Id(s2.getLecturerId());
-                                cr.setMember1Id(m1.getLecturerId());
-                                cr.setMember2Id(m2.getLecturerId());
+                                cr.setSecretaryId(s.getLecturerId());
+                                cr.setReviewer1Id(r1.getLecturerId());
+                                cr.setReviewer2Id(r2.getLecturerId());
+                                cr.setMemberId(m.getLecturerId());
                                 return cr;
                             }
                         }

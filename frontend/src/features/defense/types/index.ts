@@ -1,4 +1,19 @@
-export type CouncilRole = 'PRESIDENT' | 'SECRETARY' | 'MEMBER';
+export const COUNCIL_ROLES = ['PRESIDENT', 'SECRETARY', 'REVIEWER_1', 'REVIEWER_2', 'MEMBER'] as const;
+export type CouncilRole = (typeof COUNCIL_ROLES)[number];
+
+export const COUNCIL_ROLE_LABELS: Record<CouncilRole, string> = {
+  PRESIDENT: 'Chủ tịch hội đồng',
+  SECRETARY: 'Thư ký hội đồng',
+  REVIEWER_1: 'Ủy viên Phản biện 1',
+  REVIEWER_2: 'Ủy viên Phản biện 2',
+  MEMBER: 'Ủy viên thông thường',
+};
+
+export function getCouncilRoleLabel(role?: string, fallback = 'Thành viên HĐ'): string {
+  return role && Object.prototype.hasOwnProperty.call(COUNCIL_ROLE_LABELS, role)
+    ? COUNCIL_ROLE_LABELS[role as CouncilRole]
+    : fallback;
+}
 
 export interface CouncilMember {
   id: number;
@@ -178,7 +193,7 @@ export interface MyScoringThesis {
   canScoreReviewer?: boolean;
   canScoreCouncil?: boolean;
   isCouncilMember?: boolean;
-  myCouncilRole?: CouncilRole | string;
+  myCouncilRole?: CouncilRole;
   myLecturerId?: number;
   myLecturerName?: string;
   myLecturerDegree?: string;
@@ -189,7 +204,7 @@ export interface MinutesSignatureItem {
   councilId: number;
   lecturerId: number;
   lecturerName: string;
-  role: CouncilRole | string;
+  role: CouncilRole;
   slotLabel: string;
   signed: boolean;
   signedAt?: string;

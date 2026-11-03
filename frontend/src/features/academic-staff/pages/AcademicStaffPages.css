@@ -1,0 +1,123 @@
+.staff-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border-color, #e2e8f0);
+}
+
+.staff-tab {
+  background: none;
+  border: none;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+
+.staff-tab.active {
+  color: #003366;
+  border-bottom-color: #003366;
+}
+
+.staff-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.staff-kpi {
+  background: var(--bg-secondary, #fff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+
+.staff-kpi-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #003366;
+}
+
+.staff-kpi-value.ok { color: #15803d; }
+.staff-kpi-value.bad { color: #dc2626; }
+.staff-kpi-value.warn { color: #d97706; }
+
+.staff-kpi-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #475569);
+  font-weight: 600;
+}
+
+.staff-hint {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #475569);
+  margin: 0 0 16px 0;
+}
+
+.staff-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* Bảng điểm theo lớp */
+.class-grade-block {
+  background: var(--bg-secondary, #fff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.class-grade-title {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #003366;
+}
+
+.class-grade-meta {
+  margin: 0 0 12px 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #475569);
+}
+
+.grade-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.grade-table th,
+.grade-table td {
+  border: 1px solid #cbd5e1;
+  padding: 6px 8px;
+}
+
+.grade-table th {
+  background: #003366;
+  color: #fff;
+  text-align: center;
+}
+
+.grade-table td.center { text-align: center; }
+.grade-table td.fail { color: #dc2626; font-weight: 700; }
+.grade-table td.pass { color: #15803d; font-weight: 700; }
+
+.print-only { display: none; }
+
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+  .print-only { display: block; text-align: center; margin-bottom: 12px; }
+  .class-grade-block { border: none; padding: 0; page-break-after: always; }
+  .class-grade-block:last-child { page-break-after: auto; }
+  @page { size: A4 landscape; margin: 12mm; }
+}

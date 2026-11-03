@@ -125,6 +125,20 @@ public class AcademicRecordExcelParser {
         // Cột I (8): Ghi chú
         String note = getCellValue(row.getCell(8));
 
+        // Cột J (9): Số tín chỉ nợ (để trống = 0)
+        String debtStr = getCellValue(row.getCell(9));
+        Integer debtCredits = 0;
+        if (!debtStr.isEmpty()) {
+            try {
+                debtCredits = (int) Double.parseDouble(debtStr.replace(',', '.'));
+                if (debtCredits < 0) {
+                    errors.add("Số tín chỉ nợ phải >= 0");
+                }
+            } catch (NumberFormatException e) {
+                errors.add("Số tín chỉ nợ không đúng định dạng số: " + debtStr);
+            }
+        }
+
         boolean isValid = errors.isEmpty();
 
         return AcademicRecordImportRowDTO.builder()
@@ -137,6 +151,7 @@ public class AcademicRecordExcelParser {
                 .tuitionDebt(tuitionDebt)
                 .underDisciplinaryAction(underDisciplinaryAction)
                 .missingPrerequisiteCount(missingPrereqCount)
+                .debtCredits(debtCredits)
                 .note(note)
                 .isValid(isValid)
                 .errors(errors)
@@ -212,7 +227,8 @@ public class AcademicRecordExcelParser {
                     "Nợ học phí (CÓ/KHÔNG) *",
                     "Kỷ luật (CÓ/KHÔNG) *",
                     "Số môn tiên quyết còn nợ *",
-                    "Ghi chú"
+                    "Ghi chú",
+                    "Số tín chỉ nợ"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -226,11 +242,11 @@ public class AcademicRecordExcelParser {
 
             // Dữ liệu mẫu chuẩn ứng với 5 sinh viên của đợt
             Object[][] sampleData = {
-                    {1, "201200101", "Nguyễn Văn An", 125, 3.25, "KHÔNG", "KHÔNG", 0, "Đủ điều kiện xét làm đồ án"},
-                    {2, "201200102", "Trần Thị Bình", 118, 2.85, "KHÔNG", "KHÔNG", 0, "Đủ điều kiện xét làm đồ án"},
-                    {3, "201200103", "Lê Hoàng Cường", 132, 3.65, "KHÔNG", "KHÔNG", 0, "Đủ điều kiện xét làm đồ án xuất sắc"},
-                    {4, "201200104", "Phạm Ngọc Dung", 102, 2.15, "CÓ", "KHÔNG", 1, "Chưa đủ 110 tín chỉ và còn nợ học phí"},
-                    {5, "201200105", "Hoàng Minh Đức", 120, 1.95, "KHÔNG", "CÓ", 0, "GPA dưới 2.0 và đang bị kỷ luật"}
+                    {1, "201200101", "Nguyễn Văn An", 125, 3.25, "KHÔNG", "KHÔNG", 0, "Đủ điều kiện xét làm đồ án", 0},
+                    {2, "201200102", "Trần Thị Bình", 118, 2.85, "KHÔNG", "KHÔNG", 0, "Nợ 6 tín chỉ (< 10) vẫn đủ điều kiện nhận đồ án", 6},
+                    {3, "201200103", "Lê Hoàng Cường", 132, 3.65, "KHÔNG", "KHÔNG", 0, "Đủ điều kiện xét làm đồ án xuất sắc", 0},
+                    {4, "201200104", "Phạm Ngọc Dung", 102, 2.15, "CÓ", "KHÔNG", 1, "Nợ 15 tín chỉ (>= 10) và còn nợ học phí", 15},
+                    {5, "201200105", "Hoàng Minh Đức", 120, 1.95, "KHÔNG", "CÓ", 0, "GPA dưới 2.0 và đang bị kỷ luật", 0}
             };
 
             int rowIdx = 1;
@@ -268,6 +284,7 @@ public class AcademicRecordExcelParser {
             sheet.setColumnWidth(6, 22 * 256);
             sheet.setColumnWidth(7, 26 * 256);
             sheet.setColumnWidth(8, 36 * 256);
+            sheet.setColumnWidth(9, 18 * 256);
 
             workbook.write(out);
             return out.toByteArray();

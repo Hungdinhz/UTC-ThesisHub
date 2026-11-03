@@ -56,6 +56,8 @@ import type {
   AcademicRecordImportCommitPayload,
   AcademicRecordImportResultResponse,
   AcademicRecordItem,
+  EligibleStudentListResponse,
+  ClassGradeReportResponse,
   CreateAcademicRecordManualPayload,
   StudentRoundStatusResponse,
 } from '../types';
@@ -64,7 +66,7 @@ import {
   GROUPS, SUPERVISOR_STUDENT, PROJECTS, DOCUMENTS,
   EVALUATIONS, CHAT, TEMPLATES, NOTIFICATIONS,
   AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT, ORGANIZATION,
-  PROJECT_ROUNDS, ACADEMIC_RECORDS,
+  PROJECT_ROUNDS, ACADEMIC_RECORDS, ACADEMIC_STAFF,
 } from './endpoints';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -1269,6 +1271,38 @@ class ApiService {
       ACADEMIC_RECORDS.manual(roundId),
       payload
     );
+    return response.data;
+  }
+
+  // ─── Academic Staff APIs (Giáo vụ khoa) ─────
+  async getEligibleStudents(roundId: number, onlyEligible = false): Promise<EligibleStudentListResponse> {
+    const response = await this.api.get<EligibleStudentListResponse>(
+      ACADEMIC_STAFF.eligibleStudents(roundId),
+      { params: { onlyEligible } }
+    );
+    return response.data;
+  }
+
+  async exportEligibleStudents(roundId: number): Promise<Blob> {
+    const response = await this.api.get(ACADEMIC_STAFF.eligibleStudentsExport(roundId), {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async getGradeReport(roundId: number, className?: string): Promise<ClassGradeReportResponse> {
+    const response = await this.api.get<ClassGradeReportResponse>(
+      ACADEMIC_STAFF.grades(roundId),
+      { params: { className: className || undefined } }
+    );
+    return response.data;
+  }
+
+  async exportGradeReport(roundId: number, className?: string): Promise<Blob> {
+    const response = await this.api.get(ACADEMIC_STAFF.gradesExport(roundId), {
+      params: { className: className || undefined },
+      responseType: 'blob',
+    });
     return response.data;
   }
 

@@ -63,6 +63,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           detectedType = 'student';
         } else if (apiRole === 'ROLE_EXTERNAL') {
           detectedType = 'external_examiner';
+        } else if (apiRole === 'ROLE_ACADEMIC_STAFF') {
+          detectedType = 'academic_staff';
         }
 
         if (detectedType) {
@@ -99,6 +101,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userData = await apiService.getExternalProfile();
           break;
         case 'admin':
+        case 'academic_staff':
           userData = currentUser || await apiService.getCurrentUser();
           break;
         default:

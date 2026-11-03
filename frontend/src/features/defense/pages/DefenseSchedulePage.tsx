@@ -7,6 +7,7 @@ import { ScheduleConfigModal } from '../components/ScheduleConfigModal';
 import { defenseService } from '../services/defenseService';
 import { thesisService } from '../../thesis/services/thesisService';
 import { apiService } from '../../../services/api';
+import { getCouncilRoleLabel } from '../types';
 import type { DefenseSchedule, DefenseCouncil, ScheduleConfig, GraduationResult } from '../types';
 import type { Thesis } from '../../thesis/types';
 import './DefensePages.css';
@@ -177,10 +178,7 @@ export const DefenseSchedulePage: React.FC = () => {
         (m) => m.lecturerId === lecturerId || (m.lecturerName && fullName && m.lecturerName.toLowerCase() === fullName)
       );
       if (myMember) {
-        let roleName = 'Ủy viên';
-        if (myMember.role === 'PRESIDENT') roleName = 'Chủ tịch Hội đồng';
-        else if (myMember.role === 'SECRETARY') roleName = 'Thư ký Hội đồng';
-        committeeSchedules.push({ schedule, role: roleName });
+        committeeSchedules.push({ schedule, role: getCouncilRoleLabel(myMember.role) });
       }
     }
 
@@ -483,7 +481,7 @@ export const DefenseSchedulePage: React.FC = () => {
               {currentStudentDefense.schedule.members && currentStudentDefense.schedule.members.length > 0 && (
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '13px', marginBottom: '8px' }}>
-                    👥 Thành viên Hội đồng chấm thi (1CT - 2TK - 2UV):
+                    👥 Thành viên Hội đồng chấm thi (1CT - 1TK - 1PB1 - 1PB2 - 1UV):
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {currentStudentDefense.schedule.members.map((m) => (
@@ -499,7 +497,7 @@ export const DefenseSchedulePage: React.FC = () => {
                           color: '#334155',
                         }}
                       >
-                        {m.role === 'PRESIDENT' ? '⭐ Chủ tịch: ' : m.role === 'SECRETARY' ? '📝 Thư ký: ' : '👤 Ủy viên: '}
+                        {getCouncilRoleLabel(m.role)}:{' '}
                         <strong>{m.lecturerName}</strong>
                       </span>
                     ))}
@@ -688,21 +686,16 @@ export const DefenseSchedulePage: React.FC = () => {
 
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px 16px' }}>
                 <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '10px' }}>
-                  👥 Thành viên Hội đồng chấm thi ({detailMembers.length} Giảng viên — Cơ cấu 1CT - 2TK - 2UV):
+                  👥 Thành viên Hội đồng chấm thi ({detailMembers.length} Giảng viên — Cơ cấu 1CT - 1TK - 1PB1 - 1PB2 - 1UV):
                 </div>
                 {detailMembers.length > 0 ? (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
                     {detailMembers.map((m) => {
-                      const roleLabel =
-                        m.role === 'PRESIDENT'
-                          ? '⭐ Chủ tịch Hội đồng'
-                          : m.role === 'SECRETARY'
-                          ? '📝 Ủy viên Thư ký'
-                          : '👤 Ủy viên Hội đồng';
+                      const roleLabel = getCouncilRoleLabel(m.role);
                       const roleColor =
-                        m.role === 'PRESIDENT' ? '#b45309' : m.role === 'SECRETARY' ? '#0369a1' : '#334155';
+                        m.role === 'PRESIDENT' ? '#b45309' : m.role === 'SECRETARY' ? '#0369a1' : (m.role === 'REVIEWER_1' || m.role === 'REVIEWER_2') ? '#6d28d9' : '#334155';
                       const roleBg =
-                        m.role === 'PRESIDENT' ? '#fef3c7' : m.role === 'SECRETARY' ? '#e0f2fe' : '#f1f5f9';
+                        m.role === 'PRESIDENT' ? '#fef3c7' : m.role === 'SECRETARY' ? '#e0f2fe' : (m.role === 'REVIEWER_1' || m.role === 'REVIEWER_2') ? '#ede9fe' : '#f1f5f9';
                       return (
                         <div
                           key={m.id || `${m.lecturerId}-${m.role}`}

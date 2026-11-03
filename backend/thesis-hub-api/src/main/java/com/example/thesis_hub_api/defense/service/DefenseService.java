@@ -207,10 +207,10 @@ public class DefenseService {
                     .map(CouncilSchedulingRequestDTO.StudentInfo::getStudentId)
                     .collect(Collectors.toList()));
             fallbackCr.setPresidentId(sortedPool.get(0).getLecturerId());
-            fallbackCr.setSecretary1Id(sortedPool.get(1).getLecturerId());
-            fallbackCr.setSecretary2Id(sortedPool.get(2).getLecturerId());
-            fallbackCr.setMember1Id(sortedPool.get(3).getLecturerId());
-            fallbackCr.setMember2Id(sortedPool.get(4).getLecturerId());
+            fallbackCr.setSecretaryId(sortedPool.get(1).getLecturerId());
+            fallbackCr.setReviewer1Id(sortedPool.get(2).getLecturerId());
+            fallbackCr.setReviewer2Id(sortedPool.get(3).getLecturerId());
+            fallbackCr.setMemberId(sortedPool.get(4).getLecturerId());
             schedulerResult.getCouncils().add(fallbackCr);
         }
 
@@ -248,7 +248,7 @@ public class DefenseService {
                     .code(code)
                     .name(name)
                     .status("ACTIVE")
-                    .description("Hội đồng sinh tự động bằng thuật toán CSP Backtracking + Greedy (1CT - 2TK - 2UV)")
+                    .description("Hội đồng sinh tự động bằng thuật toán CSP Backtracking + Greedy (1CT - 1TK - 1PB1 - 1PB2 - 1UV)")
                     .build();
             DefenseCouncil savedCouncil = councilRepository.save(council);
             nextNum++;
@@ -256,13 +256,15 @@ public class DefenseService {
             List<CouncilMemberDTO> memberDTOs = new ArrayList<>();
 
             // 1 President
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getPresidentId()), "PRESIDENT"));
-            // 2 Secretaries
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getSecretary1Id()), "SECRETARY"));
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getSecretary2Id()), "SECRETARY"));
-            // 2 Members
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMember1Id()), "MEMBER"));
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMember2Id()), "MEMBER"));
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getPresidentId()), CouncilRoles.PRESIDENT));
+            // 1 Secretary
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getSecretaryId()), CouncilRoles.SECRETARY));
+            // 1 Reviewer 1
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getReviewer1Id()), CouncilRoles.REVIEWER_1));
+            // 1 Reviewer 2
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getReviewer2Id()), CouncilRoles.REVIEWER_2));
+            // 1 Member
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMemberId()), CouncilRoles.MEMBER));
 
             CouncilResponseDTO councilResp = mapToCouncilResponse(savedCouncil);
             if (councilResp.getMembers() == null || councilResp.getMembers().isEmpty()) {
@@ -317,6 +319,15 @@ public class DefenseService {
     }
 
     @Transactional
+    public CouncilResponseDTO reopenCouncil(Long id) {
+        DefenseCouncil council = councilRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
+        council.setStatus("ACTIVE");
+        DefenseCouncil saved = councilRepository.save(council);
+        return mapToCouncilResponse(saved);
+    }
+
+    @Transactional
     public CouncilResponseDTO updateCouncilMembers(Long councilId, List<CouncilMemberDTO> updatedMembers) {
         DefenseCouncil council = councilRepository.findById(councilId)
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + councilId));
@@ -325,12 +336,23 @@ public class DefenseService {
             throw new IllegalStateException("Hội đồng đã được chốt (FINALIZED), không thể thay đổi thành viên!");
         }
 
-        long presidents = updatedMembers.stream().filter(m -> "PRESIDENT".equalsIgnoreCase(m.getRole())).count();
-        long secretaries = updatedMembers.stream().filter(m -> "SECRETARY".equalsIgnoreCase(m.getRole())).count();
-        long regularMembers = updatedMembers.stream().filter(m -> "MEMBER".equalsIgnoreCase(m.getRole())).count();
+        if (updatedMembers == null || updatedMembers.size() != 5) {
+            throw new IllegalArgumentException("Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường!");
+        }
 
-        if (presidents != 1 || secretaries != 2 || regularMembers != 2) {
-            throw new IllegalArgumentException("Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch, 2 Thư ký, 2 Ủy viên!");
+        long presidents = updatedMembers.stream().filter(m -> CouncilRoles.PRESIDENT.equalsIgnoreCase(m.getRole())).count();
+        long secretaries = updatedMembers.stream().filter(m -> CouncilRoles.SECRETARY.equalsIgnoreCase(m.getRole())).count();
+        long reviewer1 = updatedMembers.stream().filter(m -> CouncilRoles.REVIEWER_1.equalsIgnoreCase(m.getRole())).count();
+        long reviewer2 = updatedMembers.stream().filter(m -> CouncilRoles.REVIEWER_2.equalsIgnoreCase(m.getRole())).count();
+        long regularMembers = updatedMembers.stream().filter(m -> CouncilRoles.MEMBER.equalsIgnoreCase(m.getRole())).count();
+
+        if (presidents != 1 || secretaries != 1 || reviewer1 != 1 || reviewer2 != 1 || regularMembers != 1) {
+            throw new IllegalArgumentException("Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường!");
+        }
+
+        Set<Long> uniqueLecturers = updatedMembers.stream().map(CouncilMemberDTO::getLecturerId).filter(Objects::nonNull).collect(Collectors.toSet());
+        if (uniqueLecturers.size() != 5) {
+            throw new IllegalArgumentException("Mỗi giảng viên chỉ được đảm nhiệm một vai trò trong Hội đồng!");
         }
 
         // Only block advisors of students explicitly scheduled into this council's sessions (if any),
@@ -1194,31 +1216,17 @@ public class DefenseService {
         }
 
         List<CouncilMember> members = new ArrayList<>(memberRepository.findByCouncilId(council.getId()));
-        members.sort(Comparator.comparingInt((CouncilMember m) -> {
-            if ("PRESIDENT".equalsIgnoreCase(m.getRole())) return 0;
-            if ("SECRETARY".equalsIgnoreCase(m.getRole())) return 1;
-            return 2;
-        }).thenComparing(m -> m.getId() != null ? m.getId() : 0L));
+        members.sort(Comparator.comparingInt((CouncilMember m) -> CouncilRoles.order(m.getRole()))
+                .thenComparing(m -> m.getId() != null ? m.getId() : 0L));
 
         Map<Long, DefenseMinutesSignature> sigMap = minutesSignatureRepository != null
                 ? minutesSignatureRepository.findByThesisId(thesisId).stream()
                         .collect(Collectors.toMap(DefenseMinutesSignature::getLecturerId, s -> s, (a, b) -> b))
                 : Collections.emptyMap();
 
-        int secCount = 0;
-        int memCount = 0;
         List<MinutesSignatureItemDTO> items = new ArrayList<>();
         for (CouncilMember m : members) {
-            String slotLabel;
-            if ("PRESIDENT".equalsIgnoreCase(m.getRole())) {
-                slotLabel = "Chủ tịch Hội đồng";
-            } else if ("SECRETARY".equalsIgnoreCase(m.getRole())) {
-                secCount++;
-                slotLabel = "Ủy viên Thư ký " + secCount;
-            } else {
-                memCount++;
-                slotLabel = "Ủy viên " + memCount;
-            }
+            String slotLabel = CouncilRoles.label(m.getRole());
             DefenseMinutesSignature sig = sigMap.get(m.getLecturerId());
             items.add(MinutesSignatureItemDTO.builder()
                     .memberId(m.getId())

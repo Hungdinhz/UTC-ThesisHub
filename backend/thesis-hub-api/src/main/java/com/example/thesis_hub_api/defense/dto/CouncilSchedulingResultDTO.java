@@ -14,9 +14,9 @@ public class CouncilSchedulingResultDTO {
     public static class CouncilResult {
         private List<String> studentIds;
         private String presidentId;
-        private String secretary1Id;
-        private String secretary2Id;
-        private String member1Id;
-        private String member2Id;
+        private String secretaryId;
+        private String reviewer1Id;
+        private String reviewer2Id;
+        private String memberId;
     }
 }

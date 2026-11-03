@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../../components/ui';
 import { CouncilMemberCard } from '../components/CouncilMemberCard';
@@ -19,17 +19,13 @@ export const CouncilManagementPage: React.FC = () => {
   const [lecturers, setLecturers] = useState<LecturerOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [finalizingLoading, setFinalizingLoading] = useState(false);
+  const [savingMembers, setSavingMembers] = useState(false);
+  const mutationInFlight = useRef(false);
+  const busy = loading || finalizingLoading || savingMembers;
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [selectedCouncilId, setSelectedCouncilId] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Demo fallback advisor map
-  const fallbackAdvisorMap: Record<number, number> = {
-    101: 502,
-    103: 507,
-    104: 501,
-    105: 508,
-  };
 
   useEffect(() => {
     initRoundsAndData();
@@ -61,11 +57,15 @@ export const CouncilManagementPage: React.FC = () => {
   };
 
   const loadDataForRound = async (roundId: number) => {
+    if (mutationInFlight.current) return;
     try {
       setLoading(true);
       const [cList, lList] = await Promise.all([
         defenseService.getCouncils(roundId),
-        defenseService.getLecturers(),
+        defenseService.getLecturers().catch((err: any) => {
+          setNotification({ type: 'error', message: err?.message || 'Không thể tải danh sách giảng viên' });
+          return [];
+        }),
       ]);
       setCouncils(cList);
       setLecturers(lList);
@@ -82,12 +82,15 @@ export const CouncilManagementPage: React.FC = () => {
   };
 
   const handleRoundChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (busy || mutationInFlight.current) return;
     const newRoundId = Number(e.target.value);
     setSelectedRoundId(newRoundId);
     await loadDataForRound(newRoundId);
   };
 
   const handleGenerate = async (req: CouncilGenerationRequest) => {
+    if (busy || mutationInFlight.current) return;
+    mutationInFlight.current = true;
     try {
       setLoading(true);
       const payload: CouncilGenerationRequest = {
@@ -99,24 +102,24 @@ export const CouncilManagementPage: React.FC = () => {
       setCouncils(result);
       setNotification({
         type: 'success',
-        message: 'Chạy thuật toán CSP thành công! Đã tự động phân công 1 Hội đồng chấm thi chuẩn (1CT - 2TK - 2UV) không trùng GVHD.',
+        message: 'Đã sinh Hội đồng tự động (1CT - 1TK - 1PB1 - 1PB2 - 1UV). Hội đồng ACTIVE có thể đổi giảng viên thủ công trước khi chốt; FINALIZED sẽ khóa thành viên.',
       });
-      if (result.length > 0) {
-        setSelectedCouncilId(result[0].id);
-      }
+      setSelectedCouncilId(result[0]?.id ?? null);
     } catch (err: any) {
       setNotification({ type: 'error', message: err?.message || 'Thất bại khi sinh Hội đồng' });
     } finally {
+      mutationInFlight.current = false;
       setLoading(false);
     }
   };
 
   const handleFinalize = async () => {
-    if (!selectedCouncil) return;
+    if (!selectedCouncil || selectedCouncil.status === 'FINALIZED' || busy || mutationInFlight.current) return;
+    mutationInFlight.current = true;
     try {
       setFinalizingLoading(true);
       const updated = await defenseService.finalizeCouncil(selectedCouncil.id);
-      setCouncils(councils.map((c) => (c.id === updated.id ? updated : c)));
+      setCouncils((current) => current.map((c) => (c.id === updated.id ? updated : c)));
       setNotification({
         type: 'success',
         message: '🔒 ĐÃ CHỐT HỘI ĐỒNG THÀNH CÔNG! Danh sách 5 thành viên đã được khóa an toàn. Bạn hãy chuyển sang bước Xếp lịch bảo vệ.',
@@ -124,12 +127,32 @@ export const CouncilManagementPage: React.FC = () => {
     } catch (err: any) {
       setNotification({ type: 'error', message: err?.message || 'Lỗi khi chốt hội đồng' });
     } finally {
+      mutationInFlight.current = false;
       setFinalizingLoading(false);
     }
   };
 
+  const handleReopen = async () => {
+    if (!selectedCouncil || selectedCouncil.status !== 'FINALIZED' || busy || mutationInFlight.current) return;
+    mutationInFlight.current = true;
+    try {
+      setLoading(true);
+      const updated = await defenseService.reopenCouncil(selectedCouncil.id);
+      setCouncils((current) => current.map((c) => (c.id === updated.id ? updated : c)));
+      setNotification({
+        type: 'success',
+        message: '🔓 ĐÃ MỞ KHÓA HỘI ĐỒNG! Bây giờ bạn có thể chỉnh sửa thủ công danh sách thành viên trước khi chốt lại.',
+      });
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err?.message || 'Lỗi khi mở khóa hội đồng' });
+    } finally {
+      mutationInFlight.current = false;
+      setLoading(false);
+    }
+  };
+
   const handleMemberChange = async (memberId: number, newLecturerId: number) => {
-    if (!selectedCouncil) return;
+    if (!selectedCouncil || busy || mutationInFlight.current) return;
 
     if (selectedCouncil.status === 'FINALIZED') {
       setNotification({
@@ -139,12 +162,19 @@ export const CouncilManagementPage: React.FC = () => {
       return;
     }
 
+    const member = selectedCouncil.members.find((m) => m.id === memberId);
     const newLecturer = lecturers.find((l) => l.lecturerId === newLecturerId);
-    if (!newLecturer) return;
+    if (!member || !newLecturer || member.lecturerId === newLecturerId) return;
+    const eligible = member.role === 'PRESIDENT' ? newLecturer.canBePresident
+      : member.role === 'SECRETARY' ? newLecturer.canBeSecretary : newLecturer.canBeMember;
+    if (!eligible) {
+      setNotification({ type: 'error', message: 'Giảng viên không đủ điều kiện đảm nhiệm vai trò này.' });
+      return;
+    }
 
     // Check if new lecturer is GVHD of any student in this council (Hard constraint)
     const assigned = selectedCouncil.assignedStudents || [];
-    const conflictStudent = assigned.find((s) => s.advisorId === newLecturerId);
+    const conflictStudent = assigned.find((s) => Number(s.advisorId) === Number(newLecturerId));
 
     if (conflictStudent) {
       setNotification({
@@ -156,7 +186,7 @@ export const CouncilManagementPage: React.FC = () => {
 
     // Check if already in this council
     const alreadyInCouncil = selectedCouncil.members.some(
-      (m) => m.id !== memberId && m.lecturerId === newLecturerId
+      (m) => m.id !== memberId && Number(m.lecturerId) === Number(newLecturerId)
     );
     if (alreadyInCouncil) {
       setNotification({
@@ -172,36 +202,28 @@ export const CouncilManagementPage: React.FC = () => {
         : m
     );
 
+    mutationInFlight.current = true;
+    setSavingMembers(true);
     try {
       const updatedCouncil = await defenseService.updateCouncilMembers(selectedCouncil.id, updatedMembers);
-      setCouncils(councils.map((c) => (c.id === updatedCouncil.id ? updatedCouncil : c)));
+      setCouncils((current) => current.map((c) => (c.id === updatedCouncil.id ? updatedCouncil : c)));
       setNotification({
         type: 'success',
         message: `Đã thay đổi thành viên Hội đồng thành công sang: ${newLecturer.fullName}`,
       });
     } catch (err: any) {
       setNotification({ type: 'error', message: err?.message || 'Lỗi cập nhật thành viên' });
+    } finally {
+      mutationInFlight.current = false;
+      setSavingMembers(false);
     }
   };
 
   const selectedCouncil = councils.find((c) => c.id === selectedCouncilId);
 
-  // Extract advisor IDs to exclude from this council
-  const excludedAdvisorIds: number[] = [];
-  if (selectedCouncil?.assignedStudents && selectedCouncil.assignedStudents.length > 0) {
-    selectedCouncil.assignedStudents.forEach((s) => {
-      if (s.advisorId && !excludedAdvisorIds.includes(s.advisorId)) {
-        excludedAdvisorIds.push(s.advisorId);
-      }
-    });
-  } else if (selectedCouncil?.studentIds) {
-    selectedCouncil.studentIds.forEach((sId) => {
-      const adv = fallbackAdvisorMap[sId];
-      if (adv && !excludedAdvisorIds.includes(adv)) {
-        excludedAdvisorIds.push(adv);
-      }
-    });
-  }
+  const excludedAdvisorIds = Array.from(new Set(
+    (selectedCouncil?.assignedStudents || []).map((s) => Number(s.advisorId)).filter(Boolean)
+  ));
 
   const isFinalized = selectedCouncil?.status === 'FINALIZED';
 
@@ -211,7 +233,7 @@ export const CouncilManagementPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">GĐ5: Thành Lập Hội Đồng Bảo Vệ Đồ Án Tốt Nghiệp</h1>
           <p className="feature-page-subtitle">
-            Cơ cấu chuẩn: 1 Chủ tịch, 2 Thư ký, 2 Ủy viên. Mỗi đợt phân công 1 Hội đồng chấm thi, chốt Hội đồng rồi chuyển sang Xếp lịch bảo vệ.
+            Cơ cấu chuẩn: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường. Chốt Hội đồng rồi chuyển sang Xếp lịch bảo vệ.
           </p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -224,6 +246,7 @@ export const CouncilManagementPage: React.FC = () => {
               id="roundSelectTop"
               value={selectedRoundId}
               onChange={handleRoundChange}
+              disabled={busy}
               style={{
                 padding: '6px 12px',
                 borderRadius: '6px',
@@ -245,7 +268,7 @@ export const CouncilManagementPage: React.FC = () => {
             </select>
           </div>
 
-          <Button variant="primary" onClick={() => setIsGenerateModalOpen(true)}>
+          <Button variant="primary" onClick={() => setIsGenerateModalOpen(true)} disabled={busy || isFinalized}>
             ⚡ Phân công 1 Hội đồng (CSP)
           </Button>
 
@@ -254,6 +277,7 @@ export const CouncilManagementPage: React.FC = () => {
               variant="success"
               onClick={handleFinalize}
               loading={finalizingLoading}
+              disabled={busy}
               style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }}
             >
               🔒 Chốt Hội Đồng
@@ -261,16 +285,26 @@ export const CouncilManagementPage: React.FC = () => {
           )}
 
           {isFinalized && (
-            <Button
-              variant="success"
-              onClick={() => navigate(`/admin/defense-schedules?roundId=${selectedRoundId}`)}
-              style={{ background: '#0284c7', borderColor: '#0284c7', color: '#fff', fontWeight: 700 }}
-            >
-              📅 Chuyển sang Xếp Lịch Bảo Vệ &gt;&gt;
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={handleReopen}
+                disabled={busy}
+                style={{ borderColor: '#d97706', color: '#d97706', fontWeight: 600 }}
+              >
+                🔓 Mở Khóa Chỉnh Sửa
+              </Button>
+              <Button
+                variant="success"
+                onClick={() => navigate(`/admin/defense-schedules?roundId=${selectedRoundId}`)}
+                style={{ background: '#0284c7', borderColor: '#0284c7', color: '#fff', fontWeight: 700 }}
+              >
+                📅 Chuyển sang Xếp Lịch Bảo Vệ &gt;&gt;
+              </Button>
+            </>
           )}
 
-          <Button variant="outline" onClick={() => loadDataForRound(selectedRoundId)} loading={loading}>
+          <Button variant="outline" onClick={() => loadDataForRound(selectedRoundId)} loading={loading} disabled={busy}>
             Làm mới
           </Button>
         </div>
@@ -300,10 +334,10 @@ export const CouncilManagementPage: React.FC = () => {
           <span style={{ fontSize: '1.4rem' }}>🛡️</span>
           <div>
             <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>
-              Quy chế GĐ5: 1 Hội đồng (1 Chủ tịch - 2 Thư ký - 2 Ủy viên)
+              Quy chế GĐ5: 1 Hội đồng (1CT - 1TK - 1PB1 - 1PB2 - 1UV)
             </div>
             <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '2px' }}>
-              Phân công duy nhất 1 Hội đồng để chấm toàn bộ sinh viên đủ điều kiện trong đợt. Sau khi chốt Hội đồng, hệ thống sẽ mở khóa để Xếp lịch bảo vệ.
+              Hội đồng sinh tự động ở trạng thái ACTIVE có thể đổi giảng viên thủ công bằng các ô chọn bên dưới trước khi chốt. Sau khi chốt (FINALIZED), thành viên bị khóa và có thể chuyển sang Xếp lịch bảo vệ.
             </div>
           </div>
         </div>
@@ -357,7 +391,7 @@ export const CouncilManagementPage: React.FC = () => {
                 <div
                   key={c.id}
                   className={`council-nav-item ${isSelected ? 'active' : ''}`}
-                  onClick={() => setSelectedCouncilId(c.id)}
+                  onClick={() => { if (!busy) setSelectedCouncilId(c.id); }}
                 >
                   <div className="council-item-header">
                     <span className="code-badge">{c.code}</span>
@@ -383,7 +417,7 @@ export const CouncilManagementPage: React.FC = () => {
             {councils.length === 0 && (
               <div style={{ padding: '24px 16px', textAlign: 'center', color: '#64748b' }}>
                 <p style={{ margin: '0 0 12px 0', fontSize: '13px' }}>Đợt này chưa có Hội đồng chấm thi.</p>
-                <Button variant="primary" size="sm" onClick={() => setIsGenerateModalOpen(true)}>
+                <Button variant="primary" size="sm" onClick={() => setIsGenerateModalOpen(true)} disabled={busy}>
                   + Phân công 1 Hội đồng
                 </Button>
               </div>
@@ -391,7 +425,7 @@ export const CouncilManagementPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: Detail & 5 Members (1CT - 2TK - 2UV) */}
+        {/* Right Side: Detail & 5 Members (1CT - 1TK - 1PB1 - 1PB2 - 1UV) */}
         <div className="council-detail-panel">
           {selectedCouncil ? (
             <>
@@ -401,27 +435,45 @@ export const CouncilManagementPage: React.FC = () => {
                   <p className="council-desc">{selectedCouncil.description}</p>
                 </div>
                 <div className="council-header-badge" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <span className="structure-pill">Cơ cấu chuẩn: 1CT - 2TK - 2UV</span>
+                  <span className="structure-pill">Cơ cấu chuẩn: 1CT - 1TK - 1PB1 - 1PB2 - 1UV</span>
                   {isFinalized ? (
-                    <button
-                      onClick={() => navigate(`/admin/defense-schedules?roundId=${selectedRoundId}`)}
-                      style={{
-                        background: '#0a3273',
-                        color: '#fff',
-                        border: 'none',
-                        padding: '6px 14px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '13px',
-                        fontWeight: 700
-                      }}
-                    >
-                      📅 Sang Xếp lịch &gt;&gt;
-                    </button>
+                    <>
+                      <button
+                        onClick={handleReopen}
+                        disabled={busy}
+                        style={{
+                          background: '#f59e0b',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: 700
+                        }}
+                      >
+                        🔓 Mở Khóa
+                      </button>
+                      <button
+                        onClick={() => navigate(`/admin/defense-schedules?roundId=${selectedRoundId}`)}
+                        style={{
+                          background: '#0a3273',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: 700
+                        }}
+                      >
+                        📅 Sang Xếp lịch &gt;&gt;
+                      </button>
+                    </>
                   ) : (
                     <button
                       onClick={handleFinalize}
-                      disabled={finalizingLoading}
+                      disabled={busy}
                       style={{
                         background: '#16a34a',
                         color: '#fff',
@@ -454,10 +506,14 @@ export const CouncilManagementPage: React.FC = () => {
 
               {/* 5 Members Grid */}
               <h3 className="section-title">
-                Thành viên Hội đồng (Đúng 5 Giảng viên: 1CT - 2TK - 2UV):
+                Thành viên Hội đồng (Đúng 5 Giảng viên: 1CT - 1TK - 1PB1 - 1PB2 - 1UV):
                 {isFinalized && <span style={{ color: '#16a34a', fontSize: '13px', marginLeft: '10px' }}>(Đã khóa)</span>}
               </h3>
-              <div className="members-grid-5">
+              {savingMembers && <p role="status">Đang lưu thay đổi thành viên…</p>}
+              {!loading && lecturers.length === 0 && !isFinalized && (
+                <p role="alert">Chưa có danh sách giảng viên để đổi thành viên. Vui lòng bấm Làm mới để tải lại.</p>
+              )}
+              <div className="members-grid-5" aria-busy={savingMembers}>
                 {selectedCouncil.members.map((member) => (
                   <CouncilMemberCard
                     key={member.id}
@@ -465,7 +521,8 @@ export const CouncilManagementPage: React.FC = () => {
                     allLecturers={lecturers}
                     onLecturerChange={handleMemberChange}
                     excludedAdvisorIds={excludedAdvisorIds}
-                    disabled={isFinalized}
+                    otherMemberLecturerIds={selectedCouncil.members.filter((m) => m.id !== member.id).map((m) => m.lecturerId)}
+                    disabled={isFinalized || busy || lecturers.length === 0}
                   />
                 ))}
               </div>
@@ -496,7 +553,7 @@ export const CouncilManagementPage: React.FC = () => {
                         <div className="student-chip-info">
                           <strong>Sinh viên #{sId}</strong>
                           <span className="advisor-name">
-                            GVHD: {lecturers.find((l) => l.lecturerId === fallbackAdvisorMap[sId])?.fullName || `GV #${fallbackAdvisorMap[sId]}`}
+                            GVHD: Chưa có dữ liệu
                           </span>
                         </div>
                       </div>

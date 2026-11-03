@@ -25,7 +25,7 @@ vi.mock('../../../../contexts/AuthContext', () => ({
 }));
 
 describe('Defense Feature Component & Page Tests', () => {
-  it('renders CouncilMemberCard with 1CT - 2TK - 2UV role badges', () => {
+  it('renders CouncilMemberCard with the president role badge', () => {
     const mockMember = {
       id: 1,
       lecturerId: 501,
@@ -52,7 +52,7 @@ describe('Defense Feature Component & Page Tests', () => {
       />
     );
 
-    expect(screen.getByText(/Chủ tịch Hội đồng/i)).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /Chủ tịch hội đồng/i })).toBeInTheDocument();
     expect(screen.getByText(/PGS\. TS\. Trần Văn Minh/i)).toBeInTheDocument();
   });
 
@@ -87,13 +87,14 @@ describe('Defense Feature Component & Page Tests', () => {
     expect(screen.getByText('⚠️ Trùng GVHD')).toBeInTheDocument();
   });
 
-  it('renders CouncilManagementPage and shows 1CT - 2TK - 2UV structure', async () => {
+  it('renders CouncilManagementPage and shows the five distinct roles', async () => {
     render(<BrowserRouter><CouncilManagementPage /></BrowserRouter>);
 
     expect(screen.getByText(/Thành Lập Hội Đồng/i)).toBeInTheDocument();
 
     await waitFor(() => {
-      
+      expect(screen.getByRole('combobox', { name: /Chọn Giảng viên đảm nhiệm: Ủy viên Phản biện 1/ })).toBeEnabled();
+      expect(screen.getByRole('combobox', { name: /Chọn Giảng viên đảm nhiệm: Ủy viên Phản biện 2/ })).toBeEnabled();
     });
 
     // Check button to run CSP algorithm

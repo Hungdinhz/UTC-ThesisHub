@@ -25,6 +25,7 @@ public class AcademicRecordImportRowDTO {
     private Boolean tuitionDebt;
     private Boolean underDisciplinaryAction;
     private Integer missingPrerequisiteCount;
+    private Integer debtCredits;
     private String note;
 
     @JsonProperty("isValid")

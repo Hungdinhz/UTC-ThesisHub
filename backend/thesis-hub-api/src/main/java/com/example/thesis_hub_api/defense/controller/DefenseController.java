@@ -87,7 +87,17 @@ public class DefenseController {
     }
 
     /**
-     * Cập nhật danh sách 5 thành viên Hội đồng (1CT - 2TK - 2UV)
+     * Mở khóa Hội đồng bảo vệ (Chuyển trạng thái từ FINALIZED về ACTIVE để chỉnh sửa thủ công)
+     */
+    @PostMapping("/councils/{id}/reopen")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<CouncilResponseDTO>> reopenCouncil(@PathVariable Long id) {
+        CouncilResponseDTO result = defenseService.reopenCouncil(id);
+        return ResponseEntity.ok(ApiResponse.success("Mở khóa Hội đồng để chỉnh sửa thành công", result));
+    }
+
+    /**
+     * Cập nhật danh sách 5 thành viên Hội đồng (1CT - 1TK - 1PB1 - 1PB2 - 1UV)
      */
     @PutMapping("/councils/{id}/members")
     @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
