@@ -420,6 +420,8 @@ public class DefenseService {
         }
 
         memberRepository.deleteByCouncilId(councilId);
+        // IDENTITY inserts run before deferred deletes; release the council/lecturer unique keys first.
+        memberRepository.flush();
         for (CouncilMemberDTO m : updatedMembers) {
             saveCouncilMember(councilId, m.getLecturerId(), m.getRole());
         }
