@@ -28,6 +28,14 @@ public class StudentImportRowDTO {
     private String email;      // Email
     private Double gpa; // Điểm GPA tích lũy
 
+    // Dữ liệu học vụ tích hợp (All-in-One Import)
+    private Integer completedCredits; // Tín chỉ tích lũy (VD: 115)
+    private Integer debtCredits; // Tín chỉ nợ (VD: 0, 6, 12)
+    private Boolean tuitionDebt; // Nợ học phí (true/false)
+    private Boolean underDisciplinaryAction; // Bị kỷ luật (true/false)
+    private Integer missingPrerequisiteCount; // Số môn tiên quyết còn nợ
+    private String academicStatus; // ELIGIBLE hoặc INELIGIBLE
+
     @JsonProperty("isValid")
     @JsonAlias({"valid", "isValid"})
     private boolean isValid;

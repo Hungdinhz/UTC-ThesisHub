@@ -1306,6 +1306,11 @@ class ApiService {
     return response.data;
   }
 
+  async clearStudentDebt(roundId: number, studentId: number): Promise<string> {
+    const response = await this.api.post(ACADEMIC_STAFF.clearDebt(roundId, studentId));
+    return response.data.message || 'Thành công';
+  }
+
   // Utility
   async logout(): Promise<void> {
     try {

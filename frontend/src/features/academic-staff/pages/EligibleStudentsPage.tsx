@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Button, Table, StatusBadge } from '../../../components/ui';
 import type { Column } from '../../../components/ui';
 import { RoundAcademicRecordsTab } from '../../project-round/components/RoundAcademicRecordsTab';
+import { RoundStudentsTab } from '../../project-round/components/RoundStudentsTab';
 import { apiService } from '../../../services/api';
 import type { EligibleStudentListResponse, EligibleStudentRow, ProjectRoundItem } from '../../../types';
 import { downloadBlob, extractErrorMessage } from '../utils/download';
 import '../../eligibility/pages/EligibilityPages.css';
 import './AcademicStaffPages.css';
 
-type TabKey = 'list' | 'import';
+type TabKey = 'list' | 'import-students' | 'academic-records';
 
 const STATUS_LABEL: Record<string, string> = {
   ELIGIBLE: 'Đủ điều kiện',
@@ -29,6 +30,26 @@ export const EligibleStudentsPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [clearingStudentId, setClearingStudentId] = useState<number | null>(null);
+
+  const handleClearDebt = async (student: EligibleStudentRow) => {
+    if (roundId === null) return;
+    const confirmed = window.confirm(
+      `Xác nhận sinh viên ${student.fullName || student.studentCode} (${student.studentCode}) đã hoàn thành trả nợ tín chỉ (Số tín chỉ nợ chuyển về 0)?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setClearingStudentId(student.studentId);
+      const msg = await apiService.clearStudentDebt(roundId, student.studentId);
+      setNotification({ type: 'success', message: msg || `Đã xóa nợ tín chỉ cho sinh viên ${student.studentCode} thành công!` });
+      await loadList(roundId);
+    } catch (err: any) {
+      setNotification({ type: 'error', message: await extractErrorMessage(err, 'Lỗi khi cập nhật trả nợ tín chỉ') });
+    } finally {
+      setClearingStudentId(null);
+    }
+  };
 
   const selectedRound = rounds.find((r) => r.roundId === roundId) || null;
 
@@ -141,6 +162,30 @@ export const EligibleStudentsPage: React.FC = () => {
       title: 'Ghi chú',
       render: (v: string[]) => <span className="text-note">{(v || []).join('; ')}</span>,
     },
+    {
+      key: 'actions',
+      title: 'Rà soát nợ (GĐ5)',
+      align: 'center',
+      width: '180px',
+      render: (_, record) => {
+        const hasDebt = record.debtCredits !== null && record.debtCredits !== undefined && record.debtCredits > 0;
+        if (!hasDebt) {
+          return <span style={{ color: '#16a34a', fontSize: '0.82rem', fontWeight: 600 }}>✓ Không nợ tín</span>;
+        }
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            loading={clearingStudentId === record.studentId}
+            onClick={() => handleClearDebt(record)}
+            style={{ fontSize: '0.78rem', padding: '4px 8px', borderColor: '#16a34a', color: '#16a34a' }}
+            title="Xác nhận sinh viên đã trả hết nợ tín chỉ trước khi xét bảo vệ"
+          >
+            ⚡ Xác nhận trả nợ (=0)
+          </Button>
+        );
+      },
+    },
   ];
 
   return (
@@ -182,14 +227,26 @@ export const EligibleStudentsPage: React.FC = () => {
 
       <div className="staff-tabs">
         <button className={`staff-tab ${tab === 'list' ? 'active' : ''}`} onClick={() => setTab('list')}>
-          Danh sách xét điều kiện
+          📋 DS xét điều kiện &amp; Rà soát nợ tín chỉ
         </button>
-        <button className={`staff-tab ${tab === 'import' ? 'active' : ''}`} onClick={() => setTab('import')}>
-          Import dữ liệu học vụ (Excel)
+        <button className={`staff-tab ${tab === 'import-students' ? 'active' : ''}`} onClick={() => setTab('import-students')}>
+          📥 Import All-in-One: Lập DS SV &amp; Học vụ (GĐ1)
+        </button>
+        <button className={`staff-tab ${tab === 'academic-records' ? 'active' : ''}`} onClick={() => setTab('academic-records')}>
+          📊 Chi tiết Dữ liệu học vụ
         </button>
       </div>
 
-      {tab === 'import' && selectedRound && (
+      {tab === 'import-students' && selectedRound && (
+        <RoundStudentsTab
+          roundId={selectedRound.roundId}
+          roundName={selectedRound.name}
+          roundCode={selectedRound.roundCode}
+          isRoundClosed={selectedRound.status === 'CLOSED' || selectedRound.status === 'ARCHIVED'}
+        />
+      )}
+
+      {tab === 'academic-records' && selectedRound && (
         <RoundAcademicRecordsTab
           roundId={selectedRound.roundId}
           roundName={selectedRound.name}

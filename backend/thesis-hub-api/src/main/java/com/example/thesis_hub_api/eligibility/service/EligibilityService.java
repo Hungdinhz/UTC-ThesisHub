@@ -961,8 +961,10 @@ public class EligibilityService {
                 .reservationReason(reservationReason)
                 .studentRoundStatus(studentRoundStatus)
                 .completedCredits(academicRecord.getCompletedCredits())
+                .debtCredits(academicRecord.getDebtCredits())
                 .missingPrerequisiteCount(academicRecord.getMissingPrerequisiteCount())
                 .tuitionDebt(tuitionDebt)
+                .underDisciplinaryAction(academicRecord.isUnderDisciplinaryAction())
                 .build();
     }
 

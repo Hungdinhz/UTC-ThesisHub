@@ -820,6 +820,12 @@ export interface StudentImportRow {
   phone?: string;
   email?: string;
   gpa?: number;
+  completedCredits?: number;
+  debtCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
+  academicStatus?: 'ELIGIBLE' | 'INELIGIBLE' | string;
   isValid: boolean;
   errors: string[];
 }

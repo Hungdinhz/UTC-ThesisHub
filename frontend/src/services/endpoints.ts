@@ -199,6 +199,7 @@ export const ACADEMIC_STAFF = {
   classes:                (roundId: number) => `/academic-staff/rounds/${roundId}/classes` as const,
   grades:                 (roundId: number) => `/academic-staff/rounds/${roundId}/grades` as const,
   gradesExport:           (roundId: number) => `/academic-staff/rounds/${roundId}/grades/export` as const,
+  clearDebt:              (roundId: number, studentId: number) => `/academic-staff/rounds/${roundId}/students/${studentId}/clear-debt` as const,
 } as const;
 
 export const ACADEMIC_RECORDS = {

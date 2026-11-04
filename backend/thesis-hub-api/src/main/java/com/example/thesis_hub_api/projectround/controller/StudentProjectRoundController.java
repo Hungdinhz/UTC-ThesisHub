@@ -47,7 +47,7 @@ public class StudentProjectRoundController {
     }
 
     @PostMapping(value = "/{roundId}/students/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(
             summary = "Xem trước (preview) phân tích file Excel import sinh viên",
             description = "Phân tích file Excel, đối soát mã ngành, trùng lặp và tính hợp lệ từng dòng trước khi commit"
@@ -61,7 +61,7 @@ public class StudentProjectRoundController {
     }
 
     @PostMapping("/{roundId}/students/import-commit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(
             summary = "Xác nhận ghi dữ liệu (commit) sinh viên vào đợt đồ án",
             description = "Tự động tạo tài khoản User (ROLE_STUDENT), hồ sơ Student và ghi danh vào đợt với trạng thái ELIGIBLE"
@@ -75,7 +75,7 @@ public class StudentProjectRoundController {
     }
 
     @GetMapping("/{roundId}/students/check-eligibility")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Kiểm tra trùng lặp và tính hợp lệ khi nhập MSSV (real-time check)")
     public ResponseEntity<ApiResponse<StudentEligibilityCheckResponseDTO>> checkStudentEligibility(
             @PathVariable Long roundId,
@@ -86,7 +86,7 @@ public class StudentProjectRoundController {
     }
 
     @PostMapping("/{roundId}/students/manual")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(summary = "Thêm sinh viên thủ công vào đợt đồ án (Tự động cấp tài khoản MSSV/MSSV)")
     public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> addStudentManually(
             @PathVariable Long roundId,
@@ -129,7 +129,7 @@ public class StudentProjectRoundController {
     }
 
     @PatchMapping("/{roundId}/students/{studentId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(summary = "Cập nhật trạng thái và ghi chú của sinh viên trong đợt đồ án")
     public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> updateStudentRoundStatus(
             @PathVariable Long roundId,
@@ -143,7 +143,7 @@ public class StudentProjectRoundController {
     }
 
     @DeleteMapping("/{roundId}/students/{studentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Xóa sinh viên khỏi đợt đồ án")
     public ResponseEntity<ApiResponse<Void>> removeStudentFromRound(
             @PathVariable Long roundId,
@@ -154,7 +154,7 @@ public class StudentProjectRoundController {
     }
 
     @DeleteMapping("/{roundId}/lecturers/{lecturerId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Xóa giảng viên khỏi đợt đồ án")
     public ResponseEntity<ApiResponse<Void>> removeLecturerFromRound(
             @PathVariable Long roundId,
@@ -164,7 +164,7 @@ public class StudentProjectRoundController {
     }
 
     @PostMapping("/{roundId}/lecturers/{lecturerId}/delete")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Xóa giảng viên khỏi đợt đồ án (POST fallback)")
     public ResponseEntity<ApiResponse<Void>> removeLecturerFromRoundPost(
             @PathVariable Long roundId,

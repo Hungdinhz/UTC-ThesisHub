@@ -33,6 +33,11 @@ public class StudentExcelParser {
         public int colGpa = 6;
         public int colPhone = 7;
         public int colEmail = 8;
+        public int colCompletedCredits = -1;
+        public int colDebtCredits = -1;
+        public int colTuitionDebt = -1;
+        public int colDiscipline = -1;
+        public int colPrereq = -1;
         public boolean combinedFullNameMode = false;
     }
 
@@ -117,7 +122,7 @@ public class StudentExcelParser {
                 foundStudentCode = true;
             } else if (val.contains("họ và tên") || val.contains("họ tên") || val.contains("ho va ten") || val.contains("ho ten") || val.contains("full name")) {
                 mapping.colFullName = c;
-            } else if (val.contains("họ đệm") || val.contains("ho dem") || val.contains("họ và tên đệm") || (val.contains("họ") && !val.contains("tên"))) {
+            } else if (val.contains("họ đệm") || val.contains("ho dem") || val.contains("họ và tên đệm") || (val.contains("họ") && !val.contains("học") && !val.contains("tên"))) {
                 mapping.colLastName = c;
             } else if (val.equals("tên") || val.equals("ten") || val.equals("tên *") || val.equals("ten *") || val.contains("first name")) {
                 mapping.colFirstName = c;
@@ -131,6 +136,16 @@ public class StudentExcelParser {
                 mapping.colEmail = c;
             } else if (val.contains("gpa") || val.contains("điểm") || val.contains("diem") || val.contains("tbc")) {
                 mapping.colGpa = c;
+            } else if (val.contains("tín chỉ nợ") || val.contains("tin chi no") || val.contains("nợ tín chỉ") || val.contains("no tin chi") || val.contains("debt credit")) {
+                mapping.colDebtCredits = c;
+            } else if (val.contains("tín chỉ tích lũy") || val.contains("tin chi tich luy") || (val.contains("tích lũy") && !val.contains("gpa")) || val.contains("completed credit")) {
+                mapping.colCompletedCredits = c;
+            } else if (val.contains("học phí") || val.contains("hoc phi") || val.contains("tuition")) {
+                mapping.colTuitionDebt = c;
+            } else if (val.contains("kỷ luật") || val.contains("ky luat") || val.contains("discipline")) {
+                mapping.colDiscipline = c;
+            } else if (val.contains("tiên quyết") || val.contains("tien quyet") || val.contains("prereq")) {
+                mapping.colPrereq = c;
             } else if (val.equals("stt") || val.contains("thứ tự") || val.contains("thu tu") || val.equals("no")) {
                 mapping.colStt = c;
             }
@@ -329,6 +344,56 @@ public class StudentExcelParser {
             errors.add("Điểm GPA không được để trống (nhập số hệ 4.0 từ 0.0 đến 4.0)");
         }
 
+        // Đọc dữ liệu học vụ (nếu có trong file All-in-One)
+        Integer debtCredits = 0;
+        if (mapping.colDebtCredits >= 0 && mapping.colDebtCredits < row.getLastCellNum()) {
+            String debtStr = getCellValue(row.getCell(mapping.colDebtCredits));
+            if (!debtStr.isEmpty()) {
+                try {
+                    debtCredits = (int) Double.parseDouble(debtStr.replace(',', '.'));
+                    if (debtCredits < 0) {
+                        errors.add("Số tín chỉ nợ phải >= 0 (nhập: " + debtStr + ")");
+                    }
+                } catch (NumberFormatException e) {
+                    errors.add("Số tín chỉ nợ không đúng định dạng số: " + debtStr);
+                }
+            }
+        }
+
+        Integer completedCredits = 115;
+        if (mapping.colCompletedCredits >= 0 && mapping.colCompletedCredits < row.getLastCellNum()) {
+            String cStr = getCellValue(row.getCell(mapping.colCompletedCredits));
+            if (!cStr.isEmpty()) {
+                try {
+                    completedCredits = (int) Double.parseDouble(cStr.replace(',', '.'));
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
+        Boolean tuitionDebt = false;
+        if (mapping.colTuitionDebt >= 0 && mapping.colTuitionDebt < row.getLastCellNum()) {
+            String tStr = getCellValue(row.getCell(mapping.colTuitionDebt)).toLowerCase();
+            tuitionDebt = tStr.contains("có") || tStr.contains("co") || tStr.contains("yes") || tStr.equals("true") || tStr.equals("1");
+        }
+
+        Boolean underDiscipline = false;
+        if (mapping.colDiscipline >= 0 && mapping.colDiscipline < row.getLastCellNum()) {
+            String dStr = getCellValue(row.getCell(mapping.colDiscipline)).toLowerCase();
+            underDiscipline = dStr.contains("có") || dStr.contains("co") || dStr.contains("yes") || dStr.equals("true") || dStr.equals("1");
+        }
+
+        Integer missingPrereq = 0;
+        if (mapping.colPrereq >= 0 && mapping.colPrereq < row.getLastCellNum()) {
+            String pStr = getCellValue(row.getCell(mapping.colPrereq));
+            if (!pStr.isEmpty()) {
+                try {
+                    missingPrereq = (int) Double.parseDouble(pStr.replace(',', '.'));
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
+        String academicStatus = (debtCredits < 10 && !underDiscipline) ? "ELIGIBLE" : "INELIGIBLE";
+
         boolean isValid = errors.isEmpty();
 
         return StudentImportRowDTO.builder()
@@ -343,6 +408,12 @@ public class StudentExcelParser {
                 .phone(phone)
                 .email(email)
                 .gpa(gpa)
+                .completedCredits(completedCredits)
+                .debtCredits(debtCredits)
+                .tuitionDebt(tuitionDebt)
+                .underDisciplinaryAction(underDiscipline)
+                .missingPrerequisiteCount(missingPrereq)
+                .academicStatus(academicStatus)
                 .isValid(isValid)
                 .errors(errors)
                 .build();
@@ -445,7 +516,11 @@ public class StudentExcelParser {
                     "Lớp sinh hoạt *",
                     "GPA",
                     "Số điện thoại",
-                    "Email"
+                    "Email",
+                    "Tín chỉ tích lũy",
+                    "Tín chỉ nợ (Nhận đồ án < 10)",
+                    "Nợ học phí (CÓ/KHÔNG)",
+                    "Kỷ luật (CÓ/KHÔNG)"
             };
 
             Row headerRow = sheet.createRow(0);
@@ -471,11 +546,11 @@ public class StudentExcelParser {
 
             // Dữ liệu mẫu chuẩn từ ảnh UTC của người dùng kèm điểm GPA
             Object[][] sampleData = {
-                    {1, "250200001", "Nguyễn Tuấn", "Anh", "CNTT", "CNTT 1 - K65", 3.28, "0983000001", "250200001@lms.utc.edu.vn"},
-                    {2, "250200002", "Trần Phương", "Thảo", "CNTT", "CNTT 2 - K65", 2.15, "0983000002", "250200002@lms.utc.edu.vn"},
-                    {3, "250200003", "Lê Hoàng", "Long", "KHMT", "KHMT 1 - K65", 2.61, "0983000003", "250200003@lms.utc.edu.vn"},
-                    {4, "250200004", "Phạm Minh", "Quân", "CNTT", "CNTT Việt Anh - K65", 2.51, "0983000004", "250200004@lms.utc.edu.vn"},
-                    {5, "250200005", "Hoàng Thu", "Trang", "KHMT", "KHMT 2 - K65", 3.46, "0983000005", "250200005@lms.utc.edu.vn"}
+                    {1, "250200001", "Nguyễn Tuấn", "Anh", "CNTT", "CNTT 1 - K65", 3.28, "0983000001", "250200001@lms.utc.edu.vn", 125, 0, "KHÔNG", "KHÔNG"},
+                    {2, "250200002", "Trần Phương", "Thảo", "CNTT", "CNTT 2 - K65", 2.85, "0983000002", "250200002@lms.utc.edu.vn", 118, 4, "KHÔNG", "KHÔNG"},
+                    {3, "250200003", "Lê Hoàng", "Long", "KHMT", "KHMT 1 - K65", 2.61, "0983000003", "250200003@lms.utc.edu.vn", 112, 8, "KHÔNG", "KHÔNG"},
+                    {4, "250200004", "Phạm Minh", "Quân", "CNTT", "CNTT Việt Anh - K65", 2.10, "0983000004", "250200004@lms.utc.edu.vn", 102, 12, "KHÔNG", "KHÔNG"},
+                    {5, "250200005", "Hoàng Thu", "Trang", "KHMT", "KHMT 2 - K65", 3.46, "0983000005", "250200005@lms.utc.edu.vn", 130, 0, "KHÔNG", "KHÔNG"}
             };
 
             int rowIdx = 1;
@@ -512,9 +587,14 @@ public class StudentExcelParser {
             sheet.setColumnWidth(6, 14 * 256);  // GPA
             sheet.setColumnWidth(7, 18 * 256);  // SĐT
             sheet.setColumnWidth(8, 30 * 256);  // Email
+            sheet.setColumnWidth(9, 18 * 256);  // Tín chỉ tích lũy
+            sheet.setColumnWidth(10, 26 * 256); // Tín chỉ nợ
+            sheet.setColumnWidth(11, 20 * 256); // Nợ học phí
+            sheet.setColumnWidth(12, 18 * 256); // Kỷ luật
 
             workbook.write(out);
             return out.toByteArray();
         }
     }
 }
+

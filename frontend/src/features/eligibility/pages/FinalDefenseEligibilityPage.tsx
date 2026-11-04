@@ -13,7 +13,7 @@ import './EligibilityPages.css';
 
 export const FinalDefenseEligibilityPage: React.FC = () => {
   const { userType } = useAuth();
-  const isAdmin = userType === 'admin';
+  const isAdmin = userType === 'admin' || userType === 'academic_staff';
   // Navigation sub-tabs: 'check' | 'students' | 'reservations'
   const [activeTab, setActiveTab] = useState<'check' | 'students' | 'reservations'>('check');
 
@@ -463,8 +463,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   <h2 className="result-main-title">
                     {result.reservationStatus === 'APPROVED'
                       ? '🟣 ĐÃ BẢO LƯU ĐỒ ÁN SANG ĐỢT SAU (RESERVED)'
-                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED'
-                      ? '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN'
+                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
+                      ? (result.studentRoundStatus === 'INELIGIBLE' ? '🚫 KHÔNG ĐỦ ĐIỀU KIỆN THAM GIA ĐỢT ĐỒ ÁN' : '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN')
                       : result.eligibleForDefense
                       ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ'
                       : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}
@@ -474,8 +474,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   <span className="result-badge">
                     {result.reservationStatus === 'APPROVED'
                       ? 'BẢO LƯU'
-                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED'
-                      ? 'BỊ LOẠI'
+                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
+                      ? (result.studentRoundStatus === 'INELIGIBLE' ? 'KHÔNG ĐỦ ĐK' : 'BỊ LOẠI')
                       : result.eligibleForDefense
                       ? 'ĐỦ ĐIỀU KIỆN'
                       : 'KHÔNG ĐỦ ĐIỀU KIỆN'}
@@ -593,31 +593,34 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   </div>
 
                   {/* Criteria 3: Điều kiện Học vụ / Tín chỉ */}
-                  <div className={`criteria-card ${result.completedCredits !== undefined && result.completedCredits !== null && result.completedCredits >= 110 && !result.missingPrerequisiteCount ? 'card-ok' : 'card-fail'}`}>
+                  <div className={`criteria-card ${result.completedCredits !== undefined && result.completedCredits !== null && result.completedCredits >= 110 && !result.missingPrerequisiteCount && (!result.debtCredits || result.debtCredits === 0) ? 'card-ok' : 'card-fail'}`}>
                     <div className="card-top">
-                      <span className="card-icon">{result.completedCredits !== undefined && result.completedCredits !== null && result.completedCredits >= 110 && !result.missingPrerequisiteCount ? '✅' : '❌'}</span>
+                      <span className="card-icon">{result.completedCredits !== undefined && result.completedCredits !== null && result.completedCredits >= 110 && !result.missingPrerequisiteCount && (!result.debtCredits || result.debtCredits === 0) ? '✅' : '❌'}</span>
                       <span className="card-heading">3. Tín chỉ &amp; Môn tiên quyết</span>
                     </div>
                     <div className="card-desc">
-                      Tích lũy tối thiểu 110 tín chỉ và không nợ môn tiên quyết.
+                      Tích lũy tối thiểu 110 tín chỉ, hoàn thành nợ tín chỉ (= 0) và không nợ môn tiên quyết.
                     </div>
                     <div className="card-metric">
                       Tín chỉ tích lũy: <strong>{result.completedCredits !== undefined && result.completedCredits !== null ? `${result.completedCredits}/110` : 'Chưa có dữ liệu'}</strong>
+                      {result.debtCredits !== undefined && result.debtCredits !== null && result.debtCredits > 0 ? (
+                        <span style={{ color: '#dc2626', fontWeight: 600 }}> (Còn nợ: {result.debtCredits} tín chỉ)</span>
+                      ) : null}
                       {result.missingPrerequisiteCount ? ` (Nợ ${result.missingPrerequisiteCount} môn)` : ''}
                     </div>
                   </div>
 
                   {/* Criteria 4: Học phí & Kỷ luật */}
-                  <div className={`criteria-card ${!result.tuitionDebt ? 'card-ok' : 'card-fail'}`}>
+                  <div className={`criteria-card ${!result.tuitionDebt && !result.underDisciplinaryAction ? 'card-ok' : 'card-fail'}`}>
                     <div className="card-top">
-                      <span className="card-icon">{!result.tuitionDebt ? '✅' : '❌'}</span>
-                      <span className="card-heading">4. Nghĩa vụ học phí</span>
+                      <span className="card-icon">{!result.tuitionDebt && !result.underDisciplinaryAction ? '✅' : '❌'}</span>
+                      <span className="card-heading">4. Nghĩa vụ học phí &amp; Kỷ luật</span>
                     </div>
                     <div className="card-desc">
                       Đã hoàn thành toàn bộ học phí và không bị kỷ luật.
                     </div>
                     <div className="card-metric">
-                      Trạng thái: <strong>{!result.tuitionDebt ? 'Đã hoàn thành' : 'Còn nợ học phí'}</strong>
+                      Trạng thái: <strong>{!result.tuitionDebt && !result.underDisciplinaryAction ? 'Đã hoàn thành' : result.tuitionDebt && result.underDisciplinaryAction ? 'Nợ học phí & Bị kỷ luật' : result.tuitionDebt ? 'Còn nợ học phí' : 'Đang bị kỷ luật'}</strong>
                     </div>
                   </div>
                 </div>

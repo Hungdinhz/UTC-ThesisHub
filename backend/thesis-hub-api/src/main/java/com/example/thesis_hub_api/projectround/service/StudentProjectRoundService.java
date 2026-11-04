@@ -25,6 +25,11 @@ import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
+import com.example.thesis_hub_api.projectround.repository.AcademicRecordRepository;
+import com.example.thesis_hub_api.notification.service.NotificationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.time.Instant;
 import com.example.thesis_hub_api.projectround.util.StudentExcelParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +59,12 @@ public class StudentProjectRoundService {
     private final TrainingProgramRepository trainingProgramRepository;
     private final StudentExcelParser studentExcelParser;
     private final PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    private AcademicRecordRepository academicRecordRepository;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     private ProjectRound getAndValidateActiveRound(Long roundId) {
         ProjectRound round = projectRoundRepository.findById(roundId)
@@ -226,6 +237,11 @@ public class StudentProjectRoundService {
                 });
             }
 
+            int rowDebt = row.getDebtCredits() != null ? row.getDebtCredits() : 0;
+            boolean rowDisc = Boolean.TRUE.equals(row.getUnderDisciplinaryAction());
+            boolean isEligible = rowDebt < 10 && !rowDisc;
+            row.setAcademicStatus(isEligible ? "ELIGIBLE" : "INELIGIBLE");
+
             row.setErrors(errors);
             row.setValid(errors.isEmpty());
 
@@ -365,6 +381,12 @@ public class StudentProjectRoundService {
             user = userRepository.save(user);
                 }
 
+                int debtCredits = row.getDebtCredits() != null ? row.getDebtCredits() : 0;
+                int completedCredits = row.getCompletedCredits() != null ? row.getCompletedCredits() : 115;
+                boolean tuitionDebt = Boolean.TRUE.equals(row.getTuitionDebt());
+                boolean underDiscipline = Boolean.TRUE.equals(row.getUnderDisciplinaryAction());
+                int missingPrereq = row.getMissingPrerequisiteCount() != null ? row.getMissingPrerequisiteCount() : 0;
+
                 // 2. Tìm hoặc tạo Student
                 Student student = existingStudent;
                 if (student == null) {
@@ -384,7 +406,7 @@ public class StudentProjectRoundService {
                             .className(row.getClassName())
                             .majorId(major != null ? major.getId() : null)
                             .trainingProgramId(roundTrainingProgramId)
-                            .debtCredits(0)
+                            .debtCredits(debtCredits)
                             .gpa(row.getGpa())
                             .build();
                     student = studentRepository.save(student);
@@ -405,6 +427,7 @@ public class StudentProjectRoundService {
                     if (row.getGpa() != null) {
                         student.setGpa(row.getGpa());
                     }
+                    student.setDebtCredits(debtCredits);
                     student = studentRepository.save(student);
                 }
 
@@ -424,22 +447,65 @@ public class StudentProjectRoundService {
                 Optional<StudentProjectRound> existingSpr = studentProjectRoundRepository
                         .findByStudentIdAndProjectRoundId(student.getId(), round.getId());
 
+                // Quy chế nhận đồ án UTC (GĐ1): Nợ tín chỉ < 10 và không bị kỷ luật
+                boolean isEligibleToStart = debtCredits < 10 && !underDiscipline;
+                String roundStatus = isEligibleToStart ? "ELIGIBLE" : "INELIGIBLE";
+                String roundNote = isEligibleToStart
+                        ? (debtCredits > 0 ? ("Đủ ĐK nhận đồ án (Nợ " + debtCredits + " tín chỉ, cần trả nợ trước GĐ5)") : "Đủ ĐK nhận đồ án (Nợ 0 tín chỉ)")
+                        : ("Không đủ ĐK nhận đồ án do nợ " + debtCredits + " tín chỉ (>= 10 tín chỉ)");
+
                 if (existingSpr.isEmpty()) {
                     StudentProjectRound spr = StudentProjectRound.builder()
                             .student(student)
                             .projectRound(round)
-                            .status("ELIGIBLE")
+                            .status(roundStatus)
                             .gpa(row.getGpa())
-                            .note("Import từ file Excel")
+                            .note(roundNote)
                             .build();
                     studentProjectRoundRepository.save(spr);
                     enrolledInRound++;
                 } else {
+                    StudentProjectRound spr = existingSpr.get();
+                    spr.setStatus(roundStatus);
+                    spr.setNote(roundNote);
                     if (row.getGpa() != null) {
-                        existingSpr.get().setGpa(row.getGpa());
-                        studentProjectRoundRepository.save(existingSpr.get());
+                        spr.setGpa(row.getGpa());
                     }
-                    skipped++;
+                    studentProjectRoundRepository.save(spr);
+                }
+
+// Student debtCredits already saved in step 2
+
+                // Đồng thời tạo hoặc cập nhật luôn bản ghi AcademicRecord của đợt (All-in-One)
+                if (academicRecordRepository != null) {
+                    AcademicRecord record = academicRecordRepository
+                            .findByStudentIdAndProjectRoundId(student.getId(), round.getId())
+                            .orElse(AcademicRecord.builder()
+                                    .student(student)
+                                    .projectRound(round)
+                                    .build());
+                    record.setDebtCredits(debtCredits);
+                    record.setCompletedCredits(completedCredits);
+                    record.setGpa(row.getGpa());
+                    record.setTuitionDebt(tuitionDebt);
+                    record.setUnderDisciplinaryAction(underDiscipline);
+                    record.setMissingPrerequisiteCount(missingPrereq);
+                    record.setNote(roundNote);
+                    record.setImportedAt(Instant.now());
+                    academicRecordRepository.save(record);
+                }
+
+                // Cảnh báo nếu không đủ điều kiện
+                if (!isEligibleToStart && notificationService != null && user != null && user.getId() != null) {
+                    try {
+                        notificationService.createNotification(
+                                user.getId(),
+                                "Cảnh báo học vụ: Không đủ điều kiện làm đồ án",
+                                "Hệ thống ghi nhận bạn đang nợ " + debtCredits + " tín chỉ (>= 10 tín chỉ quy định). Bạn không đủ điều kiện nhận đề tài đồ án tốt nghiệp đợt này. Vui lòng liên hệ Giáo vụ Khoa để được hướng dẫn.",
+                                "ACADEMIC",
+                                "/student/profile"
+                        );
+                    } catch (Exception ignored) {}
                 }
             } catch (Exception rowEx) {
                 log.error("Lỗi khi import sinh viên MSSV {}: {}", row.getStudentCode(), rowEx.getMessage(), rowEx);
