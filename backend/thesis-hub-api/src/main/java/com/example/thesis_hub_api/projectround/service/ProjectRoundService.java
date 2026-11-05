@@ -876,6 +876,34 @@ public class ProjectRoundService {
         return 2;
     }
 
+    private int calculateRoundStage(ProjectRound round, List<TimelineMilestone> milestones) {
+        if (round == null) return 1;
+        String roundStatus = round.getStatus() != null ? round.getStatus().toUpperCase() : "DRAFT";
+        if ("DRAFT".equals(roundStatus)) {
+            return 1;
+        }
+        if ("OPEN".equals(roundStatus)) {
+            return 2;
+        }
+        if ("CLOSED".equals(roundStatus)) {
+            return 5;
+        }
+        // IN_PROGRESS: xác định theo milestone active đầu tiên (tối thiểu là 3)
+        Instant now = Instant.now();
+        if (milestones != null && !milestones.isEmpty()) {
+            TimelineMilestone activeMilestone = milestones.stream()
+                    .sorted(Comparator.comparing(TimelineMilestone::getOrderIndex)
+                            .thenComparing(TimelineMilestone::getStartDate))
+                    .filter(m -> !now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate()))
+                    .findFirst()
+                    .orElse(null);
+            if (activeMilestone != null && StringUtils.hasText(activeMilestone.getPhaseType())) {
+                return Math.max(3, getStageNumberFromPhase(activeMilestone.getPhaseType()));
+            }
+        }
+        return 3;
+    }
+
     /**
      * Tự động đánh giá kết quả đạt / không đạt của toàn bộ sinh viên trong đợt khi kết thúc giai đoạn.
      * Sinh viên chưa làm nhiệm vụ của giai đoạn trước sẽ bị loại (DROPPED - Không đạt).
@@ -1150,13 +1178,7 @@ public class ProjectRoundService {
 
         List<TimelineMilestone> milestones = timelineMilestoneRepository
                 .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId);
-        int currentRoundStage = 2;
-        Instant now = Instant.now();
-        for (TimelineMilestone m : milestones) {
-            if (!now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate())) {
-                currentRoundStage = Math.max(currentRoundStage, getStageNumberFromPhase(m.getPhaseType()));
-            }
-        }
+        int currentRoundStage = calculateRoundStage(activeRound, milestones);
 
         boolean hasDefenseEligibleThesis = false;
         boolean hasThesisOrApprovedProposal = false;
@@ -1174,13 +1196,13 @@ public class ProjectRoundService {
         }
 
         if (!isDropped) {
-            if ("DEFENSE_READY".equalsIgnoreCase(status) || "DEFENDED".equalsIgnoreCase(status)
-                    || hasDefenseEligibleThesis || currentRoundStage >= 5) {
+            if ("DEFENDED".equalsIgnoreCase(status)) {
+                completedStage = 5;
+            } else if ("DEFENSE_READY".equalsIgnoreCase(status) || hasDefenseEligibleThesis) {
                 completedStage = 4;
-                currentRoundStage = Math.max(currentRoundStage, 5);
-            } else if ("IN_PROGRESS".equalsIgnoreCase(status) || hasThesisOrApprovedProposal || currentRoundStage >= 4) {
+            } else if ("IN_PROGRESS".equalsIgnoreCase(status) || hasThesisOrApprovedProposal) {
                 completedStage = 3;
-            } else if ("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status) || currentRoundStage >= 3) {
+            } else if (("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status)) && currentRoundStage >= 3) {
                 completedStage = 2;
             } else {
                 completedStage = 1;

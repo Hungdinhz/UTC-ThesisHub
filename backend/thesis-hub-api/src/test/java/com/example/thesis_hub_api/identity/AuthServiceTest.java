@@ -15,6 +15,7 @@ import com.example.thesis_hub_api.identity.security.JwtTokenProvider;
 import com.example.thesis_hub_api.identity.service.AuthService;
 import com.example.thesis_hub_api.organization.repository.LecturerRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

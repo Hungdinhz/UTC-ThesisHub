@@ -34,7 +34,8 @@ public interface StudentProjectRoundRepository extends JpaRepository<StudentProj
            "JOIN s.user u " +
            "WHERE spr.projectRound.id = :roundId " +
            "AND (:majorId IS NULL OR s.majorId = :majorId) " +
-           "AND (:status IS NULL OR spr.status = :status) " +
+           "AND (:onlyEligible IS NULL OR :onlyEligible = false OR spr.status IN ('ELIGIBLE', 'FORCE_APPROVED')) " +
+           "AND (:status IS NULL OR spr.status = :status OR (:status = 'ELIGIBLE' AND spr.status = 'FORCE_APPROVED')) " +
            "AND (:search IS NULL OR " +
            "     LOWER(s.studentCode) LIKE :search OR " +
            "     LOWER(u.fullName) LIKE :search OR " +
@@ -45,6 +46,7 @@ public interface StudentProjectRoundRepository extends JpaRepository<StudentProj
             @Param("roundId") Long roundId,
             @Param("majorId") Long majorId,
             @Param("status") String status,
+            @Param("onlyEligible") Boolean onlyEligible,
             @Param("search") String search,
             Pageable pageable);
 }

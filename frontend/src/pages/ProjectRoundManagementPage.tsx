@@ -661,6 +661,8 @@ const ProjectRoundManagementPage: React.FC = () => {
                     roundId={selectedRound.roundId}
                     roundName={selectedRound.name}
                     roundCode={selectedRound.roundCode}
+                    trainingProgram={selectedRound.trainingProgram}
+                    trainingProgramName={selectedRound.trainingProgramName}
                     isRoundClosed={selectedRound.status === 'CLOSED' || selectedRound.status === 'ARCHIVED'}
                   />
                 ) : roundActiveTab === 'lecturers' ? (

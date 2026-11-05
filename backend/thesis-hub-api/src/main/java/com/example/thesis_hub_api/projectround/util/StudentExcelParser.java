@@ -144,7 +144,7 @@ public class StudentExcelParser {
                 mapping.colTuitionDebt = c;
             } else if (val.contains("kỷ luật") || val.contains("ky luat") || val.contains("discipline")) {
                 mapping.colDiscipline = c;
-            } else if (val.contains("tiên quyết") || val.contains("tien quyet") || val.contains("prereq")) {
+            } else if (val.contains("tiên quyết") || val.contains("tien quyet") || val.contains("prereq") || val.contains("môn nợ") || val.contains("nợ môn")) {
                 mapping.colPrereq = c;
             } else if (val.equals("stt") || val.contains("thứ tự") || val.contains("thu tu") || val.equals("no")) {
                 mapping.colStt = c;
@@ -157,7 +157,7 @@ public class StudentExcelParser {
             mapping.combinedFullNameMode = true;
         }
 
-        // Nếu không phát hiện được cột MSSV từ header, giữ fallback theo chuẩn 8 cột
+        // Nếu không phát hiện được cột MSSV từ header, giữ fallback theo chuẩn đầy đủ
         if (!foundStudentCode) {
             mapping.colStt = 0;
             mapping.colStudentCode = 1;
@@ -168,6 +168,11 @@ public class StudentExcelParser {
             mapping.colGpa = 6;
             mapping.colPhone = 7;
             mapping.colEmail = 8;
+            mapping.colCompletedCredits = 9;
+            mapping.colDebtCredits = 10;
+            mapping.colPrereq = 11;
+            mapping.colTuitionDebt = 12;
+            mapping.colDiscipline = 13;
             mapping.combinedFullNameMode = false;
         }
 
@@ -366,7 +371,12 @@ public class StudentExcelParser {
             if (!cStr.isEmpty()) {
                 try {
                     completedCredits = (int) Double.parseDouble(cStr.replace(',', '.'));
-                } catch (NumberFormatException ignored) {}
+                    if (completedCredits < 0 || completedCredits > 150) {
+                        errors.add("Tín chỉ tích lũy phải nằm trong khoảng 0 - 150 tín chỉ (nhập: " + completedCredits + ")");
+                    }
+                } catch (NumberFormatException ignored) {
+                    errors.add("Tín chỉ tích lũy không đúng định dạng số: " + cStr);
+                }
             }
         }
 
@@ -392,7 +402,9 @@ public class StudentExcelParser {
             }
         }
 
-        String academicStatus = (debtCredits < 10 && !underDiscipline) ? "ELIGIBLE" : "INELIGIBLE";
+        // Điều kiện nhận đồ án UTC (GĐ1): Nợ tín chỉ < 10, Không nợ học phí, Không kỷ luật, Không nợ môn tiên quyết và GPA >= 2.0
+        boolean isEligible = debtCredits < 10 && !tuitionDebt && !underDiscipline && missingPrereq == 0 && (gpa == null || gpa >= 2.0);
+        String academicStatus = isEligible ? "ELIGIBLE" : "INELIGIBLE";
 
         boolean isValid = errors.isEmpty();
 
@@ -506,7 +518,7 @@ public class StudentExcelParser {
             centerCellStyle.cloneStyleFrom(dataCellStyle);
             centerCellStyle.setAlignment(HorizontalAlignment.CENTER);
 
-            // Danh sách tiêu đề các cột chuẩn UTC gồm cột Điểm GPA
+            // Danh sách tiêu đề các cột chuẩn UTC gồm đầy đủ thông tin sinh viên & học vụ
             String[] headers = {
                     "STT",
                     "Mã sinh viên (MSSV) *",
@@ -519,6 +531,7 @@ public class StudentExcelParser {
                     "Email",
                     "Tín chỉ tích lũy",
                     "Tín chỉ nợ (Nhận đồ án < 10)",
+                    "Nợ môn tiên quyết",
                     "Nợ học phí (CÓ/KHÔNG)",
                     "Kỷ luật (CÓ/KHÔNG)"
             };
@@ -544,13 +557,13 @@ public class StudentExcelParser {
                 }
             }
 
-            // Dữ liệu mẫu chuẩn từ ảnh UTC của người dùng kèm điểm GPA
+            // Dữ liệu mẫu chuẩn từ ảnh UTC kèm đầy đủ cột học vụ
             Object[][] sampleData = {
-                    {1, "250200001", "Nguyễn Tuấn", "Anh", "CNTT", "CNTT 1 - K65", 3.28, "0983000001", "250200001@lms.utc.edu.vn", 125, 0, "KHÔNG", "KHÔNG"},
-                    {2, "250200002", "Trần Phương", "Thảo", "CNTT", "CNTT 2 - K65", 2.85, "0983000002", "250200002@lms.utc.edu.vn", 118, 4, "KHÔNG", "KHÔNG"},
-                    {3, "250200003", "Lê Hoàng", "Long", "KHMT", "KHMT 1 - K65", 2.61, "0983000003", "250200003@lms.utc.edu.vn", 112, 8, "KHÔNG", "KHÔNG"},
-                    {4, "250200004", "Phạm Minh", "Quân", "CNTT", "CNTT Việt Anh - K65", 2.10, "0983000004", "250200004@lms.utc.edu.vn", 102, 12, "KHÔNG", "KHÔNG"},
-                    {5, "250200005", "Hoàng Thu", "Trang", "KHMT", "KHMT 2 - K65", 3.46, "0983000005", "250200005@lms.utc.edu.vn", 130, 0, "KHÔNG", "KHÔNG"}
+                    {1, sampleCodes.get(0), "Nguyễn Tuấn", "Anh", "CNTT", "CNTT 1 - K65", 3.28, "0983000001", sampleCodes.get(0) + "@lms.utc.edu.vn", 125, 0, 0, "KHÔNG", "KHÔNG"},
+                    {2, sampleCodes.get(1), "Trần Phương", "Thảo", "CNTT", "CNTT 2 - K65", 2.85, "0983000002", sampleCodes.get(1) + "@lms.utc.edu.vn", 118, 4, 0, "KHÔNG", "KHÔNG"},
+                    {3, sampleCodes.get(2), "Lê Hoàng", "Long", "KHMT", "KHMT 1 - K65", 2.61, "0983000003", sampleCodes.get(2) + "@lms.utc.edu.vn", 112, 8, 0, "KHÔNG", "KHÔNG"},
+                    {4, sampleCodes.get(3), "Phạm Minh", "Quân", "CNTT", "CNTT Việt Anh - K65", 2.10, "0983000004", sampleCodes.get(3) + "@lms.utc.edu.vn", 102, 12, 1, "KHÔNG", "KHÔNG"},
+                    {5, sampleCodes.get(4), "Hoàng Thu", "Trang", "KHMT", "KHMT 2 - K65", 3.46, "0983000005", sampleCodes.get(4) + "@lms.utc.edu.vn", 130, 0, 0, "KHÔNG", "KHÔNG"}
             };
 
             int rowIdx = 1;
@@ -589,8 +602,9 @@ public class StudentExcelParser {
             sheet.setColumnWidth(8, 30 * 256);  // Email
             sheet.setColumnWidth(9, 18 * 256);  // Tín chỉ tích lũy
             sheet.setColumnWidth(10, 26 * 256); // Tín chỉ nợ
-            sheet.setColumnWidth(11, 20 * 256); // Nợ học phí
-            sheet.setColumnWidth(12, 18 * 256); // Kỷ luật
+            sheet.setColumnWidth(11, 20 * 256); // Nợ môn tiên quyết
+            sheet.setColumnWidth(12, 20 * 256); // Nợ học phí
+            sheet.setColumnWidth(13, 18 * 256); // Kỷ luật
 
             workbook.write(out);
             return out.toByteArray();

@@ -6,6 +6,7 @@ import com.example.thesis_hub_api.assignment.service.AssignmentService;
 import com.example.thesis_hub_api.projectround.dto.request.CreateRoundStudentManualDTO;
 import com.example.thesis_hub_api.projectround.dto.request.StudentImportCommitRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.request.UpdateStudentRoundStatusRequestDTO;
+import com.example.thesis_hub_api.projectround.dto.request.UpdateRoundStudentDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentEligibilityCheckResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreviewResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportResultResponseDTO;
@@ -103,17 +104,18 @@ public class StudentProjectRoundController {
     @GetMapping("/{roundId}/students")
     @Operation(
             summary = "Tra cứu danh sách sinh viên trong đợt đồ án (Contract 3)",
-            description = "Hỗ trợ phân trang, lọc theo majorId, status và tìm kiếm theo MSSV/họ tên/lớp/email"
+            description = "Hỗ trợ phân trang, lọc theo majorId, status, onlyEligible và tìm kiếm theo MSSV/họ tên/lớp/email"
     )
     public ResponseEntity<ApiResponse<PageResponse<StudentProjectRoundResponseDTO>>> getStudentsInRound(
             @PathVariable Long roundId,
             @RequestParam(required = false) Long majorId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean onlyEligible,
             @RequestParam(required = false) String search,
             @PageableDefault(page = 0, size = 20, sort = "student.studentCode", direction = Sort.Direction.ASC) Pageable pageable) {
 
         PageResponse<StudentProjectRoundResponseDTO> response = studentProjectRoundService.getStudentsInRound(
-                roundId, majorId, status, search, pageable);
+                roundId, majorId, status, onlyEligible, search, pageable);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -126,6 +128,18 @@ public class StudentProjectRoundController {
 
         StudentProjectRoundResponseDTO detail = studentProjectRoundService.getStudentRoundDetail(roundId, studentId);
         return ResponseEntity.ok(ApiResponse.success(detail));
+    }
+
+    @RequestMapping(value = "/{roundId}/students/{studentId}", method = {RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.POST})
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
+    @Operation(summary = "Chỉnh sửa toàn bộ thông tin sinh viên & học vụ trong đợt đồ án (Tự động cập nhật trạng thái đủ/không đủ điều kiện)")
+    public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> updateStudentInRound(
+            @PathVariable Long roundId,
+            @PathVariable Long studentId,
+            @Valid @RequestBody UpdateRoundStudentDTO dto) {
+
+        StudentProjectRoundResponseDTO updated = studentProjectRoundService.updateStudentInRound(roundId, studentId, dto);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin sinh viên thành công", updated));
     }
 
     @PatchMapping("/{roundId}/students/{studentId}/status")

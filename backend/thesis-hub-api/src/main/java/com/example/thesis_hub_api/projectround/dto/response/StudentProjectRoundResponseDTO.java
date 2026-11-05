@@ -28,6 +28,10 @@ public class StudentProjectRoundResponseDTO {
     private String status;
     private Integer debtCredits;
     private Double gpa;
+    private Integer completedCredits;
+    private Boolean tuitionDebt;
+    private Boolean underDisciplinaryAction;
+    private Integer missingPrerequisiteCount;
     private String note;
     private Boolean accountActive;
     private Instant enrolledAt;

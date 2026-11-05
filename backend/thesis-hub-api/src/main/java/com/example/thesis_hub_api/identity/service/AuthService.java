@@ -17,6 +17,9 @@ import com.example.thesis_hub_api.organization.entity.Lecturer;
 import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.repository.LecturerRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
+import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +45,7 @@ public class AuthService {
     private final LecturerRepository lecturerRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final StudentProjectRoundRepository studentProjectRoundRepository;
 
     @Value("${app.admin.registration-key:thesishub_admin_secret_key_2026_fit_utc}")
     private String adminRegistrationKey;
@@ -72,7 +76,33 @@ public class AuthService {
         User user = userOpt.orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new AppException(ErrorCode.USER_LOCKED);
+            throw new AppException(ErrorCode.USER_LOCKED, "Tài khoản của bạn đã bị khóa hoặc chưa được cấp phép.");
+        }
+
+        // Quy định UTC: Sinh viên ở trạng thái Không đủ điều kiện nhận đồ án sẽ không được cấp tài khoản / không thể đăng nhập
+        if (user.getRole() != null && "ROLE_STUDENT".equalsIgnoreCase(user.getRole().getName())) {
+            Optional<Student> studentOpt = studentRepository.findByUserId(user.getId());
+            if (studentOpt.isPresent()) {
+                Student student = studentOpt.get();
+                if (studentProjectRoundRepository != null) {
+                    List<StudentProjectRound> sprList = studentProjectRoundRepository.findByStudentId(student.getId());
+                    if (!sprList.isEmpty()) {
+                        boolean hasEligibleRound = sprList.stream().anyMatch(spr ->
+                                ("ELIGIBLE".equalsIgnoreCase(spr.getStatus()) || "FORCE_APPROVED".equalsIgnoreCase(spr.getStatus()))
+                                && spr.getProjectRound() != null
+                                && !"CLOSED".equalsIgnoreCase(spr.getProjectRound().getStatus())
+                                && !"ARCHIVED".equalsIgnoreCase(spr.getProjectRound().getStatus())
+                        );
+                        if (!hasEligibleRound) {
+                            user.setIsActive(false);
+                            userRepository.save(user);
+                            String reason = sprList.get(0).getNote() != null ? sprList.get(0).getNote() : "Chưa đủ điều kiện học vụ";
+                            throw new AppException(ErrorCode.USER_LOCKED,
+                                    "Sinh viên ở trạng thái Không đủ điều kiện (" + reason + ") nên không được cấp tài khoản đăng nhập vào hệ thống.");
+                        }
+                    }
+                }
+            }
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
