@@ -70,7 +70,7 @@ public class ThesisController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Boolean defenseEligible,
             @RequestParam(required = false) String search,
-            Pageable pageable) {
+            @org.springframework.data.web.PageableDefault(size = 1000, sort = "id", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
         return ApiResponse.success(thesisService.searchTheses(roundId, lecturerId, status, defenseEligible, search, pageable));
     }
 }

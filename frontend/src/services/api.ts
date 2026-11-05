@@ -51,6 +51,7 @@ import type {
   StudentImportResultResponse,
   StudentProjectRoundItem,
   CreateRoundStudentManualPayload,
+  UpdateRoundStudentPayload,
   StudentEligibilityCheckResponse,
   AcademicRecordImportPreviewResponse,
   AcademicRecordImportCommitPayload,
@@ -1155,6 +1156,7 @@ class ApiService {
     params?: {
       majorId?: number;
       status?: string;
+      onlyEligible?: boolean;
       search?: string;
       page?: number;
       size?: number;
@@ -1165,6 +1167,30 @@ class ApiService {
       { params }
     );
     return response.data;
+  }
+
+  async updateStudentInRound(
+    roundId: number,
+    studentId: number,
+    payload: UpdateRoundStudentPayload
+  ): Promise<StudentProjectRoundItem> {
+    try {
+      const response = await this.api.put<StudentProjectRoundItem>(
+        PROJECT_ROUNDS.studentDetail(roundId, studentId),
+        payload
+      );
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.status === 405) {
+        // Fallback to PATCH if PUT is blocked by proxy or older route
+        const response = await this.api.patch<StudentProjectRoundItem>(
+          PROJECT_ROUNDS.studentDetail(roundId, studentId),
+          payload
+        );
+        return response.data;
+      }
+      throw err;
+    }
   }
 
   async updateStudentRoundStatus(
@@ -1304,6 +1330,11 @@ class ApiService {
       responseType: 'blob',
     });
     return response.data;
+  }
+
+  async clearStudentDebt(roundId: number, studentId: number): Promise<string> {
+    const response = await this.api.post(ACADEMIC_STAFF.clearDebt(roundId, studentId));
+    return response.data.message || 'Thành công';
   }
 
   // Utility

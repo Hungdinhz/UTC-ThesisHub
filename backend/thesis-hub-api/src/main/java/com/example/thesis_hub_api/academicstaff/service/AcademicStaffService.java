@@ -14,6 +14,7 @@ import com.example.thesis_hub_api.eligibility.service.EligibilityService;
 import com.example.thesis_hub_api.organization.entity.Major;
 import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.repository.MajorRepository;
+import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
@@ -46,6 +47,8 @@ public class AcademicStaffService {
     private final StudentProjectRoundRepository studentProjectRoundRepository;
     private final AcademicRecordRepository academicRecordRepository;
     private final MajorRepository majorRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private StudentRepository studentRepository;
     private final EligibilityService eligibilityService;
     private final DefenseService defenseService;
     private final AcademicStaffExcelExporter excelExporter;
@@ -227,5 +230,32 @@ public class AcademicStaffService {
     private ProjectRound getRound(Long roundId) {
         return projectRoundRepository.findById(roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy đợt đồ án ID: " + roundId));
+    }
+
+    @Transactional
+    public void clearStudentDebt(Long roundId, Long studentId) {
+        updateStudentDebt(roundId, studentId, 0);
+    }
+
+    @Transactional
+    public void updateStudentDebt(Long roundId, Long studentId, Integer newDebtCredits) {
+        int debt = newDebtCredits != null ? Math.max(0, newDebtCredits) : 0;
+        AcademicRecord record = academicRecordRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+                .orElse(null);
+        if (record != null) {
+            record.setDebtCredits(debt);
+            if (debt == 0) {
+                record.setMissingPrerequisiteCount(0);
+                record.setNote("Giáo vụ xác nhận đã hoàn thành trả nợ tín chỉ trước khi bảo vệ đồ án");
+            }
+            academicRecordRepository.save(record);
+        }
+
+        if (studentRepository != null) {
+            studentRepository.findById(studentId).ifPresent(st -> {
+                st.setDebtCredits(debt);
+                studentRepository.save(st);
+            });
+        }
     }
 }

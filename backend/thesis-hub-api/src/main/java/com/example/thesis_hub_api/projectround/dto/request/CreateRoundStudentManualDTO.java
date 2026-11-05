@@ -30,6 +30,16 @@ public class CreateRoundStudentManualDTO {
 
     private Double gpa;
 
+    private Integer completedCredits;
+
+    private Integer debtCredits;
+
+    private Boolean tuitionDebt;
+
+    private Boolean underDisciplinaryAction;
+
+    private Integer missingPrerequisiteCount;
+
     @Builder.Default
     private String status = "ELIGIBLE";
 

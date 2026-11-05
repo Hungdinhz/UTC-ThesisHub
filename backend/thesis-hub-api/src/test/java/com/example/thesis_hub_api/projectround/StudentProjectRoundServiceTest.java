@@ -276,7 +276,7 @@ class StudentProjectRoundServiceTest {
         Page<StudentProjectRound> sprPage = new PageImpl<>(List.of(spr), pageable, 1);
 
         when(projectRoundRepository.existsById(100L)).thenReturn(true);
-        when(studentProjectRoundRepository.searchStudentsInRound(eq(100L), isNull(), isNull(), isNull(), any(Pageable.class)))
+        when(studentProjectRoundRepository.searchStudentsInRound(eq(100L), isNull(), isNull(), any(), isNull(), any(Pageable.class)))
                 .thenReturn(sprPage);
         when(majorRepository.findAll()).thenReturn(List.of(sampleMajor));
         when(trainingProgramRepository.findAll()).thenReturn(List.of(sampleProgram));

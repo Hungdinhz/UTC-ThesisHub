@@ -803,7 +803,7 @@ export const ProposalManagementPage: React.FC = () => {
       case 'APPROVED':
         return (
           <span style={{ padding: '4px 8px', borderRadius: '4px', background: '#e6f4ea', color: '#137333', fontWeight: 'bold' }}>
-            ✓ ĐÃ PHÊ DUYỆT
+            ✓ ĐÃ DUYỆT ĐỀ TÀI
           </span>
         );
       case 'UNDER_REVIEW':

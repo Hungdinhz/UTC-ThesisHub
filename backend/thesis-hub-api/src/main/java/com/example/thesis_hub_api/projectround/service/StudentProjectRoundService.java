@@ -16,6 +16,7 @@ import com.example.thesis_hub_api.organization.repository.TrainingProgramReposit
 import com.example.thesis_hub_api.projectround.dto.request.CreateRoundStudentManualDTO;
 import com.example.thesis_hub_api.projectround.dto.request.StudentImportCommitRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.request.UpdateStudentRoundStatusRequestDTO;
+import com.example.thesis_hub_api.projectround.dto.request.UpdateRoundStudentDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentEligibilityCheckResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreviewResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportResultResponseDTO;
@@ -25,6 +26,11 @@ import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
+import com.example.thesis_hub_api.projectround.repository.AcademicRecordRepository;
+import com.example.thesis_hub_api.notification.service.NotificationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.time.Instant;
 import com.example.thesis_hub_api.projectround.util.StudentExcelParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +60,15 @@ public class StudentProjectRoundService {
     private final TrainingProgramRepository trainingProgramRepository;
     private final StudentExcelParser studentExcelParser;
     private final PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    private AcademicRecordRepository academicRecordRepository;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
+
+    @Autowired(required = false)
+    private com.example.thesis_hub_api.thesis.repository.ThesisRepository thesisRepository;
 
     private ProjectRound getAndValidateActiveRound(Long roundId) {
         ProjectRound round = projectRoundRepository.findById(roundId)
@@ -226,6 +241,17 @@ public class StudentProjectRoundService {
                 });
             }
 
+            int rowDebt = row.getDebtCredits() != null ? row.getDebtCredits() : 0;
+            if (rowDebt >= 10) {
+                String debtErr = "Sinh viên nợ " + rowDebt + " tín chỉ (>= 10 tín chỉ) - không đủ điều kiện nhận đồ án (bị loại khỏi đợt)";
+                if (!errors.contains(debtErr)) {
+                    errors.add(debtErr);
+                }
+            }
+            boolean rowDisc = Boolean.TRUE.equals(row.getUnderDisciplinaryAction());
+            boolean isEligible = rowDebt < 10 && !rowDisc;
+            row.setAcademicStatus(isEligible ? "ELIGIBLE" : "INELIGIBLE");
+
             row.setErrors(errors);
             row.setValid(errors.isEmpty());
 
@@ -259,6 +285,76 @@ public class StudentProjectRoundService {
      * - Tự động tạo hồ sơ Student nếu chưa có.
      * - Ghi danh vào bảng student_project_rounds với trạng thái ELIGIBLE.
      */
+    public int getMaxCreditsForRound(ProjectRound round) {
+        if (round != null && round.getTrainingProgram() != null) {
+            if (round.getTrainingProgram().getTotalCredits() != null) {
+                return round.getTrainingProgram().getTotalCredits();
+            }
+            if ("KY_SU".equalsIgnoreCase(round.getTrainingProgram().getCode())) {
+                return 150;
+            }
+        }
+        if (round != null && round.getName() != null && (round.getName().toLowerCase().contains("kỹ sư") || round.getName().toLowerCase().contains("ky su"))) {
+            return 150;
+        }
+        return 130;
+    }
+
+    public static class EligibilityEvaluation {
+        private final boolean eligible;
+        private final String status;
+        private final String note;
+
+        public EligibilityEvaluation(boolean eligible, String status, String note) {
+            this.eligible = eligible;
+            this.status = status;
+            this.note = note;
+        }
+
+        public boolean isEligible() { return eligible; }
+        public String getStatus() { return status; }
+        public String getNote() { return note; }
+    }
+
+    public static EligibilityEvaluation evaluateEligibility(
+            Integer debtCredits,
+            Boolean tuitionDebt,
+            Boolean underDiscipline,
+            Integer missingPrereq,
+            Double gpa) {
+        int debt = debtCredits != null ? Math.max(0, debtCredits) : 0;
+        boolean tuition = Boolean.TRUE.equals(tuitionDebt);
+        boolean discipline = Boolean.TRUE.equals(underDiscipline);
+        int prereq = missingPrereq != null ? Math.max(0, missingPrereq) : 0;
+
+        List<String> reasons = new ArrayList<>();
+        if (debt >= 10) {
+            reasons.add("nợ " + debt + " tín chỉ (>= 10 tín chỉ)");
+        }
+        if (tuition) {
+            reasons.add("nợ học phí");
+        }
+        if (discipline) {
+            reasons.add("đang bị kỷ luật");
+        }
+        if (prereq > 0) {
+            reasons.add("nợ " + prereq + " môn tiên quyết");
+        }
+        if (gpa != null && gpa < 2.0) {
+            reasons.add("GPA < 2.0 (" + gpa + ")");
+        }
+
+        if (reasons.isEmpty()) {
+            String note = debt > 0
+                    ? "Nợ " + debt + " TC (cần trả nợ trước GĐ5)"
+                    : "";
+            return new EligibilityEvaluation(true, "ELIGIBLE", note);
+        } else {
+            String note = "Không đủ ĐK: " + String.join(", ", reasons);
+            return new EligibilityEvaluation(false, "INELIGIBLE", note);
+        }
+    }
+
     @Transactional
     public StudentImportResultResponseDTO commitImportStudents(Long roundId, StudentImportCommitRequestDTO requestDTO) {
         ProjectRound round = getAndValidateActiveRound(roundId);
@@ -313,8 +409,24 @@ public class StudentProjectRoundService {
                         ? row.getEmail().trim().toLowerCase()
                         : studentCode.toLowerCase() + "@lms.utc.edu.vn";
 
+                // Đánh giá điều kiện học vụ trước: Sinh viên nợ >= 10 tín sẽ bị loại bỏ khỏi đợt
+                int debtCredits = row.getDebtCredits() != null ? row.getDebtCredits() : 0;
+                if (debtCredits >= 10) {
+                    log.info("Loại sinh viên {} khỏi đợt do nợ {} tín chỉ (>= 10)", studentCode, debtCredits);
+                    skipped++;
+                    continue;
+                }
+                int completedCredits = row.getCompletedCredits() != null ? row.getCompletedCredits() : 115;
+                boolean tuitionDebt = Boolean.TRUE.equals(row.getTuitionDebt());
+                boolean underDiscipline = Boolean.TRUE.equals(row.getUnderDisciplinaryAction());
+                int missingPrereq = row.getMissingPrerequisiteCount() != null ? row.getMissingPrerequisiteCount() : 0;
+
+EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, underDiscipline, missingPrereq, row.getGpa());
+                boolean isEligibleToStart = eval.isEligible();
+                String roundStatus = eval.getStatus();
+                String roundNote = eval.getNote();
+
                 // 1. Tìm hoặc tạo User
-                // Ưu tiên: nếu sinh viên đã có hồ sơ thì lấy User của sinh viên đó
                 Student existingStudent = studentRepository.findByStudentCode(studentCode).orElse(null);
                 User user = null;
                 if (existingStudent != null) {
@@ -325,8 +437,9 @@ public class StudentProjectRoundService {
                     user = userRepository.findByUsername(studentCode).orElse(null);
                 }
 
+                boolean accountActive = isEligibleToStart && shouldActivateStudentAccount(existingStudent, round, isEligibleToStart);
+
                 if (user == null) {
-                    // Kiểm tra email xem có bị xung đột với user khác trong hệ thống không
                     String targetEmail = email;
                     Optional<User> userWithEmail = userRepository.findByEmail(targetEmail);
                     if (userWithEmail.isPresent() && !studentCode.equalsIgnoreCase(userWithEmail.get().getUsername())) {
@@ -343,11 +456,12 @@ public class StudentProjectRoundService {
                             .phone(row.getPhone())
                             .password(passwordEncoder.encode("Password@123"))
                             .role(studentRole)
-                            .isActive(true)
+                            .isActive(accountActive)
                             .build();
-                    user.setIsActive(shouldActivateStudentAccount(existingStudent, round));
-            user = userRepository.save(user);
-                    newUsersCreated++;
+                    user = userRepository.save(user);
+                    if (accountActive) {
+                        newUsersCreated++;
+                    }
                 } else {
                     if (StringUtils.hasText(fullName)) {
                         user.setFullName(fullName);
@@ -361,8 +475,8 @@ public class StudentProjectRoundService {
                             user.setEmail(email);
                         }
                     }
-                    user.setIsActive(shouldActivateStudentAccount(existingStudent, round));
-            user = userRepository.save(user);
+                    user.setIsActive(accountActive);
+                    user = userRepository.save(user);
                 }
 
                 // 2. Tìm hoặc tạo Student
@@ -384,7 +498,7 @@ public class StudentProjectRoundService {
                             .className(row.getClassName())
                             .majorId(major != null ? major.getId() : null)
                             .trainingProgramId(roundTrainingProgramId)
-                            .debtCredits(0)
+                            .debtCredits(debtCredits)
                             .gpa(row.getGpa())
                             .build();
                     student = studentRepository.save(student);
@@ -405,6 +519,7 @@ public class StudentProjectRoundService {
                     if (row.getGpa() != null) {
                         student.setGpa(row.getGpa());
                     }
+                    student.setDebtCredits(debtCredits);
                     student = studentRepository.save(student);
                 }
 
@@ -428,18 +543,56 @@ public class StudentProjectRoundService {
                     StudentProjectRound spr = StudentProjectRound.builder()
                             .student(student)
                             .projectRound(round)
-                            .status("ELIGIBLE")
+                            .status(roundStatus)
                             .gpa(row.getGpa())
-                            .note("Import từ file Excel")
+                            .note(roundNote)
                             .build();
                     studentProjectRoundRepository.save(spr);
                     enrolledInRound++;
                 } else {
+                    StudentProjectRound spr = existingSpr.get();
+                    spr.setStatus(roundStatus);
+                    spr.setNote(roundNote);
                     if (row.getGpa() != null) {
-                        existingSpr.get().setGpa(row.getGpa());
-                        studentProjectRoundRepository.save(existingSpr.get());
+                        spr.setGpa(row.getGpa());
                     }
-                    skipped++;
+                    studentProjectRoundRepository.save(spr);
+                }
+
+// Student debtCredits already saved in step 2
+
+                // Đồng thời tạo hoặc cập nhật luôn bản ghi AcademicRecord của đợt (All-in-One)
+                if (academicRecordRepository != null) {
+                    AcademicRecord record = academicRecordRepository
+                            .findByStudentIdAndProjectRoundId(student.getId(), round.getId())
+                            .orElse(AcademicRecord.builder()
+                                    .student(student)
+                                    .projectRound(round)
+                                    .build());
+                    record.setDebtCredits(debtCredits);
+                    record.setCompletedCredits(completedCredits);
+                    record.setGpa(row.getGpa());
+                    record.setTuitionDebt(tuitionDebt);
+                    record.setUnderDisciplinaryAction(underDiscipline);
+                    record.setMissingPrerequisiteCount(missingPrereq);
+                    record.setNote(roundNote);
+                    record.setImportedAt(Instant.now());
+                    academicRecordRepository.save(record);
+                }
+
+                // Cảnh báo nếu không đủ điều kiện
+                if (!isEligibleToStart && notificationService != null && user != null && user.getId() != null) {
+                    try {
+                        notificationService.createNotification(
+                                user.getId(),
+                                "Cảnh báo học vụ: Không đủ điều kiện nhận đồ án",
+                                "Hệ thống ghi nhận hồ sơ học vụ của bạn trong đợt [" + round.getRoundCode() + "]: " + roundNote + ". Bạn không đủ điều kiện nhận đề tài đồ án tốt nghiệp đợt này. Vui lòng liên hệ Giáo vụ Khoa để được hỗ trợ.",
+                                "ACADEMIC",
+                                "/student/profile"
+                        );
+                    } catch (Exception ex) {
+                        log.warn("Không thể gửi thông báo cho sinh viên {}: {}", user.getId(), ex.getMessage());
+                    }
                 }
             } catch (Exception rowEx) {
                 log.error("Lỗi khi import sinh viên MSSV {}: {}", row.getStudentCode(), rowEx.getMessage(), rowEx);
@@ -511,7 +664,7 @@ public class StudentProjectRoundService {
                     .role(studentRole)
                     .isActive(true)
                     .build();
-            user.setIsActive(shouldActivateStudentAccount(existingCheckStudent, round));
+            user.setIsActive(false); // Sẽ được cập nhật chính xác theo điều kiện học vụ bên dưới
             user = userRepository.save(user);
         } else {
             user.setFullName(fullName);
@@ -525,7 +678,7 @@ public class StudentProjectRoundService {
                 }
             }
             user.setPassword(passwordEncoder.encode("Password@123"));
-            user.setIsActive(shouldActivateStudentAccount(existingCheckStudent, round));
+            user.setIsActive(false); // Sẽ được cập nhật chính xác theo điều kiện học vụ bên dưới
             user = userRepository.save(user);
         }
 
@@ -572,6 +725,32 @@ public class StudentProjectRoundService {
             student = studentRepository.save(student);
         }
 
+        int maxCredits = getMaxCreditsForRound(round);
+        if (dto.getCompletedCredits() != null && dto.getCompletedCredits() > maxCredits) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED,
+                    String.format("Tín chỉ tích lũy (%d) vượt quá số tín chỉ tối đa của hệ đào tạo (%d tín chỉ).",
+                            dto.getCompletedCredits(), maxCredits));
+        }
+        if (dto.getDebtCredits() != null && dto.getDebtCredits() > maxCredits) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED,
+                    String.format("Tín chỉ nợ (%d) không thể vượt quá tổng tín chỉ của hệ đào tạo (%d tín chỉ).",
+                            dto.getDebtCredits(), maxCredits));
+        }
+
+        int debtCredits = dto.getDebtCredits() != null ? Math.max(0, dto.getDebtCredits()) : 0;
+        if (debtCredits >= 10) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED,
+                    String.format("Sinh viên nợ %d tín chỉ (>= 10 tín chỉ) - không đủ điều kiện nhận đồ án và không thể thêm vào đợt.", debtCredits));
+        }
+        int defaultCredits = Math.min(maxCredits, 120);
+        int completedCredits = dto.getCompletedCredits() != null ? dto.getCompletedCredits() : defaultCredits;
+        boolean tuitionDebt = Boolean.TRUE.equals(dto.getTuitionDebt());
+        boolean underDiscipline = Boolean.TRUE.equals(dto.getUnderDisciplinaryAction());
+        int missingPrereq = dto.getMissingPrerequisiteCount() != null ? dto.getMissingPrerequisiteCount() : 0;
+
+        student.setDebtCredits(debtCredits);
+        student = studentRepository.save(student);
+
         // Kiểm tra điều kiện tham gia đợt (chỉ sinh viên chưa đạt/trượt ở đợt trước mới được đăng ký đợt sau)
         Optional<String> eligibilityError = validateStudentRoundEligibility(student, round);
         if (eligibilityError.isPresent()) {
@@ -583,7 +762,17 @@ public class StudentProjectRoundService {
                 .findByStudentIdAndProjectRoundId(student.getId(), roundId)
                 .orElse(null);
 
-        String initialStatus = StringUtils.hasText(dto.getStatus()) ? dto.getStatus().trim().toUpperCase() : "ELIGIBLE";
+        EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, underDiscipline, missingPrereq, manualGpa);
+        boolean isEligibleToStart = eval.isEligible();
+        String initialStatus = eval.getStatus();
+        String initialNote = StringUtils.hasText(dto.getNote()) ? dto.getNote().trim() : eval.getNote();
+
+        // Sinh viên không đủ điều kiện sẽ KHÔNG được cấp tài khoản
+        boolean manualAccountActive = isEligibleToStart && shouldActivateStudentAccount(existingCheckStudent, round, isEligibleToStart);
+        if (user != null) {
+            user.setIsActive(manualAccountActive);
+            user = userRepository.save(user);
+        }
 
         if (spr == null) {
             spr = StudentProjectRound.builder()
@@ -591,16 +780,33 @@ public class StudentProjectRoundService {
                     .projectRound(round)
                     .status(initialStatus)
                     .gpa(manualGpa)
-                    .note(dto.getNote() != null ? dto.getNote().trim() : "Thêm thủ công")
+                    .note(initialNote)
                     .build();
         } else {
             spr.setStatus(initialStatus);
             spr.setGpa(manualGpa);
-            if (dto.getNote() != null) {
-                spr.setNote(dto.getNote().trim());
-            }
+            spr.setNote(initialNote);
         }
         spr = studentProjectRoundRepository.save(spr);
+
+        AcademicRecord savedRecord = null;
+        if (academicRecordRepository != null) {
+            savedRecord = academicRecordRepository
+                    .findByStudentIdAndProjectRoundId(student.getId(), roundId)
+                    .orElse(AcademicRecord.builder()
+                            .student(student)
+                            .projectRound(round)
+                            .build());
+            savedRecord.setDebtCredits(debtCredits);
+            savedRecord.setCompletedCredits(completedCredits);
+            savedRecord.setGpa(manualGpa);
+            savedRecord.setTuitionDebt(tuitionDebt);
+            savedRecord.setUnderDisciplinaryAction(underDiscipline);
+            savedRecord.setMissingPrerequisiteCount(missingPrereq);
+            savedRecord.setNote(initialNote);
+            savedRecord.setImportedAt(Instant.now());
+            savedRecord = academicRecordRepository.save(savedRecord);
+        }
 
         Map<Long, Major> majorMap = majorRepository.findAll().stream()
                 .collect(Collectors.toMap(Major::getId, m -> m, (a, b) -> a));
@@ -608,7 +814,11 @@ public class StudentProjectRoundService {
         Map<Long, TrainingProgram> tpMap = trainingProgramRepository.findAll().stream()
                 .collect(Collectors.toMap(TrainingProgram::getId, tp -> tp, (a, b) -> a));
 
-        return toStudentProjectRoundResponseDTO(spr, majorMap, tpMap);
+        Map<Long, AcademicRecord> arMap = savedRecord != null && student.getId() != null
+                ? Map.of(student.getId(), savedRecord)
+                : Collections.emptyMap();
+
+        return toStudentProjectRoundResponseDTO(spr, majorMap, tpMap, arMap);
     }
 
     /**
@@ -620,6 +830,17 @@ public class StudentProjectRoundService {
             Long roundId,
             Long majorId,
             String status,
+            String search,
+            Pageable pageable) {
+        return getStudentsInRound(roundId, majorId, status, false, search, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<StudentProjectRoundResponseDTO> getStudentsInRound(
+            Long roundId,
+            Long majorId,
+            String status,
+            Boolean onlyEligible,
             String search,
             Pageable pageable) {
 
@@ -642,6 +863,7 @@ public class StudentProjectRoundService {
                 roundId,
                 majorId,
                 normalizedStatus,
+                onlyEligible,
                 normalizedSearch,
                 effectivePageable);
 
@@ -651,8 +873,21 @@ public class StudentProjectRoundService {
         Map<Long, TrainingProgram> tpMap = trainingProgramRepository.findAll().stream()
                 .collect(Collectors.toMap(TrainingProgram::getId, tp -> tp, (a, b) -> a));
 
+        Map<Long, AcademicRecord> arMap = Collections.emptyMap();
+        if (academicRecordRepository != null) {
+            try {
+                List<AcademicRecord> recs = academicRecordRepository.findByProjectRoundId(roundId);
+                if (recs != null) {
+                    arMap = recs.stream()
+                            .filter(ar -> ar.getStudent() != null && ar.getStudent().getId() != null)
+                            .collect(Collectors.toMap(ar -> ar.getStudent().getId(), ar -> ar, (a, b) -> a));
+                }
+            } catch (Exception ignored) {}
+        }
+
+        final Map<Long, AcademicRecord> finalArMap = arMap;
         List<StudentProjectRoundResponseDTO> mappedContent = sprPage.getContent().stream()
-                .map(spr -> toStudentProjectRoundResponseDTO(spr, majorMap, tpMap))
+                .map(spr -> toStudentProjectRoundResponseDTO(spr, majorMap, tpMap, finalArMap))
                 .toList();
 
         return PageResponse.from(sprPage, mappedContent);
@@ -676,6 +911,140 @@ public class StudentProjectRoundService {
     }
 
     /**
+     * Cập nhật toàn bộ thông tin sinh viên & học vụ trong đợt đồ án
+     * Trạng thái ELIGIBLE/INELIGIBLE được tính toán TỰ ĐỘNG theo quy chế học vụ UTC
+     */
+    @Transactional
+    public StudentProjectRoundResponseDTO updateStudentInRound(
+            Long roundId,
+            Long studentId,
+            UpdateRoundStudentDTO dto) {
+
+        ProjectRound round = getAndValidateActiveRound(roundId);
+        StudentProjectRound spr = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Student student = spr.getStudent();
+        if (student == null) {
+            student = studentRepository.findById(studentId)
+                    .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+        }
+
+        User user = student.getUser();
+        if (user != null) {
+            if (StringUtils.hasText(dto.getFullName())) {
+                user.setFullName(dto.getFullName().trim());
+            }
+            if (dto.getPhone() != null) {
+                user.setPhone(dto.getPhone().trim());
+            }
+            if (StringUtils.hasText(dto.getEmail()) && !dto.getEmail().trim().equalsIgnoreCase(user.getEmail())) {
+                Optional<User> other = userRepository.findByEmail(dto.getEmail().trim());
+                if (other.isEmpty() || other.get().getId().equals(user.getId())) {
+                    user.setEmail(dto.getEmail().trim());
+                }
+            }
+            userRepository.save(user);
+        }
+
+        if (StringUtils.hasText(dto.getClassName())) {
+            student.setClassName(dto.getClassName().trim());
+        }
+        if (dto.getMajorId() != null) {
+            student.setMajorId(dto.getMajorId());
+        }
+        if (dto.getGpa() != null) {
+            student.setGpa(dto.getGpa());
+        }
+        if (dto.getDebtCredits() != null) {
+            student.setDebtCredits(Math.max(0, dto.getDebtCredits()));
+        }
+        student = studentRepository.save(student);
+
+        // Academic record update
+        int maxCredits = getMaxCreditsForRound(round);
+        if (dto.getCompletedCredits() != null && dto.getCompletedCredits() > maxCredits) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED,
+                    String.format("Tín chỉ tích lũy (%d) vượt quá số tín chỉ tối đa của hệ đào tạo (%d tín chỉ).",
+                            dto.getCompletedCredits(), maxCredits));
+        }
+        if (dto.getDebtCredits() != null && dto.getDebtCredits() > maxCredits) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED,
+                    String.format("Tín chỉ nợ (%d) không thể vượt quá tổng tín chỉ của hệ đào tạo (%d tín chỉ).",
+                            dto.getDebtCredits(), maxCredits));
+        }
+
+        int debtCredits = dto.getDebtCredits() != null ? Math.max(0, dto.getDebtCredits()) : (student.getDebtCredits() != null ? student.getDebtCredits() : 0);
+        int defaultCredits = Math.min(maxCredits, 120);
+        int completedCredits = dto.getCompletedCredits() != null ? dto.getCompletedCredits() : defaultCredits;
+        Double gpa = dto.getGpa() != null ? dto.getGpa() : student.getGpa();
+        boolean tuitionDebt = Boolean.TRUE.equals(dto.getTuitionDebt());
+        boolean underDiscipline = Boolean.TRUE.equals(dto.getUnderDisciplinaryAction());
+        int missingPrereq = dto.getMissingPrerequisiteCount() != null ? dto.getMissingPrerequisiteCount() : 0;
+
+        // Tự động đánh giá điều kiện nhận đồ án (GĐ1)
+        EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, underDiscipline, missingPrereq, gpa);
+        String currentStatus = spr.getStatus();
+        String finalStatus;
+        if (!eval.isEligible()) {
+            finalStatus = "FORCE_APPROVED".equalsIgnoreCase(currentStatus) ? currentStatus : eval.getStatus();
+        } else {
+            // Giữ nguyên các trạng thái tiến độ cao hơn như ASSIGNED, RESERVED, DEFENSE_READY, COMPLETED nếu sinh viên đủ điều kiện
+            if ("ASSIGNED".equalsIgnoreCase(currentStatus) || "RESERVED".equalsIgnoreCase(currentStatus)
+                    || "FORCE_APPROVED".equalsIgnoreCase(currentStatus) || "COMPLETED".equalsIgnoreCase(currentStatus)
+                    || "DEFENSE_READY".equalsIgnoreCase(currentStatus)) {
+                finalStatus = currentStatus;
+            } else {
+                finalStatus = eval.getStatus();
+            }
+        }
+        String finalNote = StringUtils.hasText(dto.getNote()) ? dto.getNote().trim() : eval.getNote();
+
+        // Cập nhật trạng thái tài khoản: Nếu không đủ điều kiện thì KHÔNG cấp / hủy kích hoạt tài khoản
+        boolean isEligibleUpdated = eval.isEligible() || "FORCE_APPROVED".equalsIgnoreCase(spr.getStatus());
+        if (user != null) {
+            boolean accountActiveUpdated = isEligibleUpdated && shouldActivateStudentAccount(student, round, isEligibleUpdated);
+            user.setIsActive(accountActiveUpdated);
+            user = userRepository.save(user);
+        }
+
+        spr.setStatus(finalStatus);
+        spr.setGpa(gpa);
+        spr.setNote(finalNote);
+        spr = studentProjectRoundRepository.save(spr);
+
+        AcademicRecord record = null;
+        if (academicRecordRepository != null) {
+            record = academicRecordRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+                    .orElse(AcademicRecord.builder()
+                            .student(student)
+                            .projectRound(spr.getProjectRound())
+                            .build());
+            record.setDebtCredits(debtCredits);
+            record.setCompletedCredits(completedCredits);
+            record.setGpa(gpa);
+            record.setTuitionDebt(tuitionDebt);
+            record.setUnderDisciplinaryAction(underDiscipline);
+            record.setMissingPrerequisiteCount(missingPrereq);
+            record.setNote(finalNote);
+            record.setImportedAt(Instant.now());
+            record = academicRecordRepository.save(record);
+        }
+
+        Map<Long, Major> majorMap = majorRepository.findAll().stream()
+                .collect(Collectors.toMap(Major::getId, m -> m, (a, b) -> a));
+
+        Map<Long, TrainingProgram> tpMap = trainingProgramRepository.findAll().stream()
+                .collect(Collectors.toMap(TrainingProgram::getId, tp -> tp, (a, b) -> a));
+
+        Map<Long, AcademicRecord> arMap = record != null
+                ? Map.of(studentId, record)
+                : Collections.emptyMap();
+
+        return toStudentProjectRoundResponseDTO(spr, majorMap, tpMap, arMap);
+    }
+
+    /**
      * Cập nhật trạng thái và ghi chú của sinh viên trong đợt đồ án
      */
     @Transactional
@@ -684,7 +1053,7 @@ public class StudentProjectRoundService {
             Long studentId,
             UpdateStudentRoundStatusRequestDTO dto) {
 
-        getAndValidateActiveRound(roundId);
+        ProjectRound round = getAndValidateActiveRound(roundId);
         StudentProjectRound spr = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
 
@@ -709,7 +1078,7 @@ public class StudentProjectRoundService {
      */
     @Transactional
     public void removeStudentFromRound(Long roundId, Long studentId) {
-        getAndValidateActiveRound(roundId);
+        ProjectRound round = getAndValidateActiveRound(roundId);
         StudentProjectRound spr = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
 
@@ -738,14 +1107,27 @@ public class StudentProjectRoundService {
     }
 
     private boolean shouldActivateStudentAccount(Student existingStudent, ProjectRound round) {
+        return shouldActivateStudentAccount(existingStudent, round, true);
+    }
+
+    private boolean shouldActivateStudentAccount(Student existingStudent, ProjectRound round, boolean isEligible) {
+        if (!isEligible) {
+            return false;
+        }
         if (round != null && !"DRAFT".equalsIgnoreCase(round.getStatus())) {
             return true;
         }
         if (existingStudent != null && existingStudent.getId() != null && studentProjectRoundRepository != null) {
             return studentProjectRoundRepository.findByStudentId(existingStudent.getId()).stream()
                     .filter(spr -> spr.getProjectRound() != null && (round == null || !Objects.equals(spr.getProjectRound().getId(), round.getId())))
-                    .anyMatch(spr -> "OPEN".equalsIgnoreCase(spr.getProjectRound().getStatus())
-                            || "IN_PROGRESS".equalsIgnoreCase(spr.getProjectRound().getStatus()));
+                    .anyMatch(spr -> ("OPEN".equalsIgnoreCase(spr.getProjectRound().getStatus())
+                            || "IN_PROGRESS".equalsIgnoreCase(spr.getProjectRound().getStatus()))
+                            && ("ELIGIBLE".equalsIgnoreCase(spr.getStatus())
+                                    || "FORCE_APPROVED".equalsIgnoreCase(spr.getStatus())
+                                    || "REGISTERED".equalsIgnoreCase(spr.getStatus())
+                                    || "ASSIGNED".equalsIgnoreCase(spr.getStatus())
+                                    || "IN_PROGRESS".equalsIgnoreCase(spr.getStatus())
+                                    || "DEFENSE_READY".equalsIgnoreCase(spr.getStatus())));
         }
         return false;
     }
@@ -754,6 +1136,14 @@ public class StudentProjectRoundService {
             StudentProjectRound spr,
             Map<Long, Major> majorMap,
             Map<Long, TrainingProgram> tpMap) {
+        return toStudentProjectRoundResponseDTO(spr, majorMap, tpMap, Collections.emptyMap());
+    }
+
+    private StudentProjectRoundResponseDTO toStudentProjectRoundResponseDTO(
+            StudentProjectRound spr,
+            Map<Long, Major> majorMap,
+            Map<Long, TrainingProgram> tpMap,
+            Map<Long, AcademicRecord> arMap) {
 
         Student student = spr.getStudent();
         User user = student != null ? student.getUser() : null;
@@ -765,6 +1155,52 @@ public class StudentProjectRoundService {
         TrainingProgram tp = (student != null && student.getTrainingProgramId() != null)
                 ? tpMap.get(student.getTrainingProgramId())
                 : null;
+
+        AcademicRecord record = null;
+        if (student != null && student.getId() != null && arMap != null && !arMap.isEmpty()) {
+            record = arMap.get(student.getId());
+        } else if (academicRecordRepository != null && student != null && student.getId() != null && spr.getProjectRound() != null) {
+            try {
+                record = academicRecordRepository.findByStudentIdAndProjectRoundId(student.getId(), spr.getProjectRound().getId()).orElse(null);
+            } catch (Exception ignored) {}
+        }
+
+        Integer completedCredits = record != null && record.getCompletedCredits() != null
+                ? record.getCompletedCredits()
+                : 120;
+        Integer debtCredits = record != null && record.getDebtCredits() != null
+                ? record.getDebtCredits()
+                : (student != null && student.getDebtCredits() != null ? student.getDebtCredits() : 0);
+        Double gpa = record != null && record.getGpa() != null
+                ? record.getGpa()
+                : (spr.getGpa() != null ? spr.getGpa() : (student != null ? student.getGpa() : null));
+        Boolean tuitionDebt = record != null ? Boolean.TRUE.equals(record.getTuitionDebt()) : false;
+        Boolean underDisciplinaryAction = record != null ? Boolean.TRUE.equals(record.getUnderDisciplinaryAction()) : false;
+        Integer missingPrerequisiteCount = record != null && record.getMissingPrerequisiteCount() != null
+                ? record.getMissingPrerequisiteCount()
+                : 0;
+        EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, underDisciplinaryAction, missingPrerequisiteCount, gpa);
+        String finalStatus = spr.getStatus();
+        if (!eval.isEligible() && !"FORCE_APPROVED".equalsIgnoreCase(finalStatus)) {
+            finalStatus = "INELIGIBLE";
+        } else if (thesisRepository != null && student != null && student.getId() != null && spr.getProjectRound() != null) {
+            try {
+                if (("ASSIGNED".equalsIgnoreCase(finalStatus) || "REGISTERED".equalsIgnoreCase(finalStatus))
+                        && thesisRepository.existsByStudentIdAndProjectRoundId(student.getId(), spr.getProjectRound().getId())) {
+                    finalStatus = "IN_PROGRESS";
+                }
+            } catch (Exception ignored) {}
+        }
+        String note = StringUtils.hasText(spr.getNote()) ? spr.getNote() : (record != null ? record.getNote() : null);
+        if (StringUtils.hasText(spr.getNote()) && spr.getNote().toLowerCase().contains("chưa đăng ký")) {
+            finalStatus = "DROPPED";
+            note = spr.getNote();
+        } else if (!eval.isEligible() && "ELIGIBLE".equalsIgnoreCase(spr.getStatus())) {
+            note = eval.getNote();
+        }
+
+// Sinh vien khong du dieu kien khong duoc cap tai khoan
+        boolean isAccountActive = eval.isEligible() && user != null && Boolean.TRUE.equals(user.getIsActive());
 
         return StudentProjectRoundResponseDTO.builder()
                 .studentRoundId(spr.getId())
@@ -779,11 +1215,15 @@ public class StudentProjectRoundService {
                 .majorName(major != null ? major.getName() : null)
                 .trainingProgramId(student != null ? student.getTrainingProgramId() : null)
                 .trainingProgram(tp != null ? tp.getName() : null)
-                .status(spr.getStatus())
-                .debtCredits(student != null ? student.getDebtCredits() : 0)
-                .gpa(spr.getGpa() != null ? spr.getGpa() : (student != null ? student.getGpa() : null))
-                .note(spr.getNote())
-                .accountActive(user != null && Boolean.TRUE.equals(user.getIsActive()))
+                .status(finalStatus)
+                .debtCredits(debtCredits)
+                .gpa(gpa)
+                .completedCredits(completedCredits)
+                .tuitionDebt(tuitionDebt)
+                .underDisciplinaryAction(underDisciplinaryAction)
+                .missingPrerequisiteCount(missingPrerequisiteCount)
+                .note(note)
+                .accountActive(isAccountActive)
                 .enrolledAt(spr.getCreatedAt())
                 .build();
     }

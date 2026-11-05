@@ -39,8 +39,9 @@ public class Thesis {
     @JoinColumn(name = "project_round_id", nullable = false)
     private ProjectRound projectRound;
 
+    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id", nullable = false)
+    @JoinColumn(name = "student_id", nullable = true)
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)

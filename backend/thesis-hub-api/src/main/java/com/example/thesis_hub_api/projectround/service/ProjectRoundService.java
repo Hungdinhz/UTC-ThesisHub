@@ -357,9 +357,38 @@ public class ProjectRoundService {
             validateTransitionToOpen(round);
         }
 
-        // 2. Chuyển từ OPEN -> IN_PROGRESS
+        // 2. Chuyển từ OPEN -> IN_PROGRESS: Tự động kích hoạt mốc timeline GĐ3 (PROPOSAL_SUBMISSION)
         if ("OPEN".equalsIgnoreCase(currentStatus) && "IN_PROGRESS".equalsIgnoreCase(cleanStatus)) {
             validateTransitionToInProgress(round);
+
+            List<TimelineMilestone> milestones = timelineMilestoneRepository
+                    .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(id);
+            if (milestones != null && !milestones.isEmpty()) {
+                int propIndex = -1;
+                for (int i = 0; i < milestones.size(); i++) {
+                    if ("PROPOSAL_SUBMISSION".equalsIgnoreCase(milestones.get(i).getPhaseType())) {
+                        propIndex = i;
+                        break;
+                    }
+                }
+                if (propIndex >= 0) {
+                    Instant now = Instant.now();
+                    for (int i = 0; i < milestones.size(); i++) {
+                        TimelineMilestone m = milestones.get(i);
+                        if (i < propIndex) {
+                            m.setStartDate(now.minus(Duration.ofDays(14 * (propIndex - i + 1))));
+                            m.setEndDate(now.minusSeconds(60));
+                        } else if (i == propIndex) {
+                            m.setStartDate(now.minusSeconds(60));
+                            m.setEndDate(now.plus(Duration.ofDays(14)));
+                        } else {
+                            m.setStartDate(now.plus(Duration.ofDays(14 * (i - propIndex))));
+                            m.setEndDate(now.plus(Duration.ofDays(14 * (i - propIndex + 1))));
+                        }
+                    }
+                    timelineMilestoneRepository.saveAll(milestones);
+                }
+            }
         }
 
         if (Boolean.TRUE.equals(round.getSupplementaryOpen())
@@ -415,54 +444,64 @@ public class ProjectRoundService {
         }
         List<com.example.thesis_hub_api.thesis.entity.Thesis> theses = thesisRepository.findByProjectRoundId(round.getId());
         for (com.example.thesis_hub_api.thesis.entity.Thesis thesis : theses) {
-            if (thesis.getId() == null) {
+            if (thesis == null || thesis.getId() == null) {
                 continue;
             }
-            if (graduationResultRepository != null) {
-                java.util.Optional<com.example.thesis_hub_api.defense.entity.GraduationResult> grOpt = graduationResultRepository.findByThesisId(thesis.getId());
-                if (grOpt.isEmpty() && defenseService != null && defenseService.canSynthesizeResult(thesis.getId())) {
-                    try {
-                        defenseService.synthesizeResult(thesis.getId());
-                        grOpt = graduationResultRepository.findByThesisId(thesis.getId());
-                    } catch (Exception ignored) {}
-                }
-                grOpt.ifPresent(gr -> {
-                    gr.setPublishedAt(Instant.now());
-                    graduationResultRepository.save(gr);
-
-                    boolean passed = "PASSED".equalsIgnoreCase(gr.getFinalResult());
-                    if (passed) {
-                        thesis.setStatus("COMPLETED");
-                        thesisRepository.save(thesis);
-                    }
-
-                    if (studentProjectRoundRepository != null && thesis.getStudent() != null && thesis.getStudent().getId() != null) {
-                        studentProjectRoundRepository.findByStudentIdAndProjectRoundId(thesis.getStudent().getId(), round.getId())
-                                .ifPresent(spr -> {
-                                    spr.setStatus(passed ? "DEFENDED" : "DROPPED");
-                                    spr.setNote("Kết quả bảo vệ: " + (gr.getFinalScore() != null ? gr.getFinalScore() : "--") + "/10 (" + (passed ? "ĐẠT" : "KHÔNG ĐẠT") + ")");
-                                    studentProjectRoundRepository.save(spr);
-                                });
-                    }
-
-                    if (notificationService != null && thesis.getStudent() != null
-                            && thesis.getStudent().getUser() != null
-                            && thesis.getStudent().getUser().getId() != null) {
+            try {
+                if (graduationResultRepository != null) {
+                    java.util.Optional<com.example.thesis_hub_api.defense.entity.GraduationResult> grOpt = graduationResultRepository.findByThesisId(thesis.getId());
+                    if (grOpt.isEmpty() && defenseService != null && defenseService.canSynthesizeResult(thesis.getId())) {
                         try {
-                            String scoreStr = gr.getFinalScore() != null ? gr.getFinalScore().toPlainString() : "--";
-                            String gradeLabel = formatGradeVi(gr.getGrade());
-                            String resultLabel = passed ? "ĐẠT" : "KHÔNG ĐẠT";
-                            notificationService.createNotification(
-                                    thesis.getStudent().getUser().getId(),
-                                    "🎓 Công bố kết quả bảo vệ đồ án [" + round.getRoundCode() + "]",
-                                    "Kết quả bảo vệ đồ án tốt nghiệp của bạn đã được công bố chính thức: Điểm tổng kết "
-                                            + scoreStr + "/10 — Xếp loại: " + gradeLabel + " (" + resultLabel + ").",
-                                    "DEFENSE_RESULT",
-                                    "/admin/defense-schedules"
-                            );
+                            defenseService.synthesizeResult(thesis.getId());
+                            grOpt = graduationResultRepository.findByThesisId(thesis.getId());
                         } catch (Exception ignored) {}
                     }
-                });
+                    grOpt.ifPresent(gr -> {
+                        gr.setPublishedAt(Instant.now());
+                        graduationResultRepository.save(gr);
+
+                        boolean passed = "PASSED".equalsIgnoreCase(gr.getFinalResult());
+                        if (passed) {
+                            thesis.setStatus("COMPLETED");
+                            thesisRepository.save(thesis);
+                        }
+
+                        try {
+                            if (studentProjectRoundRepository != null && thesis.getStudent() != null && thesis.getStudent().getId() != null) {
+                                studentProjectRoundRepository.findByStudentIdAndProjectRoundId(thesis.getStudent().getId(), round.getId())
+                                        .ifPresent(spr -> {
+                                            spr.setStatus(passed ? "DEFENDED" : "DROPPED");
+                                            spr.setNote("Kết quả bảo vệ: " + (gr.getFinalScore() != null ? gr.getFinalScore() : "--") + "/10 (" + (passed ? "ĐẠT" : "KHÔNG ĐẠT") + ")");
+                                            studentProjectRoundRepository.save(spr);
+                                        });
+                            }
+                        } catch (Exception sprEx) {
+                            log.warn("Không thể cập nhật StudentProjectRound cho đề tài {}: {}", thesis.getId(), sprEx.getMessage());
+                        }
+
+                        try {
+                            if (notificationService != null && thesis.getStudent() != null
+                                    && thesis.getStudent().getUser() != null
+                                    && thesis.getStudent().getUser().getId() != null) {
+                                String scoreStr = gr.getFinalScore() != null ? gr.getFinalScore().toPlainString() : "--";
+                                String gradeLabel = formatGradeVi(gr.getGrade());
+                                String resultLabel = passed ? "ĐẠT" : "KHÔNG ĐẠT";
+                                notificationService.createNotification(
+                                        thesis.getStudent().getUser().getId(),
+                                        "🎓 Công bố kết quả bảo vệ đồ án [" + round.getRoundCode() + "]",
+                                        "Kết quả bảo vệ đồ án tốt nghiệp của bạn đã được công bố chính thức: Điểm tổng kết "
+                                                + scoreStr + "/10 — Xếp loại: " + gradeLabel + " (" + resultLabel + ").",
+                                        "DEFENSE_RESULT",
+                                        "/admin/defense-schedules"
+                                );
+                            }
+                        } catch (Exception notifEx) {
+                            log.warn("Không thể gửi thông báo kết quả cho đề tài {}: {}", thesis.getId(), notifEx.getMessage());
+                        }
+                    });
+                }
+            } catch (Exception thEx) {
+                log.error("Lỗi khi xử lý tổng kết bảo vệ cho đề tài {}: {}", thesis.getId(), thEx.getMessage());
             }
         }
     }
@@ -876,6 +915,34 @@ public class ProjectRoundService {
         return 2;
     }
 
+    private int calculateRoundStage(ProjectRound round, List<TimelineMilestone> milestones) {
+        if (round == null) return 1;
+        String roundStatus = round.getStatus() != null ? round.getStatus().toUpperCase() : "DRAFT";
+        if ("DRAFT".equals(roundStatus)) {
+            return 1;
+        }
+        if ("OPEN".equals(roundStatus)) {
+            return 2;
+        }
+        if ("CLOSED".equals(roundStatus)) {
+            return 5;
+        }
+        // IN_PROGRESS: xác định theo milestone active đầu tiên (tối thiểu là 3)
+        Instant now = Instant.now();
+        if (milestones != null && !milestones.isEmpty()) {
+            TimelineMilestone activeMilestone = milestones.stream()
+                    .sorted(Comparator.comparing(TimelineMilestone::getOrderIndex)
+                            .thenComparing(TimelineMilestone::getStartDate))
+                    .filter(m -> !now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate()))
+                    .findFirst()
+                    .orElse(null);
+            if (activeMilestone != null && StringUtils.hasText(activeMilestone.getPhaseType())) {
+                return Math.max(3, getStageNumberFromPhase(activeMilestone.getPhaseType()));
+            }
+        }
+        return 3;
+    }
+
     /**
      * Tự động đánh giá kết quả đạt / không đạt của toàn bộ sinh viên trong đợt khi kết thúc giai đoạn.
      * Sinh viên chưa làm nhiệm vụ của giai đoạn trước sẽ bị loại (DROPPED - Không đạt).
@@ -1150,13 +1217,7 @@ public class ProjectRoundService {
 
         List<TimelineMilestone> milestones = timelineMilestoneRepository
                 .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId);
-        int currentRoundStage = 2;
-        Instant now = Instant.now();
-        for (TimelineMilestone m : milestones) {
-            if (!now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate())) {
-                currentRoundStage = Math.max(currentRoundStage, getStageNumberFromPhase(m.getPhaseType()));
-            }
-        }
+        int currentRoundStage = calculateRoundStage(activeRound, milestones);
 
         boolean hasDefenseEligibleThesis = false;
         boolean hasThesisOrApprovedProposal = false;
@@ -1174,13 +1235,13 @@ public class ProjectRoundService {
         }
 
         if (!isDropped) {
-            if ("DEFENSE_READY".equalsIgnoreCase(status) || "DEFENDED".equalsIgnoreCase(status)
-                    || hasDefenseEligibleThesis || currentRoundStage >= 5) {
+            if ("DEFENDED".equalsIgnoreCase(status)) {
+                completedStage = 5;
+            } else if ("DEFENSE_READY".equalsIgnoreCase(status) || hasDefenseEligibleThesis) {
                 completedStage = 4;
-                currentRoundStage = Math.max(currentRoundStage, 5);
-            } else if ("IN_PROGRESS".equalsIgnoreCase(status) || hasThesisOrApprovedProposal || currentRoundStage >= 4) {
+            } else if ("IN_PROGRESS".equalsIgnoreCase(status) || hasThesisOrApprovedProposal) {
                 completedStage = 3;
-            } else if ("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status) || currentRoundStage >= 3) {
+            } else if (("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status)) && currentRoundStage >= 3) {
                 completedStage = 2;
             } else {
                 completedStage = 1;

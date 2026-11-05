@@ -34,6 +34,26 @@ function extractApiError(err: any, fallback: string): string {
   return err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
 }
 
+function normalizeLegacyCouncil(council: DefenseCouncil): DefenseCouncil {
+  const members = council.members;
+  if (council.status !== 'ACTIVE' || !Array.isArray(members) || members.length !== 5) return council;
+
+  const presidents = members.filter((m) => m.role === 'PRESIDENT');
+  const secretaries = members.filter((m) => m.role === 'SECRETARY').sort((a, b) => a.id - b.id);
+  const regularMembers = members.filter((m) => m.role === 'MEMBER').sort((a, b) => a.id - b.id);
+  if (presidents.length !== 1 || secretaries.length !== 2 || regularMembers.length !== 2) return council;
+
+  // Older councils used 1 president, 2 secretaries and 2 members. Preserve the
+  // first secretary and last member; promote the other two to reviewer slots.
+  const normalized = members.map((member) => {
+    if (member.id === secretaries[1].id) return { ...member, role: 'REVIEWER_1' as const };
+    if (member.id === regularMembers[0].id) return { ...member, role: 'REVIEWER_2' as const };
+    return member;
+  });
+  normalized.sort((a, b) => COUNCIL_ROLES.indexOf(a.role) - COUNCIL_ROLES.indexOf(b.role));
+  return { ...council, members: normalized };
+}
+
 export const mockLecturers: LecturerOption[] = [
   { lecturerId: 501, fullName: 'PGS. TS. Trần Văn Minh', degree: 'Phó Giáo sư', canBePresident: true, canBeSecretary: true, canBeMember: true, currentLoad: 2 },
   { lecturerId: 502, fullName: 'TS. Lê Thị Mai', degree: 'Tiến sĩ', canBePresident: true, canBeSecretary: true, canBeMember: true, currentLoad: 1 },
@@ -174,7 +194,7 @@ class DefenseService {
         headers: authHeaders(),
       });
       if (Array.isArray(res.data?.data)) {
-        return res.data.data;
+        return res.data.data.map(normalizeLegacyCouncil);
       }
       return [];
     } catch (err) {
@@ -188,7 +208,7 @@ class DefenseService {
   async getCouncilById(id: number): Promise<DefenseCouncil> {
     try {
       const res = await axios.get(`${API_BASE}/councils/${id}`, { headers: authHeaders() });
-      if (res.data?.data) return res.data.data;
+      if (res.data?.data) return normalizeLegacyCouncil(res.data.data);
     } catch (err) {
       if (!IS_TEST_ENV) {
         throw new Error(extractApiError(err, 'Không tìm thấy hội đồng'));
@@ -202,7 +222,7 @@ class DefenseService {
   async generateCouncils(request: CouncilGenerationRequest): Promise<DefenseCouncil[]> {
     try {
       const res = await axios.post(`${API_BASE}/councils/generate`, request, { headers: authHeaders() });
-      if (Array.isArray(res.data?.data)) return res.data.data;
+      if (Array.isArray(res.data?.data)) return res.data.data.map(normalizeLegacyCouncil);
       return [];
     } catch (err) {
       if (!IS_TEST_ENV) {
