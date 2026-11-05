@@ -194,7 +194,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
     const isEligible = reasons.length === 0;
     const autoNote = isEligible
-      ? (debtCredits > 0 ? `Đủ ĐK nhận đồ án (Nợ ${debtCredits} tín chỉ, cần trả nợ trước GĐ5)` : 'Đủ ĐK nhận đồ án (Nợ 0 tín chỉ)')
+      ? (debtCredits > 0 ? `Nợ ${debtCredits} tín chỉ (cần trả nợ trước GĐ5)` : '')
       : `Không đủ ĐK: ${reasons.join(', ')}`;
 
     return {
@@ -392,6 +392,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         if (value === undefined || value === null || value === '') return '';
         const num = Number(value);
         if (isNaN(num) || num < 0) return 'Số tín chỉ nợ phải >= 0';
+        if (num >= 10) {
+          return 'Sinh viên nợ từ 10 tín chỉ trở lên không đủ điều kiện nhận đồ án (bị loại)';
+        }
         if (num > resolvedProgram.maxCredits) {
           return `Số tín chỉ nợ không thể vượt quá ${resolvedProgram.maxCredits} tín`;
         }
@@ -852,7 +855,13 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, note?: string) => {
+    if (note && (note.toLowerCase().includes('chưa đăng ký hướng') || note.toLowerCase().includes('chưa đăng ký'))) {
+      return { label: 'Chưa đăng ký hướng', bg: '#fee2e2', color: '#b91c1c' };
+    }
+    if (status === 'DROPPED') {
+      return { label: 'Bị loại', bg: '#fee2e2', color: '#b91c1c' };
+    }
     switch (status) {
       case 'ELIGIBLE':
         return { label: 'Đủ điều kiện', bg: '#dcfce7', color: '#15803d' };
@@ -863,8 +872,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       case 'ASSIGNED':
         return { label: 'Đã gán GVHD', bg: '#fef3c7', color: '#b45309' };
       case 'IN_PROGRESS':
-        return { label: 'Đang làm ĐA', bg: '#e0f2fe', color: '#0369a1' };
-      case 'DROPPED':
+      case 'TOPIC_APPROVED':
+        return { label: 'Đã duyệt đề tài', bg: '#e0f2fe', color: '#0369a1' };
       case 'DISQUALIFIED':
       case 'INELIGIBLE':
         return { label: 'Không đủ ĐK', bg: '#fee2e2', color: '#b91c1c' };
@@ -1119,9 +1128,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             <option value="">Tất cả trạng thái</option>
             <option value="ELIGIBLE">Đủ điều kiện</option>
             <option value="FORCE_APPROVED">Duyệt đặc cách</option>
+            <option value="ASSIGNED">Đã gán GVHD</option>
+            <option value="IN_PROGRESS">Đã duyệt đề tài</option>
             <option value="INELIGIBLE">Không đủ điều kiện</option>
             <option value="RESERVED">Đã bảo lưu</option>
-            <option value="DROPPED">Bị loại khỏi đợt</option>
+            <option value="DROPPED">Chưa ĐK hướng / Bị loại</option>
           </select>
         )}
 
@@ -1175,8 +1186,10 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               </thead>
               <tbody>
                 {filteredStudents.map((st, idx) => {
-                  const badge = getStatusBadge(st.status);
+                  const badge = getStatusBadge(st.status, st.note);
                   const hasDebt = st.debtCredits !== undefined && st.debtCredits !== null && st.debtCredits > 0;
+                  const isUnregistered = Boolean(st.note && (st.note.toLowerCase().includes('chưa đăng ký hướng') || st.note.toLowerCase().includes('chưa đăng ký')));
+                  const isCleanNote = Boolean(st.note && !st.note.toLowerCase().includes('đủ đk nhận đồ án') && !st.note.toLowerCase().includes('chưa đăng ký hướng'));
                   return (
                     <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '10px 10px' }}>{currentPage * 15 + idx + 1}</td>
@@ -1236,7 +1249,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                         <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
                           {badge.label}
                         </span>
-                        {st.status === 'INELIGIBLE' || st.status === 'DROPPED' || st.status === 'DISQUALIFIED' ? (
+                        {isUnregistered ? (
+                          <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#b45309' }}>
+                            🔑 Đã cấp TK
+                          </div>
+                        ) : (st.status === 'INELIGIBLE' || st.status === 'DROPPED' || st.status === 'DISQUALIFIED') ? (
                           <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#dc2626' }}>
                             🚫 Không cấp TK
                           </div>
@@ -1245,7 +1262,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                             {st.accountActive === false ? '⏳ Chờ mở đợt cấp TK' : '🔑 Đã cấp TK'}
                           </div>
                         )}
-                        {st.note && (
+                        {isCleanNote && (
                           <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={st.note}>
                             {st.note}
                           </div>

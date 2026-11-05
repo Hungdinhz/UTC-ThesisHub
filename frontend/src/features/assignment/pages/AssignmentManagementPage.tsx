@@ -17,6 +17,7 @@ import { LecturerCapacityManager } from '../components/LecturerCapacityManager';
 import { DirectionRegistrationList } from '../components/DirectionRegistrationList';
 import { PreferenceList } from '../components/PreferenceList';
 import '../assignment.css';
+import { getRoundStageNumber } from '../../../utils/phaseTracking';
 
 interface Props {
   projectRoundId?: number;
@@ -81,6 +82,8 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
   const currentRound = rounds.find((r) => r.roundId === effectiveRoundId);
   const isRoundClosed = currentRound?.status === 'CLOSED' || currentRound?.status === 'ARCHIVED';
   const isSupplementaryOpen = Boolean(stats?.supplementaryOpen ?? currentRound?.supplementaryOpen);
+  const isStage3OrBeyond = (currentRound?.status === 'IN_PROGRESS' || currentRound?.status === 'CLOSED')
+    || (currentRound?.currentMilestone?.phaseType ? getRoundStageNumber(currentRound.currentMilestone.phaseType, currentRound.status) >= 3 : false);
 
   const isFinalized =
     (proposals.length > 0 && proposals.every((p) => p.status === 'FINALIZED')) ||
@@ -409,17 +412,19 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
               <button
                 className="btn-generate-algo"
                 onClick={handleGenerate}
-                disabled={actionLoading || loading || isRoundClosed || isSupplementaryOpen}
-                style={isSupplementaryOpen ? { opacity: 0.65, cursor: 'not-allowed', backgroundColor: '#94a3b8' } : undefined}
+                disabled={actionLoading || loading || isRoundClosed || isSupplementaryOpen || isStage3OrBeyond}
+                style={isSupplementaryOpen || isStage3OrBeyond ? { opacity: 0.65, cursor: 'not-allowed', backgroundColor: '#94a3b8' } : undefined}
                 title={
-                  isSupplementaryOpen
+                  isStage3OrBeyond
+                    ? 'Đợt đồ án đã chuyển sang Giai đoạn 3 (Đề cương) - Thuật toán phân công đã bị vô hiệu hóa'
+                    : isSupplementaryOpen
                     ? 'Đang mở đăng ký bổ sung - Vui lòng bấm "Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt" trước khi chạy thuật toán'
                     : isRoundClosed
                     ? 'Đợt đồ án đã đóng - Không thể chạy phân công'
                     : undefined
                 }
               >
-                ⚡ {actionLoading ? 'Đang tính toán...' : isSupplementaryOpen ? 'Chạy thuật toán (Khóa: Đang mở ĐK bổ sung)' : 'Chạy thuật toán phân công'}
+                ⚡ {actionLoading ? 'Đang tính toán...' : isStage3OrBeyond ? 'Chạy thuật toán (Khóa: Đã qua GĐ3)' : isSupplementaryOpen ? 'Chạy thuật toán (Khóa: Đang mở ĐK bổ sung)' : 'Chạy thuật toán phân công'}
               </button>
 
               <button
@@ -535,63 +540,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
         </div>
       )}
 
-      {/* Prominent Supplementary Registration Active Banner */}
-      {isSupplementaryOpen && !isRoundClosed && (
-        <div
-          style={{
-            backgroundColor: '#fff7ed',
-            border: '2px solid #fb923c',
-            borderRadius: '10px',
-            padding: '16px 20px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '14px',
-            color: '#9a3412',
-            boxShadow: '0 2px 10px rgba(234, 88, 12, 0.12)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '280px' }}>
-            <span style={{ fontSize: '1.8rem' }}>🔔</span>
-            <div>
-              <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>
-                ĐỢT ĐĂNG KÝ NGUYỆN VỌNG BỔ SUNG ĐANG MỞ
-              </strong>
-              <span style={{ fontSize: '0.9rem', lineHeight: '1.4', display: 'block' }}>
-                Hệ thống đã mở đăng ký bổ sung cho các sinh viên chưa đăng ký. Trong thời gian này, nút <strong>Chạy thuật toán phân công</strong> và <strong>Chốt đợt</strong> tạm thời bị khóa. Vui lòng bấm nút bên phải để kết thúc đợt bổ sung và xóa các sinh viên không đăng ký.
-              </span>
-            </div>
-          </div>
 
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={handleFinalizeSupplementary}
-              disabled={actionLoading || loading}
-              style={{
-                padding: '10px 18px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: '#dc2626',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
-                whiteSpace: 'nowrap',
-              }}
-              title="Chốt danh sách đăng ký bổ sung, gán GVHD cho SV đăng ký bổ sung và xóa vĩnh viễn các SV không đăng ký khỏi đợt"
-            >
-              🔒 Kết thúc ĐK bổ sung & Xóa SV không ĐK khỏi đợt
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Closed Round Alert Banner */}
       {isRoundClosed && (
@@ -664,20 +613,21 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
                 <button
                   type="button"
                   onClick={handleOpenSupplementary}
-                  disabled={actionLoading || loading || isSupplementaryOpen}
+                  disabled={actionLoading || loading || isSupplementaryOpen || isStage3OrBeyond}
+                  title={isStage3OrBeyond ? 'Đợt đồ án đã chuyển sang Giai đoạn 3 (Đề cương) - Không thể mở đăng ký bổ sung' : undefined}
                   style={{
                     padding: '7px 14px',
                     borderRadius: '8px',
                     border: '1px solid #f59e0b',
-                    backgroundColor: isSupplementaryOpen ? '#fed7aa' : '#fffbeb',
-                    color: '#b45309',
+                    backgroundColor: isStage3OrBeyond ? '#f1f5f9' : (isSupplementaryOpen ? '#fed7aa' : '#fffbeb'),
+                    color: isStage3OrBeyond ? '#94a3b8' : '#b45309',
                     fontWeight: 700,
                     fontSize: '0.84rem',
-                    cursor: actionLoading || isSupplementaryOpen ? 'not-allowed' : 'pointer',
-                    opacity: isSupplementaryOpen ? 0.75 : 1,
+                    cursor: actionLoading || isSupplementaryOpen || isStage3OrBeyond ? 'not-allowed' : 'pointer',
+                    opacity: isSupplementaryOpen || isStage3OrBeyond ? 0.75 : 1,
                   }}
                 >
-                  {isSupplementaryOpen ? '🔔 Đang mở đợt đăng ký bổ sung...' : '🔓 Mở đợt đăng ký bổ sung (Cho SV chưa ĐK)'}
+                  {isStage3OrBeyond ? '🔒 Mở ĐK bổ sung (Khóa: Đã qua GĐ3)' : isSupplementaryOpen ? '🔔 Đang mở đợt đăng ký bổ sung...' : '🔓 Mở đợt đăng ký bổ sung (Cho SV chưa ĐK)'}
                 </button>
                 <button
                   type="button"

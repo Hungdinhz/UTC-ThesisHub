@@ -131,8 +131,10 @@ export const thesisService = {
     return res.data.data;
   },
 
-  async searchTheses(params?: { roundId?: number; lecturerId?: number; status?: string; search?: string }): Promise<Thesis[]> {
-    const res = await apiClient.get('/theses', { params });
+  async searchTheses(params?: { roundId?: number; lecturerId?: number; status?: string; search?: string; page?: number; size?: number }): Promise<Thesis[]> {
+    const res = await apiClient.get('/theses', {
+      params: { size: 1000, ...params }
+    });
     return res.data.data.content || res.data.data;
   },
 

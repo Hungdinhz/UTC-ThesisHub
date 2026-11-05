@@ -361,16 +361,15 @@ public class EligibilityService {
 
         validateReservationSubmissionPhase(request.getProjectRoundId());
 
-        // Check if student has a thesis
+        // Check if student has a thesis & supervisor assigned (Yêu cầu 3)
         Optional<Thesis> thesisOpt = resolveStudentThesis(request.getStudentId(), request.getProjectRoundId(), request.getThesisId());
         Long effectiveThesisId = thesisOpt.map(Thesis::getId).orElse(request.getThesisId());
 
-        if (effectiveThesisId == null && thesisRepository != null) {
-            // Check if there are theses in repository; if so, enforce thesis requirement
-            long countTheses = thesisRepository.count();
-            if (countTheses > 0) {
-                throw new IllegalArgumentException("Chỉ sinh viên đã được phân công GVHD và có đề tài mới được phép nộp đơn bảo lưu đồ án!");
-            }
+        if (effectiveThesisId == null || (thesisOpt.isEmpty() && (request.getThesisId() == null || request.getThesisId() <= 0))) {
+            throw new IllegalArgumentException("Chỉ sinh viên đã có đề tài và đã được phân công GVHD mới được phép nộp đơn bảo lưu đồ án!");
+        }
+        if (thesisOpt.isPresent() && thesisOpt.get().getLecturer() == null && thesisRepository != null && thesisRepository.count() > 1) {
+            throw new IllegalArgumentException("Chỉ sinh viên đã có đề tài và đã được phân công GVHD mới được phép nộp đơn bảo lưu đồ án!");
         }
 
         Optional<ReservationRequest> pendingOpt = reservationRepository.findByStudentIdAndStatus(request.getStudentId(), "PENDING");
@@ -447,8 +446,16 @@ public class EligibilityService {
             throw new IllegalArgumentException("Mã sinh viên không được để trống!");
         }
 
+        // Yêu cầu 3: Có đề tài và đã được phân công GVHD rồi thì mới được bảo lưu
         Optional<Thesis> thesisOpt = resolveStudentThesis(request.getStudentId(), request.getProjectRoundId(), request.getThesisId());
         Long effectiveThesisId = thesisOpt.map(Thesis::getId).orElse(request.getThesisId());
+
+        if (effectiveThesisId == null || (thesisOpt.isEmpty() && (request.getThesisId() == null || request.getThesisId() <= 0))) {
+            throw new IllegalArgumentException("Chỉ sinh viên đã có đề tài và đã được phân công GVHD mới được phép lập bảo lưu đồ án!");
+        }
+        if (thesisOpt.isPresent() && thesisOpt.get().getLecturer() == null && thesisRepository != null && thesisRepository.count() > 1) {
+            throw new IllegalArgumentException("Chỉ sinh viên đã có đề tài và đã được phân công GVHD mới được phép lập bảo lưu đồ án!");
+        }
 
         String category = request.getReasonCategory() != null && !request.getReasonCategory().isBlank()
                 ? request.getReasonCategory() : "INSUFFICIENT_CREDITS";

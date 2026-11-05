@@ -75,11 +75,8 @@ public class AuthService {
 
         User user = userOpt.orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        if (!Boolean.TRUE.equals(user.getIsActive())) {
-            throw new AppException(ErrorCode.USER_LOCKED, "Tài khoản của bạn đã bị khóa hoặc chưa được cấp phép.");
-        }
-
-        // Quy định UTC: Sinh viên ở trạng thái Không đủ điều kiện nhận đồ án sẽ không được cấp tài khoản / không thể đăng nhập
+        // Quy định UTC: Sinh viên ở trạng thái Không đủ điều kiện nhận đồ án (nợ học phí, kỷ luật, nợ tín >= 10, GPA < 2.0)
+        // sẽ không được cấp tài khoản / không thể đăng nhập.
         if (user.getRole() != null && "ROLE_STUDENT".equalsIgnoreCase(user.getRole().getName())) {
             Optional<Student> studentOpt = studentRepository.findByUserId(user.getId());
             if (studentOpt.isPresent()) {
@@ -87,22 +84,51 @@ public class AuthService {
                 if (studentProjectRoundRepository != null) {
                     List<StudentProjectRound> sprList = studentProjectRoundRepository.findByStudentId(student.getId());
                     if (!sprList.isEmpty()) {
-                        boolean hasEligibleRound = sprList.stream().anyMatch(spr ->
-                                ("ELIGIBLE".equalsIgnoreCase(spr.getStatus()) || "FORCE_APPROVED".equalsIgnoreCase(spr.getStatus()))
-                                && spr.getProjectRound() != null
-                                && !"CLOSED".equalsIgnoreCase(spr.getProjectRound().getStatus())
-                                && !"ARCHIVED".equalsIgnoreCase(spr.getProjectRound().getStatus())
-                        );
-                        if (!hasEligibleRound) {
+                        // Kiểm tra xem sinh viên có bất kỳ đợt nào đang tham gia hợp lệ hay không
+                        boolean hasValidParticipation = sprList.stream().anyMatch(spr -> {
+                            String st = spr.getStatus();
+                            if (st == null) return false;
+                            return "ELIGIBLE".equalsIgnoreCase(st)
+                                    || "FORCE_APPROVED".equalsIgnoreCase(st)
+                                    || "REGISTERED".equalsIgnoreCase(st)
+                                    || "ASSIGNED".equalsIgnoreCase(st)
+                                    || "IN_PROGRESS".equalsIgnoreCase(st)
+                                    || "DEFENSE_READY".equalsIgnoreCase(st)
+                                    || "DEFENDED".equalsIgnoreCase(st)
+                                    || "COMPLETED".equalsIgnoreCase(st)
+                                    || "RESERVED".equalsIgnoreCase(st)
+                                    || ("DROPPED".equalsIgnoreCase(st) && spr.getNote() != null && spr.getNote().toLowerCase().contains("chưa đăng ký"));
+                        });
+
+                        if (!hasValidParticipation) {
                             user.setIsActive(false);
                             userRepository.save(user);
-                            String reason = sprList.get(0).getNote() != null ? sprList.get(0).getNote() : "Chưa đủ điều kiện học vụ";
+
+                            // Lấy ghi chú lý do không đủ điều kiện từ đợt gần nhất
+                            StudentProjectRound ineligibleSpr = sprList.stream()
+                                    .filter(spr -> "INELIGIBLE".equalsIgnoreCase(spr.getStatus()) || "DISQUALIFIED".equalsIgnoreCase(spr.getStatus()))
+                                    .reduce((first, second) -> second)
+                                    .orElse(sprList.get(sprList.size() - 1));
+
+                            String reason = org.springframework.util.StringUtils.hasText(ineligibleSpr.getNote())
+                                    ? ineligibleSpr.getNote()
+                                    : "Không đủ điều kiện học vụ";
                             throw new AppException(ErrorCode.USER_LOCKED,
                                     "Sinh viên ở trạng thái Không đủ điều kiện (" + reason + ") nên không được cấp tài khoản đăng nhập vào hệ thống.");
+                        } else {
+                            // Nếu sinh viên có đợt tham gia hợp lệ nhưng tài khoản đang bị vô hiệu hóa, tự động kích hoạt lại
+                            if (!Boolean.TRUE.equals(user.getIsActive())) {
+                                user.setIsActive(true);
+                                userRepository.save(user);
+                            }
                         }
                     }
                 }
             }
+        }
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new AppException(ErrorCode.USER_LOCKED, "Tài khoản của bạn đã bị khóa hoặc chưa được cấp phép.");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {

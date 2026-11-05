@@ -358,6 +358,8 @@ public class StudentExcelParser {
                     debtCredits = (int) Double.parseDouble(debtStr.replace(',', '.'));
                     if (debtCredits < 0) {
                         errors.add("Số tín chỉ nợ phải >= 0 (nhập: " + debtStr + ")");
+                    } else if (debtCredits >= 10) {
+                        errors.add("Sinh viên nợ " + debtCredits + " tín chỉ (>= 10 tín chỉ) - không đủ điều kiện nhận đồ án (bị loại khỏi đợt)");
                     }
                 } catch (NumberFormatException e) {
                     errors.add("Số tín chỉ nợ không đúng định dạng số: " + debtStr);

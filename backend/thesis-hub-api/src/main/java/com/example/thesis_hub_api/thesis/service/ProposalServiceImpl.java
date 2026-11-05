@@ -48,6 +48,9 @@ public class ProposalServiceImpl implements ProposalService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository supervisorAssignmentRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository studentProjectRoundRepository;
+
     @Override
     @Transactional
     public ProposalResponse createProposal(CreateProposalRequest request) {
@@ -330,9 +333,18 @@ public class ProposalServiceImpl implements ProposalService {
         }
         Proposal savedProposal = proposalRepository.save(proposal);
 
-        // Auto-generate official Thesis when Proposal is APPROVED
+        // Auto-generate official Thesis when Proposal is APPROVED and advance student status to IN_PROGRESS (Đã duyệt đề tài)
         if ("APPROVED".equalsIgnoreCase(request.getStatus())) {
             ensureThesisCreatedForProposal(savedProposal);
+            if (studentProjectRoundRepository != null && savedProposal.getStudent() != null && savedProposal.getProjectRound() != null) {
+                studentProjectRoundRepository.findByStudentIdAndProjectRoundId(
+                        savedProposal.getStudent().getId(),
+                        savedProposal.getProjectRound().getId()
+                ).ifPresent(spr -> {
+                    spr.setStatus("IN_PROGRESS");
+                    studentProjectRoundRepository.save(spr);
+                });
+            }
         }
 
         // Gửi thông báo kết quả xét duyệt đề cương cho Sinh viên

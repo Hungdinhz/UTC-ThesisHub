@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import type { ProjectRoundItem, TrainingProgram, CreateProjectRoundPayload, CreateMilestonePayload } from '../types';
@@ -100,6 +100,25 @@ const ProjectRoundManagementPage: React.FC = () => {
     loadRounds();
   }, []);
 
+  const selectedRoundRef = useRef<ProjectRoundItem | null>(null);
+  selectedRoundRef.current = selectedRound;
+
+  useEffect(() => {
+    const handlePhaseChange = async () => {
+      await loadRounds();
+      if (selectedRoundRef.current?.roundId) {
+        try {
+          const fresh = await apiService.getProjectRoundById(selectedRoundRef.current.roundId);
+          setSelectedRound(fresh);
+        } catch {}
+      }
+    };
+    window.addEventListener('utc-phase-change', handlePhaseChange);
+    return () => {
+      window.removeEventListener('utc-phase-change', handlePhaseChange);
+    };
+  }, []);
+
   useEffect(() => {
     if (!error) return;
     setSuccessMsg(null);
@@ -151,6 +170,7 @@ const ProjectRoundManagementPage: React.FC = () => {
       setTransitionTargetStatus(null);
       await loadRounds();
       setSelectedRound(updated);
+      window.dispatchEvent(new CustomEvent('utc-phase-change'));
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái';
       setTransitionError(msg);
@@ -264,7 +284,7 @@ const ProjectRoundManagementPage: React.FC = () => {
     <UTCAppLayout
       activeTab="project-rounds"
       hideHeroBanner={true}
-      pageTitle="Quản lý Đợt đồ án & Mốc thời gian (Contract 2)"
+      pageTitle="GĐ1: Quản trị Đợt đồ án & Mốc thời gian"
       onLogout={logout}
     >
       <div className="round-page-container">
@@ -616,7 +636,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                       gap: '8px'
                     }}
                   >
-                    👥 Danh sách sinh viên & Import Excel (Contract 3)
+                    👥 Danh sách sinh viên & Import Excel
                   </button>
                   <button
                     onClick={() => setRoundActiveTab('lecturers')}

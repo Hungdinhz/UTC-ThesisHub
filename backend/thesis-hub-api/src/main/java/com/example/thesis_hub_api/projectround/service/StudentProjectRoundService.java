@@ -67,6 +67,9 @@ public class StudentProjectRoundService {
     @Autowired(required = false)
     private NotificationService notificationService;
 
+    @Autowired(required = false)
+    private com.example.thesis_hub_api.thesis.repository.ThesisRepository thesisRepository;
+
     private ProjectRound getAndValidateActiveRound(Long roundId) {
         ProjectRound round = projectRoundRepository.findById(roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -239,6 +242,12 @@ public class StudentProjectRoundService {
             }
 
             int rowDebt = row.getDebtCredits() != null ? row.getDebtCredits() : 0;
+            if (rowDebt >= 10) {
+                String debtErr = "Sinh viên nợ " + rowDebt + " tín chỉ (>= 10 tín chỉ) - không đủ điều kiện nhận đồ án (bị loại khỏi đợt)";
+                if (!errors.contains(debtErr)) {
+                    errors.add(debtErr);
+                }
+            }
             boolean rowDisc = Boolean.TRUE.equals(row.getUnderDisciplinaryAction());
             boolean isEligible = rowDebt < 10 && !rowDisc;
             row.setAcademicStatus(isEligible ? "ELIGIBLE" : "INELIGIBLE");
@@ -337,8 +346,8 @@ public class StudentProjectRoundService {
 
         if (reasons.isEmpty()) {
             String note = debt > 0
-                    ? "Đủ ĐK nhận đồ án (Nợ " + debt + " tín chỉ, cần trả nợ trước GĐ5)"
-                    : "Đủ ĐK nhận đồ án (Nợ 0 tín chỉ)";
+                    ? "Nợ " + debt + " TC (cần trả nợ trước GĐ5)"
+                    : "";
             return new EligibilityEvaluation(true, "ELIGIBLE", note);
         } else {
             String note = "Không đủ ĐK: " + String.join(", ", reasons);
@@ -400,8 +409,13 @@ public class StudentProjectRoundService {
                         ? row.getEmail().trim().toLowerCase()
                         : studentCode.toLowerCase() + "@lms.utc.edu.vn";
 
-                // Đánh giá điều kiện học vụ trước: Sinh viên không đủ điều kiện sẽ KHÔNG được cấp tài khoản
+                // Đánh giá điều kiện học vụ trước: Sinh viên nợ >= 10 tín sẽ bị loại bỏ khỏi đợt
                 int debtCredits = row.getDebtCredits() != null ? row.getDebtCredits() : 0;
+                if (debtCredits >= 10) {
+                    log.info("Loại sinh viên {} khỏi đợt do nợ {} tín chỉ (>= 10)", studentCode, debtCredits);
+                    skipped++;
+                    continue;
+                }
                 int completedCredits = row.getCompletedCredits() != null ? row.getCompletedCredits() : 115;
                 boolean tuitionDebt = Boolean.TRUE.equals(row.getTuitionDebt());
                 boolean underDiscipline = Boolean.TRUE.equals(row.getUnderDisciplinaryAction());
@@ -724,6 +738,10 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         }
 
         int debtCredits = dto.getDebtCredits() != null ? Math.max(0, dto.getDebtCredits()) : 0;
+        if (debtCredits >= 10) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED,
+                    String.format("Sinh viên nợ %d tín chỉ (>= 10 tín chỉ) - không đủ điều kiện nhận đồ án và không thể thêm vào đợt.", debtCredits));
+        }
         int defaultCredits = Math.min(maxCredits, 120);
         int completedCredits = dto.getCompletedCredits() != null ? dto.getCompletedCredits() : defaultCredits;
         boolean tuitionDebt = Boolean.TRUE.equals(dto.getTuitionDebt());
@@ -966,7 +984,20 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
 
         // Tự động đánh giá điều kiện nhận đồ án (GĐ1)
         EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, underDiscipline, missingPrereq, gpa);
-        String finalStatus = eval.getStatus();
+        String currentStatus = spr.getStatus();
+        String finalStatus;
+        if (!eval.isEligible()) {
+            finalStatus = "FORCE_APPROVED".equalsIgnoreCase(currentStatus) ? currentStatus : eval.getStatus();
+        } else {
+            // Giữ nguyên các trạng thái tiến độ cao hơn như ASSIGNED, RESERVED, DEFENSE_READY, COMPLETED nếu sinh viên đủ điều kiện
+            if ("ASSIGNED".equalsIgnoreCase(currentStatus) || "RESERVED".equalsIgnoreCase(currentStatus)
+                    || "FORCE_APPROVED".equalsIgnoreCase(currentStatus) || "COMPLETED".equalsIgnoreCase(currentStatus)
+                    || "DEFENSE_READY".equalsIgnoreCase(currentStatus)) {
+                finalStatus = currentStatus;
+            } else {
+                finalStatus = eval.getStatus();
+            }
+        }
         String finalNote = StringUtils.hasText(dto.getNote()) ? dto.getNote().trim() : eval.getNote();
 
         // Cập nhật trạng thái tài khoản: Nếu không đủ điều kiện thì KHÔNG cấp / hủy kích hoạt tài khoản
@@ -1091,7 +1122,12 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                     .filter(spr -> spr.getProjectRound() != null && (round == null || !Objects.equals(spr.getProjectRound().getId(), round.getId())))
                     .anyMatch(spr -> ("OPEN".equalsIgnoreCase(spr.getProjectRound().getStatus())
                             || "IN_PROGRESS".equalsIgnoreCase(spr.getProjectRound().getStatus()))
-                            && ("ELIGIBLE".equalsIgnoreCase(spr.getStatus()) || "FORCE_APPROVED".equalsIgnoreCase(spr.getStatus())));
+                            && ("ELIGIBLE".equalsIgnoreCase(spr.getStatus())
+                                    || "FORCE_APPROVED".equalsIgnoreCase(spr.getStatus())
+                                    || "REGISTERED".equalsIgnoreCase(spr.getStatus())
+                                    || "ASSIGNED".equalsIgnoreCase(spr.getStatus())
+                                    || "IN_PROGRESS".equalsIgnoreCase(spr.getStatus())
+                                    || "DEFENSE_READY".equalsIgnoreCase(spr.getStatus())));
         }
         return false;
     }
@@ -1144,9 +1180,22 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 ? record.getMissingPrerequisiteCount()
                 : 0;
         EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, underDisciplinaryAction, missingPrerequisiteCount, gpa);
-        String finalStatus = eval.isEligible() ? spr.getStatus() : "INELIGIBLE";
-        String note = record != null && StringUtils.hasText(record.getNote()) ? record.getNote() : spr.getNote();
-        if (!eval.isEligible() && "ELIGIBLE".equalsIgnoreCase(spr.getStatus())) {
+        String finalStatus = spr.getStatus();
+        if (!eval.isEligible() && !"FORCE_APPROVED".equalsIgnoreCase(finalStatus)) {
+            finalStatus = "INELIGIBLE";
+        } else if (thesisRepository != null && student != null && student.getId() != null && spr.getProjectRound() != null) {
+            try {
+                if (("ASSIGNED".equalsIgnoreCase(finalStatus) || "REGISTERED".equalsIgnoreCase(finalStatus))
+                        && thesisRepository.existsByStudentIdAndProjectRoundId(student.getId(), spr.getProjectRound().getId())) {
+                    finalStatus = "IN_PROGRESS";
+                }
+            } catch (Exception ignored) {}
+        }
+        String note = StringUtils.hasText(spr.getNote()) ? spr.getNote() : (record != null ? record.getNote() : null);
+        if (StringUtils.hasText(spr.getNote()) && spr.getNote().toLowerCase().contains("chưa đăng ký")) {
+            finalStatus = "DROPPED";
+            note = spr.getNote();
+        } else if (!eval.isEligible() && "ELIGIBLE".equalsIgnoreCase(spr.getStatus())) {
             note = eval.getNote();
         }
 

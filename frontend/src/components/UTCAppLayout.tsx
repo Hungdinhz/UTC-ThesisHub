@@ -377,7 +377,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/project-rounds', true)}
               >
                 <span className="utc-nav-icon">🗓️</span>
-                <span className="utc-nav-label">Quản trị Đợt đồ án &amp; Mốc thời gian</span>
+                <span className="utc-nav-label">GĐ1: Quản trị Đợt đồ án &amp; Mốc thời gian</span>
               </div>
 
               <div
