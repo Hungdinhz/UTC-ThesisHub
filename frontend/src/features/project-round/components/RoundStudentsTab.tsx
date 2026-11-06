@@ -50,11 +50,12 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     hasDebt: number;
   }>({ total: 0, eligible: 0, ineligible: 0, hasDebt: 0 });
 
-  // Xác định hệ đào tạo và giới hạn tín chỉ theo hệ của đợt (Cử nhân 130 tín, Kỹ sư 150 tín)
+  // Xác định hệ đào tạo và giới hạn tín chỉ theo hệ của đợt (khi bắt đầu làm đồ án: Cử nhân 132 tín, Kỹ sư 170 tín; tổng CTĐT: Cử nhân 142, Kỹ sư 180)
   const [resolvedProgram, setResolvedProgram] = useState<{
     code: string;
     name: string;
     maxCredits: number;
+    totalProgramCredits: number;
   }>(() => {
     const isKs =
       trainingProgram === 'KY_SU' ||
@@ -65,7 +66,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     return {
       code: trainingProgram || (isKs ? 'KY_SU' : 'CU_NHAN'),
       name: trainingProgramName || (isKs ? 'Chương trình Kỹ sư' : 'Chương trình Cử nhân'),
-      maxCredits: isKs ? 180 : 142,
+      maxCredits: isKs ? 170 : 132,
+      totalProgramCredits: isKs ? 180 : 142,
     };
   });
 
@@ -83,7 +85,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
           setResolvedProgram({
             code: cur.trainingProgram || (isKs ? 'KY_SU' : 'CU_NHAN'),
             name: cur.trainingProgramName || (isKs ? 'Chương trình Kỹ sư' : 'Chương trình Cử nhân'),
-            maxCredits: isKs ? 180 : 142,
+            maxCredits: isKs ? 170 : 132,
+            totalProgramCredits: isKs ? 180 : 142,
           });
         }
       } catch {
@@ -380,7 +383,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         const num = Number(value);
         if (isNaN(num) || num < 0) return 'Tín chỉ tích lũy phải >= 0';
         if (num > resolvedProgram.maxCredits) {
-          return `Tín chỉ tích lũy không được vượt quá ${resolvedProgram.maxCredits} tín (hệ ${resolvedProgram.name})`;
+          return `Tín chỉ tích lũy khi bắt đầu làm đồ án không được vượt quá ${resolvedProgram.maxCredits} tín (hệ ${resolvedProgram.name})`;
         }
         return '';
       }
@@ -389,7 +392,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         const num = Number(value);
         if (isNaN(num) || num < 0) return 'Số tín chỉ nợ phải >= 0';
         if (num > 10) {
-          return 'Sinh viên nợ trên 10 tín chỉ không đủ điều kiện nhận đồ án (bị loại)';
+          return `Sinh viên nợ ${num} tín chỉ (> 10 tín chỉ) - không đủ điều kiện nhận đồ án (bị loại)`;
         }
         if (num > resolvedProgram.maxCredits) {
           return `Số tín chỉ nợ không thể vượt quá ${resolvedProgram.maxCredits} tín`;
@@ -410,6 +413,15 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   const handleManualFieldChange = (field: keyof CreateRoundStudentManualPayload, value: any) => {
     if (manualModalError) setManualModalError(null);
     const updated = { ...manualForm, [field]: value };
+    if (field === 'completedCredits') {
+      const compNum = Number(value);
+      const autoDebt = !isNaN(compNum) && value !== '' && value !== undefined
+        ? Math.max(0, resolvedProgram.maxCredits - compNum)
+        : 0;
+      updated.debtCredits = autoDebt;
+      const debtErr = validateManualField('debtCredits', autoDebt);
+      setManualErrors((prev) => ({ ...prev, debtCredits: debtErr }));
+    }
     if (field === 'studentCode') {
       const code = String(value || '').trim();
       setEligibilityResult(null);
@@ -670,7 +682,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         fullName: manualForm.fullName.trim(),
         email: emailVal,
         completedCredits: Number(manualForm.completedCredits ?? resolvedProgram.maxCredits),
-        debtCredits: Number(manualForm.debtCredits ?? 0),
+        debtCredits: Math.max(0, resolvedProgram.maxCredits - Number(manualForm.completedCredits ?? resolvedProgram.maxCredits)),
         missingPrerequisiteCount: 0,
         tuitionDebt: Boolean(manualForm.tuitionDebt),
         underDisciplinaryAction: Boolean(manualForm.underDisciplinaryAction),
@@ -714,6 +726,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     if (isRoundClosed) return;
     setEditingStudent(st);
     setEditModalError(null);
+    const initialCompleted = st.completedCredits !== undefined && st.completedCredits !== null ? st.completedCredits : resolvedProgram.maxCredits;
+    const initialDebt = Math.max(0, resolvedProgram.maxCredits - initialCompleted);
     setEditForm({
       fullName: st.fullName || '',
       className: st.className || '',
@@ -721,8 +735,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       email: st.email || '',
       phone: st.phone || '',
       gpa: st.gpa !== undefined && st.gpa !== null ? st.gpa : 3.0,
-      completedCredits: st.completedCredits !== undefined && st.completedCredits !== null ? st.completedCredits : resolvedProgram.maxCredits,
-      debtCredits: st.debtCredits !== undefined && st.debtCredits !== null ? st.debtCredits : 0,
+      completedCredits: initialCompleted,
+      debtCredits: initialDebt,
       tuitionDebt: Boolean(st.tuitionDebt),
       underDisciplinaryAction: Boolean(st.underDisciplinaryAction),
       missingPrerequisiteCount: 0,
@@ -744,18 +758,14 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     }
 
     const editCompletedNum = typeof editForm.completedCredits === 'string' ? parseInt(editForm.completedCredits, 10) : editForm.completedCredits;
-    const editDebtNum = typeof editForm.debtCredits === 'string' ? parseInt(editForm.debtCredits, 10) : editForm.debtCredits;
+    const editDebtNum = !isNaN(editCompletedNum) ? Math.max(0, resolvedProgram.maxCredits - editCompletedNum) : 0;
 
     if (!isNaN(editCompletedNum) && editCompletedNum > resolvedProgram.maxCredits) {
-      setEditModalError(`Tín chỉ tích lũy (${editCompletedNum}) vượt quá số tín chỉ tối đa của hệ ${resolvedProgram.name} (${resolvedProgram.maxCredits} tín chỉ). Vui lòng nhập trong khoảng 0 - ${resolvedProgram.maxCredits}.`);
+      setEditModalError(`Tín chỉ tích lũy (${editCompletedNum}) vượt quá số tín chỉ tối đa khi bắt đầu làm đồ án của hệ ${resolvedProgram.name} (${resolvedProgram.maxCredits} tín chỉ). Vui lòng nhập trong khoảng 0 - ${resolvedProgram.maxCredits}.`);
       return;
     }
     if (!isNaN(editCompletedNum) && editCompletedNum < 0) {
       setEditModalError('Tín chỉ tích lũy không được nhỏ hơn 0.');
-      return;
-    }
-    if (!isNaN(editDebtNum) && editDebtNum > resolvedProgram.maxCredits) {
-      setEditModalError(`Tín chỉ nợ (${editDebtNum}) không thể vượt quá tổng tín chỉ của hệ ${resolvedProgram.name} (${resolvedProgram.maxCredits} tín chỉ).`);
       return;
     }
 
@@ -764,12 +774,12 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setEditModalError(null);
 
       const gpaNum = typeof editForm.gpa === 'string' ? parseFloat(editForm.gpa) : editForm.gpa;
-      const debtCreditsNum = typeof editForm.debtCredits === 'string' ? parseInt(editForm.debtCredits, 10) : editForm.debtCredits;
-      const completedCreditsNum = typeof editForm.completedCredits === 'string' ? parseInt(editForm.completedCredits, 10) : editForm.completedCredits;
+      const completedCreditsNum = !isNaN(editCompletedNum) ? editCompletedNum : resolvedProgram.maxCredits;
+      const debtCreditsNum = editDebtNum;
       const missingPrereqNum = typeof editForm.missingPrerequisiteCount === 'string' ? parseInt(editForm.missingPrerequisiteCount, 10) : editForm.missingPrerequisiteCount;
 
       const evalResult = computeStudentEligibility(
-        isNaN(debtCreditsNum) ? 0 : debtCreditsNum,
+        debtCreditsNum,
         editForm.tuitionDebt,
         editForm.underDisciplinaryAction,
         isNaN(missingPrereqNum) ? 0 : missingPrereqNum,
@@ -783,8 +793,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         email: editForm.email.trim() || undefined,
         phone: editForm.phone.trim() || undefined,
         gpa: isNaN(gpaNum) ? undefined : gpaNum,
-        debtCredits: isNaN(debtCreditsNum) ? 0 : Math.max(0, debtCreditsNum),
-        completedCredits: isNaN(completedCreditsNum) ? resolvedProgram.maxCredits : Math.max(0, completedCreditsNum),
+        debtCredits: debtCreditsNum,
+        completedCredits: completedCreditsNum,
         tuitionDebt: editForm.tuitionDebt,
         underDisciplinaryAction: editForm.underDisciplinaryAction,
         missingPrerequisiteCount: 0,
@@ -1713,8 +1723,19 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                       min="0"
                       max={resolvedProgram.maxCredits}
                       value={editForm.completedCredits}
-                      onChange={(e) => setEditForm({ ...editForm, completedCredits: e.target.value })}
-                      placeholder={`VD: ${resolvedProgram.maxCredits - 15} (tối đa ${resolvedProgram.maxCredits})`}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const num = Number(val);
+                        const autoDebt = !isNaN(num) && val !== ''
+                          ? Math.max(0, resolvedProgram.maxCredits - num)
+                          : 0;
+                        setEditForm({
+                          ...editForm,
+                          completedCredits: val,
+                          debtCredits: autoDebt,
+                        });
+                      }}
+                      placeholder={`VD: ${resolvedProgram.maxCredits - 4} (tối đa ${resolvedProgram.maxCredits})`}
                       required
                       style={{
                         width: '100%',
@@ -1732,26 +1753,36 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                      Tín chỉ nợ (tối đa 10 tín)
+                      Tín chỉ nợ (khóa cứng theo TC tích lũy)
                     </label>
                     <input
                       type="number"
                       min="0"
                       max={resolvedProgram.maxCredits}
                       value={editForm.debtCredits}
-                      onChange={(e) => setEditForm({ ...editForm, debtCredits: e.target.value })}
-                      placeholder="VD: 0"
+                      readOnly
+                      tabIndex={-1}
+                      placeholder="0"
+                      title="Tín chỉ nợ được khóa cứng và tính tự động theo tín chỉ tích lũy"
                       style={{
                         width: '100%',
                         padding: '7px 10px',
                         borderRadius: '6px',
-                        border: (Number(editForm.debtCredits) > resolvedProgram.maxCredits) ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                        backgroundColor: (Number(editForm.debtCredits) > resolvedProgram.maxCredits) ? '#fef2f2' : '#fff',
+                        border: (Number(editForm.debtCredits) > 10) ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        backgroundColor: '#f1f5f9',
+                        cursor: 'not-allowed',
+                        color: (Number(editForm.debtCredits) > 10) ? '#dc2626' : '#334155',
+                        fontWeight: 600,
                       }}
                     />
-                    {Number(editForm.debtCredits) > resolvedProgram.maxCredits && (
-                      <div style={{ color: '#dc2626', fontSize: '0.72rem', marginTop: '3px', fontWeight: 600 }}>
-                        ⚠️ Không thể vượt quá {resolvedProgram.maxCredits} tín
+                      { Number(editForm.debtCredits) > 10 && (
+                        <div style={{ color: '#dc2626', fontSize: '0.72rem', marginTop: '3px', fontWeight: 600 }}>
+                          ⚠️ Nợ {editForm.debtCredits} tín (&gt; 10 tín) - Không đủ điều kiện nhận đồ án (bị loại)
+                        </div>
+                      )}
+                    {Number(editForm.debtCredits) > 0 && Number(editForm.debtCredits) <= 10 && (
+                      <div style={{ color: '#0369a1', fontSize: '0.72rem', marginTop: '3px', fontWeight: 500 }}>
+                        ℹ️ Nợ {editForm.debtCredits} tín (cần trả nợ trước GĐ5)
                       </div>
                     )}
                   </div>
@@ -1823,7 +1854,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             <h3 style={{ margin: '0 0 12px 0', color: '#0a3273' }}>
               ➕ Thêm Sinh viên &amp; Dữ liệu Học vụ thủ công
             </h3>
-            
+
             <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '0.85rem', color: '#1e40af' }}>
               🔐 <strong>Cấp tài khoản đăng nhập tự động:</strong> Khi lưu, hệ thống tự động tạo tài khoản Sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu mặc định = Password@123</strong>.
             </div>
@@ -2102,22 +2133,38 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                      Tín chỉ nợ (tối đa 10 tín)
+                      Tín chỉ nợ (khóa cứng theo TC tích lũy)
                     </label>
                     <input
                       type="number"
                       min="0"
                       max={resolvedProgram.maxCredits}
                       value={manualForm.debtCredits ?? 0}
-                      onChange={(e) => handleManualFieldChange('debtCredits', Number(e.target.value))}
-                      placeholder="VD: 0"
+                      readOnly
+                      tabIndex={-1}
+                      placeholder="0"
+                      title="Tín chỉ nợ được khóa cứng và tính tự động theo tín chỉ tích lũy"
                       style={{
                         width: '100%',
                         padding: '7px 10px',
                         borderRadius: '6px',
-                        border: ((manualForm.debtCredits ?? 0) > resolvedProgram.maxCredits) ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        border: ((manualForm.debtCredits ?? 0) > 10) ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        backgroundColor: '#f1f5f9',
+                        cursor: 'not-allowed',
+                        color: ((manualForm.debtCredits ?? 0) > 10) ? '#dc2626' : '#334155',
+                        fontWeight: 600,
                       }}
                     />
+                    {(manualForm.debtCredits ?? 0) > 10 && (
+                      <div style={{ color: '#dc2626', fontSize: '0.72rem', marginTop: '3px', fontWeight: 600 }}>
+                        ⚠️ Nợ {manualForm.debtCredits} tín (&gt; 10 tín) - Không đủ điều kiện nhận đồ án (bị loại)
+                      </div>
+                    )}
+                    {(manualForm.debtCredits ?? 0) > 0 && (manualForm.debtCredits ?? 0) <= 10 && (
+                      <div style={{ color: '#0369a1', fontSize: '0.72rem', marginTop: '3px', fontWeight: 500 }}>
+                        ℹ️ Nợ {manualForm.debtCredits} tín (cần trả nợ trước GĐ5)
+                      </div>
+                    )}
                   </div>
                 </div>
 
