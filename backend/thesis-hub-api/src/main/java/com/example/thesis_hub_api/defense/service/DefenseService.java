@@ -16,6 +16,7 @@ import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.service.ProjectRoundService;
+import com.example.thesis_hub_api.notification.service.NotificationService;
 import com.example.thesis_hub_api.thesis.entity.Thesis;
 import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,9 @@ public class DefenseService {
     @Autowired(required = false)
     @Lazy
     private ProjectRoundService projectRoundService;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     private boolean isThesisDefenseEligible(Thesis t) {
         if (t == null) return false;
@@ -315,6 +319,36 @@ public class DefenseService {
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
         council.setStatus("FINALIZED");
         DefenseCouncil saved = councilRepository.save(council);
+
+        if (notificationService != null && lecturerRepository != null) {
+            List<CouncilMember> members = memberRepository.findByCouncilId(id);
+            for (CouncilMember m : members) {
+                if (m.getLecturerId() != null) {
+                    lecturerRepository.findById(m.getLecturerId()).ifPresent(lec -> {
+                        if (lec.getUser() != null && lec.getUser().getId() != null) {
+                            try {
+                                String roleVn = switch (m.getRole() != null ? m.getRole().toUpperCase() : "") {
+                                    case "PRESIDENT" -> "Chủ tịch Hội đồng";
+                                    case "SECRETARY" -> "Thư ký Hội đồng";
+                                    case "REVIEWER_1" -> "Ủy viên Phản biện 1";
+                                    case "REVIEWER_2" -> "Ủy viên Phản biện 2";
+                                    case "MEMBER" -> "Ủy viên Hội đồng";
+                                    default -> "Thành viên Hội đồng";
+                                };
+                                notificationService.createNotification(
+                                        lec.getUser().getId(),
+                                        "Quyết định thành lập Hội đồng bảo vệ",
+                                        "Thầy/Cô đã được phân công tham gia " + council.getName() + " với vai trò: " + roleVn + ".",
+                                        "DEFENSE",
+                                        "/defense-councils"
+                                );
+                            } catch (Exception ignored) {}
+                        }
+                    });
+                }
+            }
+        }
+
         return mapToCouncilResponse(saved);
     }
 
@@ -386,6 +420,8 @@ public class DefenseService {
         }
 
         memberRepository.deleteByCouncilId(councilId);
+        // IDENTITY inserts run before deferred deletes; release the council/lecturer unique keys first.
+        memberRepository.flush();
         for (CouncilMemberDTO m : updatedMembers) {
             saveCouncilMember(councilId, m.getLecturerId(), m.getRole());
         }
@@ -729,6 +765,60 @@ public class DefenseService {
                     .displayOrder(order++)
                     .build();
             scheduleThesisRepository.save(dst);
+        }
+
+        if (notificationService != null) {
+            StringBuilder timeSb = new StringBuilder();
+            if (savedSchedule.getDefenseDate() != null) {
+                timeSb.append("ngày ").append(savedSchedule.getDefenseDate());
+            }
+            if (savedSchedule.getRoom() != null && !savedSchedule.getRoom().isBlank()) {
+                timeSb.append(", phòng ").append(savedSchedule.getRoom().trim());
+            }
+            if (savedSchedule.getStartTime() != null) {
+                timeSb.append(" (bắt đầu ").append(savedSchedule.getStartTime()).append(")");
+            }
+            String timeDetail = timeSb.toString();
+
+            if (thesisRepository != null) {
+                for (Long tId : uniqueIds) {
+                    if (tId == null) continue;
+                    thesisRepository.findById(tId).ifPresent(th -> {
+                        if (th.getStudent() != null && th.getStudent().getUser() != null) {
+                            try {
+                                notificationService.createNotification(
+                                        th.getStudent().getUser().getId(),
+                                        "Lịch bảo vệ đồ án tốt nghiệp chính thức",
+                                        "Đề tài [" + th.getTitleVn() + "] của bạn đã được xếp lịch bảo vệ vào " + timeDetail + ". Vui lòng chuẩn bị và có mặt đúng giờ.",
+                                        "DEFENSE",
+                                        "/my-defense"
+                                );
+                            } catch (Exception ignored) {}
+                        }
+                    });
+                }
+            }
+
+            if (lecturerRepository != null && savedSchedule.getCouncilId() != null) {
+                List<CouncilMember> members = memberRepository.findByCouncilId(savedSchedule.getCouncilId());
+                for (CouncilMember m : members) {
+                    if (m.getLecturerId() != null) {
+                        lecturerRepository.findById(m.getLecturerId()).ifPresent(lec -> {
+                            if (lec.getUser() != null && lec.getUser().getId() != null) {
+                                try {
+                                    notificationService.createNotification(
+                                            lec.getUser().getId(),
+                                            "Lịch bảo vệ đồ án của Hội đồng",
+                                            "Hội đồng của Thầy/Cô đã có lịch bảo vệ cho " + uniqueIds.size() + " sinh viên vào " + timeDetail + ".",
+                                            "DEFENSE",
+                                            "/defense-schedules"
+                                    );
+                                } catch (Exception ignored) {}
+                            }
+                        });
+                    }
+                }
+            }
         }
     }
 
@@ -1403,6 +1493,22 @@ public class DefenseService {
         entity.setNotes(request.getNotes() != null ? request.getNotes() : "Đã tổng hợp điểm tốt nghiệp");
 
         GraduationResult saved = graduationResultRepository.save(entity);
+        if (notificationService != null && thesisRepository != null) {
+            thesisRepository.findById(thesisId).ifPresent(t -> {
+                if (t.getStudent() != null && t.getStudent().getUser() != null) {
+                    try {
+                        String resultStatusVi = "PASSED".equalsIgnoreCase(finalResult) ? "ĐẠT (Qua môn)" : "KHÔNG ĐẠT";
+                        notificationService.createNotification(
+                                t.getStudent().getUser().getId(),
+                                "Kết quả bảo vệ đồ án tốt nghiệp",
+                                "Điểm bảo vệ đồ án [" + t.getTitleVn() + "] của bạn: " + finalScore + " điểm. Kết quả: " + resultStatusVi + " (Xếp loại: " + grade + ").",
+                                "DEFENSE_RESULT",
+                                "/my-defense"
+                        );
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
         return enrichGraduationResultDTO(saved);
     }
 

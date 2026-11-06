@@ -22,11 +22,9 @@ import java.util.Set;
 @Component
 public class AcademicStaffExcelExporter {
 
-    private static final String[] ELIGIBLE_HEADERS = {
-            "STT", "Mã sinh viên", "Họ và tên", "Lớp", "Ngành", "Tín chỉ tích lũy", "Tín chỉ nợ", "GPA", "Trạng thái"
-    };
-    private static final String[] INELIGIBLE_HEADERS = {
-            "STT", "Mã sinh viên", "Họ và tên", "Lớp", "Tín chỉ nợ", "Trạng thái", "Lý do"
+    private static final String[] FULL_STUDENT_HEADERS = {
+            "STT", "MSSV", "Họ và tên", "Lớp", "Ngành", "Email", "Số điện thoại",
+            "TC tích lũy", "GPA", "Học phí", "Kỷ luật", "Nợ tín", "Trạng thái", "Ghi chú"
     };
     private static final String[] GRADE_HEADERS = {
             "STT", "Mã sinh viên", "Họ và tên", "Tên đề tài", "GVHD", "Điểm GVHD", "Điểm phản biện",
@@ -49,65 +47,91 @@ public class AcademicStaffExcelExporter {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Styles st = createStyles(workbook);
 
-            // Sheet 1: Đủ điều kiện
+            // Sheet 1: Toàn bộ danh sách sinh viên trong đợt (đầy đủ cột như bảng danh sách bên dưới)
+            Sheet allSheet = workbook.createSheet("Danh_sach_sinh_vien");
+            int rAll = writeTitle(allSheet, st, "DANH SÁCH SINH VIÊN TRONG ĐỢT ĐỒ ÁN",
+                    "Đợt: " + safe(data.getRoundName()) + " (" + safe(data.getRoundCode()) + ")"
+                            + " - Điều kiện: nợ tín chỉ <= " + data.getMaxDebtCredits(),
+                    FULL_STUDENT_HEADERS.length);
+            writeHeader(allSheet, st, rAll++, FULL_STUDENT_HEADERS);
+            int sttAll = 1;
+            for (EligibleStudentRowDTO s : data.getStudents()) {
+                writeStudentRow(allSheet.createRow(rAll++), st, sttAll++, s);
+            }
+            rAll++;
+            Row sumAll = allSheet.createRow(rAll);
+            Cell sumAllCell = sumAll.createCell(1);
+            sumAllCell.setCellValue("Tổng số sinh viên trong đợt: " + data.getTotalStudents()
+                    + " (Đủ điều kiện: " + data.getEligibleCount() + ", Không đủ điều kiện: " + data.getIneligibleCount() + ")");
+            sumAllCell.setCellStyle(st.bold);
+            widths(allSheet, 6, 16, 26, 18, 24, 28, 16, 14, 10, 14, 14, 12, 18, 36);
+
+            // Sheet 2: Đủ điều kiện
             Sheet ok = workbook.createSheet("Du_dieu_kien");
             int r = writeTitle(ok, st, "DANH SÁCH SINH VIÊN ĐỦ ĐIỀU KIỆN NHẬN ĐỒ ÁN",
                     "Đợt: " + safe(data.getRoundName()) + " (" + safe(data.getRoundCode()) + ")"
-                            + " - Điều kiện: nợ tín chỉ < " + data.getMaxDebtCredits(),
-                    ELIGIBLE_HEADERS.length);
-            writeHeader(ok, st, r++, ELIGIBLE_HEADERS);
+                            + " - Điều kiện: nợ tín chỉ <= " + data.getMaxDebtCredits(),
+                    FULL_STUDENT_HEADERS.length);
+            writeHeader(ok, st, r++, FULL_STUDENT_HEADERS);
             int stt = 1;
             for (EligibleStudentRowDTO s : data.getStudents()) {
                 if (!s.isEligible()) {
                     continue;
                 }
-                Row row = ok.createRow(r++);
-                cell(row, 0, st.center).setCellValue(stt++);
-                cell(row, 1, st.center).setCellValue(safe(s.getStudentCode()));
-                cell(row, 2, st.text).setCellValue(safe(s.getFullName()));
-                cell(row, 3, st.center).setCellValue(safe(s.getClassName()));
-                cell(row, 4, st.text).setCellValue(safe(s.getMajorName()));
-                setInt(cell(row, 5, st.center), s.getCompletedCredits());
-                setInt(cell(row, 6, st.center), s.getDebtCredits());
-                if (s.getGpa() != null) {
-                    cell(row, 7, st.number).setCellValue(s.getGpa());
-                } else {
-                    cell(row, 7, st.center);
-                }
-                cell(row, 8, st.center).setCellValue("FORCE_APPROVED".equalsIgnoreCase(s.getStatus()) ? "Duyệt đặc cách" : "Đủ điều kiện");
+                writeStudentRow(ok.createRow(r++), st, stt++, s);
             }
             r++;
             Row sum = ok.createRow(r);
             Cell sumCell = sum.createCell(1);
             sumCell.setCellValue("Tổng số sinh viên đủ điều kiện: " + (stt - 1) + " / " + data.getTotalStudents());
             sumCell.setCellStyle(st.bold);
-            widths(ok, 6, 16, 28, 16, 28, 16, 12, 8, 18);
+            widths(ok, 6, 16, 26, 18, 24, 28, 16, 14, 10, 14, 14, 12, 18, 36);
 
-            // Sheet 2: Không đủ điều kiện / chưa có dữ liệu
+            // Sheet 3: Không đủ điều kiện / chưa có dữ liệu
             Sheet no = workbook.createSheet("Khong_du_dieu_kien");
             r = writeTitle(no, st, "DANH SÁCH SINH VIÊN KHÔNG ĐỦ ĐIỀU KIỆN HOẶC CHƯA CÓ DỮ LIỆU HỌC VỤ",
                     "Đợt: " + safe(data.getRoundName()) + " (" + safe(data.getRoundCode()) + ")",
-                    INELIGIBLE_HEADERS.length);
-            writeHeader(no, st, r++, INELIGIBLE_HEADERS);
+                    FULL_STUDENT_HEADERS.length);
+            writeHeader(no, st, r++, FULL_STUDENT_HEADERS);
             stt = 1;
             for (EligibleStudentRowDTO s : data.getStudents()) {
                 if (s.isEligible()) {
                     continue;
                 }
-                Row row = no.createRow(r++);
-                cell(row, 0, st.center).setCellValue(stt++);
-                cell(row, 1, st.center).setCellValue(safe(s.getStudentCode()));
-                cell(row, 2, st.text).setCellValue(safe(s.getFullName()));
-                cell(row, 3, st.center).setCellValue(safe(s.getClassName()));
-                setInt(cell(row, 4, st.center), s.getDebtCredits());
-                cell(row, 5, st.center).setCellValue(statusLabel(s.getStatus()));
-                cell(row, 6, st.text).setCellValue(s.getReasons() == null ? "" : String.join("; ", s.getReasons()));
+                writeStudentRow(no.createRow(r++), st, stt++, s);
             }
-            widths(no, 6, 16, 28, 16, 12, 20, 80);
+            widths(no, 6, 16, 26, 18, 24, 28, 16, 14, 10, 14, 14, 12, 18, 36);
 
             workbook.write(out);
             return out.toByteArray();
         }
+    }
+
+    private void writeStudentRow(Row row, Styles st, int stt, EligibleStudentRowDTO s) {
+        cell(row, 0, st.center).setCellValue(stt);
+        cell(row, 1, st.center).setCellValue(safe(s.getStudentCode()));
+        cell(row, 2, st.text).setCellValue(safe(s.getFullName()));
+        cell(row, 3, st.center).setCellValue(safe(s.getClassName()));
+        String majorDisplay = !safe(s.getMajorCode()).isEmpty() && !safe(s.getMajorName()).isEmpty()
+                ? s.getMajorCode() + " - " + s.getMajorName()
+                : (!safe(s.getMajorName()).isEmpty() ? s.getMajorName() : safe(s.getMajorCode()));
+        cell(row, 4, st.text).setCellValue(majorDisplay);
+        cell(row, 5, st.text).setCellValue(safe(s.getEmail()));
+        cell(row, 6, st.center).setCellValue(safe(s.getPhone()));
+        setInt(cell(row, 7, st.center), s.getCompletedCredits());
+        if (s.getGpa() != null) {
+            cell(row, 8, st.number).setCellValue(s.getGpa());
+        } else {
+            cell(row, 8, st.center);
+        }
+        cell(row, 9, st.center).setCellValue(Boolean.TRUE.equals(s.getTuitionDebt()) ? "Nợ HP" : "Đã đóng");
+        cell(row, 10, st.center).setCellValue(Boolean.TRUE.equals(s.getUnderDisciplinaryAction()) ? "Bị KL" : "Không");
+        setInt(cell(row, 11, st.center), s.getDebtCredits() != null ? s.getDebtCredits() : 0);
+        cell(row, 12, st.center).setCellValue(statusLabel(s.getStatus()));
+        String noteOrReasons = !safe(s.getNote()).isEmpty()
+                ? s.getNote()
+                : (s.getReasons() == null ? "" : String.join("; ", s.getReasons()));
+        cell(row, 13, st.text).setCellValue(noteOrReasons);
     }
 
     // ─── Danh sách điểm đồ án theo lớp ───────────────────────────────────────

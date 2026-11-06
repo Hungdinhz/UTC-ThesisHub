@@ -140,6 +140,8 @@ export interface FinalDefenseEligibilityResponse {
   reservationReason?: string;
   studentRoundStatus?: string;
   completedCredits?: number;
+  debtCredits?: number;
   missingPrerequisiteCount?: number;
   tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
 }

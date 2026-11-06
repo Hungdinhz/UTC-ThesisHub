@@ -194,24 +194,6 @@ export const AdminDashboard: React.FC = () => {
             >
               <span>🗓️</span> Quản lý Đợt đồ án
             </button>
-            <button
-              onClick={() => navigate('/chat')}
-              style={{
-                backgroundColor: '#f8fafc',
-                color: '#0a3273',
-                border: '1px solid #cbd5e1',
-                padding: '9px 16px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span>💬</span> Nhóm Chat GV–SV
-            </button>
           </div>
         </div>
 

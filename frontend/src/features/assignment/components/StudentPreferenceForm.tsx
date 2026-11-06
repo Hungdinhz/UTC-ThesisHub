@@ -39,9 +39,9 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   studentProgram = 'CU_NHAN',
   loading,
   projectRoundName,
-  projectRoundCode,
-  academicYear,
-  semester,
+  projectRoundCode: _projectRoundCode,
+  academicYear: _academicYear,
+  semester: _semester,
   isRoundClosed = false,
   hasSubmitted = false,
   canEdit = true,
@@ -165,33 +165,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
 
   return (
     <div className="student-reg-card">
-      <div className="form-intro-banner">
-        <div className="banner-icon">{hasSubmitted ? '✏️' : '📝'}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
-            <h3 style={{ margin: 0 }}>
-              {hasSubmitted
-                ? 'Chỉnh sửa Hướng đồ án & Nguyện vọng Giảng viên hướng dẫn'
-                : 'Đăng ký Hướng đồ án & Nguyện vọng Giảng viên hướng dẫn'}
-            </h3>
-            {projectRoundName && (
-              <span className="round-tag-indicator">
-                🎓 Đang phân công cho: <strong>{projectRoundName}</strong> {projectRoundCode ? `(${projectRoundCode})` : ''}
-              </span>
-            )}
-          </div>
-          <p style={{ color: '#1e293b', fontSize: '0.95rem', fontWeight: 500, margin: '4px 0 0 0' }}>
-            Sinh viên lựa chọn hướng chuyên môn và đăng ký tối đa 3 nguyện vọng giảng viên cho đợt đồ án{' '}
-            <strong>{projectRoundName || 'tốt nghiệp'}</strong>
-            {academicYear ? ` (${academicYear}${semester ? ` - ${semester}` : ''})` : ''}.
-            {studentProgram === 'KY_SU' && (
-              <span className="badge-kysu-note">
-                Chương trình Kỹ sư: Yêu cầu GVHD có học vị Tiến sĩ (TS/PGS/GS) trở lên.
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
+      
 
       {isRoundClosed && (
         <div className="alert-box alert-warning" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderLeft: '4px solid #f59e0b' }}>

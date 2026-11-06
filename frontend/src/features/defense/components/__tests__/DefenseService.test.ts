@@ -28,9 +28,36 @@ describe('DefenseService member structure', () => {
     expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/defense/councils/1/members'), members, expect.any(Object));
   });
 
-  it('rejects the old two-secretary/two-member structure before making a request', async () => {
-    const oldMembers = members.map((m) => ({ ...m, role: m.role === 'REVIEWER_1' ? 'SECRETARY' as const : m.role === 'REVIEWER_2' ? 'MEMBER' as const : m.role }));
-    await expect(service.updateCouncilMembers(1, oldMembers)).rejects.toThrow('Ủy viên Phản biện 1');
+  it('converts a generated legacy council before displaying and saving a manual replacement', async () => {
+    const legacy = { ...council, members: members.map((m) => ({ ...m,
+      role: m.role === 'REVIEWER_1' ? 'SECRETARY' as const : m.role === 'REVIEWER_2' ? 'MEMBER' as const : m.role,
+    })) };
+    vi.mocked(axios.post).mockResolvedValue({ data: { data: [legacy] } });
+    const generated = await service.generateCouncils({ projectRoundId: 10 });
+    expect(generated[0].members.map((m) => m.role)).toEqual([...COUNCIL_ROLES]);
+    expect(generated[0].members.map((m) => m.lecturerId)).toEqual(members.map((m) => m.lecturerId));
+
+    const changed = generated[0].members.map((m) => m.role === 'REVIEWER_1' ? { ...m, lecturerId: 508 } : m);
+    vi.mocked(axios.put).mockResolvedValue({ data: { data: { ...council, members: changed } } });
+    await expect(service.updateCouncilMembers(1, changed)).resolves.toMatchObject({ members: changed });
+    expect(axios.put).toHaveBeenCalledWith(expect.stringContaining('/defense/councils/1/members'), changed, expect.any(Object));
+  });
+
+  it('normalizes legacy councils loaded on refresh without changing other structures', async () => {
+    const legacy = { ...council, members: members.map((m) => ({ ...m,
+      role: m.role === 'REVIEWER_1' ? 'SECRETARY' as const : m.role === 'REVIEWER_2' ? 'MEMBER' as const : m.role,
+    })) };
+    const finalizedLegacy = { ...legacy, status: 'FINALIZED' };
+    vi.mocked(axios.get).mockResolvedValue({ data: { data: [legacy, council, finalizedLegacy] } });
+    const result = await service.getCouncils(10);
+    expect(result[0].members.map((m) => m.role)).toEqual([...COUNCIL_ROLES]);
+    expect(result[1]).toEqual(council);
+    expect(result[2]).toEqual(finalizedLegacy);
+  });
+
+  it('rejects unrelated invalid structures rather than guessing the roles', async () => {
+    const invalid = members.map((m, i) => i === 4 ? { ...m, role: 'SECRETARY' as const } : m);
+    await expect(service.updateCouncilMembers(1, invalid)).rejects.toThrow('đúng 5 người');
     expect(axios.put).not.toHaveBeenCalled();
   });
 

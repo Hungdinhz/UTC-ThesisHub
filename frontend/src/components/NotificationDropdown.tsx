@@ -133,8 +133,14 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
       targetUrl = (userType === 'supervisor') ? '/supervisor/dashboard' : '/student/dashboard';
     } else if (nType === 'DEFENSE') {
       targetUrl = (userType === 'supervisor' || userType === 'committee_member') ? '/admin/defense-schedules' : '/student/dashboard';
+    } else if (nType === 'DEFENSE_RESULT') {
+      targetUrl = (userType === 'student') ? '/student/dashboard' : '/admin/defense-schedules';
+    } else if (nType === 'RESERVATION') {
+      targetUrl = (userType === 'student') ? '/student/reservations' : '/admin/final-eligibility';
+    } else if (nType === 'ACADEMIC') {
+      targetUrl = (userType === 'student') ? '/student/profile' : '/admin/final-eligibility';
     } else if (nType === 'ELIGIBILITY') {
-      targetUrl = '/student/dashboard';
+      targetUrl = (userType === 'student') ? '/student/dashboard' : '/admin/final-eligibility';
     }
 
     if (targetUrl) {
@@ -191,6 +197,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
     if (upper === 'PROPOSAL') return '📑';
     if (upper === 'ASSIGNMENT') return '🎯';
     if (upper === 'DEFENSE') return '📅';
+    if (upper === 'DEFENSE_RESULT') return '🏆';
+    if (upper === 'RESERVATION') return '🛡️';
+    if (upper === 'ACADEMIC') return '⚠️';
     if (upper === 'ELIGIBILITY') return '⚖️';
     if (upper.includes('GROUP')) return '👥';
     if (upper.includes('SUPERVISOR')) return '👨‍🏫';
@@ -209,6 +218,9 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
     if (upper === 'PROPOSAL') return '#8b5cf6';
     if (upper === 'ASSIGNMENT') return '#f59e0b';
     if (upper === 'DEFENSE') return '#ec4899';
+    if (upper === 'DEFENSE_RESULT') return '#10b981';
+    if (upper === 'RESERVATION') return '#6366f1';
+    if (upper === 'ACADEMIC') return '#ef4444';
     if (upper === 'ELIGIBILITY') return '#14b8a6';
     return '#64748b';
   };

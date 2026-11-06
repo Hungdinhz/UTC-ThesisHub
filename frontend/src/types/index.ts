@@ -820,6 +820,12 @@ export interface StudentImportRow {
   phone?: string;
   email?: string;
   gpa?: number;
+  completedCredits?: number;
+  debtCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
+  academicStatus?: 'ELIGIBLE' | 'INELIGIBLE' | string;
   isValid: boolean;
   errors: string[];
 }
@@ -863,6 +869,10 @@ export interface StudentProjectRoundItem {
   status: string;
   debtCredits: number;
   gpa?: number;
+  completedCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
   note?: string;
   enrolledAt?: string;
   accountActive?: boolean;
@@ -1065,6 +1075,21 @@ export interface UpdateStudentPayload {
 }
 
 
+export interface UpdateRoundStudentPayload {
+  fullName?: string;
+  className?: string;
+  majorId?: number;
+  email?: string;
+  phone?: string;
+  gpa?: number;
+  completedCredits?: number;
+  debtCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
+  note?: string;
+}
+
 export interface CreateRoundStudentManualPayload {
   studentCode: string;
   fullName: string;
@@ -1073,6 +1098,11 @@ export interface CreateRoundStudentManualPayload {
   majorId: number;
   phone?: string;
   gpa?: number;
+  completedCredits?: number;
+  debtCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
   status?: string;
   note?: string;
 }

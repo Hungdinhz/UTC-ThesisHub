@@ -14,6 +14,7 @@ import com.example.thesis_hub_api.eligibility.service.EligibilityService;
 import com.example.thesis_hub_api.organization.entity.Major;
 import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.repository.MajorRepository;
+import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
@@ -46,6 +47,8 @@ public class AcademicStaffService {
     private final StudentProjectRoundRepository studentProjectRoundRepository;
     private final AcademicRecordRepository academicRecordRepository;
     private final MajorRepository majorRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private StudentRepository studentRepository;
     private final EligibilityService eligibilityService;
     private final DefenseService defenseService;
     private final AcademicStaffExcelExporter excelExporter;
@@ -113,16 +116,26 @@ public class AcademicStaffService {
 
         Major major = student.getMajorId() != null ? majorMap.get(student.getMajorId()) : null;
         boolean eligible = "ELIGIBLE".equalsIgnoreCase(status) || "FORCE_APPROVED".equalsIgnoreCase(status);
+        Integer debt = record != null && record.getDebtCredits() != null ? record.getDebtCredits() : (student.getDebtCredits() != null ? student.getDebtCredits() : 0);
+        Integer completed = record != null && record.getCompletedCredits() != null ? record.getCompletedCredits() : Math.max(0, 142 - debt);
+        Double gpaVal = record != null && record.getGpa() != null ? record.getGpa() : (spr.getGpa() != null ? spr.getGpa().doubleValue() : (student.getGpa() != null ? student.getGpa().doubleValue() : null));
+        String noteVal = (spr.getNote() != null && !spr.getNote().isBlank()) ? spr.getNote() : (record != null ? record.getNote() : "");
 
         return EligibleStudentRowDTO.builder()
                 .studentId(student.getId())
                 .studentCode(student.getStudentCode())
                 .fullName(student.getUser() != null ? student.getUser().getFullName() : null)
                 .className(student.getClassName())
+                .majorCode(major != null ? major.getCode() : null)
                 .majorName(major != null ? major.getName() : null)
-                .completedCredits(record != null ? record.getCompletedCredits() : null)
-                .debtCredits(record != null ? record.getDebtCredits() : null)
-                .gpa(record != null ? record.getGpa() : null)
+                .email(student.getUser() != null ? student.getUser().getEmail() : null)
+                .phone(student.getUser() != null ? student.getUser().getPhone() : null)
+                .completedCredits(completed)
+                .debtCredits(debt)
+                .gpa(gpaVal)
+                .tuitionDebt(record != null && Boolean.TRUE.equals(record.getTuitionDebt()))
+                .underDisciplinaryAction(record != null && Boolean.TRUE.equals(record.getUnderDisciplinaryAction()))
+                .note(noteVal)
                 .status(status)
                 .eligible(eligible)
                 .reasons(reasons)
@@ -227,5 +240,32 @@ public class AcademicStaffService {
     private ProjectRound getRound(Long roundId) {
         return projectRoundRepository.findById(roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy đợt đồ án ID: " + roundId));
+    }
+
+    @Transactional
+    public void clearStudentDebt(Long roundId, Long studentId) {
+        updateStudentDebt(roundId, studentId, 0);
+    }
+
+    @Transactional
+    public void updateStudentDebt(Long roundId, Long studentId, Integer newDebtCredits) {
+        int debt = newDebtCredits != null ? Math.max(0, newDebtCredits) : 0;
+        AcademicRecord record = academicRecordRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+                .orElse(null);
+        if (record != null) {
+            record.setDebtCredits(debt);
+            if (debt == 0) {
+                record.setMissingPrerequisiteCount(0);
+                record.setNote("Giáo vụ xác nhận đã hoàn thành trả nợ tín chỉ trước khi bảo vệ đồ án");
+            }
+            academicRecordRepository.save(record);
+        }
+
+        if (studentRepository != null) {
+            studentRepository.findById(studentId).ifPresent(st -> {
+                st.setDebtCredits(debt);
+                studentRepository.save(st);
+            });
+        }
     }
 }

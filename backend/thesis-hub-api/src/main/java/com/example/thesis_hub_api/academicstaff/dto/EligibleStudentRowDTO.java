@@ -16,10 +16,16 @@ public class EligibleStudentRowDTO {
     private String studentCode;
     private String fullName;
     private String className;
+    private String majorCode;
     private String majorName;
+    private String email;
+    private String phone;
     private Integer completedCredits;
     private Integer debtCredits;
     private Double gpa;
+    private Boolean tuitionDebt;
+    private Boolean underDisciplinaryAction;
+    private String note;
     /** ELIGIBLE, FORCE_APPROVED, INELIGIBLE, RESERVED, DISQUALIFIED, NO_DATA */
     private String status;
     private boolean eligible;

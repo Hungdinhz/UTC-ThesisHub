@@ -416,21 +416,18 @@ class EligibilityService {
       if (res.data && res.data.data) {
         const d = res.data.data;
         return {
-          thesisId: d.thesisId || params.thesisId || 101,
-          thesisTitle: d.thesisTitle || `Đề tài tốt nghiệp #${d.thesisId || params.thesisId || 101}`,
-          studentId: d.studentId || params.studentId || 101,
-          studentCode: d.studentCode || params.studentCode || `SV${d.studentId || params.studentId || 101}`,
-          studentName: d.studentName || `Sinh viên #${d.studentId || params.studentId || 101}`,
-          supervisorApproved: d.supervisorApproved,
-          supervisorScore: Number(d.supervisorScore ?? 8.5),
+          thesisId: d.thesisId ?? (params.thesisId || 0),
+          thesisTitle: d.thesisTitle || (d.thesisId ? `Đề tài tốt nghiệp #${d.thesisId}` : 'Chưa có đề tài'),
+          studentId: d.studentId || params.studentId || 0,
+          studentCode: d.studentCode || params.studentCode || '',
+          studentName: d.studentName || 'Sinh viên',
+          supervisorApproved: Boolean(d.supervisorApproved),
+          supervisorScore: d.supervisorScore !== null && d.supervisorScore !== undefined ? Number(d.supervisorScore) : 0,
           reviewerAssigned: Boolean(d.reviewerAssigned),
           reviewerScore: 0,
           plagiarismRate: 0,
-          thesisProgressPercentage: d.thesisProgressPercentage !== undefined ? Number(d.thesisProgressPercentage) : 100,
-          allProgressStagesCompleted:
-            d.allProgressStagesCompleted !== undefined
-              ? Boolean(d.allProgressStagesCompleted)
-              : Number(d.thesisProgressPercentage ?? 100) >= 100,
+          thesisProgressPercentage: d.thesisProgressPercentage !== null && d.thesisProgressPercentage !== undefined ? Number(d.thesisProgressPercentage) : 0,
+          allProgressStagesCompleted: Boolean(d.allProgressStagesCompleted),
           eligibleForDefense: Boolean(d.eligibleForDefense),
           reasons: Array.isArray(d.reasons) ? d.reasons : [],
           hasPendingReservation: Boolean(d.hasPendingReservation),

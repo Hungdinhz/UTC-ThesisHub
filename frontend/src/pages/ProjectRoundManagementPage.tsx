@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import type { ProjectRoundItem, TrainingProgram, CreateProjectRoundPayload, CreateMilestonePayload } from '../types';
@@ -100,6 +100,25 @@ const ProjectRoundManagementPage: React.FC = () => {
     loadRounds();
   }, []);
 
+  const selectedRoundRef = useRef<ProjectRoundItem | null>(null);
+  selectedRoundRef.current = selectedRound;
+
+  useEffect(() => {
+    const handlePhaseChange = async () => {
+      await loadRounds();
+      if (selectedRoundRef.current?.roundId) {
+        try {
+          const fresh = await apiService.getProjectRoundById(selectedRoundRef.current.roundId);
+          setSelectedRound(fresh);
+        } catch {}
+      }
+    };
+    window.addEventListener('utc-phase-change', handlePhaseChange);
+    return () => {
+      window.removeEventListener('utc-phase-change', handlePhaseChange);
+    };
+  }, []);
+
   useEffect(() => {
     if (!error) return;
     setSuccessMsg(null);
@@ -151,6 +170,7 @@ const ProjectRoundManagementPage: React.FC = () => {
       setTransitionTargetStatus(null);
       await loadRounds();
       setSelectedRound(updated);
+      window.dispatchEvent(new CustomEvent('utc-phase-change'));
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái';
       setTransitionError(msg);
@@ -239,7 +259,6 @@ const ProjectRoundManagementPage: React.FC = () => {
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi xóa đợt đồ án';
       setDeleteError(msg);
-      setError(msg);
     } finally {
       setDeleteLoading(false);
     }
@@ -264,7 +283,7 @@ const ProjectRoundManagementPage: React.FC = () => {
     <UTCAppLayout
       activeTab="project-rounds"
       hideHeroBanner={true}
-      pageTitle="Quản lý Đợt đồ án & Mốc thời gian (Contract 2)"
+      pageTitle="GĐ1: Quản trị Đợt đồ án & Mốc thời gian"
       onLogout={logout}
     >
       <div className="round-page-container">
@@ -616,7 +635,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                       gap: '8px'
                     }}
                   >
-                    👥 Danh sách sinh viên & Import Excel (Contract 3)
+                    👥 Danh sách sinh viên & Import Excel
                   </button>
                   <button
                     onClick={() => setRoundActiveTab('lecturers')}
@@ -661,6 +680,8 @@ const ProjectRoundManagementPage: React.FC = () => {
                     roundId={selectedRound.roundId}
                     roundName={selectedRound.name}
                     roundCode={selectedRound.roundCode}
+                    trainingProgram={selectedRound.trainingProgram}
+                    trainingProgramName={selectedRound.trainingProgramName}
                     isRoundClosed={selectedRound.status === 'CLOSED' || selectedRound.status === 'ARCHIVED'}
                   />
                 ) : roundActiveTab === 'lecturers' ? (
@@ -1178,7 +1199,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                     Xác nhận xóa đợt đồ án
                   </h3>
                   <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                    Thao tác này chỉ áp dụng cho đợt đồ án đã kết thúc
+                    Thao tác này áp dụng cho đợt đồ án ở trạng thái Bản nháp hoặc Đã kết thúc
                   </span>
                 </div>
               </div>
@@ -1198,7 +1219,7 @@ const ProjectRoundManagementPage: React.FC = () => {
               )}
 
               <p style={{ margin: '0 0 14px 0', fontSize: '0.95rem', color: '#1e293b', lineHeight: 1.5 }}>
-                Bạn có muốn xóa đợt đồ án <strong>(đợt đã kết thúc rồi)</strong> này không?
+                Bạn có muốn xóa đợt đồ án <strong>({roundToDelete.status === 'DRAFT' ? 'đang ở trạng thái Bản nháp' : 'đợt đã kết thúc'})</strong> này không?
               </p>
 
               <div style={{

@@ -40,15 +40,22 @@ export const AdminCreateReservationModal: React.FC<AdminCreateReservationModalPr
       if (student.defaultReason) {
         setReason(student.defaultReason);
       } else {
-        setReason('Bảo lưu kết quả đồ án do chưa hoàn thành đủ số tín chỉ quy định / còn nợ môn tốt nghiệp');
+        setReason('Bảo lưu kết quả đồ án do chưa hoàn thành đủ số tín chỉ quy định / còn nợ tín chỉ tốt nghiệp');
       }
+      setError('');
     }
   }, [student]);
 
   if (!student) return null;
 
+  const hasThesis = Boolean(student.thesisId && student.thesisId > 0);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasThesis) {
+      setError('Sinh viên chưa có đề tài và chưa được phân công GVHD. Theo quy định, chỉ sinh viên có đề tài và GVHD mới được bảo lưu!');
+      return;
+    }
     if (!reason.trim()) {
       setError('Vui lòng nhập lý do / căn cứ bảo lưu');
       return;
@@ -84,8 +91,14 @@ export const AdminCreateReservationModal: React.FC<AdminCreateReservationModalPr
       <form onSubmit={handleSubmit} className="modal-form">
         <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
           <div><strong>Sinh viên:</strong> <span style={{ color: '#2563eb', fontWeight: 600 }}>{student.studentName}</span> ({student.studentCode || `SV${student.studentId}`})</div>
-          {student.thesisTitle && (
-            <div style={{ marginTop: '4px', fontSize: '13px' }}><strong>Đề tài:</strong> <em>{student.thesisTitle}</em></div>
+          {student.thesisTitle && hasThesis ? (
+            <div style={{ marginTop: '4px', fontSize: '13px' }}>
+              <strong>Đề tài:</strong> <em>{student.thesisTitle}</em> (Mã đề tài: #{student.thesisId})
+            </div>
+          ) : (
+            <div style={{ marginTop: '6px', fontSize: '13px', color: '#dc2626', fontWeight: 600, backgroundColor: '#fef2f2', padding: '6px 10px', borderRadius: '4px' }}>
+              ⚠️ Sinh viên chưa có đề tài / chưa phân công GVHD. Theo quy định, chỉ sinh viên có đề tài và GVHD mới được bảo lưu!
+            </div>
           )}
         </div>
 
@@ -97,9 +110,10 @@ export const AdminCreateReservationModal: React.FC<AdminCreateReservationModalPr
             value={reasonCategory}
             onChange={(e) => setReasonCategory(e.target.value as ReservationReasonCategory)}
             required
+            disabled={!hasThesis}
             style={{ fontWeight: 500 }}
           >
-            <option value="INSUFFICIENT_CREDITS">❌ Chưa trả đủ tín chỉ / Nợ môn học (Đồ án GVHD đạt)</option>
+            <option value="INSUFFICIENT_CREDITS">❌ Chưa trả đủ tín chỉ nợ (Đồ án GVHD đạt)</option>
             <option value="SUPERVISOR_NOT_ELIGIBLE">⏳ GVHD xét chưa đạt tiến độ / Chưa đủ điều kiện bảo vệ</option>
             <option value="RESEARCH_PROGRESS">⏱️ Cần thêm thời gian hoàn thiện khối lượng nghiên cứu</option>
             <option value="HEALTH_REASONS">🏥 Lý do sức khỏe / Bệnh án điều trị</option>
@@ -118,15 +132,18 @@ export const AdminCreateReservationModal: React.FC<AdminCreateReservationModalPr
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             required
+            disabled={!hasThesis}
+            placeholder={!hasThesis ? 'Không thể lập đơn bảo lưu khi chưa có đề tài và GVHD' : 'Nhập lý do / căn cứ bảo lưu...'}
           />
         </div>
 
         <div className="form-group">
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: hasThesis ? 'pointer' : 'not-allowed', fontWeight: 600 }}>
             <input
               type="checkbox"
               checked={autoApprove}
               onChange={(e) => setAutoApprove(e.target.checked)}
+              disabled={!hasThesis}
             />
             <span>Phê duyệt có hiệu lực ngay lập tức (Chuyển sang RESERVED và đóng băng đề tài)</span>
           </label>
@@ -140,6 +157,7 @@ export const AdminCreateReservationModal: React.FC<AdminCreateReservationModalPr
             className="form-control"
             value={note}
             onChange={(e) => setNote(e.target.value)}
+            disabled={!hasThesis}
           />
         </div>
 
@@ -149,7 +167,7 @@ export const AdminCreateReservationModal: React.FC<AdminCreateReservationModalPr
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             Hủy
           </Button>
-          <Button type="submit" variant="primary" loading={loading}>
+          <Button type="submit" variant="primary" loading={loading} disabled={!hasThesis}>
             Xác nhận lập bảo lưu
           </Button>
         </div>

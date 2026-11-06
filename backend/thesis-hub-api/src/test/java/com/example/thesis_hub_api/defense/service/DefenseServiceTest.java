@@ -8,6 +8,8 @@ import com.example.thesis_hub_api.defense.service.mock.ExternalThesisMockService
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -16,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -78,6 +81,75 @@ class DefenseServiceTest {
         CouncilResponseDTO council = result.get(0);
         assertEquals(5, council.getMembers().size());
         assertEquals("ACTIVE", council.getStatus());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PRESIDENT", "SECRETARY", "REVIEWER_1", "REVIEWER_2", "MEMBER"})
+    void testUpdateCouncilMembers_FlushesDeletesBeforeReinsertingRetainedLecturers(String changedRole) {
+        DefenseCouncil council = DefenseCouncil.builder()
+                .id(10L).projectRoundId(10L).status("ACTIVE").build();
+        List<String> roles = List.of("PRESIDENT", "SECRETARY", "REVIEWER_1", "REVIEWER_2", "MEMBER");
+        List<CouncilMember> existingMembers = new ArrayList<>();
+        List<CouncilMemberDTO> updatedMembers = new ArrayList<>();
+        for (int i = 0; i < roles.size(); i++) {
+            String role = roles.get(i);
+            long lecturerId = 501L + i;
+            existingMembers.add(CouncilMember.builder()
+                    .id(1L + i).councilId(10L).lecturerId(lecturerId).role(role).build());
+            updatedMembers.add(CouncilMemberDTO.builder()
+                    .id(1L + i).lecturerId(role.equals(changedRole) ? 900L : lecturerId)
+                    .role(role).build());
+        }
+        List<CouncilMember> savedMembers = new ArrayList<>();
+        when(councilRepository.findById(10L)).thenReturn(Optional.of(council));
+        when(memberRepository.findByCouncilId(10L)).thenReturn(existingMembers, savedMembers);
+        when(memberRepository.save(any(CouncilMember.class))).thenAnswer(invocation -> {
+            CouncilMember member = invocation.getArgument(0);
+            member.setId(100L + savedMembers.size());
+            savedMembers.add(member);
+            return member;
+        });
+
+        CouncilResponseDTO result = defenseService.updateCouncilMembers(10L, updatedMembers);
+
+        var persistenceOrder = inOrder(memberRepository);
+        persistenceOrder.verify(memberRepository).deleteByCouncilId(10L);
+        persistenceOrder.verify(memberRepository).flush();
+        persistenceOrder.verify(memberRepository, times(5)).save(any(CouncilMember.class));
+        assertEquals("ACTIVE", result.getStatus());
+        assertEquals(5, result.getMembers().size());
+        for (CouncilMemberDTO expected : updatedMembers) {
+            CouncilMemberDTO actual = result.getMembers().stream()
+                    .filter(member -> expected.getRole().equals(member.getRole()))
+                    .findFirst().orElseThrow();
+            assertEquals(expected.getLecturerId(), actual.getLecturerId());
+            assertNotNull(actual.getId());
+        }
+    }
+
+    @Test
+    void testUpdateCouncilMembers_FinalizedCouncilDoesNotModifyMembers() {
+        when(councilRepository.findById(10L)).thenReturn(Optional.of(
+                DefenseCouncil.builder().id(10L).status("FINALIZED").build()));
+
+        assertThrows(IllegalStateException.class,
+                () -> defenseService.updateCouncilMembers(10L, List.of()));
+
+        verifyNoInteractions(memberRepository);
+    }
+
+    @Test
+    void testUpdateCouncilMembers_DuplicateLecturerDoesNotModifyMembers() {
+        when(councilRepository.findById(10L)).thenReturn(Optional.of(
+                DefenseCouncil.builder().id(10L).status("ACTIVE").build()));
+        List<CouncilMemberDTO> members = List.of("PRESIDENT", "SECRETARY", "REVIEWER_1", "REVIEWER_2", "MEMBER")
+                .stream().map(role -> CouncilMemberDTO.builder().lecturerId(501L).role(role).build()).toList();
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> defenseService.updateCouncilMembers(10L, members));
+
+        assertTrue(error.getMessage().contains("Mỗi giảng viên"));
+        verifyNoInteractions(memberRepository);
     }
 
     @Test

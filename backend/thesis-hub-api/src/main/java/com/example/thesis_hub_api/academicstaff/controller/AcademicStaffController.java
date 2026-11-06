@@ -78,4 +78,13 @@ public class AcademicStaffController {
     private String safeFileName(String raw) {
         return raw == null ? "" : raw.trim().replaceAll("[^A-Za-z0-9_-]+", "_");
     }
+
+    @PostMapping("/rounds/{roundId}/students/{studentId}/clear-debt")
+    @Operation(summary = "Xác nhận sinh viên đã hoàn thành trả nợ tín chỉ trước khi bảo vệ (Giai đoạn 5)")
+    public ResponseEntity<ApiResponse<String>> clearStudentDebt(
+            @PathVariable Long roundId,
+            @PathVariable Long studentId) {
+        academicStaffService.clearStudentDebt(roundId, studentId);
+        return ResponseEntity.ok(ApiResponse.success("Xác nhận sinh viên đã hoàn thành trả nợ tín chỉ thành công"));
+    }
 }

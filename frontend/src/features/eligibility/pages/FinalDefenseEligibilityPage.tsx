@@ -9,11 +9,12 @@ import type { FinalDefenseEligibilityResponse, ReservationRequestItem, AdminCrea
 import type { ProjectRoundItem, StudentProjectRoundItem } from '../../../types';
 import { ReservationReviewModal } from '../components/ReservationReviewModal';
 import { AdminCreateReservationModal } from '../components/AdminCreateReservationModal';
+import { EditAcademicRecordModal } from '../components/EditAcademicRecordModal';
 import './EligibilityPages.css';
 
 export const FinalDefenseEligibilityPage: React.FC = () => {
   const { userType } = useAuth();
-  const isAdmin = userType === 'admin';
+  const isAdmin = userType === 'admin' || userType === 'academic_staff';
   // Navigation sub-tabs: 'check' | 'students' | 'reservations'
   const [activeTab, setActiveTab] = useState<'check' | 'students' | 'reservations'>('check');
 
@@ -41,6 +42,9 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
     defaultCategory?: any;
     defaultReason?: string;
   } | null>(null);
+
+  // Academic record edit modal state
+  const [editingAcademicStudent, setEditingAcademicStudent] = useState<StudentProjectRoundItem | null>(null);
 
   // Single student check state (search by Student Code / MSSV only)
   const [studentCodeInput, setStudentCodeInput] = useState('');
@@ -448,21 +452,17 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   result.reservationStatus === 'APPROVED'
                     ? 'result-header-reserved'
                     : result.eligibleForDefense
-                    ? 'result-header-passed'
-                    : 'result-header-failed'
+                    ? 'result-header-eligible'
+                    : 'result-header-ineligible'
                 }`}
-                style={{
-                  background:
-                    result.reservationStatus === 'APPROVED'
-                      ? 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
-                      : undefined,
-                }}
               >
                 <div>
                   <div className="result-sub-title">Kết quả xét duyệt điều kiện bảo vệ cuối kỳ:</div>
                   <h2 className="result-main-title">
                     {result.reservationStatus === 'APPROVED'
                       ? '🟣 ĐÃ BẢO LƯU ĐỒ ÁN SANG ĐỢT SAU (RESERVED)'
+                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
+                      ? (result.studentRoundStatus === 'INELIGIBLE' ? '🚫 KHÔNG ĐỦ ĐIỀU KIỆN THAM GIA ĐỢT ĐỒ ÁN' : '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN')
                       : result.eligibleForDefense
                       ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ'
                       : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}
@@ -472,6 +472,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   <span className="result-badge">
                     {result.reservationStatus === 'APPROVED'
                       ? 'BẢO LƯU'
+                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
+                      ? (result.studentRoundStatus === 'INELIGIBLE' ? 'KHÔNG ĐỦ ĐK' : 'BỊ LOẠI')
                       : result.eligibleForDefense
                       ? 'ĐỦ ĐIỀU KIỆN'
                       : 'KHÔNG ĐỦ ĐIỀU KIỆN'}
@@ -503,44 +505,53 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
               )}
 
               {/* Recommendation for Reservation if not eligible */}
-              {!result.eligibleForDefense && result.reservationStatus !== 'APPROVED' && !result.hasPendingReservation && isAdmin && (
-                <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '14px', borderRadius: '8px', margin: '16px 20px 0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong style={{ color: '#5b21b6' }}>💡 Hỗ trợ bảo lưu đồ án tốt nghiệp:</strong>
-                    <div style={{ fontSize: '13px', color: '#6d28d9', marginTop: '4px' }}>
-                      Sinh viên chưa đủ điều kiện bảo vệ đợt này (do chưa trả đủ tín chỉ hoặc tiến độ). Khoa có thể lập quyết định bảo lưu để đóng băng đề tài và điểm quá trình sang đợt sau.
+              {!result.eligibleForDefense && result.reservationStatus !== 'APPROVED' && result.studentRoundStatus !== 'DROPPED' && result.studentRoundStatus !== 'DISQUALIFIED' && !result.hasPendingReservation && isAdmin && (
+                result.thesisId && result.thesisId > 0 && result.thesisTitle && !result.thesisTitle.includes('Chưa có đề tài') ? (
+                  <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '14px', borderRadius: '8px', margin: '16px 20px 0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ color: '#5b21b6' }}>💡 Hỗ trợ bảo lưu đồ án tốt nghiệp:</strong>
+                      <div style={{ fontSize: '13px', color: '#6d28d9', marginTop: '4px' }}>
+                        Sinh viên chưa đủ điều kiện bảo vệ đợt này (do chưa trả đủ tín chỉ hoặc tiến độ). Sinh viên đã có đề tài và GVHD, Khoa có thể lập quyết định bảo lưu để đóng băng đề tài sang đợt sau.
+                      </div>
+                    </div>
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        setSelectedStudentForAdminReserve({
+                          studentId: result.studentId,
+                          studentCode: result.studentCode,
+                          studentName: result.studentName,
+                          thesisId: result.thesisId,
+                          thesisTitle: result.thesisTitle,
+                          defaultCategory: (result.debtCredits && result.debtCredits > 0) ? 'INSUFFICIENT_CREDITS' : 'SUPERVISOR_NOT_ELIGIBLE',
+                          defaultReason: (result.debtCredits && result.debtCredits > 0)
+                            ? `Bảo lưu kết quả đồ án do chưa hoàn thành đủ số tín chỉ quy định (Còn nợ: ${result.debtCredits} tín chỉ)`
+                            : 'Bảo lưu kết quả đồ án theo đề nghị của Khoa / GVHD',
+                        });
+                      }}
+                    >
+                      ⚡ Lập quyết định bảo lưu
+                    </Button>
+                  </div>
+                ) : (
+                  <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '14px', borderRadius: '8px', margin: '16px 20px 0 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
+                    <div style={{ fontSize: '13px', color: '#64748b' }}>
+                      <strong>Lưu ý bảo lưu:</strong> Sinh viên chưa có đề tài chính thức hoặc chưa được phân công GVHD trong đợt này. Theo quy định, sinh viên chỉ được lập bảo lưu khi đã có đề tài và đã được phân công GVHD.
                     </div>
                   </div>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      setSelectedStudentForAdminReserve({
-                        studentId: result.studentId,
-                        studentCode: result.studentCode,
-                        studentName: result.studentName,
-                        thesisId: result.thesisId,
-                        thesisTitle: result.thesisTitle,
-                        defaultCategory: result.supervisorApproved ? 'INSUFFICIENT_CREDITS' : 'SUPERVISOR_NOT_ELIGIBLE',
-                        defaultReason: result.supervisorApproved
-                          ? 'Đồ án đã đạt duyệt của GVHD nhưng sinh viên chưa tích lũy đủ số tín chỉ quy định / còn nợ môn'
-                          : 'GVHD đánh giá chưa hoàn thành đủ khối lượng đồ án đợt này',
-                      });
-                    }}
-                  >
-                    ⚡ Lập quyết định bảo lưu
-                  </Button>
-                </div>
+                )
               )}
 
               {/* Student and Thesis Meta Box */}
               <div className="result-meta-grid">
                 <div className="meta-item">
                   <span className="meta-label">Mã sinh viên:</span>
-                  <span className="meta-val font-semibold">{result.studentCode}</span>
+                  <span className="meta-val font-bold">{result.studentCode}</span>
                 </div>
                 <div className="meta-item">
                   <span className="meta-label">Họ và tên:</span>
-                  <span className="meta-val font-semibold">{result.studentName}</span>
+                  <span className="meta-val font-bold">{result.studentName}</span>
                 </div>
                 <div className="meta-item">
                   <span className="meta-label">Mã đề tài:</span>
@@ -589,31 +600,33 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   </div>
 
                   {/* Criteria 3: Điều kiện Học vụ / Tín chỉ */}
-                  <div className={`criteria-card ${!(result.completedCredits && result.completedCredits < 110) ? 'card-ok' : 'card-fail'}`}>
+                  <div className={`criteria-card ${result.completedCredits !== undefined && result.completedCredits !== null && (!result.debtCredits || result.debtCredits === 0) ? 'card-ok' : 'card-fail'}`}>
                     <div className="card-top">
-                      <span className="card-icon">{!(result.completedCredits && result.completedCredits < 110) ? '✅' : '❌'}</span>
-                      <span className="card-heading">3. Tín chỉ &amp; Môn tiên quyết</span>
+                      <span className="card-icon">{result.completedCredits !== undefined && result.completedCredits !== null && (!result.debtCredits || result.debtCredits === 0) ? '✅' : '❌'}</span>
+                      <span className="card-heading">3. Tín chỉ tích lũy &amp; Nợ tín chỉ</span>
                     </div>
                     <div className="card-desc">
-                      Tích lũy tối thiểu 110 tín chỉ và không nợ môn tiên quyết.
+                      Hoàn thành toàn bộ nợ tín chỉ (= 0) theo chương trình đào tạo (Cử nhân: 142 TC, Kỹ sư: 180 TC).
                     </div>
                     <div className="card-metric">
-                      Tín chỉ tích lũy: <strong>{result.completedCredits ?? 110}/110</strong>
-                      {result.missingPrerequisiteCount ? ` (Nợ ${result.missingPrerequisiteCount} môn)` : ''}
+                      Tín chỉ tích lũy: <strong>{result.completedCredits !== undefined && result.completedCredits !== null ? `${result.completedCredits} TC` : 'Chưa có dữ liệu'}</strong>
+                      {result.debtCredits !== undefined && result.debtCredits !== null && result.debtCredits > 0 ? (
+                        <span style={{ color: '#dc2626', fontWeight: 600 }}> (Còn nợ: {result.debtCredits} tín chỉ)</span>
+                      ) : null}
                     </div>
                   </div>
 
                   {/* Criteria 4: Học phí & Kỷ luật */}
-                  <div className={`criteria-card ${!result.tuitionDebt ? 'card-ok' : 'card-fail'}`}>
+                  <div className={`criteria-card ${!result.tuitionDebt && !result.underDisciplinaryAction ? 'card-ok' : 'card-fail'}`}>
                     <div className="card-top">
-                      <span className="card-icon">{!result.tuitionDebt ? '✅' : '❌'}</span>
-                      <span className="card-heading">4. Nghĩa vụ học phí</span>
+                      <span className="card-icon">{!result.tuitionDebt && !result.underDisciplinaryAction ? '✅' : '❌'}</span>
+                      <span className="card-heading">4. Nghĩa vụ học phí &amp; Kỷ luật</span>
                     </div>
                     <div className="card-desc">
                       Đã hoàn thành toàn bộ học phí và không bị kỷ luật.
                     </div>
                     <div className="card-metric">
-                      Trạng thái: <strong>{!result.tuitionDebt ? 'Đã hoàn thành' : 'Còn nợ học phí'}</strong>
+                      Trạng thái: <strong>{!result.tuitionDebt && !result.underDisciplinaryAction ? 'Đã hoàn thành' : result.tuitionDebt && result.underDisciplinaryAction ? 'Nợ học phí & Bị kỷ luật' : result.tuitionDebt ? 'Còn nợ học phí' : 'Đang bị kỷ luật'}</strong>
                     </div>
                   </div>
                 </div>
@@ -644,7 +657,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                 Danh sách Sinh viên trong đợt — {selectedRound?.name} ({roundStudents.length} SV)
               </h3>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-                Theo dõi điều kiện bảo vệ và thực hiện lập quyết định bảo lưu trực tiếp cho sinh viên chưa đủ tín chỉ / GVHD chưa duyệt.
+                Theo dõi dữ liệu học vụ, điều kiện bảo vệ và thực hiện lập quyết định bảo lưu trực tiếp cho sinh viên đã có đề tài / GVHD nhưng chưa đủ điều kiện bảo vệ.
               </p>
             </div>
 
@@ -681,6 +694,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     <th style={{ padding: '10px 12px' }}>MSSV</th>
                     <th style={{ padding: '10px 12px' }}>Họ và tên</th>
                     <th style={{ padding: '10px 12px' }}>Đề tài &amp; Tiến độ</th>
+                    <th style={{ padding: '10px 12px' }}>Thông tin học vụ</th>
                     <th style={{ padding: '10px 12px' }}>Điểm GPA</th>
                     <th style={{ padding: '10px 12px' }}>Điều kiện Bảo vệ &amp; Bảo lưu</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
@@ -692,13 +706,41 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     const reservation = findStudentReservation(st.studentId, st.studentCode);
                     const isReserved = st.status === 'RESERVED' || thesis?.status === 'RESERVED' || reservation?.status === 'APPROVED';
                     const hasPendingRes = reservation?.status === 'PENDING';
+                    const isDropped = st.status === 'DROPPED' || st.status === 'DISQUALIFIED' || st.status === 'INELIGIBLE';
+
+                    // Academic condition check: debtCredits == 0, no tuition debt, no discipline
+                    const isAcademicEligible =
+                      (!st.debtCredits || st.debtCredits === 0) &&
+                      !st.tuitionDebt &&
+                      !st.underDisciplinaryAction;
+
+                    const hasSupervisorApproved = Boolean(
+                      thesis && (
+                        thesis.defenseEligible ||
+                        thesis.status === 'COMPLETED' ||
+                        thesis.status === 'DEFENSE_READY'
+                      )
+                    );
+
+                    const isThesisProgressComplete = Boolean(
+                      thesis && (thesis.completionRate === 100 || hasSupervisorApproved)
+                    );
+
+                    // Requirement 3: Student must have a thesis and supervisor assigned
+                    const hasAssignedThesisAndSupervisor = Boolean(
+                      thesis && thesis.id && (thesis.lecturerId || thesis.lecturerFullName)
+                    );
+
+                    // Requirement 2: Student is eligible for defense ONLY IF thesis approved AND academic conditions satisfied
                     const isEligibleForDefense = Boolean(
                       !isReserved &&
-                      thesis &&
-                        (thesis.defenseEligible ||
-                          thesis.status === 'COMPLETED')
+                      !isDropped &&
+                      hasAssignedThesisAndSupervisor &&
+                      hasSupervisorApproved &&
+                      isThesisProgressComplete &&
+                      isAcademicEligible
                     );
-                    const progressRate = thesis?.completionRate ?? (isEligibleForDefense ? 100 : 0);
+                    const progressRate = thesis?.completionRate ?? (hasSupervisorApproved ? 100 : 0);
 
                     return (
                       <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -724,11 +766,72 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                             <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa có đề tài chính thức</span>
                           )}
                         </td>
+                        {/* Cột Học vụ (Yêu cầu 1) */}
+                        <td style={{ padding: '10px 12px', minWidth: '190px' }}>
+                          <div style={{ fontSize: '0.82rem' }}>
+                            <div style={{ marginBottom: '3px' }}>
+                              <strong>Tích lũy:</strong> {st.completedCredits ?? 0} TC
+                            </div>
+                            <div style={{ marginBottom: '4px' }}>
+                              <strong>Nợ tín:</strong>{' '}
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  color: (st.debtCredits !== undefined && st.debtCredits > 0) ? '#dc2626' : '#16a34a',
+                                }}
+                              >
+                                {st.debtCredits !== undefined && st.debtCredits > 0 ? `${st.debtCredits} TC (Nợ)` : '0 TC'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  backgroundColor: st.tuitionDebt ? '#fee2e2' : '#dcfce7',
+                                  color: st.tuitionDebt ? '#991b1b' : '#166534',
+                                }}
+                              >
+                                {st.tuitionDebt ? 'Nợ HP' : 'Đã đóng HP'}
+                              </span>
+                              {st.underDisciplinaryAction ? (
+                                <span
+                                  style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    backgroundColor: '#fee2e2',
+                                    color: '#991b1b',
+                                  }}
+                                >
+                                  Kỷ luật
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#475569',
+                                  }}
+                                >
+                                  Không KL
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
                             {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '—'}
                           </span>
                         </td>
+                        {/* Cột Điều kiện Bảo vệ & Bảo lưu (Yêu cầu 2) */}
                         <td style={{ padding: '10px 12px' }}>
                           {isReserved ? (
                             <span
@@ -760,7 +863,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                             >
                               🟠 Chờ duyệt bảo lưu (#{reservation.id})
                             </span>
-                          ) : st.status === 'DROPPED' ? (
+                          ) : isDropped ? (
                             <span
                               style={{
                                 padding: '4px 10px',
@@ -791,22 +894,42 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                               ✅ Đủ điều kiện bảo vệ
                             </span>
                           ) : (
-                            <span
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                backgroundColor: '#fff1f2',
-                                color: '#be123c',
-                                border: '1px solid #fecdd3',
-                                display: 'inline-block',
-                              }}
-                            >
-                              ❌ Chưa đủ điều kiện bảo vệ
-                            </span>
+                            <div>
+                              <span
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  backgroundColor: '#fff1f2',
+                                  color: '#be123c',
+                                  border: '1px solid #fecdd3',
+                                  display: 'inline-block',
+                                }}
+                              >
+                                ❌ Chưa đủ điều kiện bảo vệ
+                              </span>
+                              <div style={{ fontSize: '0.72rem', color: '#b91c1c', marginTop: '3px', fontWeight: 600 }}>
+                                {!thesis
+                                  ? 'Chưa có đề tài'
+                                  : !hasAssignedThesisAndSupervisor
+                                  ? 'Chưa phân công GVHD'
+                                  : (st.debtCredits !== undefined && st.debtCredits > 0)
+                                  ? `Nợ ${st.debtCredits} tín chỉ`
+                                  : st.tuitionDebt
+                                  ? 'Còn nợ học phí'
+                                  : st.underDisciplinaryAction
+                                  ? 'Đang bị kỷ luật'
+                                  : !hasSupervisorApproved
+                                  ? 'GVHD chưa duyệt'
+                                  : !isThesisProgressComplete
+                                  ? `Tiến độ ${progressRate}%`
+                                  : 'Chưa đủ tiêu chí'}
+                              </div>
+                            </div>
                           )}
                         </td>
+                        {/* Cột Thao tác (Yêu cầu 1 & 3) */}
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
                             <button
@@ -824,6 +947,26 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                             >
                               🔍 Kiểm tra
                             </button>
+
+                            {/* Thao tác thay đổi học vụ (Yêu cầu 1) */}
+                            {isAdmin && (
+                              <button
+                                onClick={() => setEditingAcademicStudent(st)}
+                                title="Chỉnh sửa thông tin học vụ (tín chỉ tích lũy, nợ tín, học phí, kỷ luật)"
+                                style={{
+                                  backgroundColor: '#eff6ff',
+                                  color: '#0a3273',
+                                  border: '1px solid #bfdbfe',
+                                  padding: '5px 10px',
+                                  borderRadius: '4px',
+                                  fontWeight: 600,
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                ✏️ Sửa học vụ
+                              </button>
+                            )}
 
                             {hasPendingRes && reservation && (
                               <button
@@ -843,7 +986,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                               </button>
                             )}
 
-                            {!isReserved && !isEligibleForDefense && !hasPendingRes && isAdmin && (
+                            {/* Yêu cầu 3: Có đề tài và đã được phân GVHD rồi thì mới được bảo lưu */}
+                            {!isReserved && !isEligibleForDefense && !hasPendingRes && isAdmin && hasAssignedThesisAndSupervisor && (
                               <button
                                 onClick={() => {
                                   setSelectedStudentForAdminReserve({
@@ -852,8 +996,10 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                                     studentName: st.fullName,
                                     thesisId: thesis?.id,
                                     thesisTitle: thesis?.titleVn,
-                                    defaultCategory: 'INSUFFICIENT_CREDITS',
-                                    defaultReason: 'Bảo lưu kết quả đồ án do chưa hoàn thành đủ số tín chỉ quy định / còn nợ môn',
+                                    defaultCategory: (st.debtCredits && st.debtCredits > 0) ? 'INSUFFICIENT_CREDITS' : 'SUPERVISOR_NOT_ELIGIBLE',
+                                    defaultReason: (st.debtCredits && st.debtCredits > 0)
+                                      ? `Bảo lưu kết quả đồ án do chưa hoàn thành nợ tín chỉ (Còn nợ: ${st.debtCredits} tín chỉ)`
+                                      : 'Bảo lưu kết quả đồ án theo đề nghị của Khoa / GVHD',
                                   });
                                 }}
                                 style={{
@@ -1024,6 +1170,26 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         student={selectedStudentForAdminReserve}
         projectRoundId={selectedRoundId || 10}
         onConfirm={handleAdminCreateReservation}
+      />
+
+      {/* Modal: Chỉnh sửa thông tin học vụ (Yêu cầu 1) */}
+      <EditAcademicRecordModal
+        isOpen={Boolean(editingAcademicStudent)}
+        onClose={() => setEditingAcademicStudent(null)}
+        student={editingAcademicStudent}
+        projectRoundId={selectedRoundId || 10}
+        onSuccess={async () => {
+          setNotification({
+            type: 'success',
+            message: `Cập nhật thông tin học vụ cho sinh viên ${editingAcademicStudent?.studentCode} thành công`,
+          });
+          if (selectedRoundId) {
+            await loadRoundData(selectedRoundId);
+          }
+          if (result && editingAcademicStudent && result.studentId === editingAcademicStudent.studentId) {
+            await handleCheck(undefined, result.studentId, result.thesisId, result.studentCode);
+          }
+        }}
       />
     </div>
   );
