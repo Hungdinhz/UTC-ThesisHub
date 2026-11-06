@@ -53,11 +53,6 @@ export const ForceApproveModal: React.FC<ForceApproveModalProps> = ({
           <div><strong>Mã sinh viên:</strong> {student.studentCode}</div>
           <div><strong>Họ và tên:</strong> {student.studentName}</div>
           <div><strong>Điểm GPA:</strong> {student.gpa.toFixed(2)} | <strong>Tín chỉ:</strong> {student.accumulatedCredits}</div>
-          {student.unpassedPrerequisites.length > 0 && (
-            <div className="warning-text">
-              <strong>Nợ môn tiên quyết:</strong> {student.unpassedPrerequisites.join(', ')}
-            </div>
-          )}
         </div>
 
         <div className="form-group">

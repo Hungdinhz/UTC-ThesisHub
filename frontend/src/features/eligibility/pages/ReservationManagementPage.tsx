@@ -253,8 +253,8 @@ export const ReservationManagementPage: React.FC = () => {
       <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '14px 18px', marginBottom: '16px', fontSize: '13px', color: '#1e40af' }}>
         <strong>📌 Hướng dẫn quy chế bảo lưu đồ án tốt nghiệp:</strong>
         <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
-          <li><strong>Trường hợp 1 (Học vụ):</strong> Đồ án đã được GVHD đồng ý cho bảo vệ nhưng sinh viên chưa tích lũy đủ 110 tín chỉ hoặc còn nợ môn tiên quyết $\rightarrow$ Được bảo lưu kết quả đồ án và điểm GVHD sang đợt sau.</li>
-          <li><strong>Trường hợp 2 (Tiến độ):</strong> Được phân GVHD nhưng đến cuối quá trình GVHD xét chưa đủ điều kiện bảo vệ $\rightarrow$ Được bảo lưu khối lượng công việc đã làm để tiếp tục hoàn thiện sang đợt sau.</li>
+          <li><strong>Trường hợp 1 (Học vụ):</strong> Đồ án đã được GVHD đồng ý cho bảo vệ nhưng sinh viên chưa hoàn thành trả hết nợ tín chỉ tốt nghiệp (Cử nhân: 142 TC, Kỹ sư: 180 TC) → Được bảo lưu kết quả đồ án và điểm GVHD sang đợt sau.</li>
+          <li><strong>Trường hợp 2 (Tiến độ):</strong> Được phân GVHD nhưng đến cuối quá trình GVHD xét chưa đủ điều kiện bảo vệ → Được bảo lưu khối lượng công việc đã làm để tiếp tục hoàn thiện sang đợt sau.</li>
           <li><strong>Hạn chót:</strong> Đơn phải được gửi và duyệt trước khi Khoa tiến hành chốt danh sách và thành lập Hội đồng bảo vệ.</li>
         </ul>
       </div>
@@ -287,7 +287,7 @@ export const ReservationManagementPage: React.FC = () => {
             style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
           >
             <option value="ALL">-- Tất cả lý do --</option>
-            <option value="INSUFFICIENT_CREDITS">Chưa trả đủ tín chỉ / Nợ môn</option>
+            <option value="INSUFFICIENT_CREDITS">Chưa trả đủ tín chỉ nợ</option>
             <option value="SUPERVISOR_NOT_ELIGIBLE">GVHD xét chưa đạt tiến độ</option>
             <option value="RESEARCH_PROGRESS">Tiến độ nghiên cứu đề tài</option>
             <option value="HEALTH_REASONS">Lý do sức khỏe / Y tế</option>

@@ -200,9 +200,9 @@ public class EligibilityService {
         List<String> reasons = new ArrayList<>();
         boolean eligible = true;
 
-        if (record.getDebtCredits() >= maxDebtCreditsToStart) {
+        if (record.getDebtCredits() > maxDebtCreditsToStart) {
             eligible = false;
-            reasons.add("Số tín chỉ nợ vượt mức cho phép (Yêu cầu nợ < " + maxDebtCreditsToStart + " tín chỉ, hiện nợ: " + record.getDebtCredits() + ")");
+            reasons.add("Số tín chỉ nợ vượt mức cho phép (Yêu cầu nợ tối đa " + maxDebtCreditsToStart + " tín chỉ, hiện nợ: " + record.getDebtCredits() + ")");
         }
         if (record.getGpa() < 2.0) {
             eligible = false;
@@ -215,10 +215,6 @@ public class EligibilityService {
         if (record.isUnderDisciplinaryAction()) {
             eligible = false;
             reasons.add("Sinh viên đang trong thời gian bị kỷ luật");
-        }
-        if (record.getMissingPrerequisiteCount() > 0) {
-            eligible = false;
-            reasons.add("Chưa hoàn thành " + record.getMissingPrerequisiteCount() + " môn học tiên quyết");
         }
 
         String finalStatus;
@@ -262,7 +258,7 @@ public class EligibilityService {
                 .projectRoundId(projectRoundId)
                 .status(finalStatus)
                 .completedCredits(record.getCompletedCredits())
-                .requiredCredits(110)
+                .requiredCredits(132)
                 .debtCredits(record.getDebtCredits())
                 .maxDebtCredits(maxDebtCreditsToStart)
                 .gpa(record.getGpa())
@@ -385,7 +381,7 @@ public class EligibilityService {
         // Auto-enrich category based on academic / supervisor status if not specified or generic
         if ("OTHER".equalsIgnoreCase(category)) {
             StudentAcademicRecord record = resolveAcademicRecord(request.getStudentId(), request.getProjectRoundId());
-            if (record.getCompletedCredits() < 110 || record.getMissingPrerequisiteCount() > 0) {
+            if (record.getCompletedCredits() < 132 || record.getDebtCredits() > 0) {
                 category = "INSUFFICIENT_CREDITS";
             }
         }
@@ -794,9 +790,9 @@ public class EligibilityService {
             }
         }
 
-        // 4. Resolve Academic Records (Credits, prerequisites, tuition debt)
+        // 4. Resolve Academic Records (Credits, tuition debt)
         StudentAcademicRecord academicRecord = resolveAcademicRecord(studentId, projectRoundId);
-        boolean creditsLacking = academicRecord.getDebtCredits() > maxDebtCreditsToDefend || academicRecord.getMissingPrerequisiteCount() > 0;
+        boolean creditsLacking = academicRecord.getDebtCredits() > maxDebtCreditsToDefend;
         boolean tuitionDebt = academicRecord.isTuitionDebt();
 
         // 5. Check Reservation status
@@ -898,14 +894,12 @@ public class EligibilityService {
                 supervisorScore = supervisorApproved ? BigDecimal.valueOf(8.5) : BigDecimal.valueOf(4.5);
             }
 
-            // Academic Condition Check: Credits / Prerequisites / Tuition / Discipline
+            // Academic Condition Check: Credits / Tuition / Discipline
             if (creditsLacking) {
                 eligible = false;
                 if (supervisorApproved && progressPercentage >= 100.0) {
                     reasons.add("Đồ án đã được GVHD duyệt đạt yêu cầu, nhưng sinh viên CHƯA TRẢ HẾT NỢ TÍN CHỈ (Còn nợ: " +
-                            academicRecord.getDebtCredits() + " tín chỉ" +
-                            (academicRecord.getMissingPrerequisiteCount() > 0 ? ", nợ " + academicRecord.getMissingPrerequisiteCount() + " môn tiên quyết" : "") +
-                            "). Sinh viên ĐƯỢC BẢO LƯU kết quả đồ án để bảo vệ đợt sau khi hoàn thành tín chỉ.");
+                            academicRecord.getDebtCredits() + " tín chỉ). Sinh viên ĐƯỢC BẢO LƯU kết quả đồ án để bảo vệ đợt sau khi hoàn thành tín chỉ.");
                 } else {
                     reasons.add("Chưa trả hết nợ tín chỉ (Còn nợ: " + academicRecord.getDebtCredits() + " tín chỉ).");
                 }

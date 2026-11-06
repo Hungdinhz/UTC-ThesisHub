@@ -61,7 +61,7 @@ export const ReservationSubmitModal: React.FC<ReservationSubmitModalProps> = ({
   const getCategoryHint = (cat: ReservationReasonCategory) => {
     switch (cat) {
       case 'INSUFFICIENT_CREDITS':
-        return '💡 GVHD đã duyệt đề tài đạt yêu cầu nhưng sinh viên còn nợ môn / chưa tích lũy đủ 110 tín chỉ tốt nghiệp. Kết quả đề tài và điểm GVHD sẽ được bảo lưu sang đợt sau.';
+        return '💡 GVHD đã duyệt đề tài đạt yêu cầu nhưng sinh viên chưa hoàn thành trả hết nợ tín chỉ tốt nghiệp (Cử nhân: 142 TC, Kỹ sư: 180 TC). Kết quả đề tài và điểm GVHD sẽ được bảo lưu sang đợt sau.';
       case 'SUPERVISOR_NOT_ELIGIBLE':
         return '💡 GVHD đánh giá tiến độ chưa hoàn tất hoặc điểm đánh giá chưa đạt chuẩn. Sinh viên được bảo lưu khối lượng đã làm để tiếp tục hoàn thiện sang đợt sau.';
       case 'RESEARCH_PROGRESS':
@@ -136,7 +136,7 @@ export const ReservationSubmitModal: React.FC<ReservationSubmitModalProps> = ({
             required
             style={{ fontWeight: 500 }}
           >
-            <option value="INSUFFICIENT_CREDITS">❌ Chưa trả đủ tín chỉ / Nợ môn học (Đồ án GVHD đã đạt)</option>
+            <option value="INSUFFICIENT_CREDITS">❌ Chưa trả đủ tín chỉ nợ (Đồ án GVHD đã đạt)</option>
             <option value="SUPERVISOR_NOT_ELIGIBLE">⏳ GVHD xét chưa đạt tiến độ / Chưa đủ điều kiện bảo vệ</option>
             <option value="RESEARCH_PROGRESS">⏱️ Cần thêm thời gian hoàn thiện khối lượng nghiên cứu</option>
             <option value="HEALTH_REASONS">🏥 Lý do sức khỏe / Điều trị y tế dài hạn</option>

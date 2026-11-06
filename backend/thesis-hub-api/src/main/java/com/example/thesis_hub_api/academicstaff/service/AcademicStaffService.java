@@ -116,16 +116,26 @@ public class AcademicStaffService {
 
         Major major = student.getMajorId() != null ? majorMap.get(student.getMajorId()) : null;
         boolean eligible = "ELIGIBLE".equalsIgnoreCase(status) || "FORCE_APPROVED".equalsIgnoreCase(status);
+        Integer debt = record != null && record.getDebtCredits() != null ? record.getDebtCredits() : (student.getDebtCredits() != null ? student.getDebtCredits() : 0);
+        Integer completed = record != null && record.getCompletedCredits() != null ? record.getCompletedCredits() : Math.max(0, 142 - debt);
+        Double gpaVal = record != null && record.getGpa() != null ? record.getGpa() : (spr.getGpa() != null ? spr.getGpa().doubleValue() : (student.getGpa() != null ? student.getGpa().doubleValue() : null));
+        String noteVal = (spr.getNote() != null && !spr.getNote().isBlank()) ? spr.getNote() : (record != null ? record.getNote() : "");
 
         return EligibleStudentRowDTO.builder()
                 .studentId(student.getId())
                 .studentCode(student.getStudentCode())
                 .fullName(student.getUser() != null ? student.getUser().getFullName() : null)
                 .className(student.getClassName())
+                .majorCode(major != null ? major.getCode() : null)
                 .majorName(major != null ? major.getName() : null)
-                .completedCredits(record != null ? record.getCompletedCredits() : null)
-                .debtCredits(record != null ? record.getDebtCredits() : null)
-                .gpa(record != null ? record.getGpa() : null)
+                .email(student.getUser() != null ? student.getUser().getEmail() : null)
+                .phone(student.getUser() != null ? student.getUser().getPhone() : null)
+                .completedCredits(completed)
+                .debtCredits(debt)
+                .gpa(gpaVal)
+                .tuitionDebt(record != null && Boolean.TRUE.equals(record.getTuitionDebt()))
+                .underDisciplinaryAction(record != null && Boolean.TRUE.equals(record.getUnderDisciplinaryAction()))
+                .note(noteVal)
                 .status(status)
                 .eligible(eligible)
                 .reasons(reasons)

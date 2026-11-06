@@ -45,7 +45,6 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
 
   // Academic record edit modal state
   const [editingAcademicStudent, setEditingAcademicStudent] = useState<StudentProjectRoundItem | null>(null);
-  const [clearingDebtStudentId, setClearingDebtStudentId] = useState<number | null>(null);
 
   // Single student check state (search by Student Code / MSSV only)
   const [studentCodeInput, setStudentCodeInput] = useState('');
@@ -187,32 +186,6 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
     const thesis = findStudentThesis(student);
     setStudentCodeInput(student.studentCode || String(student.studentId));
     handleCheck(undefined, student.studentId, thesis?.id, student.studentCode);
-  };
-
-  // Handle Quick Clear Debt (Debt -> 0)
-  const handleQuickClearDebt = async (student: StudentProjectRoundItem) => {
-    if (!selectedRoundId) return;
-    const confirmed = window.confirm(
-      `Xác nhận sinh viên ${student.fullName || student.studentCode} (${student.studentCode}) đã hoàn thành trả nợ ${student.debtCredits} tín chỉ (Số tín chỉ nợ chuyển về 0 để đủ điều kiện xét bảo vệ)?`
-    );
-    if (!confirmed) return;
-
-    try {
-      setClearingDebtStudentId(student.studentId);
-      const msg = await apiService.clearStudentDebt(selectedRoundId, student.studentId);
-      setNotification({
-        type: 'success',
-        message: msg || `Đã hoàn tất trả nợ tín chỉ cho sinh viên ${student.studentCode} thành công!`,
-      });
-      await loadRoundData(selectedRoundId);
-      if (result && result.studentId === student.studentId) {
-        await handleCheck(undefined, result.studentId, result.thesisId, result.studentCode);
-      }
-    } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Lỗi khi xóa nợ tín chỉ' });
-    } finally {
-      setClearingDebtStudentId(null);
-    }
   };
 
   // Handle Review reservation (Approve/Reject)
@@ -627,20 +600,19 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   </div>
 
                   {/* Criteria 3: Điều kiện Học vụ / Tín chỉ */}
-                  <div className={`criteria-card ${result.completedCredits !== undefined && result.completedCredits !== null && result.completedCredits >= 110 && !result.missingPrerequisiteCount && (!result.debtCredits || result.debtCredits === 0) ? 'card-ok' : 'card-fail'}`}>
+                  <div className={`criteria-card ${result.completedCredits !== undefined && result.completedCredits !== null && (!result.debtCredits || result.debtCredits === 0) ? 'card-ok' : 'card-fail'}`}>
                     <div className="card-top">
-                      <span className="card-icon">{result.completedCredits !== undefined && result.completedCredits !== null && result.completedCredits >= 110 && !result.missingPrerequisiteCount && (!result.debtCredits || result.debtCredits === 0) ? '✅' : '❌'}</span>
-                      <span className="card-heading">3. Tín chỉ &amp; Môn tiên quyết</span>
+                      <span className="card-icon">{result.completedCredits !== undefined && result.completedCredits !== null && (!result.debtCredits || result.debtCredits === 0) ? '✅' : '❌'}</span>
+                      <span className="card-heading">3. Tín chỉ tích lũy &amp; Nợ tín chỉ</span>
                     </div>
                     <div className="card-desc">
-                      Tích lũy tối thiểu 110 tín chỉ, hoàn thành nợ tín chỉ (= 0) và không nợ môn tiên quyết.
+                      Hoàn thành toàn bộ nợ tín chỉ (= 0) theo chương trình đào tạo (Cử nhân: 142 TC, Kỹ sư: 180 TC).
                     </div>
                     <div className="card-metric">
-                      Tín chỉ tích lũy: <strong>{result.completedCredits !== undefined && result.completedCredits !== null ? `${result.completedCredits}/110` : 'Chưa có dữ liệu'}</strong>
+                      Tín chỉ tích lũy: <strong>{result.completedCredits !== undefined && result.completedCredits !== null ? `${result.completedCredits} TC` : 'Chưa có dữ liệu'}</strong>
                       {result.debtCredits !== undefined && result.debtCredits !== null && result.debtCredits > 0 ? (
                         <span style={{ color: '#dc2626', fontWeight: 600 }}> (Còn nợ: {result.debtCredits} tín chỉ)</span>
                       ) : null}
-                      {result.missingPrerequisiteCount ? ` (Nợ ${result.missingPrerequisiteCount} môn)` : ''}
                     </div>
                   </div>
 
@@ -736,13 +708,11 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     const hasPendingRes = reservation?.status === 'PENDING';
                     const isDropped = st.status === 'DROPPED' || st.status === 'DISQUALIFIED' || st.status === 'INELIGIBLE';
 
-                    // Academic condition check: Completed credits >= 110, debtCredits == 0, no prerequisites missing, no tuition debt, no discipline
+                    // Academic condition check: debtCredits == 0, no tuition debt, no discipline
                     const isAcademicEligible =
                       (!st.debtCredits || st.debtCredits === 0) &&
-                      (!st.missingPrerequisiteCount || st.missingPrerequisiteCount === 0) &&
                       !st.tuitionDebt &&
-                      !st.underDisciplinaryAction &&
-                      (st.completedCredits === undefined || st.completedCredits === null || st.completedCredits >= 110);
+                      !st.underDisciplinaryAction;
 
                     const hasSupervisorApproved = Boolean(
                       thesis && (
@@ -812,11 +782,6 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                               >
                                 {st.debtCredits !== undefined && st.debtCredits > 0 ? `${st.debtCredits} TC (Nợ)` : '0 TC'}
                               </span>
-                              {st.missingPrerequisiteCount && st.missingPrerequisiteCount > 0 ? (
-                                <span style={{ color: '#ea580c', fontSize: '0.75rem', marginLeft: '4px' }}>
-                                  • Nợ {st.missingPrerequisiteCount} môn TQ
-                                </span>
-                              ) : null}
                             </div>
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                               <span
@@ -951,8 +916,6 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                                   ? 'Chưa phân công GVHD'
                                   : (st.debtCredits !== undefined && st.debtCredits > 0)
                                   ? `Nợ ${st.debtCredits} tín chỉ`
-                                  : (st.missingPrerequisiteCount && st.missingPrerequisiteCount > 0)
-                                  ? `Nợ ${st.missingPrerequisiteCount} môn TQ`
                                   : st.tuitionDebt
                                   ? 'Còn nợ học phí'
                                   : st.underDisciplinaryAction
@@ -1002,27 +965,6 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                                 }}
                               >
                                 ✏️ Sửa học vụ
-                              </button>
-                            )}
-
-                            {/* Trả nợ tín chỉ nhanh về 0 nếu còn nợ */}
-                            {isAdmin && st.debtCredits !== undefined && st.debtCredits > 0 && (
-                              <button
-                                onClick={() => handleQuickClearDebt(st)}
-                                disabled={clearingDebtStudentId === st.studentId}
-                                title="Xác nhận sinh viên đã trả nợ xong để đủ điều kiện xét bảo vệ (chuyển nợ tín về 0)"
-                                style={{
-                                  backgroundColor: '#f0fdf4',
-                                  color: '#16a34a',
-                                  border: '1px solid #86efac',
-                                  padding: '5px 10px',
-                                  borderRadius: '4px',
-                                  fontWeight: 700,
-                                  fontSize: '0.75rem',
-                                  cursor: clearingDebtStudentId === st.studentId ? 'not-allowed' : 'pointer',
-                                }}
-                              >
-                                {clearingDebtStudentId === st.studentId ? '⏳ Đang xóa...' : '⚡ Trả nợ (=0)'}
                               </button>
                             )}
 

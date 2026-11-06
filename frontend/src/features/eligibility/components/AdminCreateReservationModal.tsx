@@ -40,7 +40,7 @@ export const AdminCreateReservationModal: React.FC<AdminCreateReservationModalPr
       if (student.defaultReason) {
         setReason(student.defaultReason);
       } else {
-        setReason('Bảo lưu kết quả đồ án do chưa hoàn thành đủ số tín chỉ quy định / còn nợ môn tốt nghiệp');
+        setReason('Bảo lưu kết quả đồ án do chưa hoàn thành đủ số tín chỉ quy định / còn nợ tín chỉ tốt nghiệp');
       }
       setError('');
     }
@@ -113,7 +113,7 @@ export const AdminCreateReservationModal: React.FC<AdminCreateReservationModalPr
             disabled={!hasThesis}
             style={{ fontWeight: 500 }}
           >
-            <option value="INSUFFICIENT_CREDITS">❌ Chưa trả đủ tín chỉ / Nợ môn học (Đồ án GVHD đạt)</option>
+            <option value="INSUFFICIENT_CREDITS">❌ Chưa trả đủ tín chỉ nợ (Đồ án GVHD đạt)</option>
             <option value="SUPERVISOR_NOT_ELIGIBLE">⏳ GVHD xét chưa đạt tiến độ / Chưa đủ điều kiện bảo vệ</option>
             <option value="RESEARCH_PROGRESS">⏱️ Cần thêm thời gian hoàn thiện khối lượng nghiên cứu</option>
             <option value="HEALTH_REASONS">🏥 Lý do sức khỏe / Bệnh án điều trị</option>

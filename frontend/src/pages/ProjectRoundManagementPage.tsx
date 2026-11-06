@@ -259,7 +259,6 @@ const ProjectRoundManagementPage: React.FC = () => {
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Lỗi khi xóa đợt đồ án';
       setDeleteError(msg);
-      setError(msg);
     } finally {
       setDeleteLoading(false);
     }
@@ -1200,7 +1199,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                     Xác nhận xóa đợt đồ án
                   </h3>
                   <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                    Thao tác này chỉ áp dụng cho đợt đồ án đã kết thúc
+                    Thao tác này áp dụng cho đợt đồ án ở trạng thái Bản nháp hoặc Đã kết thúc
                   </span>
                 </div>
               </div>
@@ -1220,7 +1219,7 @@ const ProjectRoundManagementPage: React.FC = () => {
               )}
 
               <p style={{ margin: '0 0 14px 0', fontSize: '0.95rem', color: '#1e293b', lineHeight: 1.5 }}>
-                Bạn có muốn xóa đợt đồ án <strong>(đợt đã kết thúc rồi)</strong> này không?
+                Bạn có muốn xóa đợt đồ án <strong>({roundToDelete.status === 'DRAFT' ? 'đang ở trạng thái Bản nháp' : 'đợt đã kết thúc'})</strong> này không?
               </p>
 
               <div style={{

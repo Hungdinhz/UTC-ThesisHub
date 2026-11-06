@@ -1343,6 +1343,42 @@ public class ProjectRoundService {
                 .build();
     }
 
+    private void safeExecuteUpdate(String sql, Object... args) {
+        if (jdbcTemplate == null) {
+            return;
+        }
+        try {
+            if (jdbcTemplate.getDataSource() == null) {
+                jdbcTemplate.update(sql, args);
+                return;
+            }
+            jdbcTemplate.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) conn -> {
+                java.sql.Savepoint sp = null;
+                try {
+                    sp = conn.setSavepoint();
+                    try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+                        for (int i = 0; i < args.length; i++) {
+                            ps.setObject(i + 1, args[i]);
+                        }
+                        ps.executeUpdate();
+                    }
+                    conn.releaseSavepoint(sp);
+                } catch (Exception ex) {
+                    if (sp != null) {
+                        try {
+                            conn.rollback(sp);
+                        } catch (Exception ignored) {
+                        }
+                    }
+                    log.warn("Bỏ qua lỗi SQL khi dọn dẹp dữ liệu đợt đồ án [{}]: {}", sql, ex.getMessage());
+                }
+                return null;
+            });
+        } catch (Exception ex) {
+            log.warn("Cảnh báo dọn dẹp SQL [{}]: {}", sql, ex.getMessage());
+        }
+    }
+
     @Transactional
     public void deleteRound(Long roundId) {
         ProjectRound round = projectRoundRepository.findById(roundId)
@@ -1357,94 +1393,95 @@ public class ProjectRoundService {
 
         if (jdbcTemplate != null) {
             // Lấy danh sách sinh viên chỉ thuộc đợt đồ án này (không tham gia đợt nào khác) để xóa tài khoản sinh viên
-            List<Long> studentIdsToDelete = jdbcTemplate.queryForList(
-                    "SELECT spr.student_id FROM student_project_rounds spr WHERE spr.project_round_id = ? " +
-                    "AND spr.student_id IS NOT NULL " +
-                    "AND NOT EXISTS (SELECT 1 FROM student_project_rounds spr2 WHERE spr2.student_id = spr.student_id AND spr2.project_round_id <> ?)",
-                    Long.class, roundId, roundId
-            );
+            List<Long> studentIdsToDelete = new ArrayList<>();
+            try {
+                List<Long> queriedStudents = jdbcTemplate.queryForList(
+                        "SELECT spr.student_id FROM student_project_rounds spr WHERE spr.project_round_id = ? " +
+                        "AND spr.student_id IS NOT NULL " +
+                        "AND NOT EXISTS (SELECT 1 FROM student_project_rounds spr2 WHERE spr2.student_id = spr.student_id AND spr2.project_round_id <> ?)",
+                        Long.class, roundId, roundId
+                );
+                if (queriedStudents != null) {
+                    studentIdsToDelete.addAll(queriedStudents);
+                }
+            } catch (Exception ex) {
+                log.warn("Không thể truy vấn danh sách sinh viên cần xóa cho đợt {}: {}", roundId, ex.getMessage());
+            }
+
             List<Long> userIdsToDelete = new ArrayList<>();
             if (!studentIdsToDelete.isEmpty()) {
                 String inStudentIds = studentIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
-                userIdsToDelete = jdbcTemplate.queryForList(
-                        "SELECT s.user_id FROM students s WHERE s.id IN (" + inStudentIds + ") AND s.user_id IS NOT NULL " +
-                        "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = s.user_id)",
-                        Long.class
-                );
+                try {
+                    List<Long> queriedUsers = jdbcTemplate.queryForList(
+                            "SELECT s.user_id FROM students s WHERE s.id IN (" + inStudentIds + ") AND s.user_id IS NOT NULL " +
+                            "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = s.user_id)",
+                            Long.class
+                    );
+                    if (queriedUsers != null) {
+                        userIdsToDelete.addAll(queriedUsers);
+                    }
+                } catch (Exception ex) {
+                    log.warn("Không thể truy vấn danh sách user_id sinh viên cần xóa cho đợt {}: {}", roundId, ex.getMessage());
+                }
             }
 
-            // Cleanup dependent tables without explicit ON DELETE CASCADE
-            try {
-                jdbcTemplate.update("DELETE FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
-            } catch (Exception ignored) {}
-            try {
-                jdbcTemplate.update("DELETE FROM chat_messages WHERE project_round_id = ?", roundId);
-            } catch (Exception ignored) {}
-            try {
-                jdbcTemplate.update("DELETE FROM defense_minutes_signatures WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            } catch (Exception ignored) {}
-            try {
-                jdbcTemplate.update("DELETE FROM defense_schedule_theses WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            } catch (Exception ignored) {}
-            jdbcTemplate.update("DELETE FROM scores WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM reviewer_assignments WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM graduation_results WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM submissions WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
-            jdbcTemplate.update("DELETE FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM documents WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM progress_feedbacks WHERE progress_report_id IN (SELECT id FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
-            jdbcTemplate.update("DELETE FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM progress_reports WHERE milestone_id IN (SELECT id FROM timeline_milestones WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM theses WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM proposal_review_assignments WHERE proposal_id IN (SELECT id FROM proposals WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM proposals WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM council_members WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM defense_schedules WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM defense_councils WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM reservation_requests WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM supervisor_assignments WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM preferences WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM direction_registrations WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM lecturer_capacities WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM student_project_rounds WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM timeline_milestones WHERE project_round_id = ?", roundId);
+            // Cleanup dependent tables using savepoint-protected SQL so PostgreSQL never aborts the transaction
+            safeExecuteUpdate("DELETE FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            safeExecuteUpdate("DELETE FROM chat_messages WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM defense_minutes_signatures WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?) OR council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId, roundId);
+            safeExecuteUpdate("DELETE FROM defense_schedule_theses WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?) OR schedule_id IN (SELECT id FROM defense_schedules WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?))", roundId, roundId);
+            safeExecuteUpdate("DELETE FROM scores WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM reviewer_assignments WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM graduation_results WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM submissions WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            safeExecuteUpdate("DELETE FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM documents WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM progress_feedbacks WHERE progress_report_id IN (SELECT id FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            safeExecuteUpdate("DELETE FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM progress_reports WHERE milestone_id IN (SELECT id FROM timeline_milestones WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM reservation_requests WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM theses WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM proposal_review_assignments WHERE proposal_id IN (SELECT id FROM proposals WHERE project_round_id = ?) OR review_group_id IN (SELECT id FROM review_groups WHERE project_round_id = ?)", roundId, roundId);
+            safeExecuteUpdate("DELETE FROM proposals WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM review_group_members WHERE review_group_id IN (SELECT id FROM review_groups WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM review_groups WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM council_members WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM defense_schedules WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM defense_councils WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM reservation_requests WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM supervisor_assignments WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM preferences WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM direction_registrations WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM lecturer_capacities WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM academic_records WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM student_project_rounds WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM timeline_milestones WHERE project_round_id = ?", roundId);
 
             // Xóa tài khoản sinh viên thuộc đợt đồ án này (tuyệt đối không xóa tài khoản giảng viên)
             if (!studentIdsToDelete.isEmpty()) {
                 String inStudentIds = studentIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
-                try {
-                    jdbcTemplate.update("DELETE FROM preferences WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM direction_registrations WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM supervisor_assignments WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM reservation_requests WHERE student_id IN (" + inStudentIds + ")");
-                    try {
-                        jdbcTemplate.update("DELETE FROM academic_records WHERE student_id IN (" + inStudentIds + ")");
-                    } catch (Exception ignored) {}
-                    jdbcTemplate.update("DELETE FROM proposals WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM theses WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM students WHERE id IN (" + inStudentIds + ")");
-                } catch (Exception ex) {
-                    log.warn("Lỗi khi dọn dẹp bảng students cho đợt {}: {}", roundId, ex.getMessage());
-                }
+                safeExecuteUpdate("DELETE FROM preferences WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM direction_registrations WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM supervisor_assignments WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM reservation_requests WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM academic_records WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM submissions WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM progress_reports WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM proposals WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM theses WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM students WHERE id IN (" + inStudentIds + ")");
             }
             if (!userIdsToDelete.isEmpty()) {
                 String inUserIds = userIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
-                try {
-                    jdbcTemplate.update("DELETE FROM notifications WHERE user_id IN (" + inUserIds + ")");
-                } catch (Exception ignored) {}
-                try {
-                    jdbcTemplate.update("DELETE FROM comments WHERE author_id IN (" + inUserIds + ")");
-                } catch (Exception ignored) {}
-                try {
-                    jdbcTemplate.update("DELETE FROM user_roles WHERE user_id IN (" + inUserIds + ") " +
-                            "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = user_roles.user_id)");
-                    jdbcTemplate.update("DELETE FROM users WHERE id IN (" + inUserIds + ") " +
-                            "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = users.id) " +
-                            "AND NOT EXISTS (SELECT 1 FROM students s WHERE s.user_id = users.id)");
-                    log.info("Đã xóa {} tài khoản sinh viên khi xóa đợt đồ án id={}", userIdsToDelete.size(), roundId);
-                } catch (Exception ex) {
-                    log.warn("Lỗi khi dọn dẹp bảng users cho sinh viên đợt {}: {}", roundId, ex.getMessage());
-                }
+                safeExecuteUpdate("DELETE FROM notifications WHERE user_id IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM comments WHERE user_id IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM chat_messages WHERE sender_user_id IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM documents WHERE uploader_id IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM tasks WHERE created_by IN (" + inUserIds + ") OR assigned_to IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM users WHERE id IN (" + inUserIds + ") " +
+                        "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = users.id) " +
+                        "AND NOT EXISTS (SELECT 1 FROM students s WHERE s.user_id = users.id)");
+                log.info("Đã xóa {} tài khoản sinh viên khi xóa đợt đồ án id={}", userIdsToDelete.size(), roundId);
             }
         }
 

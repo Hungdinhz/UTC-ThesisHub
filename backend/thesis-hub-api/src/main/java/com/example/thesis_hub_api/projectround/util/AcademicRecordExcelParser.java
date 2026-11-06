@@ -108,25 +108,13 @@ public class AcademicRecordExcelParser {
         String disciplinaryStr = getCellValue(row.getCell(6));
         boolean underDisciplinaryAction = parseBoolean(disciplinaryStr);
 
-        // Cột H (7): Số môn tiên quyết còn nợ *
-        String prereqStr = getCellValue(row.getCell(7));
         Integer missingPrereqCount = 0;
-        if (!prereqStr.isEmpty()) {
-            try {
-                missingPrereqCount = (int) Double.parseDouble(prereqStr);
-                if (missingPrereqCount < 0) {
-                    errors.add("Số môn tiên quyết còn nợ phải >= 0");
-                }
-            } catch (NumberFormatException e) {
-                errors.add("Số môn tiên quyết còn nợ không đúng định dạng số: " + prereqStr);
-            }
-        }
 
-        // Cột I (8): Ghi chú
-        String note = getCellValue(row.getCell(8));
+        // Cột H (7): Ghi chú
+        String note = getCellValue(row.getCell(7));
 
-        // Cột J (9): Số tín chỉ nợ (để trống = 0)
-        String debtStr = getCellValue(row.getCell(9));
+        // Cột I (8): Số tín chỉ nợ (để trống = 0)
+        String debtStr = getCellValue(row.getCell(8));
         Integer debtCredits = 0;
         if (!debtStr.isEmpty()) {
             try {
@@ -226,7 +214,6 @@ public class AcademicRecordExcelParser {
                     "Điểm GPA tích lũy *",
                     "Nợ học phí (CÓ/KHÔNG) *",
                     "Kỷ luật (CÓ/KHÔNG) *",
-                    "Số môn tiên quyết còn nợ *",
                     "Ghi chú",
                     "Số tín chỉ nợ"
             };
@@ -242,11 +229,11 @@ public class AcademicRecordExcelParser {
 
             // Dữ liệu mẫu chuẩn ứng với 5 sinh viên của đợt
             Object[][] sampleData = {
-                    {1, "201200101", "Nguyễn Văn An", 125, 3.25, "KHÔNG", "KHÔNG", 0, "Đủ điều kiện xét làm đồ án", 0},
-                    {2, "201200102", "Trần Thị Bình", 118, 2.85, "KHÔNG", "KHÔNG", 0, "Nợ 6 tín chỉ (< 10) vẫn đủ điều kiện nhận đồ án", 6},
-                    {3, "201200103", "Lê Hoàng Cường", 132, 3.65, "KHÔNG", "KHÔNG", 0, "Đủ điều kiện xét làm đồ án xuất sắc", 0},
-                    {4, "201200104", "Phạm Ngọc Dung", 102, 2.15, "CÓ", "KHÔNG", 1, "Nợ 15 tín chỉ (>= 10) và còn nợ học phí", 15},
-                    {5, "201200105", "Hoàng Minh Đức", 120, 1.95, "KHÔNG", "CÓ", 0, "GPA dưới 2.0 và đang bị kỷ luật", 0}
+                    {1, "201200101", "Nguyễn Văn An", 142, 3.25, "KHÔNG", "KHÔNG", "Đủ điều kiện xét làm đồ án", 0},
+                    {2, "201200102", "Trần Thị Bình", 136, 2.85, "KHÔNG", "KHÔNG", "Nợ 6 tín chỉ (<= 10) vẫn đủ điều kiện nhận đồ án", 6},
+                    {3, "201200103", "Lê Hoàng Cường", 142, 3.65, "KHÔNG", "KHÔNG", "Đủ điều kiện xét làm đồ án xuất sắc", 0},
+                    {4, "201200104", "Phạm Ngọc Dung", 127, 2.15, "CÓ", "KHÔNG", "Nợ 15 tín chỉ (> 10) và còn nợ học phí", 15},
+                    {5, "201200105", "Hoàng Minh Đức", 142, 1.95, "KHÔNG", "CÓ", "GPA dưới 2.0 và đang bị kỷ luật", 0}
             };
 
             int rowIdx = 1;
