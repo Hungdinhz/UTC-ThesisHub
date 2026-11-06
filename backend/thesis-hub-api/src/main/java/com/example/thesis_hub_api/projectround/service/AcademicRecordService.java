@@ -185,12 +185,12 @@ public class AcademicRecordService {
 
             academicRecordRepository.save(record);
 
-            if (record.getDebtCredits() != null && record.getDebtCredits() >= 10 && notificationService != null && student.getUser() != null) {
+            if (record.getDebtCredits() != null && record.getDebtCredits() > 10 && notificationService != null && student.getUser() != null) {
                 try {
                     notificationService.createNotification(
                             student.getUser().getId(),
                             "Cảnh báo học vụ: Không đủ điều kiện làm đồ án",
-                            "Hệ thống ghi nhận bạn đang nợ " + record.getDebtCredits() + " tín chỉ (>= 10 tín chỉ quy định). Bạn không đủ điều kiện nhận đề tài đồ án tốt nghiệp đợt này. Vui lòng liên hệ Giáo vụ Khoa để được hướng dẫn.",
+                            "Hệ thống ghi nhận bạn đang nợ " + record.getDebtCredits() + " tín chỉ (> 10 tín chỉ quy định). Bạn không đủ điều kiện nhận đề tài đồ án tốt nghiệp đợt này. Vui lòng liên hệ Giáo vụ Khoa để được hướng dẫn.",
                             "ACADEMIC",
                             "/student/profile"
                     );

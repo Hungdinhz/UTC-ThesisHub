@@ -45,7 +45,7 @@ export const ReservationReviewModal: React.FC<ReservationReviewModalProps> = ({
   const getCategoryBadge = (cat?: string) => {
     switch (cat) {
       case 'INSUFFICIENT_CREDITS':
-        return <span style={{ background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>Chưa trả đủ tín chỉ / Nợ môn</span>;
+        return <span style={{ background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>Chưa trả đủ tín chỉ nợ</span>;
       case 'SUPERVISOR_NOT_ELIGIBLE':
         return <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>GVHD xét chưa đạt tiến độ</span>;
       case 'RESEARCH_PROGRESS':

@@ -65,7 +65,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     return {
       code: trainingProgram || (isKs ? 'KY_SU' : 'CU_NHAN'),
       name: trainingProgramName || (isKs ? 'Chương trình Kỹ sư' : 'Chương trình Cử nhân'),
-      maxCredits: isKs ? 150 : 130,
+      maxCredits: isKs ? 180 : 142,
     };
   });
 
@@ -83,7 +83,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
           setResolvedProgram({
             code: cur.trainingProgram || (isKs ? 'KY_SU' : 'CU_NHAN'),
             name: cur.trainingProgramName || (isKs ? 'Chương trình Kỹ sư' : 'Chương trình Cử nhân'),
-            maxCredits: isKs ? 150 : 130,
+            maxCredits: isKs ? 180 : 142,
           });
         }
       } catch {
@@ -107,7 +107,6 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
   // Export & Action states
   const [exporting, setExporting] = useState(false);
-  const [clearingStudentId, setClearingStudentId] = useState<number | null>(null);
 
   // Modal Import Excel states
   const [showImportModal, setShowImportModal] = useState(false);
@@ -127,7 +126,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     majorId: 0,
     phone: '',
     gpa: '' as any,
-    completedCredits: 120,
+    completedCredits: 142,
     debtCredits: 0,
     tuitionDebt: false,
     underDisciplinaryAction: false,
@@ -158,7 +157,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     email: '',
     phone: '',
     gpa: 3.0,
-    completedCredits: 115,
+    completedCredits: 142,
     debtCredits: 0,
     tuitionDebt: false,
     underDisciplinaryAction: false,
@@ -172,21 +171,18 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     debtCredits: number,
     tuitionDebt: boolean,
     underDiscipline: boolean,
-    missingPrereq: number,
+    _missingPrereq: number,
     gpa?: number
   ) => {
     const reasons: string[] = [];
-    if (debtCredits >= 10) {
-      reasons.push(`Nợ ${debtCredits} tín chỉ (quy chế UTC: < 10 tín chỉ)`);
+    if (debtCredits > 10) {
+      reasons.push(`Nợ ${debtCredits} tín chỉ (quy chế UTC: tối đa 10 tín chỉ)`);
     }
     if (tuitionDebt) {
       reasons.push('Đang nợ học phí');
     }
     if (underDiscipline) {
       reasons.push('Đang bị kỷ luật');
-    }
-    if (missingPrereq > 0) {
-      reasons.push(`Nợ ${missingPrereq} môn tiên quyết`);
     }
     if (gpa !== undefined && gpa !== null && !isNaN(gpa) && gpa < 2.0) {
       reasons.push(`GPA < 2.0 (${Number(gpa).toFixed(2)})`);
@@ -392,8 +388,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         if (value === undefined || value === null || value === '') return '';
         const num = Number(value);
         if (isNaN(num) || num < 0) return 'Số tín chỉ nợ phải >= 0';
-        if (num >= 10) {
-          return 'Sinh viên nợ từ 10 tín chỉ trở lên không đủ điều kiện nhận đồ án (bị loại)';
+        if (num > 10) {
+          return 'Sinh viên nợ trên 10 tín chỉ không đủ điều kiện nhận đồ án (bị loại)';
         }
         if (num > resolvedProgram.maxCredits) {
           return `Số tín chỉ nợ không thể vượt quá ${resolvedProgram.maxCredits} tín`;
@@ -557,26 +553,6 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     }
   };
 
-  // Clear debt (= 0)
-  const handleClearDebt = async (student: StudentProjectRoundItem) => {
-    const confirmed = window.confirm(
-      `Xác nhận sinh viên ${student.fullName || student.studentCode} (${student.studentCode}) đã hoàn thành trả nợ tín chỉ (Số tín chỉ nợ chuyển về 0)?`
-    );
-    if (!confirmed) return;
-
-    try {
-      setClearingStudentId(student.studentId);
-      const msg = await apiService.clearStudentDebt(roundId, student.studentId);
-      setSuccessMsg(msg || `Đã xóa nợ tín chỉ cho sinh viên ${student.studentCode} thành công!`);
-      await loadStudents();
-      fetchKpis();
-    } catch (err: any) {
-      setError(await extractErrorMessage(err, 'Lỗi khi cập nhật trả nợ tín chỉ'));
-    } finally {
-      setClearingStudentId(null);
-    }
-  };
-
   // Preview import
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -693,9 +669,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         studentCode: code,
         fullName: manualForm.fullName.trim(),
         email: emailVal,
-        completedCredits: Number(manualForm.completedCredits ?? 120),
+        completedCredits: Number(manualForm.completedCredits ?? resolvedProgram.maxCredits),
         debtCredits: Number(manualForm.debtCredits ?? 0),
-        missingPrerequisiteCount: Number(manualForm.missingPrerequisiteCount ?? 0),
+        missingPrerequisiteCount: 0,
         tuitionDebt: Boolean(manualForm.tuitionDebt),
         underDisciplinaryAction: Boolean(manualForm.underDisciplinaryAction),
       });
@@ -710,7 +686,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         majorId: majors[0]?.id || 0,
         phone: '',
         gpa: '' as any,
-        completedCredits: 120,
+        completedCredits: resolvedProgram.maxCredits,
         debtCredits: 0,
         tuitionDebt: false,
         underDisciplinaryAction: false,
@@ -745,11 +721,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       email: st.email || '',
       phone: st.phone || '',
       gpa: st.gpa !== undefined && st.gpa !== null ? st.gpa : 3.0,
-      completedCredits: st.completedCredits !== undefined && st.completedCredits !== null ? st.completedCredits : 115,
+      completedCredits: st.completedCredits !== undefined && st.completedCredits !== null ? st.completedCredits : resolvedProgram.maxCredits,
       debtCredits: st.debtCredits !== undefined && st.debtCredits !== null ? st.debtCredits : 0,
       tuitionDebt: Boolean(st.tuitionDebt),
       underDisciplinaryAction: Boolean(st.underDisciplinaryAction),
-      missingPrerequisiteCount: st.missingPrerequisiteCount !== undefined && st.missingPrerequisiteCount !== null ? st.missingPrerequisiteCount : 0,
+      missingPrerequisiteCount: 0,
       note: st.note || '',
     });
   };
@@ -808,10 +784,10 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         phone: editForm.phone.trim() || undefined,
         gpa: isNaN(gpaNum) ? undefined : gpaNum,
         debtCredits: isNaN(debtCreditsNum) ? 0 : Math.max(0, debtCreditsNum),
-        completedCredits: isNaN(completedCreditsNum) ? 115 : Math.max(0, completedCreditsNum),
+        completedCredits: isNaN(completedCreditsNum) ? resolvedProgram.maxCredits : Math.max(0, completedCreditsNum),
         tuitionDebt: editForm.tuitionDebt,
         underDisciplinaryAction: editForm.underDisciplinaryAction,
-        missingPrerequisiteCount: isNaN(missingPrereqNum) ? 0 : Math.max(0, missingPrereqNum),
+        missingPrerequisiteCount: 0,
         note: editForm.note.trim() || evalResult.autoNote,
       };
 
@@ -1178,7 +1154,6 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   <th style={{ padding: '10px 10px', textAlign: 'center', width: '65px' }}>GPA</th>
                   <th style={{ padding: '10px 10px', textAlign: 'center', width: '85px' }}>Học phí</th>
                   <th style={{ padding: '10px 10px', textAlign: 'center', width: '85px' }}>Kỷ luật</th>
-                  <th style={{ padding: '10px 10px', textAlign: 'center', width: '75px' }}>Nợ môn</th>
                   <th style={{ padding: '10px 10px', textAlign: 'center', width: '75px' }}>Nợ tín</th>
                   <th style={{ padding: '10px 10px', width: '140px' }}>Trạng thái</th>
                   <th style={{ padding: '10px 10px', width: '150px', textAlign: 'center' }}>Thao tác</th>
@@ -1187,7 +1162,6 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               <tbody>
                 {filteredStudents.map((st, idx) => {
                   const badge = getStatusBadge(st.status, st.note);
-                  const hasDebt = st.debtCredits !== undefined && st.debtCredits !== null && st.debtCredits > 0;
                   const isUnregistered = Boolean(st.note && (st.note.toLowerCase().includes('chưa đăng ký hướng') || st.note.toLowerCase().includes('chưa đăng ký')));
                   const isCleanNote = Boolean(st.note && !st.note.toLowerCase().includes('đủ đk nhận đồ án') && !st.note.toLowerCase().includes('chưa đăng ký hướng'));
                   return (
@@ -1208,7 +1182,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                         {st.phone && <div style={{ fontSize: '0.75rem' }}>📞 {st.phone}</div>}
                       </td>
                       <td style={{ padding: '10px 10px', textAlign: 'center', fontWeight: 600 }}>
-                        {st.completedCredits ?? 120}
+                        {st.completedCredits ?? resolvedProgram.maxCredits}
                       </td>
                       <td style={{ padding: '10px 10px', textAlign: 'center' }}>
                         <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
@@ -1236,12 +1210,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                         )}
                       </td>
                       <td style={{ padding: '10px 10px', textAlign: 'center' }}>
-                        <span style={{ color: (st.missingPrerequisiteCount && st.missingPrerequisiteCount > 0) ? '#dc2626' : '#475569', fontWeight: 600 }}>
-                          {st.missingPrerequisiteCount ?? 0}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'center' }}>
-                        <span style={{ color: (st.debtCredits !== undefined && st.debtCredits >= 10) ? '#dc2626' : '#15803d', fontWeight: 700 }}>
+                        <span style={{ color: (st.debtCredits !== undefined && st.debtCredits > 10) ? '#dc2626' : '#15803d', fontWeight: 700 }}>
                           {st.debtCredits ?? 0}
                         </span>
                       </td>
@@ -1278,16 +1247,6 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                             >
                               ✏️ Sửa
                             </button>
-                            {hasDebt && (
-                              <button
-                                onClick={() => handleClearDebt(st)}
-                                disabled={clearingStudentId === st.studentId}
-                                title="Xác nhận sinh viên đã hoàn thành trả nợ tín chỉ trước khi bảo vệ (GĐ5)"
-                                style={{ backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', padding: '3px 7px', borderRadius: '4px', cursor: clearingStudentId === st.studentId ? 'not-allowed' : 'pointer', fontSize: '0.72rem', fontWeight: 700 }}
-                              >
-                                {clearingStudentId === st.studentId ? '⏳ Đang xóa...' : '⚡ Trả nợ (=0)'}
-                              </button>
-                            )}
                             <button
                               onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
                               title="Xóa khỏi đợt"
@@ -1420,7 +1379,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                     📥 Tải file mẫu Excel UTC
                   </button>
                 </div>
-                <strong style={{ color: '#0a3273' }}>📌 Quy định dữ liệu:</strong> Mã sinh viên (MSSV) <strong>chỉ có đúng 9 số</strong>. Số tín chỉ nợ &lt; 10 và không kỷ luật thì được tính là đủ điều kiện nhận đồ án.
+                <strong style={{ color: '#0a3273' }}>📌 Quy định dữ liệu:</strong> Mã sinh viên (MSSV) <strong>chỉ có đúng 9 số</strong>. Số tín chỉ nợ tối đa 10 tín (&lt;= 10) và không kỷ luật thì được tính là đủ điều kiện nhận đồ án.
                 <br />
                 <strong style={{ color: '#16a34a' }}>🔐 Cấp tài khoản sinh viên:</strong> Hệ thống tự động cấp tài khoản đăng nhập (Tên đăng nhập = Mã SV, Mật khẩu mặc định = Password@123) <strong>chỉ cho sinh viên ĐỦ ĐIỀU KIỆN</strong> nhận đồ án. Sinh viên không đủ điều kiện sẽ <strong>không được cấp tài khoản</strong>.
               </div>
@@ -1477,8 +1436,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                           <td style={{ padding: '8px', fontWeight: 700, color: '#0a3273' }}>
                             {row.gpa !== undefined && row.gpa !== null ? Number(row.gpa).toFixed(2) : '—'}
                           </td>
-                          <td style={{ padding: '8px', textAlign: 'center' }}>{row.completedCredits ?? 115}</td>
-                          <td style={{ padding: '8px', textAlign: 'center', fontWeight: 700, color: (row.debtCredits ?? 0) >= 10 ? '#dc2626' : '#15803d' }}>
+                          <td style={{ padding: '8px', textAlign: 'center' }}>{row.completedCredits ?? resolvedProgram.maxCredits}</td>
+                          <td style={{ padding: '8px', textAlign: 'center', fontWeight: 700, color: (row.debtCredits ?? 0) > 10 ? '#dc2626' : '#15803d' }}>
                             {row.debtCredits ?? 0}
                           </td>
                           <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -1773,7 +1732,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                      Tín chỉ nợ (&lt; 10 tín)
+                      Tín chỉ nợ (tối đa 10 tín)
                     </label>
                     <input
                       type="number"
@@ -1798,20 +1757,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', alignItems: 'center' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                      Nợ môn tiên quyết (= 0)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={editForm.missingPrerequisiteCount}
-                      onChange={(e) => setEditForm({ ...editForm, missingPrerequisiteCount: e.target.value })}
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    />
-                  </div>
-                  <div style={{ paddingTop: '18px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ paddingTop: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600, color: editForm.tuitionDebt ? '#dc2626' : '#1e293b' }}>
                       <input
                         type="checkbox"
@@ -1821,7 +1768,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                       Đang nợ học phí
                     </label>
                   </div>
-                  <div style={{ paddingTop: '18px' }}>
+                  <div style={{ paddingTop: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600, color: editForm.underDisciplinaryAction ? '#dc2626' : '#1e293b' }}>
                       <input
                         type="checkbox"
@@ -2136,9 +2083,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                       type="number"
                       min="0"
                       max={resolvedProgram.maxCredits}
-                      value={manualForm.completedCredits ?? Math.min(120, resolvedProgram.maxCredits)}
+                      value={manualForm.completedCredits ?? resolvedProgram.maxCredits}
                       onChange={(e) => handleManualFieldChange('completedCredits', Number(e.target.value))}
-                      placeholder={`VD: ${resolvedProgram.maxCredits - 15}`}
+                      placeholder={`VD: ${resolvedProgram.maxCredits}`}
                       style={{
                         width: '100%',
                         padding: '7px 10px',
@@ -2155,7 +2102,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                      Tín chỉ nợ (&lt; 10 tín)
+                      Tín chỉ nợ (tối đa 10 tín)
                     </label>
                     <input
                       type="number"
@@ -2174,22 +2121,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', alignItems: 'center' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                      Nợ môn tiên quyết
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={manualForm.missingPrerequisiteCount ?? 0}
-                      onChange={(e) => handleManualFieldChange('missingPrerequisiteCount', Number(e.target.value))}
-                      placeholder="VD: 0"
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    />
-                  </div>
-
-                  <div style={{ paddingTop: '18px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ paddingTop: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600, color: manualForm.tuitionDebt ? '#dc2626' : '#1e293b' }}>
                       <input
                         type="checkbox"
@@ -2200,7 +2133,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                     </label>
                   </div>
 
-                  <div style={{ paddingTop: '18px' }}>
+                  <div style={{ paddingTop: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600, color: manualForm.underDisciplinaryAction ? '#dc2626' : '#1e293b' }}>
                       <input
                         type="checkbox"

@@ -18,9 +18,8 @@ export const EditAcademicRecordModal: React.FC<EditAcademicRecordModalProps> = (
   projectRoundId,
   onSuccess,
 }) => {
-  const [completedCredits, setCompletedCredits] = useState<number>(115);
+  const [completedCredits, setCompletedCredits] = useState<number>(142);
   const [debtCredits, setDebtCredits] = useState<number>(0);
-  const [missingPrerequisiteCount, setMissingPrerequisiteCount] = useState<number>(0);
   const [gpa, setGpa] = useState<number>(3.0);
   const [tuitionDebt, setTuitionDebt] = useState<boolean>(false);
   const [underDisciplinaryAction, setUnderDisciplinaryAction] = useState<boolean>(false);
@@ -30,9 +29,8 @@ export const EditAcademicRecordModal: React.FC<EditAcademicRecordModalProps> = (
 
   useEffect(() => {
     if (student) {
-      setCompletedCredits(student.completedCredits ?? 115);
+      setCompletedCredits(student.completedCredits ?? 142);
       setDebtCredits(student.debtCredits ?? 0);
-      setMissingPrerequisiteCount(student.missingPrerequisiteCount ?? 0);
       setGpa(student.gpa ?? 3.0);
       setTuitionDebt(Boolean(student.tuitionDebt));
       setUnderDisciplinaryAction(Boolean(student.underDisciplinaryAction));
@@ -67,7 +65,7 @@ export const EditAcademicRecordModal: React.FC<EditAcademicRecordModalProps> = (
         gpa,
         completedCredits: Math.max(0, completedCredits),
         debtCredits: Math.max(0, debtCredits),
-        missingPrerequisiteCount: Math.max(0, missingPrerequisiteCount),
+        missingPrerequisiteCount: 0,
         tuitionDebt,
         underDisciplinaryAction,
         note: note.trim() || undefined,
@@ -126,7 +124,7 @@ export const EditAcademicRecordModal: React.FC<EditAcademicRecordModalProps> = (
               required
               style={{ fontWeight: 600 }}
             />
-            <small style={{ color: '#64748b', fontSize: '0.75rem' }}>Tối thiểu 110 tín chỉ để bảo vệ</small>
+            <small style={{ color: '#64748b', fontSize: '0.75rem' }}>Chương trình Cử nhân: 142 TC, Kỹ sư: 180 TC</small>
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
@@ -154,41 +152,22 @@ export const EditAcademicRecordModal: React.FC<EditAcademicRecordModalProps> = (
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label htmlFor="missingPrereq" style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-              Số môn tiên quyết còn nợ:
-            </label>
-            <input
-              id="missingPrereq"
-              type="number"
-              min={0}
-              max={10}
-              className="form-control"
-              value={missingPrerequisiteCount}
-              onChange={(e) => setMissingPrerequisiteCount(Number(e.target.value))}
-              required
-              style={{ fontWeight: 600 }}
-            />
-          </div>
-
-          <div className="form-group" style={{ margin: 0 }}>
-            <label htmlFor="gpaInput" style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-              Điểm GPA tích lũy:
-            </label>
-            <input
-              id="gpaInput"
-              type="number"
-              step="0.01"
-              min={0}
-              max={4.0}
-              className="form-control"
-              value={gpa}
-              onChange={(e) => setGpa(Number(e.target.value))}
-              required
-              style={{ fontWeight: 600 }}
-            />
-          </div>
+        <div className="form-group" style={{ marginBottom: '14px' }}>
+          <label htmlFor="gpaInput" style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+            Điểm GPA tích lũy:
+          </label>
+          <input
+            id="gpaInput"
+            type="number"
+            step="0.01"
+            min={0}
+            max={4.0}
+            className="form-control"
+            value={gpa}
+            onChange={(e) => setGpa(Number(e.target.value))}
+            required
+            style={{ fontWeight: 600 }}
+          />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
