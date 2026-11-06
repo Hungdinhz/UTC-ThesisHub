@@ -24,15 +24,15 @@ public class StudentExcelParser {
 
     public static class ColumnMapping {
         public int colStt = 0;
-        public int colStudentCode = 1;
-        public int colLastName = 2;
-        public int colFirstName = 3;
+        public int colStudentCode = -1;
+        public int colLastName = -1;
+        public int colFirstName = -1;
         public int colFullName = -1;
-        public int colMajor = 4;
-        public int colClass = 5;
-        public int colGpa = 6;
-        public int colPhone = 7;
-        public int colEmail = 8;
+        public int colMajor = -1;
+        public int colClass = -1;
+        public int colGpa = -1;
+        public int colPhone = -1;
+        public int colEmail = -1;
         public boolean combinedFullNameMode = false;
     }
 
@@ -110,28 +110,36 @@ public class StudentExcelParser {
         for (int c = 0; c < lastCell; c++) {
             String val = getCellValue(headerRow.getCell(c)).toLowerCase().trim();
             if (val.isEmpty()) continue;
+            String compact = val.replaceAll("[\\s_.:*#()-]", "");
 
             if (val.contains("mssv") || val.contains("mã sinh viên") || val.contains("ma sinh vien")
-                    || val.contains("mã sv") || val.contains("ma sv") || val.contains("student code") || val.contains("mã số sv")) {
+                    || val.contains("mã sv") || val.contains("ma sv") || val.contains("student code") || val.contains("mã số sv")
+                    || compact.contains("mssv") || compact.contains("masv")) {
                 mapping.colStudentCode = c;
                 foundStudentCode = true;
-            } else if (val.contains("họ và tên") || val.contains("họ tên") || val.contains("ho va ten") || val.contains("ho ten") || val.contains("full name")) {
+            } else if (val.contains("họ và tên") || val.contains("họ tên") || val.contains("ho va ten") || val.contains("ho ten")
+                    || val.contains("full name") || compact.contains("hoten")) {
                 mapping.colFullName = c;
             } else if (val.contains("họ đệm") || val.contains("ho dem") || val.contains("họ và tên đệm") || (val.contains("họ") && !val.contains("tên"))) {
                 mapping.colLastName = c;
-            } else if (val.equals("tên") || val.equals("ten") || val.equals("tên *") || val.equals("ten *") || val.contains("first name")) {
+            } else if (val.equals("tên") || val.equals("ten") || val.equals("tên *") || val.equals("ten *") || val.contains("first name") || compact.equals("ten")) {
                 mapping.colFirstName = c;
-            } else if (val.contains("ngành") || val.contains("nganh") || val.contains("chuyên ngành") || val.contains("major")) {
+            } else if (val.contains("ngành") || val.contains("nganh") || val.contains("chuyên ngành") || val.contains("major") || compact.contains("nganh")) {
                 mapping.colMajor = c;
-            } else if (val.contains("lớp") || val.contains("lop") || val.contains("class")) {
+            } else if (val.contains("lớp") || val.contains("lop") || val.contains("class") || compact.contains("lop")) {
                 mapping.colClass = c;
-            } else if (val.contains("điện thoại") || val.contains("dien thoai") || val.contains("sđt") || val.contains("sdt") || val.contains("phone") || val.contains("mobile")) {
+            } else if (val.contains("điện thoại") || val.contains("dien thoai") || val.contains("sđt") || val.contains("sdt")
+                    || val.contains("phone") || val.contains("mobile") || val.contains("số đt") || val.contains("so dt")
+                    || val.contains("số dt") || val.contains("so đt")
+                    || compact.contains("dienthoai") || compact.contains("điệnthoại")
+                    || compact.contains("sđt") || compact.contains("sdt")
+                    || compact.contains("phone") || compact.contains("mobile") || compact.contains("tel")) {
                 mapping.colPhone = c;
-            } else if (val.contains("email") || val.contains("thư điện tử") || val.contains("mail")) {
+            } else if (val.contains("email") || val.contains("thư điện tử") || val.contains("mail") || compact.contains("email") || compact.contains("mail")) {
                 mapping.colEmail = c;
-            } else if (val.contains("gpa") || val.contains("điểm") || val.contains("diem") || val.contains("tbc")) {
+            } else if (val.contains("gpa") || val.contains("điểm") || val.contains("diem") || val.contains("tbc") || compact.contains("gpa") || compact.contains("diem")) {
                 mapping.colGpa = c;
-            } else if (val.equals("stt") || val.contains("thứ tự") || val.contains("thu tu") || val.equals("no")) {
+            } else if (val.equals("stt") || val.contains("thứ tự") || val.contains("thu tu") || val.equals("no") || compact.equals("stt")) {
                 mapping.colStt = c;
             }
         }
@@ -169,7 +177,8 @@ public class StudentExcelParser {
         if (upper.equals("KTPM") || upper.contains("KỸ THUẬT PHẦN MỀM") || upper.contains("KY THUAT PHAN MEM") || upper.contains("CÔNG NGHỆ PHẦN MỀM") || upper.equals("CNPM") || upper.equals("SE")) {
             return "KTPM";
         }
-        if (upper.equals("KHMT") || upper.contains("KHOA HỌC MÁY TÍNH") || upper.contains("KHOA HOC MAY TINH") || upper.equals("CS")) {
+        if (upper.equals("KHMT") || upper.contains("KHOA HỌC MÁY TÍNH") || upper.contains("KHOA HOC MAY TINH") || upper.equals("CS")
+                || upper.contains("DỮ LIỆU") || upper.contains("DU LIEU") || upper.equals("KTDL") || upper.equals("KHDL")) {
             return "KHMT";
         }
         if (upper.equals("HTTT") || upper.contains("HỆ THỐNG THÔNG TIN") || upper.contains("HE THONG THONG TIN") || upper.equals("IS")) {
@@ -264,6 +273,14 @@ public class StudentExcelParser {
         }
         if (mapping.colEmail >= 0 && mapping.colEmail < row.getLastCellNum()) {
             email = getCellValue(row.getCell(mapping.colEmail));
+        }
+
+        // Safety fallback: neu truong phone vo tinh chua ky tu '@' thi chac chan do la email
+        if (phone != null && phone.contains("@")) {
+            if (email == null || email.isEmpty()) {
+                email = phone;
+            }
+            phone = "";
         }
 
         String majorCode = normalizeMajorCode(rawMajor);

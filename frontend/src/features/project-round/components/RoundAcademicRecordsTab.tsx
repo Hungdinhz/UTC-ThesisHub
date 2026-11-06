@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../../../services/api';
+import { extractApiErrorMessage } from '../../../utils/apiError';
 import type {
   AcademicRecordItem,
   AcademicRecordImportPreviewResponse,
@@ -123,16 +124,17 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
     setManualErrors({});
     setManualTouched({});
     setManualError(null);
+    setRoundStudents([]);
     setShowManualModal(true);
     try {
-      const res = await apiService.getStudentsInRound(roundId, { size: 100 });
+      const res = await apiService.getStudentsInRound(roundId, { size: 500 });
       const rawStudents = res?.content || [];
       const sortedStudents = [...rawStudents].sort((a, b) =>
         (a.studentCode || '').localeCompare(b.studentCode || '', undefined, { numeric: true })
       );
       setRoundStudents(sortedStudents);
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      console.error('Không thể tải danh sách sinh viên trong đợt:', err);
     }
   };
 
@@ -161,6 +163,22 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       return;
     }
 
+    // Chặn sớm khi sinh viên chưa được ghi danh trong đợt đồ án này.
+    // Backend sẽ trả lỗi 400 "chưa được ghi danh" nếu không kiểm tra ở đây,
+    // gây trải nghiệm 404/400 khó hiểu cho người dùng.
+    const code = (manualForm.studentCode || '').trim();
+    const isEnrolled = roundStudents.some(
+      (s) => (s.studentCode || '').trim().toLowerCase() === code.toLowerCase()
+    );
+    if (roundStudents.length > 0 && !isEnrolled) {
+      const msg = `Sinh viên ${code} chưa được ghi danh trong đợt đồ án "${roundName}". `
+        + 'Vui lòng thêm sinh viên vào đợt ở tab "Sinh viên" trước khi nhập kết quả học vụ.';
+      setManualTouched((prev) => ({ ...prev, studentCode: true }));
+      setManualErrors((prev) => ({ ...prev, studentCode: msg }));
+      setManualError(msg);
+      return;
+    }
+
     try {
       setManualLoading(true);
       setManualError(null);
@@ -176,7 +194,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       setTimeout(() => setSuccessMsg(null), 4000);
       loadRecords();
     } catch (err: unknown) {
-      setManualError(err instanceof Error ? err.message : 'Lỗi khi lưu dữ liệu học vụ');
+      setManualError(extractApiErrorMessage(err, 'Lỗi khi lưu dữ liệu học vụ'));
     } finally {
       setManualLoading(false);
     }
@@ -203,7 +221,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       setTotalPages(res?.totalPages || 0);
       setTotalElements(res?.totalElements || 0);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi tải danh sách kết quả học vụ');
+      setError(extractApiErrorMessage(err, 'Lỗi khi tải danh sách kết quả học vụ'));
     } finally {
       setLoading(false);
     }
@@ -248,7 +266,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       setSuccessMsg('Đã tải xuống file Excel mẫu học vụ UTC thành công.');
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (e: unknown) {
-      setError('Lỗi khi tải file template: ' + (e instanceof Error ? e.message : 'Unknown error'));
+      setError(extractApiErrorMessage(e, 'Lỗi khi tải file template'));
     }
   };
 
@@ -274,7 +292,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       const preview = await apiService.previewImportAcademicRecords(roundId, importFile);
       setPreviewData(preview);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi phân tích dữ liệu file Excel');
+      setError(extractApiErrorMessage(err, 'Lỗi khi phân tích dữ liệu file Excel'));
     } finally {
       setImportLoading(false);
     }
@@ -302,7 +320,7 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       setImportFile(null);
       loadRecords();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi lưu dữ liệu học vụ vào hệ thống');
+      setError(extractApiErrorMessage(err, 'Lỗi khi lưu dữ liệu học vụ vào hệ thống'));
     } finally {
       setImportLoading(false);
     }
@@ -565,6 +583,9 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
       ) : (
         <div style={{ padding: '36px', textAlign: 'center', color: '#475569', fontWeight: 500, border: '1px dashed #94a3b8', borderRadius: '8px' }}>
           Chưa có dữ liệu học vụ nào được import cho đợt đồ án này. Hãy bấm <strong style={{ color: '#0f172a' }}>"Import học vụ (Excel)"</strong> ở trên để nạp dữ liệu.
+          <div style={{ marginTop: '12px', fontSize: '0.8rem', fontWeight: 400, color: '#64748b' }}>
+            Lưu ý: Học vụ chỉ được nhập cho sinh viên đã ghi danh trong đợt. Nếu chưa có sinh viên nào, hãy chuyển sang tab <strong>Sinh viên</strong> để import danh sách trước.
+          </div>
         </div>
       )}
 
@@ -751,6 +772,21 @@ export const RoundAcademicRecordsTab: React.FC<RoundAcademicRecordsTabProps> = (
             {manualError && (
               <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', fontSize: '0.85rem' }}>
                 ⚠️ {manualError}
+              </div>
+            )}
+
+            {roundStudents.length === 0 && (
+              <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                ⚠️ <strong>Đợt đồ án này chưa có sinh viên nào được ghi danh.</strong>
+                <br />
+                Hệ thống chỉ nhập được kết quả học vụ cho sinh viên đã có trong danh sách của đợt.
+                Vui lòng chuyển sang tab <strong>Sinh viên</strong> để import danh sách từ Excel hoặc thêm thủ công trước.
+              </div>
+            )}
+
+            {roundStudents.length > 0 && (
+              <div style={{ backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', color: '#075985', padding: '8px 14px', borderRadius: '8px', marginBottom: '14px', fontSize: '0.8rem' }}>
+                💡 Đợt đồ án có <strong>{roundStudents.length}</strong> sinh viên đã ghi danh. Chỉ nhập được học vụ cho các sinh viên này.
               </div>
             )}
 

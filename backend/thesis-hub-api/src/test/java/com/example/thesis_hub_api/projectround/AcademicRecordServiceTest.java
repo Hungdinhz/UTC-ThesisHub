@@ -1,5 +1,7 @@
 package com.example.thesis_hub_api.projectround;
 
+import com.example.thesis_hub_api.common.exception.AppException;
+import com.example.thesis_hub_api.common.exception.ErrorCode;
 import com.example.thesis_hub_api.common.pagination.PageResponse;
 import com.example.thesis_hub_api.identity.entity.User;
 import com.example.thesis_hub_api.organization.entity.Major;
@@ -7,6 +9,7 @@ import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.repository.MajorRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.dto.request.AcademicRecordImportCommitRequestDTO;
+import com.example.thesis_hub_api.projectround.dto.request.CreateAcademicRecordManualRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.response.AcademicRecordImportPreviewResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.AcademicRecordImportResultResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.AcademicRecordImportRowDTO;
@@ -29,6 +32,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.IOException;
@@ -219,5 +223,65 @@ class AcademicRecordServiceTest {
 
         byte[] result = academicRecordService.generateTemplate();
         assertArrayEquals(sampleBytes, result);
+    }
+
+    @Test
+    @DisplayName("Lưu học vụ thủ công - Sinh viên chưa ghi danh trong đợt phải báo lỗi 400 chứ không phải 404")
+    void saveManualAcademicRecord_StudentNotEnrolled_ThrowsBadRequest() {
+        CreateAcademicRecordManualRequestDTO dto = CreateAcademicRecordManualRequestDTO.builder()
+                .studentCode("201200101")
+                .completedCredits(125)
+                .gpa(3.25)
+                .tuitionDebt(false)
+                .underDisciplinaryAction(false)
+                .missingPrerequisiteCount(0)
+                .debtCredits(0)
+                .build();
+
+        when(projectRoundRepository.findById(1L)).thenReturn(Optional.of(sampleRound));
+        when(studentRepository.findByStudentCode("201200101")).thenReturn(Optional.of(sampleStudent));
+        when(studentProjectRoundRepository.existsByStudentIdAndProjectRoundId(100L, 1L)).thenReturn(false);
+
+        AppException ex = assertThrows(AppException.class,
+                () -> academicRecordService.saveManualAcademicRecord(1L, dto));
+
+        assertEquals(ErrorCode.STUDENT_NOT_ENROLLED_IN_ROUND, ex.getErrorCode());
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getErrorCode().getHttpStatus());
+        assertTrue(ex.getMessage().contains("201200101"));
+        assertTrue(ex.getMessage().contains("chưa được ghi danh"));
+
+        verify(academicRecordRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Lưu học vụ thủ công - Sinh viên đã ghi danh thì tạo mới bản ghi học vụ")
+    void saveManualAcademicRecord_EnrolledStudent_Success() {
+        CreateAcademicRecordManualRequestDTO dto = CreateAcademicRecordManualRequestDTO.builder()
+                .studentCode("201200101")
+                .completedCredits(125)
+                .gpa(3.25)
+                .tuitionDebt(false)
+                .underDisciplinaryAction(false)
+                .missingPrerequisiteCount(0)
+                .debtCredits(0)
+                .note("Đủ điều kiện")
+                .build();
+
+        when(projectRoundRepository.findById(1L)).thenReturn(Optional.of(sampleRound));
+        when(studentRepository.findByStudentCode("201200101")).thenReturn(Optional.of(sampleStudent));
+        when(studentProjectRoundRepository.existsByStudentIdAndProjectRoundId(100L, 1L)).thenReturn(true);
+        when(academicRecordRepository.findByStudentIdAndProjectRoundId(100L, 1L)).thenReturn(Optional.empty());
+        when(academicRecordRepository.save(any(AcademicRecord.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(majorRepository.findAll()).thenReturn(List.of(sampleMajor));
+
+        AcademicRecordResponseDTO response = academicRecordService.saveManualAcademicRecord(1L, dto);
+
+        assertNotNull(response);
+        assertEquals("201200101", response.getStudentCode());
+        assertEquals(125, response.getCompletedCredits());
+        assertEquals(3.25, response.getGpa(), 0.001);
+        assertEquals(1L, response.getProjectRoundId());
+
+        verify(academicRecordRepository, times(1)).save(any(AcademicRecord.class));
     }
 }

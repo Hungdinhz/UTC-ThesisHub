@@ -281,7 +281,9 @@ public class AcademicRecordService {
         }
 
         if (!studentProjectRoundRepository.existsByStudentIdAndProjectRoundId(student.getId(), round.getId())) {
-            throw new AppException(ErrorCode.RESOURCE_NOT_FOUND, "Sinh viên " + student.getStudentCode() + " chưa được ghi danh trong đợt đồ án này.");
+            throw new AppException(ErrorCode.STUDENT_NOT_ENROLLED_IN_ROUND,
+                    "Sinh viên " + student.getStudentCode() + " chưa được ghi danh trong đợt đồ án này. "
+                            + "Vui lòng thêm sinh viên vào đợt đồ án ở tab \"Sinh viên\" trước khi nhập kết quả học vụ.");
         }
 
         Optional<AcademicRecord> recordOpt = academicRecordRepository

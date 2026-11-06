@@ -43,6 +43,7 @@ import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -520,5 +521,35 @@ class ProjectRoundServiceTest {
         AppException ex = assertThrows(AppException.class, () -> projectRoundService.deleteRound(999L));
         assertEquals(ErrorCode.RESOURCE_NOT_FOUND, ex.getErrorCode());
         verify(projectRoundRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteRound - Không được xóa vào bảng không tồn tại (user_roles) trong transaction")
+    void deleteRound_neverDeletesFromNonExistentTable() {
+        sampleRound.setStatus("CLOSED");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        projectRoundService.deleteRound(10L);
+
+        // Bảng "user_roles" không tồn tại trong schema -> lệnh này sẽ ABORT transaction
+        // trong PostgreSQL. Không được phép gửi lệnh DELETE vào bảng đó.
+        verify(jdbcTemplate, never()).update(contains("user_roles"), any(Object[].class));
+        verify(jdbcTemplate, never()).update(contains("user_roles"), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("deleteRound - Lỗi một lệnh DELETE không được làm hỏng việc xóa đợt")
+    void deleteRound_survivesFailingDeleteStatement() {
+        sampleRound.setStatus("CLOSED");
+        when(projectRoundRepository.findById(10L)).thenReturn(Optional.of(sampleRound));
+
+        // Mô phỏng một statement DELETE thất bại (ví dụ vi phạm FK hoặc bảng không tồn tại).
+        // Trong PostgreSQL điều này sẽ ABORT transaction, nên phải được xử lý bằng SAVEPOINT.
+        when(jdbcTemplate.update(anyString(), any(Object[].class)))
+                .thenThrow(new org.springframework.dao.DataAccessException("relation \"user_roles\" does not exist") { });
+
+        // Việc dọn dẹp bị lỗi nhưng vẫn phải xóa được đợt đồ án
+        assertDoesNotThrow(() -> projectRoundService.deleteRound(10L));
+        verify(projectRoundRepository, times(1)).delete(sampleRound);
     }
 }

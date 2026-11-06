@@ -49,8 +49,10 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   const [expandedMenu, setExpandedMenu] = useState<string | null>('academic');
 
   const [activeRound, setActiveRound] = useState<ProjectRoundItem | null>(null);
-  const [roundCurrentStage, setRoundCurrentStage] = useState<number>(2);
-  const [userCompletedStageState, setUserCompletedStageState] = useState<number>(1);
+  // Mặc định là GĐ1: chưa thiết lập mốc timeline / chưa chuyển giai đoạn thì
+  // KHÔNG được hiển thị "Giai đoạn 2" (xem getRoundStageNumber).
+  const [roundCurrentStage, setRoundCurrentStage] = useState<number>(1);
+  const [userCompletedStageState, setUserCompletedStageState] = useState<number>(0);
   const [advancingPhase, setAdvancingPhase] = useState<boolean>(false);
   const [lockAlertMessage, setLockAlertMessage] = useState<string | null>(null);
   const [studentStatusInfo, setStudentStatusInfo] = useState<{
@@ -202,11 +204,19 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           currentRole === 'committee_member' ||
           currentRole === 'committee'
         ) {
-          setUserCompletedStageState(Math.max(st - 1, 1));
+          setUserCompletedStageState(Math.max(st - 1, 0));
         }
+      } else {
+        // Không có đợt đồ án đang mở: reset về GĐ1 thay vì giữ giá trị cũ (GĐ2)
+        setActiveRound(null);
+        setRoundCurrentStage(1);
+        setUserCompletedStageState(0);
       }
     } catch {
-      // Ignored if round not active
+      // API lỗi (ví dụ chưa có đợt đồ án nào): reset về GĐ1, không giữ GĐ2 cũ
+      setActiveRound(null);
+      setRoundCurrentStage(1);
+      setUserCompletedStageState(0);
     }
   };
 
@@ -331,7 +341,9 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     }
   };
 
-  const currentStageDef = STAGES.find((s) => s.stageNumber === roundCurrentStage) || STAGES[1];
+  // Fallback về GĐ1 (STAGES[0]), KHÔNG phải STAGES[1] (=GĐ2),
+  // để không hiển thị "Giai đoạn 2" khi chưa xác định được giai đoạn hiện tại.
+  const currentStageDef = STAGES.find((s) => s.stageNumber === roundCurrentStage) || STAGES[0];
 
   return (
     <div className={`utc-dashboard-wrapper ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>

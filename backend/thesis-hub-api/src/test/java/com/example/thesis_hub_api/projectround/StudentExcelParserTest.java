@@ -57,4 +57,47 @@ class StudentExcelParserTest {
         assertEquals(2.61, row3.getGpa(), 0.001);
         assertTrue(row3.isValid());
     }
+
+    @Test
+    @DisplayName("Parse file co cot So DT va cot Ho ten gop")
+    void parseFile_WithCombinedFullName_And_SoDTHeader() throws IOException {
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet("SinhVien");
+            org.apache.poi.ss.usermodel.Row header = sheet.createRow(0);
+            String[] headers = {"STT", "MSSV", "Họ tên", "Ngành", "Lớp", "GPA", "Số ĐT", "Email", "Trạng thái / Lỗi"};
+            for (int i = 0; i < headers.length; i++) {
+                header.createCell(i).setCellValue(headers[i]);
+            }
+
+            org.apache.poi.ss.usermodel.Row row = sheet.createRow(1);
+            row.createCell(0).setCellValue(1);
+            row.createCell(1).setCellValue("225106007");
+            row.createCell(2).setCellValue("Đỗ Mai Phương");
+            row.createCell(3).setCellValue("Công nghệ thông tin");
+            row.createCell(4).setCellValue("CNTT2022B");
+            row.createCell(5).setCellValue(1.40);
+            row.createCell(6).setCellValue("0978901234");
+            row.createCell(7).setCellValue("phuong.dm225106007@sv.edu.vn");
+            row.createCell(8).setCellValue("Đình chỉ học tập tạm thời");
+
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            wb.write(out);
+
+            MockMultipartFile file = new MockMultipartFile(
+                    "file",
+                    "test.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    out.toByteArray()
+            );
+
+            List<StudentImportRowDTO> parsed = studentExcelParser.parseExcel(file);
+            assertEquals(1, parsed.size());
+            StudentImportRowDTO r = parsed.get(0);
+            assertEquals("225106007", r.getStudentCode());
+            assertEquals("Đỗ Mai Phương", r.getFullName());
+            assertEquals("0978901234", r.getPhone());
+            assertEquals("phuong.dm225106007@sv.edu.vn", r.getEmail());
+            assertTrue(r.isValid());
+        }
+    }
 }

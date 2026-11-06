@@ -60,20 +60,29 @@ export const STAGES: StageDefinition[] = [
 
 /**
  * Maps a milestone phaseType or round status to a stage number (1 to 5).
+ *
+ * QUAN TRỌNG: khi đợt đồ án CHƯA có mốc timeline nào đang chạy (chưa được Admin
+ * thiết lập/chuyển giai đoạn), hàm phải trả về 1 (GĐ1 - Khởi tạo đợt) chứ không
+ * phải 2. Nếu mặc định là 2 thì UI sẽ hiển thị "Giai đoạn 2" dù người dùng
+ * chưa chọn/chưa thiết lập bất kỳ giai đoạn nào.
  */
 export function getRoundStageNumber(milestonePhaseType?: string, roundStatus?: string): number {
-  if (!milestonePhaseType) {
-    if (roundStatus === 'DRAFT') return 1;
-    if (roundStatus === 'OPEN') return 2;
-    if (roundStatus === 'IN_PROGRESS') return 3;
-    return 2;
+  const status = (roundStatus || '').toUpperCase();
+
+  // Chưa có mốc timeline nào được thiết lập -> đợt vẫn ở GĐ1
+  if (!milestonePhaseType || !milestonePhaseType.trim()) {
+    if (status === 'DRAFT' || status === '') return 1;
+    // Trạng thái vòng đời không đủ thông tin để suy ra giai đoạn -> an toàn: GĐ1
+    if (status === 'OPEN' || status === 'IN_PROGRESS') return 1;
+    return 1;
   }
+
   const pt = milestonePhaseType.toUpperCase();
   if (pt === 'REGISTRATION') return 2;
   if (pt === 'PROPOSAL_SUBMISSION') return 3;
   if (pt === 'WEEKLY_REPORT') return 4;
   if (pt === 'ELIGIBILITY_REVIEW' || pt === 'COMMITTEE_ASSIGNMENT' || pt === 'DEFENSE') return 5;
-  return 2;
+  return 1;
 }
 
 const STORAGE_PREFIX = 'utc_thesis_demo_user_stage_';
@@ -131,6 +140,9 @@ export function resetUserStage(userId: string | number, role: string): void {
  *     - If roundCurrentStage >= stageNumber: 'IN_PROGRESS'
  *     - Otherwise: 'LOCKED' (round not reached yet)
  * - If stageNumber > userCompletedStage + 1: 'LOCKED' (prerequisite not completed)
+ *
+ * `userCompletedStage` có thể bằng 0 (người dùng chưa hoàn thành giai đoạn nào).
+ * Khi đó GĐ1 sẽ là giai đoạn đang thực hiện (nếu đợt đã mở), các giai đoạn sau khóa.
  */
 export function calculateStageStatus(
   stageNumber: number,
