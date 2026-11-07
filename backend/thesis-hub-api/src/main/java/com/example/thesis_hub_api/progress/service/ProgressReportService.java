@@ -19,4 +19,6 @@ public interface ProgressReportService {
     Page<ProgressReportResponse> getReportsByThesis(Long thesisId, Pageable pageable);
 
     ThesisProgressSummaryResponse getProgressSummaryByThesis(Long thesisId);
+
+    List<ThesisProgressSummaryResponse> getProgressSummariesByRoundAndLecturer(Long roundId, Long lecturerId);
 }
