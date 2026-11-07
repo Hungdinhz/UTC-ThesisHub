@@ -120,8 +120,9 @@ export function buildStageSteps(params: {
   isDropped?: boolean;
   milestones?: MilestoneItem[];
   now?: Date;
+  hasRound?: boolean;
 }): StageStepInfo[] {
-  const { role, roundStage, userCompletedStage, isDropped = false, milestones = [], now = new Date() } = params;
+  const { role, roundStage, userCompletedStage, isDropped = false, milestones = [], now = new Date(), hasRound = true } = params;
   const r = (role || 'student').toLowerCase();
 
   return STAGES.map((stage) => {
@@ -129,7 +130,10 @@ export function buildStageSteps(params: {
     let status: ExtendedStageStatus = 'LOCKED';
     let lockedReason: string | undefined;
 
-    if (r === 'student') {
+    if (!hasRound || roundStage === 0) {
+      status = 'LOCKED';
+      lockedReason = 'Chưa có đợt đồ án nào đang mở';
+    } else if (r === 'student') {
       if (isDropped) {
         const failedStage = (userCompletedStage || 1) + 1;
         if (num < failedStage) {

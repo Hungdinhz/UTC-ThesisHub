@@ -311,6 +311,8 @@ export const AcademicStaffHomePage: React.FC = () => {
       label: 'GĐ5: Rà soát ĐK Bảo vệ cuối',
       subtitle: 'Kiểm tra trả nợ tín chỉ & điều kiện bảo vệ',
       route: '/admin/final-eligibility',
+      disabled: !activeRoundId || roundStage < 5,
+      disabledReason: !activeRoundId ? 'Chưa chọn đợt đồ án' : 'Đợt đồ án chưa mở Giai đoạn 5 (Bảo vệ)',
     },
     {
       id: 'as-reservations',
@@ -318,6 +320,8 @@ export const AcademicStaffHomePage: React.FC = () => {
       label: 'GĐ5: Quản lý Đơn bảo lưu',
       subtitle: `${pendingReservationsCount} đơn chờ xử lý`,
       route: '/admin/reservations',
+      disabled: !activeRoundId || roundStage < 5,
+      disabledReason: !activeRoundId ? 'Chưa chọn đợt đồ án' : 'Đợt đồ án chưa mở Giai đoạn 5',
     },
     {
       id: 'as-class-grades',
@@ -325,6 +329,8 @@ export const AcademicStaffHomePage: React.FC = () => {
       label: 'GĐ5: In điểm đồ án theo lớp',
       subtitle: 'Xem & in bảng điểm tổng hợp theo lớp',
       route: '/academic-staff/class-grades',
+      disabled: !activeRoundId || (roundStage < 5 && round?.status !== 'CLOSED'),
+      disabledReason: !activeRoundId ? 'Chưa chọn đợt đồ án' : 'Giai đoạn 5 chưa mở hoặc chưa công bố điểm',
     },
     {
       id: 'as-export-grades',
@@ -332,7 +338,8 @@ export const AcademicStaffHomePage: React.FC = () => {
       label: exportingGrades ? 'Đang xuất bảng điểm...' : 'Tải nhanh Excel Điểm theo lớp',
       subtitle: 'Xuất file Excel điểm tất cả các lớp',
       onClick: handleExportGradesExcel,
-      disabled: !activeRoundId || exportingGrades,
+      disabled: !activeRoundId || exportingGrades || (roundStage < 5 && round?.status !== 'CLOSED'),
+      disabledReason: !activeRoundId ? 'Chưa chọn đợt đồ án' : 'Chưa có điểm đồ án để xuất file',
     },
   ];
 
@@ -405,6 +412,7 @@ export const AcademicStaffHomePage: React.FC = () => {
 
       <RoundProgressStepper
         role="academic_staff"
+        round={round}
         roundStage={roundStage}
         userCompletedStage={userCompletedStage}
         milestones={milestones}
@@ -455,10 +463,10 @@ export const AcademicStaffHomePage: React.FC = () => {
         <StatCard
           label="Đơn bảo lưu chờ duyệt"
           value={pendingReservationsCount}
-          subtitle="Giai đoạn 5 • Rà soát bảo lưu"
+          subtitle={roundStage < 5 ? '🔒 GĐ5 chưa mở' : 'Giai đoạn 5 • Rà soát bảo lưu'}
           icon="⏸️"
           accentColor="#7c3aed"
-          onClick={() => navigate('/admin/reservations')}
+          onClick={activeRoundId && roundStage >= 5 ? () => navigate('/admin/reservations') : undefined}
         />
       </div>
 

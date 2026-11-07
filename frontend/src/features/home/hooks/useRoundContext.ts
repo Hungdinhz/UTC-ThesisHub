@@ -26,8 +26,8 @@ export function useRoundContext(role: string, roundIdOverride?: number): RoundCo
   const [round, setRound] = useState<ProjectRoundItem | null>(null);
   const [allRounds, setAllRounds] = useState<ProjectRoundItem[]>([]);
   const [milestones, setMilestones] = useState<MilestoneItem[]>([]);
-  const [roundStage, setRoundStage] = useState<number>(2);
-  const [userCompletedStage, setUserCompletedStage] = useState<number>(1);
+  const [roundStage, setRoundStage] = useState<number>(0);
+  const [userCompletedStage, setUserCompletedStage] = useState<number>(0);
   const [studentStatus, setStudentStatus] = useState<StudentRoundStatusResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | undefined>();
@@ -39,8 +39,8 @@ export function useRoundContext(role: string, roundIdOverride?: number): RoundCo
     setError(undefined);
     try {
       let resolvedRound: ProjectRoundItem | null = null;
-      let resolvedStage = 2;
-      let resolvedCompletedStage = normalizedRole === 'student' ? 1 : 2;
+      let resolvedStage = 0;
+      let resolvedCompletedStage = 0;
 
       if (normalizedRole === 'academic_staff' || normalizedRole === 'admin') {
         const roundsRes = await apiService.getProjectRounds().catch(() => []);
@@ -69,7 +69,7 @@ export function useRoundContext(role: string, roundIdOverride?: number): RoundCo
             resolvedRound = await apiService.getActiveProjectRound().catch(() => null);
             resolvedStage = resolvedRound
               ? getRoundStageNumber(resolvedRound.currentMilestone?.phaseType, resolvedRound.status)
-              : 1;
+              : 0;
             resolvedCompletedStage = 0;
           }
         } catch {
@@ -105,9 +105,15 @@ export function useRoundContext(role: string, roundIdOverride?: number): RoundCo
       } else {
         setRound(null);
         setMilestones([]);
+        setRoundStage(0);
+        setUserCompletedStage(0);
       }
     } catch (e: any) {
       setError(e?.message || 'Không thể tải thông tin đợt đồ án');
+      setRound(null);
+      setMilestones([]);
+      setRoundStage(0);
+      setUserCompletedStage(0);
     } finally {
       setLoading(false);
     }

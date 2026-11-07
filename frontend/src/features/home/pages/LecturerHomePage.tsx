@@ -89,13 +89,23 @@ export const LecturerHomePage: React.FC = () => {
     user?.username;
   const lecturerFullName = (user?.fullName || '').trim().toLowerCase();
 
+  const isStageLocked = (stageNum: number) => !round || roundStage < stageNum;
+
   useEffect(() => {
     let mounted = true;
     const loadLecturerData = async () => {
       if (roundLoading) return;
+      if (!round) {
+        setStudentRows([]);
+        setPendingProposals([]);
+        setMySchedules([]);
+        setScoringTheses([]);
+        setDataLoading(false);
+        return;
+      }
       setDataLoading(true);
       try {
-        const roundId = round?.roundId;
+        const roundId = round.roundId;
 
         const [batchSummariesRes, allThesesRes, proposalsRes, schedulesRes, scoringRes] =
           await Promise.allSettled([
@@ -273,15 +283,13 @@ export const LecturerHomePage: React.FC = () => {
     };
   }, [
     roundLoading,
-    round?.roundId,
+    round,
     lecturerId,
     lecturerCode,
     lecturerFullName,
     milestones,
     currentMilestone,
   ]);
-
-  const isStageLocked = (stageNum: number) => roundStage < stageNum;
 
   const totalPendingSubmissions = studentRows.reduce(
     (acc, r) => acc + r.submittedTasksCount,
@@ -385,7 +393,7 @@ export const LecturerHomePage: React.FC = () => {
       subtitle: `${pendingProposals.length} đề cương chờ duyệt`,
       route: '/thesis/proposals',
       disabled: isStageLocked(3),
-      disabledReason: 'Đợt đồ án chưa mở Giai đoạn 3',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Đợt đồ án chưa mở Giai đoạn 3 (Đề cương)',
     },
     {
       id: 'l-tasks',
@@ -394,7 +402,7 @@ export const LecturerHomePage: React.FC = () => {
       subtitle: `${totalPendingSubmissions} bài nộp chờ chấm`,
       route: '/progress/tasks',
       disabled: isStageLocked(4),
-      disabledReason: 'Đợt đồ án chưa mở Giai đoạn 4',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Đợt đồ án chưa mở Giai đoạn 4 (Giao task)',
     },
     {
       id: 'l-reports',
@@ -403,7 +411,7 @@ export const LecturerHomePage: React.FC = () => {
       subtitle: `${totalUnreviewedReports} báo cáo chờ phản hồi`,
       route: '/progress/reports',
       disabled: isStageLocked(4),
-      disabledReason: 'Đợt đồ án chưa mở Giai đoạn 4',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Đợt đồ án chưa mở Giai đoạn 4 (Báo cáo)',
     },
     {
       id: 'l-defense-eligible',
@@ -412,7 +420,7 @@ export const LecturerHomePage: React.FC = () => {
       subtitle: `${defenseEligibleCount}/${studentRows.length} SV đạt điều kiện`,
       route: '/thesis/detail',
       disabled: isStageLocked(5),
-      disabledReason: 'Đợt đồ án chưa mở Giai đoạn 5',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Đợt đồ án chưa mở Giai đoạn 5 (Xét ĐK bảo vệ)',
     },
     {
       id: 'l-schedules',
@@ -420,6 +428,8 @@ export const LecturerHomePage: React.FC = () => {
       label: 'GĐ5: Lịch Hội đồng Bảo vệ',
       subtitle: 'Xem lịch và phòng bảo vệ',
       route: '/admin/defense-schedules',
+      disabled: isStageLocked(5),
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Đợt đồ án chưa mở Giai đoạn 5 (Lịch bảo vệ)',
     },
     {
       id: 'l-scoring',
@@ -427,6 +437,8 @@ export const LecturerHomePage: React.FC = () => {
       label: 'GĐ5: Chấm điểm & Biên bản PDF',
       subtitle: `${scoringTheses.length} đề tài phân công chấm`,
       route: '/admin/defense-scoring',
+      disabled: isStageLocked(5),
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Đợt đồ án chưa mở Giai đoạn 5 (Chấm điểm)',
     },
     ...(isCommitteeRole
       ? [
@@ -436,6 +448,8 @@ export const LecturerHomePage: React.FC = () => {
             label: 'Hội đồng chấm (1CT-1TK-2PB-1UV)',
             subtitle: 'Danh sách thành viên hội đồng',
             route: '/admin/councils',
+            disabled: isStageLocked(5),
+            disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Đợt đồ án chưa mở Giai đoạn 5 (Hội đồng)',
           },
         ]
       : []),
@@ -445,6 +459,8 @@ export const LecturerHomePage: React.FC = () => {
       label: 'Nhóm Chat Hướng dẫn',
       subtitle: 'Trao đổi với sinh viên hướng dẫn',
       route: '/chat',
+      disabled: !round,
+      disabledReason: 'Chưa có đợt đồ án nào đang mở',
     },
   ];
 
@@ -469,16 +485,29 @@ export const LecturerHomePage: React.FC = () => {
             <button
               type="button"
               className="utc-home-btn utc-home-btn-secondary"
-              onClick={() => navigate('/chat')}
+              disabled={!round}
+              title={!round ? 'Chưa có đợt đồ án nào đang mở' : 'Nhóm Chat SV'}
+              onClick={() => {
+                if (round) navigate('/chat');
+              }}
             >
               💬 Nhóm Chat SV
             </button>
             <button
               type="button"
               className="utc-home-btn utc-home-btn-primary"
-              onClick={() =>
-                navigate(!isStageLocked(4) ? '/progress/tasks' : '/thesis/proposals')
+              disabled={!round || isStageLocked(3)}
+              title={
+                !round
+                  ? 'Chưa có đợt đồ án nào đang mở'
+                  : isStageLocked(3)
+                  ? 'Giai đoạn giao đề tài / công việc chưa mở'
+                  : 'Giao Task & Chấm bài'
               }
+              onClick={() => {
+                if (!round || isStageLocked(3)) return;
+                navigate(!isStageLocked(4) ? '/progress/tasks' : '/thesis/proposals');
+              }}
             >
               📋 Giao Task & Chấm bài
             </button>
@@ -488,6 +517,7 @@ export const LecturerHomePage: React.FC = () => {
 
       <RoundProgressStepper
         role={isCommitteeRole ? 'committee_member' : 'supervisor'}
+        round={round}
         roundStage={roundStage}
         userCompletedStage={userCompletedStage}
         milestones={milestones}
@@ -503,7 +533,9 @@ export const LecturerHomePage: React.FC = () => {
           label="SV Hướng dẫn"
           value={studentRows.length}
           subtitle={
-            atRiskCount > 0
+            !round
+              ? 'Chưa có đợt đồ án mở'
+              : atRiskCount > 0
               ? `⚠️ ${atRiskCount} SV có nguy cơ trễ hạn`
               : 'Tất cả SV đang theo kịp lộ trình'
           }
@@ -515,34 +547,50 @@ export const LecturerHomePage: React.FC = () => {
         <StatCard
           label="Đề cương chờ duyệt"
           value={pendingProposals.length}
-          subtitle="Bấm để mở trang phê duyệt GĐ3"
+          subtitle={
+            isStageLocked(3)
+              ? '🔒 GĐ3 chưa mở'
+              : 'Bấm để mở trang phê duyệt GĐ3'
+          }
           icon="📑"
           accentColor="#7c3aed"
-          onClick={() => navigate('/thesis/proposals')}
+          onClick={!isStageLocked(3) ? () => navigate('/thesis/proposals') : undefined}
         />
         <StatCard
           label="Bài nộp Task chờ chấm"
           value={totalPendingSubmissions}
-          subtitle="Bấm để mở bảng công việc GĐ4"
+          subtitle={
+            isStageLocked(4)
+              ? '🔒 GĐ4 chưa mở'
+              : 'Bấm để mở bảng công việc GĐ4'
+          }
           icon="📥"
           accentColor="#0284c7"
-          onClick={() => navigate('/progress/tasks')}
+          onClick={!isStageLocked(4) ? () => navigate('/progress/tasks') : undefined}
         />
         <StatCard
           label="Báo cáo chờ phản hồi"
           value={totalUnreviewedReports}
-          subtitle="Bấm để nhận xét báo cáo tiến độ"
+          subtitle={
+            isStageLocked(4)
+              ? '🔒 GĐ4 chưa mở'
+              : 'Bấm để nhận xét báo cáo tiến độ'
+          }
           icon="📝"
           accentColor="#d97706"
-          onClick={() => navigate('/progress/reports')}
+          onClick={!isStageLocked(4) ? () => navigate('/progress/reports') : undefined}
         />
         <StatCard
           label="Đủ điều kiện Bảo vệ"
           value={`${defenseEligibleCount}/${studentRows.length}`}
-          subtitle="Xác nhận điều kiện bảo vệ GĐ5"
+          subtitle={
+            isStageLocked(5)
+              ? '🔒 GĐ5 chưa mở'
+              : 'Xác nhận điều kiện bảo vệ GĐ5'
+          }
           icon="✅"
           accentColor="#16a34a"
-          onClick={() => navigate('/thesis/detail')}
+          onClick={!isStageLocked(5) ? () => navigate('/thesis/detail') : undefined}
         />
       </div>
 
@@ -555,7 +603,11 @@ export const LecturerHomePage: React.FC = () => {
       >
         <TodoList
           items={sortedQueue}
-          emptyMessage="🎉 Không có đề cương, bài nộp hay báo cáo nào đang tồn đọng!"
+          emptyMessage={
+            !round
+              ? 'Hiện chưa có đợt đồ án nào được kích hoạt.'
+              : '🎉 Không có đề cương, bài nộp hay báo cáo nào đang tồn đọng!'
+          }
           onAction={(route) => navigate(route)}
         />
       </HomeSection>
@@ -612,7 +664,11 @@ export const LecturerHomePage: React.FC = () => {
           </div>
         }
       >
-        {filteredStudentRows.length === 0 ? (
+        {!round ? (
+          <div className="utc-home-empty">
+            Chưa có đợt đồ án nào đang mở trong hệ thống.
+          </div>
+        ) : filteredStudentRows.length === 0 ? (
           <div className="utc-home-empty">
             Không có sinh viên nào khớp với bộ lọc hiện tại.
           </div>
@@ -704,9 +760,13 @@ export const LecturerHomePage: React.FC = () => {
                           type="button"
                           className="utc-home-btn utc-home-btn-secondary"
                           style={{ padding: '5px 9px', fontSize: '0.77rem' }}
-                          onClick={() =>
-                            navigate(`/progress/tasks?thesisId=${row.thesisId}`)
-                          }
+                          disabled={isStageLocked(4)}
+                          title={isStageLocked(4) ? 'Giai đoạn 4 chưa mở' : 'Bảng Task'}
+                          onClick={() => {
+                            if (!isStageLocked(4)) {
+                              navigate(`/progress/tasks?thesisId=${row.thesisId}`);
+                            }
+                          }}
                         >
                           Task
                         </button>
@@ -714,9 +774,13 @@ export const LecturerHomePage: React.FC = () => {
                           type="button"
                           className="utc-home-btn utc-home-btn-secondary"
                           style={{ padding: '5px 9px', fontSize: '0.77rem' }}
-                          onClick={() =>
-                            navigate(`/progress/reports?thesisId=${row.thesisId}`)
-                          }
+                          disabled={isStageLocked(4)}
+                          title={isStageLocked(4) ? 'Giai đoạn 4 chưa mở' : 'Báo cáo tiến độ'}
+                          onClick={() => {
+                            if (!isStageLocked(4)) {
+                              navigate(`/progress/reports?thesisId=${row.thesisId}`);
+                            }
+                          }}
                         >
                           Báo cáo
                         </button>
@@ -724,7 +788,13 @@ export const LecturerHomePage: React.FC = () => {
                           type="button"
                           className="utc-home-btn utc-home-btn-secondary"
                           style={{ padding: '5px 9px', fontSize: '0.77rem' }}
-                          onClick={() => navigate(`/thesis/detail?id=${row.thesisId}`)}
+                          disabled={isStageLocked(3)}
+                          title={isStageLocked(3) ? 'Giai đoạn 3 chưa mở' : 'Chi tiết đề tài'}
+                          onClick={() => {
+                            if (!isStageLocked(3)) {
+                              navigate(`/thesis/detail?id=${row.thesisId}`);
+                            }
+                          }}
                         >
                           Đề tài
                         </button>
@@ -743,20 +813,28 @@ export const LecturerHomePage: React.FC = () => {
         <HomeSection
           title="Hội đồng của tôi & Lịch chấm Bảo vệ"
           icon="⚖️"
-          badgeCount={scoringTheses.length || mySchedules.length}
+          badgeCount={isStageLocked(5) ? 0 : scoringTheses.length || mySchedules.length}
           loading={dataLoading}
           headerRight={
             <button
               type="button"
               className="utc-home-btn utc-home-btn-secondary"
+              disabled={isStageLocked(5)}
+              title={isStageLocked(5) ? 'Giai đoạn 5 (Hội đồng & Bảo vệ) chưa mở' : 'Chấm điểm Hội đồng'}
               style={{ padding: '5px 10px', fontSize: '0.78rem' }}
-              onClick={() => navigate('/admin/defense-scoring')}
+              onClick={() => {
+                if (!isStageLocked(5)) navigate('/admin/defense-scoring');
+              }}
             >
               Chấm điểm Hội đồng →
             </button>
           }
         >
-          {mySchedules.length === 0 && scoringTheses.length === 0 ? (
+          {isStageLocked(5) ? (
+            <div className="utc-home-empty">
+              🔒 Giai đoạn 5 (Hội đồng & Bảo vệ) hiện chưa mở trong đợt đồ án này.
+            </div>
+          ) : mySchedules.length === 0 && scoringTheses.length === 0 ? (
             <div className="utc-home-empty">
               Chưa có lịch hội đồng bảo vệ hoặc danh sách đề tài phân công chấm trong đợt này.
             </div>
@@ -780,8 +858,11 @@ export const LecturerHomePage: React.FC = () => {
                   <button
                     type="button"
                     className="utc-home-btn utc-home-btn-secondary"
+                    disabled={isStageLocked(5)}
                     style={{ padding: '6px 11px', fontSize: '0.78rem' }}
-                    onClick={() => navigate('/admin/defense-schedules')}
+                    onClick={() => {
+                      if (!isStageLocked(5)) navigate('/admin/defense-schedules');
+                    }}
                   >
                     Xem lịch →
                   </button>
@@ -808,8 +889,11 @@ export const LecturerHomePage: React.FC = () => {
                   <button
                     type="button"
                     className="utc-home-btn utc-home-btn-secondary"
+                    disabled={isStageLocked(5)}
                     style={{ padding: '6px 11px', fontSize: '0.78rem' }}
-                    onClick={() => navigate('/admin/defense-scoring')}
+                    onClick={() => {
+                      if (!isStageLocked(5)) navigate('/admin/defense-scoring');
+                    }}
                   >
                     Nhập điểm →
                   </button>

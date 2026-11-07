@@ -70,11 +70,31 @@ export const StudentHomePage: React.FC = () => {
 
   const isDropped = Boolean(studentStatus?.isDropped);
 
+  const isStageLocked = (stageNumber: number): boolean => {
+    if (!round) return true;
+    if (isDropped) {
+      const failedStage = (studentStatus?.completedStage || 1) + 1;
+      if (stageNumber >= failedStage) return true;
+    }
+    if (stageNumber <= userCompletedStage) return false;
+    if (stageNumber === userCompletedStage + 1 && roundStage >= stageNumber) {
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
     let mounted = true;
     const loadStudentData = async () => {
       if (roundLoading) return;
       if (!round?.roundId || !studentId) {
+        setPreferences([]);
+        setProposal(null);
+        setThesis(null);
+        setSummary(null);
+        setTasks([]);
+        setMySchedule(null);
+        setGradResult(null);
         setDataLoading(false);
         return;
       }
@@ -164,18 +184,6 @@ export const StudentHomePage: React.FC = () => {
       mounted = false;
     };
   }, [roundLoading, round?.roundId, studentId, studentStatus?.studentCode]);
-
-  const isStageLocked = (stageNumber: number): boolean => {
-    if (isDropped) {
-      const failedStage = (studentStatus?.completedStage || 1) + 1;
-      if (stageNumber >= failedStage) return true;
-    }
-    if (stageNumber <= userCompletedStage) return false;
-    if (stageNumber === userCompletedStage + 1 && roundStage >= stageNumber) {
-      return false;
-    }
-    return true;
-  };
 
   // Build Student Todo List
   const todoItems: TodoItem[] = [];
@@ -287,39 +295,41 @@ export const StudentHomePage: React.FC = () => {
 
   // Upcoming deadlines (milestones + tasks due within 14 days)
   const deadlineItems: TodoItem[] = [];
-  for (const m of milestones) {
-    const d = daysUntil(m.endDate);
-    if (d !== undefined && d >= -2 && d <= 21) {
-      deadlineItems.push({
-        id: `ms-${m.milestoneId}`,
-        title: m.name,
-        subtitle: m.description || `Mốc đợt đồ án (${m.phaseType})`,
-        dueDate: m.endDate,
-        daysLeft: d,
-        priority: d <= 3 ? 'HIGH' : 'MEDIUM',
-        tag: m.isActive ? 'Mốc đang mở' : 'Mốc đợt',
-        tagColor: d <= 3 ? 'danger' : m.isActive ? 'primary' : 'info',
-        actionLabel: 'Xem giai đoạn',
-        actionRoute: '/student/home',
-      });
-    }
-  }
-  for (const t of tasks) {
-    if (t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && t.dueDate) {
-      const d = daysUntil(t.dueDate);
-      if (d !== undefined && d <= 14) {
+  if (round) {
+    for (const m of milestones) {
+      const d = daysUntil(m.endDate);
+      if (d !== undefined && d >= -2 && d <= 21) {
         deadlineItems.push({
-          id: `dl-task-${t.id}`,
-          title: `Hạn nộp task: ${t.title}`,
-          subtitle: thesis?.titleVn,
-          dueDate: t.dueDate,
+          id: `ms-${m.milestoneId}`,
+          title: m.name,
+          subtitle: m.description || `Mốc đợt đồ án (${m.phaseType})`,
+          dueDate: m.endDate,
           daysLeft: d,
-          priority: t.priority,
-          tag: 'Hạn Task',
-          tagColor: d < 0 ? 'danger' : d <= 3 ? 'warning' : 'primary',
-          actionLabel: 'Mở Task',
-          actionRoute: `/progress/tasks${thesis?.id ? `?thesisId=${thesis.id}` : ''}`,
+          priority: d <= 3 ? 'HIGH' : 'MEDIUM',
+          tag: m.isActive ? 'Mốc đang mở' : 'Mốc đợt',
+          tagColor: d <= 3 ? 'danger' : m.isActive ? 'primary' : 'info',
+          actionLabel: 'Xem chi tiết',
+          actionRoute: '/student/home',
         });
+      }
+    }
+    for (const t of tasks) {
+      if (t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && t.dueDate) {
+        const d = daysUntil(t.dueDate);
+        if (d !== undefined && d <= 14) {
+          deadlineItems.push({
+            id: `dl-task-${t.id}`,
+            title: `Hạn nộp task: ${t.title}`,
+            subtitle: thesis?.titleVn,
+            dueDate: t.dueDate,
+            daysLeft: d,
+            priority: t.priority,
+            tag: 'Hạn Task',
+            tagColor: d < 0 ? 'danger' : d <= 3 ? 'warning' : 'primary',
+            actionLabel: 'Mở Task',
+            actionRoute: `/progress/tasks${thesis?.id ? `?thesisId=${thesis.id}` : ''}`,
+          });
+        }
       }
     }
   }
@@ -342,7 +352,7 @@ export const StudentHomePage: React.FC = () => {
       subtitle: 'Đăng ký hướng & GVHD',
       route: '/student/assignment',
       disabled: isStageLocked(2),
-      disabledReason: 'Giai đoạn 2 hiện đang khóa',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Giai đoạn 2 hiện đang khóa',
     },
     {
       id: 'qa-proposal',
@@ -351,7 +361,7 @@ export const StudentHomePage: React.FC = () => {
       subtitle: 'Soạn thảo & ký số đề cương',
       route: '/thesis/proposals',
       disabled: isStageLocked(3),
-      disabledReason: 'Cần hoàn thành GĐ2 trước khi mở Đề cương',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Cần hoàn thành GĐ2 trước khi mở Đề cương',
     },
     {
       id: 'qa-tasks',
@@ -360,7 +370,7 @@ export const StudentHomePage: React.FC = () => {
       subtitle: 'Nhận việc & nộp sản phẩm',
       route: `/progress/tasks${thesis?.id ? `?thesisId=${thesis.id}` : ''}`,
       disabled: isStageLocked(4),
-      disabledReason: 'Cần hoàn thành GĐ3 trước khi mở Bảng Task',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Cần hoàn thành GĐ3 trước khi mở Bảng Task',
     },
     {
       id: 'qa-reports',
@@ -369,7 +379,7 @@ export const StudentHomePage: React.FC = () => {
       subtitle: 'Báo cáo tuần/mốc cho GVHD',
       route: `/progress/reports${thesis?.id ? `?thesisId=${thesis.id}` : ''}`,
       disabled: isStageLocked(4),
-      disabledReason: 'Chưa mở giai đoạn thực hiện đồ án',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Chưa mở giai đoạn thực hiện đồ án',
     },
     {
       id: 'qa-thesis-detail',
@@ -377,6 +387,8 @@ export const StudentHomePage: React.FC = () => {
       label: 'Chi tiết Đề tài của tôi',
       subtitle: 'Thông tin đề tài & tài liệu',
       route: `/thesis/detail${thesis?.id ? `?id=${thesis.id}` : ''}`,
+      disabled: isStageLocked(3) || !thesis,
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : !thesis ? 'Bạn chưa có đề tài chính thức' : 'Chưa đến giai đoạn đề tài',
     },
     {
       id: 'qa-schedule',
@@ -385,7 +397,7 @@ export const StudentHomePage: React.FC = () => {
       subtitle: 'Xem phòng, hội đồng & điểm',
       route: '/admin/defense-schedules',
       disabled: isStageLocked(5),
-      disabledReason: 'Giai đoạn 5 (Bảo vệ) chưa mở',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Giai đoạn 5 (Bảo vệ) chưa mở',
     },
     {
       id: 'qa-reservation',
@@ -394,7 +406,7 @@ export const StudentHomePage: React.FC = () => {
       subtitle: 'Nộp & theo dõi đơn bảo lưu',
       route: '/student/reservation',
       disabled: isStageLocked(5),
-      disabledReason: 'Giai đoạn 5 chưa mở',
+      disabledReason: !round ? 'Chưa có đợt đồ án nào đang mở' : 'Giai đoạn 5 chưa mở',
     },
     {
       id: 'qa-chat',
@@ -402,6 +414,8 @@ export const StudentHomePage: React.FC = () => {
       label: 'Nhóm Chat Hướng dẫn',
       subtitle: 'Trao đổi trực tiếp với GVHD',
       route: '/chat',
+      disabled: !round,
+      disabledReason: 'Chưa có đợt đồ án nào đang mở',
     },
   ];
 
@@ -432,22 +446,35 @@ export const StudentHomePage: React.FC = () => {
             <button
               type="button"
               className="utc-home-btn utc-home-btn-secondary"
-              onClick={() => navigate('/chat')}
+              disabled={!round}
+              title={!round ? 'Chưa có đợt đồ án nào đang mở' : 'Chat với GVHD'}
+              onClick={() => {
+                if (round) navigate('/chat');
+              }}
             >
               💬 Chat với GVHD
             </button>
             <button
               type="button"
               className="utc-home-btn utc-home-btn-primary"
-              onClick={() =>
+              disabled={!round || isDropped || isStageLocked(2)}
+              title={
+                !round
+                  ? 'Chưa có đợt đồ án nào đang mở'
+                  : isDropped
+                  ? 'Bạn đã dừng thực hiện đợt đồ án'
+                  : 'Vào giai đoạn hiện tại'
+              }
+              onClick={() => {
+                if (!round || isDropped) return;
                 navigate(
                   !isStageLocked(4)
                     ? `/progress/tasks${thesis?.id ? `?thesisId=${thesis.id}` : ''}`
                     : !isStageLocked(3)
                     ? '/thesis/proposals'
                     : '/student/assignment'
-                )
-              }
+                );
+              }}
             >
               🚀 Vào giai đoạn hiện tại
             </button>
@@ -473,6 +500,7 @@ export const StudentHomePage: React.FC = () => {
 
       <RoundProgressStepper
         role="student"
+        round={round}
         roundStage={roundStage}
         userCompletedStage={userCompletedStage}
         isDropped={isDropped}
@@ -488,37 +516,53 @@ export const StudentHomePage: React.FC = () => {
           label="Tiến độ Đề tài"
           value={`${completionPercent}%`}
           subtitle={
-            thesis?.defenseEligible
+            !round
+              ? 'Chưa có đợt đồ án'
+              : isStageLocked(3)
+              ? '🔒 Chưa tới giai đoạn đề tài'
+              : thesis?.defenseEligible
               ? '✅ Đã đủ điều kiện bảo vệ'
               : 'Cần đạt tối thiểu 80% để bảo vệ'
           }
           icon="📊"
           accentColor="#0a3273"
-          onClick={() =>
-            navigate(`/thesis/detail${thesis?.id ? `?id=${thesis.id}` : ''}`)
+          onClick={
+            !isStageLocked(3) && thesis?.id
+              ? () => navigate(`/thesis/detail?id=${thesis.id}`)
+              : undefined
           }
         />
         <StatCard
           label="Task hoàn thành"
           value={`${completedTasksCount}/${totalTasksCount}`}
-          subtitle={`${sortedTodos.length} việc đang cần xử lý`}
+          subtitle={
+            isStageLocked(4)
+              ? '🔒 GĐ4 chưa mở'
+              : `${sortedTodos.length} việc đang cần xử lý`
+          }
           icon="📋"
           accentColor="#0284c7"
-          onClick={() => {
-            if (!isStageLocked(4)) {
-              navigate(`/progress/tasks${thesis?.id ? `?thesisId=${thesis.id}` : ''}`);
-            }
-          }}
+          onClick={
+            !isStageLocked(4) && thesis?.id
+              ? () => navigate(`/progress/tasks?thesisId=${thesis.id}`)
+              : undefined
+          }
         />
         <StatCard
           label="Trạng thái Đề cương"
           value={
-            proposal
+            !round
+              ? 'Chưa mở'
+              : isStageLocked(3)
+              ? '🔒 Chưa mở'
+              : proposal
               ? PROPOSAL_STATUS_LABELS[proposal.status] || proposal.status
               : 'Chưa nộp'
           }
           subtitle={
-            proposal?.studentSigned
+            isStageLocked(3)
+              ? 'Giai đoạn 3 chưa mở'
+              : proposal?.studentSigned
               ? '✓ Đã ký số PDF'
               : proposal
               ? `Phiên bản v${proposal.version}`
@@ -526,25 +570,25 @@ export const StudentHomePage: React.FC = () => {
           }
           icon="📑"
           accentColor="#7c3aed"
-          onClick={() => {
-            if (!isStageLocked(3)) navigate('/thesis/proposals');
-          }}
+          onClick={!isStageLocked(3) ? () => navigate('/thesis/proposals') : undefined}
         />
         <StatCard
           label="Báo cáo Tiến độ"
           value={summary?.totalProgressReports ?? 0}
           subtitle={
-            summary?.latestAssessment
+            isStageLocked(4)
+              ? '🔒 GĐ4 chưa mở'
+              : summary?.latestAssessment
               ? `Đánh giá gần nhất: ${summary.latestAssessment}`
               : 'Báo cáo định kỳ với GVHD'
           }
           icon="📈"
           accentColor="#059669"
-          onClick={() => {
-            if (!isStageLocked(4)) {
-              navigate(`/progress/reports${thesis?.id ? `?thesisId=${thesis.id}` : ''}`);
-            }
-          }}
+          onClick={
+            !isStageLocked(4) && thesis?.id
+              ? () => navigate(`/progress/reports?thesisId=${thesis.id}`)
+              : undefined
+          }
         />
       </div>
 
@@ -555,7 +599,7 @@ export const StudentHomePage: React.FC = () => {
           icon="📘"
           loading={dataLoading}
           headerRight={
-            thesis ? (
+            thesis && !isStageLocked(3) ? (
               <button
                 type="button"
                 className="utc-home-btn utc-home-btn-secondary"
@@ -567,7 +611,7 @@ export const StudentHomePage: React.FC = () => {
             ) : undefined
           }
         >
-          {studentStatus && !studentStatus.inRound ? (
+          {!round || (studentStatus && !studentStatus.inRound) ? (
             <div className="utc-home-empty">
               Bạn hiện chưa có tên trong danh sách đợt đồ án đang mở. Vui lòng liên hệ Giáo vụ khoa nếu có thắc mắc.
             </div>
@@ -675,7 +719,10 @@ export const StudentHomePage: React.FC = () => {
                 type="button"
                 className="utc-home-btn utc-home-btn-primary"
                 style={{ alignSelf: 'flex-start' }}
-                onClick={() => navigate('/thesis/proposals')}
+                disabled={isStageLocked(3)}
+                onClick={() => {
+                  if (!isStageLocked(3)) navigate('/thesis/proposals');
+                }}
               >
                 📑 Mở trang Đề cương →
               </button>
@@ -697,7 +744,10 @@ export const StudentHomePage: React.FC = () => {
                 type="button"
                 className="utc-home-btn utc-home-btn-primary"
                 style={{ alignSelf: 'flex-start' }}
-                onClick={() => navigate('/student/assignment')}
+                disabled={isStageLocked(2)}
+                onClick={() => {
+                  if (!isStageLocked(2)) navigate('/student/assignment');
+                }}
               >
                 🎯 Đi tới Đăng ký Nguyện vọng →
               </button>
@@ -712,7 +762,15 @@ export const StudentHomePage: React.FC = () => {
           badgeCount={sortedTodos.length}
           loading={dataLoading}
         >
-          <TodoList items={sortedTodos} onAction={(route) => navigate(route)} />
+          <TodoList
+            items={sortedTodos}
+            emptyMessage={
+              !round
+                ? 'Hiện chưa có đợt đồ án nào được kích hoạt.'
+                : '🎉 Tuyệt vời! Hiện không có công việc tồn đọng nào.'
+            }
+            onAction={(route) => navigate(route)}
+          />
         </HomeSection>
       </div>
 
@@ -725,7 +783,11 @@ export const StudentHomePage: React.FC = () => {
         >
           <TodoList
             items={sortedDeadlines}
-            emptyMessage="Không có hạn chót nào trong 14 ngày tới."
+            emptyMessage={
+              !round
+                ? 'Chưa có mốc thời gian nào.'
+                : 'Không có hạn chót nào trong 14 ngày tới.'
+            }
             onAction={(route) => navigate(route)}
           />
         </HomeSection>

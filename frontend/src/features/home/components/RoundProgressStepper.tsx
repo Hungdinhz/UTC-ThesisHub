@@ -5,10 +5,11 @@ import {
   formatCountdown,
   type StageStepInfo,
 } from '../utils/homeMetrics';
-import type { MilestoneItem } from '../../../types';
+import type { MilestoneItem, ProjectRoundItem } from '../../../types';
 
 export interface RoundProgressStepperProps {
   role: string;
+  round?: ProjectRoundItem | null;
   roundStage: number;
   userCompletedStage: number;
   isDropped?: boolean;
@@ -30,6 +31,7 @@ const formatShortDate = (dateStr?: string) => {
 
 export const RoundProgressStepper: React.FC<RoundProgressStepperProps> = ({
   role,
+  round,
   roundStage,
   userCompletedStage,
   isDropped = false,
@@ -39,17 +41,23 @@ export const RoundProgressStepper: React.FC<RoundProgressStepperProps> = ({
   title = 'Tiến trình 5 Giai đoạn Đồ án Tốt nghiệp UTC',
   onStepClick,
 }) => {
+  const hasRound = Boolean(round) && roundStage > 0;
+
   const steps = buildStageSteps({
     role,
-    roundStage,
-    userCompletedStage,
+    roundStage: hasRound ? roundStage : 0,
+    userCompletedStage: hasRound ? userCompletedStage : 0,
     isDropped,
-    milestones,
+    milestones: hasRound ? milestones : [],
+    hasRound,
   });
 
-  const overallPercent = calculateOverallStepPercent(steps);
+  const overallPercent = hasRound ? calculateOverallStepPercent(steps) : 0;
   const countdown = formatCountdown(daysLeftInMilestone);
-  const activeStep = steps.find((s) => s.status === 'IN_PROGRESS') || steps[Math.min(roundStage - 1, steps.length - 1)];
+  const activeStep = hasRound
+    ? steps.find((s) => s.status === 'IN_PROGRESS') ||
+      steps[Math.min(roundStage - 1, steps.length - 1)]
+    : undefined;
 
   const getStateLabel = (status: StageStepInfo['status']) => {
     switch (status) {
@@ -69,14 +77,18 @@ export const RoundProgressStepper: React.FC<RoundProgressStepperProps> = ({
       <div className="utc-stepper-header">
         <div className="utc-stepper-title-group">
           <h3 className="utc-stepper-title">📊 {title}</h3>
-          {currentMilestone && (
+          {!hasRound ? (
+            <span className="utc-stepper-countdown muted">
+              ⚠️ Hiện tại chưa có đợt đồ án nào được kích hoạt
+            </span>
+          ) : currentMilestone ? (
             <span className={`utc-stepper-countdown ${countdown.tone}`}>
               ⏰ Mốc hiện tại: {currentMilestone.name} • {countdown.text}
             </span>
-          )}
+          ) : null}
         </div>
 
-        {activeStep && activeStep.status !== 'LOCKED' && onStepClick && (
+        {hasRound && activeStep && activeStep.status !== 'LOCKED' && onStepClick && (
           <button
             type="button"
             className="utc-home-btn utc-home-btn-secondary"
@@ -99,7 +111,7 @@ export const RoundProgressStepper: React.FC<RoundProgressStepperProps> = ({
 
       <div className="utc-stepper-grid">
         {steps.map((step) => {
-          const isClickable = step.status !== 'LOCKED' && Boolean(onStepClick);
+          const isClickable = hasRound && step.status !== 'LOCKED' && Boolean(onStepClick);
           const dateRange =
             step.startDate || step.endDate
               ? `${formatShortDate(step.startDate)}${step.endDate ? ` – ${formatShortDate(step.endDate)}` : ''}`
@@ -113,10 +125,16 @@ export const RoundProgressStepper: React.FC<RoundProgressStepperProps> = ({
               className={`utc-step-box status-${step.status.toLowerCase()} ${
                 isClickable ? 'clickable' : ''
               }`}
-              title={step.status === 'LOCKED' ? step.lockedReason : `Mở ${step.name}`}
-              disabled={step.status === 'LOCKED'}
+              title={
+                !hasRound
+                  ? 'Chưa có đợt đồ án nào đang mở'
+                  : step.status === 'LOCKED'
+                  ? step.lockedReason
+                  : `Mở ${step.name}`
+              }
+              disabled={!isClickable}
               onClick={() => {
-                if (step.status !== 'LOCKED' && onStepClick) {
+                if (isClickable && onStepClick) {
                   onStepClick(step);
                 }
               }}
@@ -127,8 +145,8 @@ export const RoundProgressStepper: React.FC<RoundProgressStepperProps> = ({
               </div>
               <div className="utc-step-name">{step.name.replace(/^GĐ\d:\s*/, '')}</div>
               <div className="utc-step-desc">{step.description}</div>
-              {dateRange && <div className="utc-step-dates">📅 {dateRange}</div>}
-              {step.status === 'IN_PROGRESS' && step.daysLeft !== undefined && (
+              {hasRound && dateRange && <div className="utc-step-dates">📅 {dateRange}</div>}
+              {hasRound && step.status === 'IN_PROGRESS' && step.daysLeft !== undefined && (
                 <div
                   className="utc-step-dates"
                   style={{

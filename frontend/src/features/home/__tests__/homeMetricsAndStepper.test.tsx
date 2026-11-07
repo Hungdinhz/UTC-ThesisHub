@@ -22,6 +22,21 @@ describe('homeMetrics utilities', () => {
     expect(formatCountdown(12).tone).toBe('normal');
   });
 
+  it('builds stage steps when there is NO active round (hasRound=false or roundStage=0)', () => {
+    const noRoundSteps = buildStageSteps({
+      role: 'lecturer',
+      roundStage: 0,
+      userCompletedStage: 0,
+      hasRound: false,
+    });
+    expect(noRoundSteps.length).toBe(5);
+    noRoundSteps.forEach((s) => {
+      expect(s.status).toBe('LOCKED');
+      expect(s.lockedReason).toBe('Chưa có đợt đồ án nào đang mở');
+    });
+    expect(calculateOverallStepPercent(noRoundSteps)).toBe(0);
+  });
+
   it('builds stage steps for student (normal and dropped)', () => {
     const normalSteps = buildStageSteps({
       role: 'student',
@@ -118,11 +133,35 @@ describe('homeMetrics utilities', () => {
 });
 
 describe('RoundProgressStepper component', () => {
-  it('renders 5 stages and prevents clicking locked stages', () => {
+  it('renders all steps as locked and shows 0% when there is no round', () => {
     const onStepClick = vi.fn();
     render(
       <RoundProgressStepper
+        role="supervisor"
+        round={null}
+        roundStage={0}
+        userCompletedStage={0}
+        onStepClick={onStepClick}
+      />
+    );
+
+    expect(screen.getByText(/0%/i)).toBeInTheDocument();
+    expect(screen.getByText(/Chưa có đợt đồ án nào được kích hoạt/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Đi tới/i)).not.toBeInTheDocument();
+
+    const step1 = screen.getByTestId('stepper-step-1');
+    expect(step1).toBeDisabled();
+    fireEvent.click(step1);
+    expect(onStepClick).not.toHaveBeenCalled();
+  });
+
+  it('renders 5 stages and prevents clicking locked stages when round is active', () => {
+    const onStepClick = vi.fn();
+    const mockRound: any = { roundId: 1, name: 'Đợt 1', status: 'IN_PROGRESS' };
+    render(
+      <RoundProgressStepper
         role="student"
+        round={mockRound}
         roundStage={3}
         userCompletedStage={2}
         onStepClick={onStepClick}

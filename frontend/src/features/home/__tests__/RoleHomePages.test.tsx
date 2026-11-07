@@ -272,4 +272,31 @@ describe('Role Homepages rendering and progress visibility', () => {
     });
     expect(screen.getAllByText('42')[0]).toBeInTheDocument();
   });
+
+  it('disables stage 5 council actions and shortcuts on LecturerHomePage when roundStage < 5', async () => {
+    // Stage 4 in mock is < 5
+    render(
+      <MemoryRouter>
+        <LecturerHomePage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      // Council scoring button in section header should be disabled
+      const councilScoreBtn = screen.getByRole('button', { name: /Chấm điểm Hội đồng →/i });
+      expect(councilScoreBtn).toBeDisabled();
+
+      // Council banner warning
+      expect(
+        screen.getByText(/Giai đoạn 5 \(Hội đồng & Bảo vệ\) hiện chưa mở trong đợt đồ án này/i)
+      ).toBeInTheDocument();
+
+      // GD5 shortcuts should be disabled
+      const gd5SchedBtn = screen.getByRole('button', { name: /GĐ5: Lịch Hội đồng Bảo vệ/i });
+      expect(gd5SchedBtn).toBeDisabled();
+
+      const gd5ScoringBtn = screen.getByRole('button', { name: /GĐ5: Chấm điểm & Biên bản PDF/i });
+      expect(gd5ScoringBtn).toBeDisabled();
+    });
+  });
 });
