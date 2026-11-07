@@ -124,5 +124,11 @@ export const progressService = {
   async getThesisProgressSummary(thesisId: number): Promise<ThesisProgressSummary> {
     const res = await apiClient.get(`/progress-reports/by-thesis/${thesisId}/summary`);
     return res.data.data;
+  },
+
+  // Batch summary API for Lecturer / Admin Homepages
+  async getProgressSummaries(params?: { roundId?: number; lecturerId?: number }): Promise<ThesisProgressSummary[]> {
+    const res = await apiClient.get('/progress-reports/summaries', { params });
+    return res.data.data || [];
   }
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { thesisService } from '../services/thesisService';
 import type { Proposal } from '../types';
@@ -12,6 +12,8 @@ import type { SupervisorAssignment } from '../../assignment/types';
 
 export const ProposalManagementPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const queryProposalId = Number(searchParams.get('proposalId')) || null;
   const { user, userType } = useAuth();
   const isStudent = userType === 'student';
   const isSupervisor = userType === 'supervisor' || userType === 'committee_member';
@@ -123,6 +125,15 @@ export const ProposalManagementPage: React.FC = () => {
     const timer = setTimeout(() => setBannerMsg(null), 5000);
     return () => clearTimeout(timer);
   }, [bannerMsg]);
+
+  useEffect(() => {
+    if (queryProposalId && proposals.length > 0 && !pdfPreviewProposal) {
+      const target = proposals.find((p) => p.id === queryProposalId);
+      if (target) {
+        setPdfPreviewProposal(target);
+      }
+    }
+  }, [queryProposalId, proposals]);
 
   const fetchRounds = async () => {
     try {
