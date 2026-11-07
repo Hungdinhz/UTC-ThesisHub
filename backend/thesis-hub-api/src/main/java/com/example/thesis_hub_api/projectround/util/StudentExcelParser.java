@@ -367,14 +367,14 @@ public class StudentExcelParser {
             }
         }
 
-        Integer completedCredits = Math.max(0, 142 - Math.max(0, debtCredits));
+        Integer completedCredits = Math.max(0, 132 - Math.max(0, debtCredits));
         if (mapping.colCompletedCredits >= 0 && mapping.colCompletedCredits < row.getLastCellNum()) {
             String cStr = getCellValue(row.getCell(mapping.colCompletedCredits));
             if (!cStr.isEmpty()) {
                 try {
                     completedCredits = (int) Double.parseDouble(cStr.replace(',', '.'));
-                    if (completedCredits < 0 || completedCredits > 180) {
-                        errors.add("Tín chỉ tích lũy phải nằm trong khoảng 0 - 180 tín chỉ (nhập: " + completedCredits + ")");
+                    if (completedCredits < 0 || completedCredits > 170) {
+                        errors.add("Tín chỉ tích lũy khi bắt đầu làm đồ án phải nằm trong khoảng 0 - 170 tín chỉ (nhập: " + completedCredits + ")");
                     }
                 } catch (NumberFormatException ignored) {
                     errors.add("Tín chỉ tích lũy không đúng định dạng số: " + cStr);
@@ -550,13 +550,13 @@ public class StudentExcelParser {
                 }
             }
 
-            // Dữ liệu mẫu chuẩn từ ảnh UTC kèm đầy đủ cột học vụ (Cử nhân 142 tín chỉ, nợ tối đa 10 tín chỉ)
+            // Dữ liệu mẫu chuẩn từ ảnh UTC kèm đầy đủ cột học vụ (Cử nhân 132 tín chỉ trước đồ án, nợ tối đa 10 tín chỉ)
             Object[][] sampleData = {
-                    {1, sampleCodes.get(0), "Nguyễn Tuấn", "Anh", "CNTT", "CNTT 1 - K65", 3.28, "0983000001", sampleCodes.get(0) + "@lms.utc.edu.vn", 142, 0, "KHÔNG", "KHÔNG"},
-                    {2, sampleCodes.get(1), "Trần Phương", "Thảo", "CNTT", "CNTT 2 - K65", 2.85, "0983000002", sampleCodes.get(1) + "@lms.utc.edu.vn", 138, 4, "KHÔNG", "KHÔNG"},
-                    {3, sampleCodes.get(2), "Lê Hoàng", "Long", "KHMT", "KHMT 1 - K65", 2.61, "0983000003", sampleCodes.get(2) + "@lms.utc.edu.vn", 132, 10, "KHÔNG", "KHÔNG"},
-                    {4, sampleCodes.get(3), "Phạm Minh", "Quân", "CNTT", "CNTT Việt Anh - K65", 2.51, "0983000004", sampleCodes.get(3) + "@lms.utc.edu.vn", 136, 6, "KHÔNG", "KHÔNG"},
-                    {5, sampleCodes.get(4), "Hoàng Thu", "Trang", "KHMT", "KHMT 2 - K65", 3.46, "0983000005", sampleCodes.get(4) + "@lms.utc.edu.vn", 142, 0, "KHÔNG", "KHÔNG"}
+                    {1, sampleCodes.get(0), "Nguyễn Tuấn", "Anh", "CNTT", "CNTT 1 - K65", 3.28, "0983000001", sampleCodes.get(0) + "@lms.utc.edu.vn", 132, 0, "KHÔNG", "KHÔNG"},
+                    {2, sampleCodes.get(1), "Trần Phương", "Thảo", "CNTT", "CNTT 2 - K65", 2.85, "0983000002", sampleCodes.get(1) + "@lms.utc.edu.vn", 128, 4, "KHÔNG", "KHÔNG"},
+                    {3, sampleCodes.get(2), "Lê Hoàng", "Long", "KHMT", "KHMT 1 - K65", 2.61, "0983000003", sampleCodes.get(2) + "@lms.utc.edu.vn", 122, 10, "KHÔNG", "KHÔNG"},
+                    {4, sampleCodes.get(3), "Phạm Minh", "Quân", "CNTT", "CNTT Việt Anh - K65", 2.51, "0983000004", sampleCodes.get(3) + "@lms.utc.edu.vn", 126, 6, "KHÔNG", "KHÔNG"},
+                    {5, sampleCodes.get(4), "Hoàng Thu", "Trang", "KHMT", "KHMT 2 - K65", 3.46, "0983000005", sampleCodes.get(4) + "@lms.utc.edu.vn", 132, 0, "KHÔNG", "KHÔNG"}
             };
 
             int rowIdx = 1;

@@ -25,6 +25,9 @@ import { DefenseScoringPage } from './features/defense/pages/DefenseScoringPage'
 import { ChatGroupPage } from './features/chat/pages/ChatGroupPage';
 import { EligibleStudentsPage } from './features/academic-staff/pages/EligibleStudentsPage';
 import { ClassGradeReportPage } from './features/academic-staff/pages/ClassGradeReportPage';
+import { StudentHomePage } from './features/home/pages/StudentHomePage';
+import { LecturerHomePage } from './features/home/pages/LecturerHomePage';
+import { AcademicStaffHomePage } from './features/home/pages/AcademicStaffHomePage';
 import './App.css';
 
 const getDefaultRouteForRole = (role?: string | null): string => {
@@ -32,14 +35,14 @@ const getDefaultRouteForRole = (role?: string | null): string => {
     case 'admin':
       return '/admin/dashboard';
     case 'student':
-      return '/student/assignment';
+      return '/student/home';
     case 'supervisor':
     case 'committee_member':
-      return '/thesis/proposals';
+      return '/lecturer/home';
     case 'external_examiner':
       return '/external_examiner/dashboard';
     case 'academic_staff':
-      return '/academic-staff/eligible-students';
+      return '/academic-staff/home';
     default:
       return '/login';
   }
@@ -70,7 +73,7 @@ const FullPageLoader: React.FC<{ message?: string }> = ({ message = 'Đang tải
       }}
     />
     <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>{message}</span>
-    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(0deg); } }`}</style>
   </div>
 );
 
@@ -119,7 +122,7 @@ const AppRoutes: React.FC = () => {
         element={userType ? <Navigate to={getDefaultRouteForRole(userType)} replace /> : <LoginPage />}
       />
 
-      {/* Redirect removed Overview dashboards directly to functional pages (#26) */}
+      {/* Role Homepages */}
       <Route
         path="/admin/dashboard"
         element={
@@ -128,9 +131,41 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      <Route path="/student/dashboard" element={<Navigate to="/student/assignment" replace />} />
-      <Route path="/supervisor/dashboard" element={<Navigate to="/admin/assignments" replace />} />
-      <Route path="/committee_member/dashboard" element={<Navigate to="/admin/assignments" replace />} />
+      <Route
+        path="/student/home"
+        element={
+          <ProtectedRoute allowedTypes={['student', 'admin']}>
+            <LayoutPageWrapper activeTab="home" pageTitle="Trang chủ Sinh viên — Theo dõi Lộ trình & Tiến độ Đồ án">
+              <StudentHomePage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/lecturer/home"
+        element={
+          <ProtectedRoute allowedTypes={['supervisor', 'committee_member', 'admin']}>
+            <LayoutPageWrapper activeTab="home" pageTitle="Trang chủ Giảng viên & Hội đồng — Điều hành Hướng dẫn & Bảo vệ">
+              <LecturerHomePage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/academic-staff/home"
+        element={
+          <ProtectedRoute allowedTypes={['academic_staff', 'admin']}>
+            <LayoutPageWrapper activeTab="home" pageTitle="Trang chủ Giáo vụ Khoa — Quản lý Học vụ & Đợt Đồ án">
+              <AcademicStaffHomePage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Legacy dashboard routes redirect to the new role homepages */}
+      <Route path="/student/dashboard" element={<Navigate to="/student/home" replace />} />
+      <Route path="/supervisor/dashboard" element={<Navigate to="/lecturer/home" replace />} />
+      <Route path="/committee_member/dashboard" element={<Navigate to="/lecturer/home" replace />} />
 
       <Route
         path="/external_examiner/dashboard"
@@ -284,7 +319,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin/councils"
         element={
-          <ProtectedRoute allowedTypes={['admin']}>
+          <ProtectedRoute allowedTypes={['admin', 'committee_member']}>
             <LayoutPageWrapper activeTab="councils" pageTitle="Giai đoạn 5: Thành lập Hội đồng (1CT-1TK-2PB-1UV)">
               <CouncilManagementPage />
             </LayoutPageWrapper>
@@ -335,10 +370,11 @@ const AppRoutes: React.FC = () => {
       />
 
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/student" element={<Navigate to="/student/assignment" replace />} />
-      <Route path="/supervisor" element={<Navigate to="/thesis/proposals" replace />} />
-      <Route path="/committee" element={<Navigate to="/thesis/proposals" replace />} />
-      <Route path="/committee_member" element={<Navigate to="/thesis/proposals" replace />} />
+      <Route path="/student" element={<Navigate to="/student/home" replace />} />
+      <Route path="/supervisor" element={<Navigate to="/lecturer/home" replace />} />
+      <Route path="/committee" element={<Navigate to="/lecturer/home" replace />} />
+      <Route path="/committee_member" element={<Navigate to="/lecturer/home" replace />} />
+      <Route path="/academic-staff" element={<Navigate to="/academic-staff/home" replace />} />
       <Route path="/" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
       <Route path="*" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
     </Routes>

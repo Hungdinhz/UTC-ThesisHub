@@ -62,4 +62,14 @@ public class ProgressReportController {
     public ApiResponse<ThesisProgressSummaryResponse> getProgressSummaryByThesis(@PathVariable Long thesisId) {
         return ApiResponse.success(progressReportService.getProgressSummaryByThesis(thesisId));
     }
+
+    /**
+     * Batch summary endpoint for Lecturer / Admin Homepages to avoid N+1 requests.
+     */
+    @GetMapping("/summaries")
+    public ApiResponse<List<ThesisProgressSummaryResponse>> getProgressSummaries(
+            @RequestParam(required = false) Long roundId,
+            @RequestParam(required = false) Long lecturerId) {
+        return ApiResponse.success(progressReportService.getProgressSummariesByRoundAndLecturer(roundId, lecturerId));
+    }
 }

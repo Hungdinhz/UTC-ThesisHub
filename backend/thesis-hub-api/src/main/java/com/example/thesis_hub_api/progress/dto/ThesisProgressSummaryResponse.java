@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 /**
  * Summary DTO provided to Module 4 (Khuat Dang Khoa - Eligibility & Defense)
@@ -18,6 +19,7 @@ import java.math.BigDecimal;
 public class ThesisProgressSummaryResponse {
     private Long thesisId;
     private String thesisCode;
+    private String thesisTitle;
     private Long studentId;
     private String studentCode;
     private String studentFullName;
@@ -31,6 +33,10 @@ public class ThesisProgressSummaryResponse {
     private long totalProgressReports;
     private Integer latestReportPercent;
     private String latestAssessment;
+    private Instant latestReportAt;
+    private long submittedTasksCount;
+    private long overdueTasksCount;
+    private long unreviewedReportsCount;
     private Boolean defenseEligible;
     private boolean readyForDefense;
 }

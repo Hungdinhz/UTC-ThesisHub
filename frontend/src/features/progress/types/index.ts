@@ -102,6 +102,7 @@ export interface ProgressReport {
 export interface ThesisProgressSummary {
   thesisId: number;
   thesisCode: string;
+  thesisTitle?: string;
   studentId: number;
   studentCode: string;
   studentFullName: string;
@@ -115,6 +116,10 @@ export interface ThesisProgressSummary {
   totalProgressReports: number;
   latestReportPercent?: number;
   latestAssessment?: string;
+  latestReportAt?: string;
+  submittedTasksCount?: number;
+  overdueTasksCount?: number;
+  unreviewedReportsCount?: number;
   defenseEligible: boolean;
   readyForDefense: boolean;
 }

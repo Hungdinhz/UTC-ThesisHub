@@ -290,20 +290,20 @@ public class StudentProjectRoundService {
         if (round != null && round.getTrainingProgram() != null) {
             if ("KY_SU".equalsIgnoreCase(round.getTrainingProgram().getCode())) {
                 Integer tc = round.getTrainingProgram().getTotalCredits();
-                return (tc != null && tc >= 180) ? tc : 180;
+                return (tc != null && tc >= 180) ? tc - 10 : 170;
             }
             if ("CU_NHAN".equalsIgnoreCase(round.getTrainingProgram().getCode())) {
                 Integer tc = round.getTrainingProgram().getTotalCredits();
-                return (tc != null && tc >= 142) ? tc : 142;
+                return (tc != null && tc >= 142) ? tc - 10 : 132;
             }
             if (round.getTrainingProgram().getTotalCredits() != null) {
-                return round.getTrainingProgram().getTotalCredits();
+                return Math.max(0, round.getTrainingProgram().getTotalCredits() - 10);
             }
         }
         if (round != null && round.getName() != null && (round.getName().toLowerCase().contains("kỹ sư") || round.getName().toLowerCase().contains("ky su"))) {
-            return 180;
+            return 170;
         }
-        return 142;
+        return 132;
     }
 
     public static class EligibilityEvaluation {
@@ -411,15 +411,17 @@ public class StudentProjectRoundService {
                         ? row.getEmail().trim().toLowerCase()
                         : studentCode.toLowerCase() + "@lms.utc.edu.vn";
 
-                // Đánh giá điều kiện học vụ trước: Sinh viên nợ > 10 tín sẽ bị loại bỏ khỏi đợt
-                int debtCredits = row.getDebtCredits() != null ? row.getDebtCredits() : 0;
+                // Đánh giá điều kiện học vụ: Nợ tín khóa cứng theo tín chỉ tích lũy (tối đa 170 tín với Kỹ sư, 132 tín với Cử nhân)
+                int maxRoundCredits = getMaxCreditsForRound(round);
+                int completedCredits = row.getCompletedCredits() != null
+                        ? Math.min(row.getCompletedCredits(), maxRoundCredits)
+                        : (row.getDebtCredits() != null ? Math.max(0, maxRoundCredits - row.getDebtCredits()) : maxRoundCredits);
+                int debtCredits = Math.max(0, maxRoundCredits - completedCredits);
                 if (debtCredits > 10) {
                     log.info("Loại sinh viên {} khỏi đợt do nợ {} tín chỉ (> 10)", studentCode, debtCredits);
                     skipped++;
                     continue;
                 }
-                int maxRoundCredits = getMaxCreditsForRound(round);
-                int completedCredits = row.getCompletedCredits() != null ? row.getCompletedCredits() : Math.max(0, maxRoundCredits - debtCredits);
                 boolean tuitionDebt = Boolean.TRUE.equals(row.getTuitionDebt());
                 boolean underDiscipline = Boolean.TRUE.equals(row.getUnderDisciplinaryAction());
                 int missingPrereq = 0;
@@ -731,22 +733,20 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         int maxCredits = getMaxCreditsForRound(round);
         if (dto.getCompletedCredits() != null && dto.getCompletedCredits() > maxCredits) {
             throw new AppException(ErrorCode.VALIDATION_FAILED,
-                    String.format("Tín chỉ tích lũy (%d) vượt quá số tín chỉ tối đa của hệ đào tạo (%d tín chỉ).",
+                    String.format("Tín chỉ tích lũy (%d) vượt quá số tín chỉ tối đa của hệ đào tạo khi bắt đầu làm đồ án (%d tín chỉ).",
                             dto.getCompletedCredits(), maxCredits));
         }
-        if (dto.getDebtCredits() != null && dto.getDebtCredits() > maxCredits) {
-            throw new AppException(ErrorCode.VALIDATION_FAILED,
-                    String.format("Tín chỉ nợ (%d) không thể vượt quá tổng tín chỉ của hệ đào tạo (%d tín chỉ).",
-                            dto.getDebtCredits(), maxCredits));
-        }
 
-        int debtCredits = dto.getDebtCredits() != null ? Math.max(0, dto.getDebtCredits()) : 0;
+        // Tín chỉ nợ khóa cứng theo tín chỉ tích lũy (Cử nhân 132 tín, Kỹ sư 170 tín)
+        int completedCredits = dto.getCompletedCredits() != null
+                ? dto.getCompletedCredits()
+                : (dto.getDebtCredits() != null ? Math.max(0, maxCredits - dto.getDebtCredits()) : maxCredits);
+        int debtCredits = Math.max(0, maxCredits - completedCredits);
+
         if (debtCredits > 10) {
             throw new AppException(ErrorCode.VALIDATION_FAILED,
                     String.format("Sinh viên nợ %d tín chỉ (> 10 tín chỉ) - không đủ điều kiện nhận đồ án và không thể thêm vào đợt.", debtCredits));
         }
-        int defaultCredits = Math.max(0, maxCredits - debtCredits);
-        int completedCredits = dto.getCompletedCredits() != null ? dto.getCompletedCredits() : defaultCredits;
         boolean tuitionDebt = Boolean.TRUE.equals(dto.getTuitionDebt());
         boolean underDiscipline = Boolean.TRUE.equals(dto.getUnderDisciplinaryAction());
         int missingPrereq = 0;
@@ -959,27 +959,21 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         if (dto.getGpa() != null) {
             student.setGpa(dto.getGpa());
         }
-        if (dto.getDebtCredits() != null) {
-            student.setDebtCredits(Math.max(0, dto.getDebtCredits()));
-        }
-        student = studentRepository.save(student);
 
-        // Academic record update
+        // Academic record update: Tín chỉ nợ khóa cứng theo tín chỉ tích lũy (tối đa 170 tín Kỹ sư, 132 tín Cử nhân)
         int maxCredits = getMaxCreditsForRound(round);
         if (dto.getCompletedCredits() != null && dto.getCompletedCredits() > maxCredits) {
             throw new AppException(ErrorCode.VALIDATION_FAILED,
-                    String.format("Tín chỉ tích lũy (%d) vượt quá số tín chỉ tối đa của hệ đào tạo (%d tín chỉ).",
+                    String.format("Tín chỉ tích lũy (%d) vượt quá số tín chỉ tối đa của hệ đào tạo khi bắt đầu làm đồ án (%d tín chỉ).",
                             dto.getCompletedCredits(), maxCredits));
         }
-        if (dto.getDebtCredits() != null && dto.getDebtCredits() > maxCredits) {
-            throw new AppException(ErrorCode.VALIDATION_FAILED,
-                    String.format("Tín chỉ nợ (%d) không thể vượt quá tổng tín chỉ của hệ đào tạo (%d tín chỉ).",
-                            dto.getDebtCredits(), maxCredits));
-        }
 
-        int debtCredits = dto.getDebtCredits() != null ? Math.max(0, dto.getDebtCredits()) : (student.getDebtCredits() != null ? student.getDebtCredits() : 0);
-        int defaultCredits = Math.max(0, maxCredits - debtCredits);
-        int completedCredits = dto.getCompletedCredits() != null ? dto.getCompletedCredits() : defaultCredits;
+        int completedCredits = dto.getCompletedCredits() != null
+                ? dto.getCompletedCredits()
+                : (dto.getDebtCredits() != null ? Math.max(0, maxCredits - dto.getDebtCredits()) : (student.getDebtCredits() != null ? Math.max(0, maxCredits - student.getDebtCredits()) : maxCredits));
+        int debtCredits = Math.max(0, maxCredits - completedCredits);
+        student.setDebtCredits(debtCredits);
+        student = studentRepository.save(student);
         Double gpa = dto.getGpa() != null ? dto.getGpa() : student.getGpa();
         boolean tuitionDebt = Boolean.TRUE.equals(dto.getTuitionDebt());
         boolean underDiscipline = Boolean.TRUE.equals(dto.getUnderDisciplinaryAction());
@@ -1168,13 +1162,16 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
             } catch (Exception ignored) {}
         }
 
-        Integer debtCredits = record != null && record.getDebtCredits() != null
-                ? record.getDebtCredits()
-                : (student != null && student.getDebtCredits() != null ? student.getDebtCredits() : 0);
         int maxRoundCredits = getMaxCreditsForRound(spr.getProjectRound());
         Integer completedCredits = record != null && record.getCompletedCredits() != null
                 ? record.getCompletedCredits()
-                : Math.max(0, maxRoundCredits - debtCredits);
+                : (record != null && record.getDebtCredits() != null
+                        ? Math.max(0, maxRoundCredits - record.getDebtCredits())
+                        : (student != null && student.getDebtCredits() != null
+                                ? Math.max(0, maxRoundCredits - student.getDebtCredits())
+                                : maxRoundCredits));
+        // Khóa cứng nợ tín theo tín chỉ tích lũy (Cử nhân 132 tín, Kỹ sư 170 tín)
+        Integer debtCredits = Math.max(0, maxRoundCredits - completedCredits);
         Double gpa = record != null && record.getGpa() != null
                 ? record.getGpa()
                 : (spr.getGpa() != null ? spr.getGpa() : (student != null ? student.getGpa() : null));
