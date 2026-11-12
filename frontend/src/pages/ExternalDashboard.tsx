@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
-import type {
-  ExternalDashboardData,
+import type { 
+  ExternalDashboardData, 
   ExternalGroup,
   ExternalGroupAssignment
 } from '../types';
@@ -79,7 +79,7 @@ const ExternalDashboard: React.FC = () => {
 
   if (loading && !dashboardData) {
     return (
-      <UTCAppLayout user={user} onLogout={logout} activeTab="overview" onTabChange={() => { }}>
+      <UTCAppLayout user={user} onLogout={logout} activeTab="overview" onTabChange={() => {}}>
         <div style={{ padding: '20px 0' }}>
           <div className="dashboard-header" style={{ marginBottom: '20px' }}>
             <div>
@@ -102,7 +102,7 @@ const ExternalDashboard: React.FC = () => {
 
   if (error || !dashboardData) {
     return (
-      <UTCAppLayout user={user} onLogout={logout} activeTab="overview" onTabChange={() => { }}>
+      <UTCAppLayout user={user} onLogout={logout} activeTab="overview" onTabChange={() => {}}>
         <div style={{ padding: '20px 0' }}>
           <div className="card error-card" style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '24px', border: '1px solid #fecaca' }}>
             <h2 style={{ color: '#dc2626', margin: '0 0 12px 0' }}>Lỗi khi tải bảng điều khiển</h2>
@@ -141,7 +141,7 @@ const ExternalDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-
+          
           {/* Statistics */}
           <div className="stats-grid external-stats">
             <div className="stat-card">
@@ -207,14 +207,14 @@ const ExternalDashboard: React.FC = () => {
                         <div className="pending-info">
                           <span className="student-name">
                             {assignment.supervisor_group_details?.group?.student_1?.name || 'Unknown'}
-                            {assignment.supervisor_group_details?.group?.student_2 &&
+                            {assignment.supervisor_group_details?.group?.student_2 && 
                               ` & ${assignment.supervisor_group_details.group.student_2.name}`}
                           </span>
                           <span className="project-name">
                             {assignment.supervisor_group_details?.project?.project_name || 'No Project'}
                           </span>
                         </div>
-                        <button
+                        <button 
                           className="btn btn-sm btn-primary"
                           onClick={() => handleStartEvaluation(assignment)}
                         >
@@ -223,7 +223,7 @@ const ExternalDashboard: React.FC = () => {
                       </div>
                     ))}
                     {upcoming_evaluations.length > 5 && (
-                      <button
+                      <button 
                         className="btn btn-link"
                         onClick={() => setActiveTab('evaluations')}
                       >
@@ -250,7 +250,7 @@ const ExternalDashboard: React.FC = () => {
                           <span className="marks">{Math.round(evaluation.total_marks)}/100</span>
                         </div>
                         <span className="date">
-                          {evaluation.evaluated_at
+                          {evaluation.evaluated_at 
                             ? new Date(evaluation.evaluated_at).toLocaleDateString()
                             : 'N/A'}
                         </span>
@@ -264,20 +264,20 @@ const ExternalDashboard: React.FC = () => {
               <div className="card">
                 <h3>Quick Actions</h3>
                 <div className="quick-actions">
-                  <button
+                  <button 
                     className="btn btn-primary"
                     onClick={() => setActiveTab('groups')}
                   >
                     View My Groups
                   </button>
-                  <button
+                  <button 
                     className="btn btn-secondary"
                     onClick={() => setActiveTab('schedule')}
                   >
                     View Schedule
                   </button>
                   {statistics.pending_evaluations > 0 && (
-                    <button
+                    <button 
                       className="btn btn-success"
                       onClick={() => setActiveTab('evaluations')}
                     >
@@ -313,7 +313,7 @@ const ExternalDashboard: React.FC = () => {
                       )}
                     </div>
                   </div>
-
+                  
                   <h3>Assigned Students ({groupAssignments.length})</h3>
                   {loadingAssignments ? (
                     <p>Loading students...</p>
@@ -327,7 +327,7 @@ const ExternalDashboard: React.FC = () => {
                             <div className="student-details">
                               <strong>
                                 {assignment.supervisor_group_details?.group?.student_1?.name}
-                                {assignment.supervisor_group_details?.group?.student_2 &&
+                                {assignment.supervisor_group_details?.group?.student_2 && 
                                   ` & ${assignment.supervisor_group_details.group.student_2.name}`}
                               </strong>
                               <span className="reg-no">
@@ -358,7 +358,7 @@ const ExternalDashboard: React.FC = () => {
                                 <span>{Math.round(assignment.evaluation.total_marks)}/100</span>
                               </div>
                             ) : (
-                              <button
+                              <button 
                                 className="btn btn-primary"
                                 onClick={() => handleStartEvaluation(assignment)}
                               >
@@ -382,8 +382,8 @@ const ExternalDashboard: React.FC = () => {
                   upcoming_evaluations.length > 0 ? (
                     // Group assignments by external group
                     [...new Map(upcoming_evaluations.map(a => [a.external_group, a])).values()].map(assignment => (
-                      <div
-                        key={assignment.external_group}
+                      <div 
+                        key={assignment.external_group} 
                         className="card group-card clickable"
                         onClick={() => {
                           const group: ExternalGroup = {
@@ -434,7 +434,7 @@ const ExternalDashboard: React.FC = () => {
                           <div className="student-info">
                             <strong>
                               {assignment.supervisor_group_details?.group?.student_1?.name}
-                              {assignment.supervisor_group_details?.group?.student_2 &&
+                              {assignment.supervisor_group_details?.group?.student_2 && 
                                 ` & ${assignment.supervisor_group_details.group.student_2.name}`}
                             </strong>
                             <span>
@@ -446,7 +446,7 @@ const ExternalDashboard: React.FC = () => {
                             <span className="group-name">{assignment.external_group_name}</span>
                           </div>
                         </div>
-                        <button
+                        <button 
                           className="btn btn-primary"
                           onClick={() => handleStartEvaluation(assignment)}
                         >
@@ -473,7 +473,7 @@ const ExternalDashboard: React.FC = () => {
                             </span>
                           </div>
                           <span className="date">
-                            {evaluation.evaluated_at
+                            {evaluation.evaluated_at 
                               ? new Date(evaluation.evaluated_at).toLocaleDateString()
                               : 'N/A'}
                           </span>
@@ -509,10 +509,10 @@ interface EvaluationFormProps {
   onCancel: () => void;
 }
 
-const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
-  assignment,
-  onComplete,
-  onCancel
+const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({ 
+  assignment, 
+  onComplete, 
+  onCancel 
 }) => {
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -545,7 +545,7 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
     const presentationSkills = formData.presentation_clarity + formData.communication + formData.time_management;
     const documentation = formData.documentation_completeness + formData.documentation_quality;
     const qaResponse = formData.qa_response;
-
+    
     return {
       projectImplementation,
       technicalKnowledge,
@@ -572,7 +572,7 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-
+    
     try {
       await apiService.createExternalEvaluation({
         assignment: assignment.id,
@@ -599,11 +599,11 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
         </button>
         <h2>External Evaluation</h2>
       </div>
-
+      
       <div className="student-being-evaluated">
         <h3>
           {assignment.supervisor_group_details?.group?.student_1?.name}
-          {assignment.supervisor_group_details?.group?.student_2 &&
+          {assignment.supervisor_group_details?.group?.student_2 && 
             ` & ${assignment.supervisor_group_details.group.student_2.name}`}
         </h3>
         <p>{assignment.supervisor_group_details?.project?.project_name || 'No Project'}</p>
@@ -616,9 +616,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
           <div className="criteria-grid">
             <div className="criteria-item">
               <label>Project Completion (0-10)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="10"
                 value={formData.project_completion}
                 onChange={(e) => handleInputChange('project_completion', Math.min(10, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -626,9 +626,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
             </div>
             <div className="criteria-item">
               <label>Code Quality (0-10)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="10"
                 value={formData.code_quality}
                 onChange={(e) => handleInputChange('code_quality', Math.min(10, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -636,9 +636,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
             </div>
             <div className="criteria-item">
               <label>Functionality (0-10)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="10"
                 value={formData.functionality}
                 onChange={(e) => handleInputChange('functionality', Math.min(10, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -654,9 +654,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
           <div className="criteria-grid">
             <div className="criteria-item">
               <label>Understanding of Technology (0-10)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="10"
                 value={formData.understanding_of_technology}
                 onChange={(e) => handleInputChange('understanding_of_technology', Math.min(10, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -664,9 +664,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
             </div>
             <div className="criteria-item">
               <label>Problem Solving (0-10)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="10"
                 value={formData.problem_solving}
                 onChange={(e) => handleInputChange('problem_solving', Math.min(10, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -674,9 +674,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
             </div>
             <div className="criteria-item">
               <label>Innovation (0-5)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="5"
                 value={formData.innovation}
                 onChange={(e) => handleInputChange('innovation', Math.min(5, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -692,9 +692,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
           <div className="criteria-grid">
             <div className="criteria-item">
               <label>Presentation Clarity (0-8)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="8"
                 value={formData.presentation_clarity}
                 onChange={(e) => handleInputChange('presentation_clarity', Math.min(8, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -702,9 +702,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
             </div>
             <div className="criteria-item">
               <label>Communication (0-7)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="7"
                 value={formData.communication}
                 onChange={(e) => handleInputChange('communication', Math.min(7, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -712,9 +712,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
             </div>
             <div className="criteria-item">
               <label>Time Management (0-5)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="5"
                 value={formData.time_management}
                 onChange={(e) => handleInputChange('time_management', Math.min(5, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -730,9 +730,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
           <div className="criteria-grid">
             <div className="criteria-item">
               <label>Documentation Completeness (0-8)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="8"
                 value={formData.documentation_completeness}
                 onChange={(e) => handleInputChange('documentation_completeness', Math.min(8, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -740,9 +740,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
             </div>
             <div className="criteria-item">
               <label>Documentation Quality (0-7)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="7"
                 value={formData.documentation_quality}
                 onChange={(e) => handleInputChange('documentation_quality', Math.min(7, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -758,9 +758,9 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
           <div className="criteria-grid">
             <div className="criteria-item">
               <label>Q&A Response (0-10)</label>
-              <input
-                type="number"
-                min="0"
+              <input 
+                type="number" 
+                min="0" 
                 max="10"
                 value={formData.qa_response}
                 onChange={(e) => handleInputChange('qa_response', Math.min(10, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -792,7 +792,7 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
           <h4>Comments</h4>
           <div className="comment-field">
             <label>Overall Comment</label>
-            <textarea
+            <textarea 
               value={formData.overall_comment}
               onChange={(e) => handleInputChange('overall_comment', e.target.value)}
               placeholder="Provide an overall assessment..."
@@ -801,7 +801,7 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
           </div>
           <div className="comment-field">
             <label>Strengths</label>
-            <textarea
+            <textarea 
               value={formData.strengths}
               onChange={(e) => handleInputChange('strengths', e.target.value)}
               placeholder="What did the student do well?"
@@ -810,7 +810,7 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
           </div>
           <div className="comment-field">
             <label>Areas of Improvement</label>
-            <textarea
+            <textarea 
               value={formData.areas_of_improvement}
               onChange={(e) => handleInputChange('areas_of_improvement', e.target.value)}
               placeholder="What could be improved?"

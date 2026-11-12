@@ -468,12 +468,13 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
             <div className="final-defense-result-card" style={{ marginTop: '20px' }}>
               {/* Status Header */}
               <div
-                className={`result-header-box ${result.reservationStatus === 'APPROVED'
+                className={`result-header-box ${
+                  result.reservationStatus === 'APPROVED'
                     ? 'result-header-reserved'
                     : result.eligibleForDefense
-                      ? 'result-header-eligible'
-                      : 'result-header-ineligible'
-                  }`}
+                    ? 'result-header-eligible'
+                    : 'result-header-ineligible'
+                }`}
               >
                 <div>
                   <div className="result-sub-title">Kết quả xét duyệt điều kiện bảo vệ cuối kỳ:</div>
@@ -481,10 +482,10 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     {result.reservationStatus === 'APPROVED'
                       ? '🟣 ĐÃ BẢO LƯU ĐỒ ÁN SANG ĐỢT SAU (RESERVED)'
                       : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
-                        ? (result.studentRoundStatus === 'INELIGIBLE' ? '🚫 KHÔNG ĐỦ ĐIỀU KIỆN THAM GIA ĐỢT ĐỒ ÁN' : '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN')
-                        : result.eligibleForDefense
-                          ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ'
-                          : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}
+                      ? (result.studentRoundStatus === 'INELIGIBLE' ? '🚫 KHÔNG ĐỦ ĐIỀU KIỆN THAM GIA ĐỢT ĐỒ ÁN' : '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN')
+                      : result.eligibleForDefense
+                      ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ'
+                      : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}
                   </h2>
                 </div>
                 <div>
@@ -492,10 +493,10 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     {result.reservationStatus === 'APPROVED'
                       ? 'BẢO LƯU'
                       : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
-                        ? (result.studentRoundStatus === 'INELIGIBLE' ? 'KHÔNG ĐỦ ĐK' : 'BỊ LOẠI')
-                        : result.eligibleForDefense
-                          ? 'ĐỦ ĐIỀU KIỆN'
-                          : 'KHÔNG ĐỦ ĐIỀU KIỆN'}
+                      ? (result.studentRoundStatus === 'INELIGIBLE' ? 'KHÔNG ĐỦ ĐK' : 'BỊ LOẠI')
+                      : result.eligibleForDefense
+                      ? 'ĐỦ ĐIỀU KIỆN'
+                      : 'KHÔNG ĐỦ ĐIỀU KIỆN'}
                   </span>
                 </div>
               </div>
@@ -932,18 +933,18 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                                 {!thesis
                                   ? 'Chưa có đề tài'
                                   : !hasAssignedThesisAndSupervisor
-                                    ? 'Chưa phân công GVHD'
-                                    : (st.debtCredits !== undefined && st.debtCredits > 0)
-                                      ? `Nợ ${st.debtCredits} tín chỉ`
-                                      : st.tuitionDebt
-                                        ? 'Còn nợ học phí'
-                                        : st.underDisciplinaryAction
-                                          ? 'Đang bị kỷ luật'
-                                          : !hasSupervisorApproved
-                                            ? 'GVHD chưa duyệt'
-                                            : !isThesisProgressComplete
-                                              ? `Tiến độ ${progressRate}%`
-                                              : 'Chưa đủ tiêu chí'}
+                                  ? 'Chưa phân công GVHD'
+                                  : (st.debtCredits !== undefined && st.debtCredits > 0)
+                                  ? `Nợ ${st.debtCredits} tín chỉ`
+                                  : st.tuitionDebt
+                                  ? 'Còn nợ học phí'
+                                  : st.underDisciplinaryAction
+                                  ? 'Đang bị kỷ luật'
+                                  : !hasSupervisorApproved
+                                  ? 'GVHD chưa duyệt'
+                                  : !isThesisProgressComplete
+                                  ? `Tiến độ ${progressRate}%`
+                                  : 'Chưa đủ tiêu chí'}
                               </div>
                             </div>
                           )}

@@ -16,7 +16,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
+  
   // Validation States
   const [fieldErrors, setFieldErrors] = useState<{ registrationNo?: string; email?: string; password?: string }>({});
   const [touched, setTouched] = useState<{ registrationNo?: boolean; email?: boolean; password?: boolean }>({});
@@ -46,8 +46,8 @@ const LoginPage: React.FC = () => {
 
     if (type === 'student') {
       if (!regNoVal.trim()) {
-        errors.registrationNo = i18n.language.startsWith('vi')
-          ? 'Vui lòng nhập Mã sinh viên hoặc Tên đăng nhập UTC'
+        errors.registrationNo = i18n.language.startsWith('vi') 
+          ? 'Vui lòng nhập Mã sinh viên hoặc Tên đăng nhập UTC' 
           : 'Please enter UTC Student ID or Username';
       } else if (regNoVal.trim().length < 3) {
         errors.registrationNo = i18n.language.startsWith('vi')
@@ -338,7 +338,7 @@ const LoginPage: React.FC = () => {
             }}>
               <div style={{ fontSize: '0.85rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.1rem' }}>🔑</span>
-                <span><strong>Chưa có tài khoản Quản trị viên?</strong><br /><span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Đăng ký tài khoản Admin mới với Admin API Key</span></span>
+                <span><strong>Chưa có tài khoản Quản trị viên?</strong><br/><span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Đăng ký tài khoản Admin mới với Admin API Key</span></span>
               </div>
               <button
                 type="button"

@@ -309,10 +309,10 @@ export const ThesisDetailPage: React.FC = () => {
               {thesis.status === 'COMPLETED'
                 ? '✓ ĐÃ BẢO VỆ HOÀN THÀNH'
                 : thesis.status === 'DEFENSE_NOT_ELIGIBLE'
-                  ? '❌ CHƯA ĐỦ ĐK BẢO VỆ (DEFENSE_NOT_ELIGIBLE)'
-                  : thesis.defenseEligible
-                    ? '🎓 ĐỦ ĐK BẢO VỆ (DEFENSE_READY)'
-                    : '⏳ ĐANG THỰC HIỆN (IN_PROGRESS)'}
+                ? '❌ CHƯA ĐỦ ĐK BẢO VỆ (DEFENSE_NOT_ELIGIBLE)'
+                : thesis.defenseEligible
+                ? '🎓 ĐỦ ĐK BẢO VỆ (DEFENSE_READY)'
+                : '⏳ ĐANG THỰC HIỆN (IN_PROGRESS)'}
             </span>
           </div>
         </div>
@@ -368,9 +368,9 @@ export const ThesisDetailPage: React.FC = () => {
             }}>
               {graduationResult.finalResult === 'PASSED' ? '✅ ĐẠT TỐT NGHIỆP' : '❌ KHÔNG ĐẠT'} — Xếp loại: {
                 graduationResult.grade === 'EXCELLENT' ? 'Xuất sắc (A)' :
-                  graduationResult.grade === 'VERY_GOOD' ? 'Giỏi (B+)' :
-                    graduationResult.grade === 'GOOD' ? 'Khá (B)' :
-                      graduationResult.grade === 'AVERAGE' ? 'Trung bình (C)' : 'Kém (F)'
+                graduationResult.grade === 'VERY_GOOD' ? 'Giỏi (B+)' :
+                graduationResult.grade === 'GOOD' ? 'Khá (B)' :
+                graduationResult.grade === 'AVERAGE' ? 'Trung bình (C)' : 'Kém (F)'
               }
             </span>
           </div>

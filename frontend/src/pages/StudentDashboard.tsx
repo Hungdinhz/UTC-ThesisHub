@@ -211,19 +211,19 @@ const StudentDashboard: React.FC = () => {
 
   const handleGroupRequest = async (studentId: number, categoryId: number) => {
     try {
-      await apiService.createGroupRequest({
-        student_2: studentId,
-        project_category: categoryId
+      await apiService.createGroupRequest({ 
+        student_2: studentId, 
+        project_category: categoryId 
       });
       await loadGroupRequests(); // Reload group requests
       setShowGroupModal(false);
       toast.success('Gửi yêu cầu ghép nhóm thành công!');
     } catch (error: any) {
       console.error('Failed to create group request:', error);
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.non_field_errors?.[0] ||
-        error.message ||
-        'Gửi yêu cầu ghép nhóm thất bại';
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.non_field_errors?.[0] ||
+                          error.message || 
+                          'Gửi yêu cầu ghép nhóm thất bại';
       toast.error(`Lỗi: ${errorMessage}`);
       throw error; // Re-throw to let modal handle it
     }
@@ -531,11 +531,11 @@ const StudentDashboard: React.FC = () => {
                           <h4 style={{ marginBottom: '10px', color: '#1e293b', fontWeight: 600 }}>Committee Members</h4>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                             {panel.members.map(member => (
-                              <div
-                                key={member.id}
-                                style={{
-                                  padding: '8px 12px',
-                                  backgroundColor: '#f8fafc',
+                              <div 
+                                key={member.id} 
+                                style={{ 
+                                  padding: '8px 12px', 
+                                  backgroundColor: '#f8fafc', 
                                   borderRadius: '6px',
                                   border: '1px solid #e2e8f0'
                                 }}
@@ -568,7 +568,7 @@ const StudentDashboard: React.FC = () => {
                     Send Group Request
                   </button>
                 </div>
-
+                
                 <div style={{ marginBottom: '30px' }}>
                   <h3 style={{ marginBottom: '15px', color: '#333' }}>Received Requests</h3>
                   {receivedRequests.length === 0 ? (
@@ -605,7 +605,7 @@ const StudentDashboard: React.FC = () => {
                     <h3 style={{ marginBottom: '15px', color: '#333' }}>Group Formation Discussion</h3>
                     {(() => {
                       // Show comments for the most recent pending group
-                      const pendingGroup = receivedRequests.find(r => r.status === 'pending')
+                      const pendingGroup = receivedRequests.find(r => r.status === 'pending') 
                         || sentRequests.find(r => r.status === 'pending');
                       if (pendingGroup) {
                         return (
@@ -715,7 +715,7 @@ const StudentDashboard: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    <SupervisorRequestsList
+                    <SupervisorRequestsList 
                       requests={supervisorRequests}
                       viewType="student"
                       onCancel={handleCancelSupervisorRequest}
@@ -735,12 +735,12 @@ const StudentDashboard: React.FC = () => {
                           if (acceptedGroup?.project?.panel_info) {
                             const panel = acceptedGroup.project.panel_info;
                             return (
-                              <div style={{
-                                marginTop: '20px',
-                                padding: '15px',
-                                backgroundColor: '#e8f4f8',
-                                borderRadius: '4px',
-                                border: '1px solid #bee5eb'
+                              <div style={{ 
+                                marginTop: '20px', 
+                                padding: '15px', 
+                                backgroundColor: '#e8f4f8', 
+                                borderRadius: '4px', 
+                                border: '1px solid #bee5eb' 
                               }}>
                                 <strong>📋 Evaluation Panel: {panel.name || `Panel #${panel.id}`}</strong>
                                 {panel.members && panel.members.length > 0 && (
@@ -759,7 +759,7 @@ const StudentDashboard: React.FC = () => {
                           }
                           return null;
                         })()}
-
+                        
                         {/* Supervisor-Student Discussion */}
                         <div style={{ marginTop: '30px' }}>
                           <h3 style={{ marginBottom: '15px', color: '#333' }}>Discussion with Supervisor</h3>
@@ -870,9 +870,9 @@ const StudentDashboard: React.FC = () => {
               <h2>External Evaluation Results</h2>
               {externalLoading ? (
                 <div className="loading-state" style={{ padding: '40px', textAlign: 'center' }}>
-                  <div className="loading-spinner" style={{
-                    width: '40px',
-                    height: '40px',
+                  <div className="loading-spinner" style={{ 
+                    width: '40px', 
+                    height: '40px', 
                     border: '3px solid #e2e8f0',
                     borderTopColor: '#3b82f6',
                     borderRadius: '50%',

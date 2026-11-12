@@ -158,7 +158,7 @@ export const UTCCouncilLiveDefenseView: React.FC = () => {
 
                   <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 pt-1">
                     <span>GVHD: <b className="text-slate-300">{p.supervisor?.full_name}</b> ({p.supervisor_score !== null ? `${p.supervisor_score}đ` : 'Chưa điểm'})</span>
-
+                    
                     {p.final_grade?.final_score_10 !== null && (
                       <span className="text-amber-400 font-bold">
                         Điểm Tổng kết: {p.final_grade.final_score_10}đ ({p.final_grade.final_letter_grade})
@@ -179,10 +179,11 @@ export const UTCCouncilLiveDefenseView: React.FC = () => {
 
                   <button
                     onClick={() => handleOpenScoreModal(p)}
-                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${hasMyScore
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                      hasMyScore
                         ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                         : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30'
-                      }`}
+                    }`}
                   >
                     {hasMyScore ? 'Sửa điểm' : '✍️ Chấm điểm bảo vệ'}
                   </button>

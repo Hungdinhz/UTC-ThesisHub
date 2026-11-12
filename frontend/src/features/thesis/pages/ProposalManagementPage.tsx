@@ -543,8 +543,8 @@ export const ProposalManagementPage: React.FC = () => {
         reviewStatus === 'APPROVED'
           ? `Khoa/Ban đã PHÊ DUYỆT đề tài của SV ${selectedProposal.studentFullName}. Hệ thống đã tự động tạo Đề tài tốt nghiệp chính thức!`
           : reviewStatus === 'REJECTED'
-            ? `Khoa/Ban đã TỪ CHỐI đề cương của SV ${selectedProposal.studentFullName}.`
-            : `Khoa/Ban đã YÊU CẦU CHỈNH SỬA lại đề cương của SV ${selectedProposal.studentFullName}.`;
+          ? `Khoa/Ban đã TỪ CHỐI đề cương của SV ${selectedProposal.studentFullName}.`
+          : `Khoa/Ban đã YÊU CẦU CHỈNH SỬA lại đề cương của SV ${selectedProposal.studentFullName}.`;
       setBannerMsg(statusText);
       setReviewModal(false);
       setSelectedProposal(null);
@@ -1471,8 +1471,8 @@ export const ProposalManagementPage: React.FC = () => {
                   reviewStatus === 'REJECTED'
                     ? 'Bắt buộc nhập lý do từ chối đề cương...'
                     : reviewStatus === 'REVISE_REQUIRED'
-                      ? 'Bắt buộc nhập các điểm cần sinh viên chỉnh sửa đề cương...'
-                      : 'Nhập nội dung nhận xét hoặc các điểm cần sửa đổi...'
+                    ? 'Bắt buộc nhập các điểm cần sinh viên chỉnh sửa đề cương...'
+                    : 'Nhập nội dung nhận xét hoặc các điểm cần sửa đổi...'
                 }
                 style={{
                   width: '100%',

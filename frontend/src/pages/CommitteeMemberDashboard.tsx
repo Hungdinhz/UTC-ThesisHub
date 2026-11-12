@@ -185,17 +185,17 @@ const CommitteeMemberDashboard: React.FC = () => {
                   <div className="profile-info">
                     <p><strong>Panel Name:</strong> {profile.panel_info.name || `Panel #${profile.panel_info.id}`}</p>
                   </div>
-
+                  
                   {profile.panel_info.members && profile.panel_info.members.length > 0 ? (
                     <div style={{ marginTop: '15px' }}>
                       <h4 style={{ marginBottom: '10px', color: '#1e293b', fontWeight: 600 }}>Other Panel Members</h4>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                         {profile.panel_info.members.map(member => (
-                          <div
-                            key={member.id}
-                            style={{
-                              padding: '10px 15px',
-                              backgroundColor: '#f8fafc',
+                          <div 
+                            key={member.id} 
+                            style={{ 
+                              padding: '10px 15px', 
+                              backgroundColor: '#f8fafc', 
                               borderRadius: '6px',
                               border: '1px solid #e2e8f0'
                             }}
@@ -213,11 +213,11 @@ const CommitteeMemberDashboard: React.FC = () => {
                   ) : (
                     <p style={{ color: '#475569', marginTop: '15px' }}>You are the only member in this panel.</p>
                   )}
-
-                  <div style={{
-                    marginTop: '20px',
-                    padding: '12px',
-                    backgroundColor: '#eff6ff',
+                  
+                  <div style={{ 
+                    marginTop: '20px', 
+                    padding: '12px', 
+                    backgroundColor: '#eff6ff', 
                     borderRadius: '6px',
                     border: '1px solid #bfdbfe',
                     color: '#1e40af'
@@ -251,7 +251,7 @@ const CommitteeMemberDashboard: React.FC = () => {
                 </div>
               </div>
               <p style={{ color: '#666', marginBottom: '20px' }}>
-                These are the student groups assigned to your panel for evaluation.
+                These are the student groups assigned to your panel for evaluation. 
                 Select a group to evaluate or view their submitted documents.
               </p>
               <PanelGroupsList
@@ -279,7 +279,7 @@ const CommitteeMemberDashboard: React.FC = () => {
                     <div>
                       <h2>Documents - Group #{selectedGroup.id}</h2>
                       <p style={{ color: '#666', marginTop: '8px' }}>
-                        <strong>Project:</strong> {selectedGroup.project?.project_name || 'N/A'} |
+                        <strong>Project:</strong> {selectedGroup.project?.project_name || 'N/A'} | 
                         <strong> Students:</strong> {selectedGroup.group?.student_1_details?.user?.username || 'N/A'} & {selectedGroup.group?.student_2_details?.user?.username || 'N/A'}
                       </p>
                     </div>
@@ -317,7 +317,7 @@ const CommitteeMemberDashboard: React.FC = () => {
                       <div>
                         <h2>Evaluations for Group #{selectedGroup.id}</h2>
                         <p style={{ color: '#666', marginTop: '8px' }}>
-                          <strong>Project:</strong> {selectedGroup.project?.project_name || 'N/A'} |
+                          <strong>Project:</strong> {selectedGroup.project?.project_name || 'N/A'} | 
                           <strong> Students:</strong> {selectedGroup.group?.student_1_details?.user?.username || 'N/A'} & {selectedGroup.group?.student_2_details?.user?.username || 'N/A'}
                         </p>
                       </div>
@@ -446,7 +446,7 @@ const PanelGroupsList: React.FC<{
             <p style={{ margin: '4px 0' }}>
               <strong>Students:</strong><br />
               <span style={{ marginLeft: '8px' }}>
-                {group.group?.student_1_details?.user?.username || 'N/A'}
+                {group.group?.student_1_details?.user?.username || 'N/A'} 
                 {group.group?.student_1_details?.registration_no && (
                   <span style={{ color: '#666', fontSize: '0.85rem' }}> ({group.group.student_1_details.registration_no})</span>
                 )}
@@ -515,7 +515,7 @@ const CommitteeEvaluationsList: React.FC<{ groupId: number }> = ({ groupId }) =>
     for (const config of committeeMemberEvaluationConfigs) {
       try {
         const data = await config.getEvaluation(groupId);
-
+        
         // Calculate current marks
         let currentMarks = 0;
         let hasAnyValue = false;
@@ -585,7 +585,7 @@ const CommitteeEvaluationsList: React.FC<{ groupId: number }> = ({ groupId }) =>
       <div className="evaluation-cards">
         {evaluations.map((evaluation) => {
           const percentage = (evaluation.currentMarks / evaluation.config.totalMaxMarks) * 100;
-
+          
           return (
             <div
               key={evaluation.config.id}
@@ -600,19 +600,19 @@ const CommitteeEvaluationsList: React.FC<{ groupId: number }> = ({ groupId }) =>
                   {evaluation.status === 'completed' && 'Completed'}
                 </span>
               </div>
-
+              
               <div className="evaluation-card-marks">
                 <span className="current">{evaluation.currentMarks.toFixed(1)}</span>
                 <span className="max">/ {evaluation.config.totalMaxMarks}</span>
               </div>
-
+              
               <div className="evaluation-card-progress">
                 <div
                   className="evaluation-card-progress-bar"
                   style={{ width: `${Math.min(percentage, 100)}%` }}
                 />
               </div>
-
+              
               <div className="evaluation-card-action">
                 Click to {evaluation.status === 'not-started' ? 'start' : 'edit'} evaluation
               </div>

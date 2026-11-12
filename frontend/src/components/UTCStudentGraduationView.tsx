@@ -194,10 +194,11 @@ export const UTCStudentGraduationView: React.FC = () => {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${activeTab === tab.key
+            className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${
+              activeTab === tab.key
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                 : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
-              }`}
+            }`}
           >
             <span>{tab.icon}</span>
             <span>{tab.label}</span>
@@ -408,11 +409,12 @@ export const UTCStudentGraduationView: React.FC = () => {
             <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-slate-300">Tình trạng xét duyệt đề cương:</span>
-                <span className={`px-2.5 py-0.5 rounded font-bold ${projectData.outline_review.verdict === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                    projectData.outline_review.verdict === 'REVISION_REQUIRED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                      projectData.outline_review.verdict === 'REJECTED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                        'bg-blue-500/10 text-blue-400'
-                  }`}>
+                <span className={`px-2.5 py-0.5 rounded font-bold ${
+                  projectData.outline_review.verdict === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                  projectData.outline_review.verdict === 'REVISION_REQUIRED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                  projectData.outline_review.verdict === 'REJECTED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                  'bg-blue-500/10 text-blue-400'
+                }`}>
                   {projectData.outline_review.verdict}
                 </span>
               </div>
@@ -555,12 +557,13 @@ export const UTCStudentGraduationView: React.FC = () => {
                   <div key={r.id} className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-blue-400">Tuần {r.week_number}</span>
-                      <span className={`px-2 py-0.5 rounded font-semibold ${r.supervisor_rating === 'GOOD' ? 'bg-emerald-500/10 text-emerald-400' :
-                          r.supervisor_rating === 'ACCEPTABLE' ? 'bg-blue-500/10 text-blue-400' :
-                            r.supervisor_rating === 'LATE' ? 'bg-amber-500/10 text-amber-400' :
-                              r.supervisor_rating === 'UNSATISFACTORY' ? 'bg-rose-500/10 text-rose-400' :
-                                'bg-slate-800 text-slate-400'
-                        }`}>
+                      <span className={`px-2 py-0.5 rounded font-semibold ${
+                        r.supervisor_rating === 'GOOD' ? 'bg-emerald-500/10 text-emerald-400' :
+                        r.supervisor_rating === 'ACCEPTABLE' ? 'bg-blue-500/10 text-blue-400' :
+                        r.supervisor_rating === 'LATE' ? 'bg-amber-500/10 text-amber-400' :
+                        r.supervisor_rating === 'UNSATISFACTORY' ? 'bg-rose-500/10 text-rose-400' :
+                        'bg-slate-800 text-slate-400'
+                      }`}>
                         {r.supervisor_rating_display || r.supervisor_rating}
                       </span>
                     </div>

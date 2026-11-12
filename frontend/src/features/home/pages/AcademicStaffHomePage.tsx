@@ -104,8 +104,8 @@ export const AcademicStaffHomePage: React.FC = () => {
         if (assignStatsRes.status === 'fulfilled' && assignStatsRes.value) {
           setAssignedCount(
             assignStatsRes.value.totalAssigned ??
-            assignStatsRes.value.finalizedCount ??
-            0
+              assignStatsRes.value.finalizedCount ??
+              0
           );
         }
 
@@ -353,8 +353,9 @@ export const AcademicStaffHomePage: React.FC = () => {
     <div className="utc-home-container">
       <HomeWelcomeBanner
         icon="🏛️"
-        title={`Trang chủ Giáo vụ Khoa — ${user?.fullName || user?.username || 'Giáo vụ'
-          }`}
+        title={`Trang chủ Giáo vụ Khoa — ${
+          user?.fullName || user?.username || 'Giáo vụ'
+        }`}
         roleBadge="ACADEMIC STAFF PORTAL"
         roundBadge={
           round ? `${round.name} (${round.roundCode})` : 'Chưa chọn đợt đồ án'
