@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from './Toast';
 import './UTCGraduationViews.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -70,13 +71,13 @@ export const UTCSupervisorGraduationView: React.FC = () => {
           verdict,
           comments: outlineComments,
         },
-        { headers: getHeaders()}
+        { headers: getHeaders() }
       );
-      alert('Đã cập nhật kết quả duyệt đề cương!');
+      toast.success('Đã cập nhật kết quả duyệt đề cương!');
       setShowOutlineModal(false);
       fetchData();
     } catch (err: any) {
-      alert('Lỗi: ' + (err.response?.data?.detail || err.message));
+      toast.error('Lỗi: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -91,13 +92,13 @@ export const UTCSupervisorGraduationView: React.FC = () => {
           rating: weeklyRating,
           feedback: weeklyFeedback,
         },
-        { headers: getHeaders()}
+        { headers: getHeaders() }
       );
-      alert('Đã lưu nhận xét và đánh giá tiến độ tuần!');
+      toast.success('Đã lưu nhận xét và đánh giá tiến độ tuần!');
       setShowWeeklyModal(false);
       fetchData();
     } catch (err: any) {
-      alert('Lỗi: ' + (err.response?.data?.detail || err.message));
+      toast.error('Lỗi: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -113,13 +114,13 @@ export const UTCSupervisorGraduationView: React.FC = () => {
           supervisor_feedback: evalFeedback,
           is_eligible_for_defense: isEligible,
         },
-        { headers: getHeaders()}
+        { headers: getHeaders() }
       );
-      alert('Đã lưu phiếu đánh giá GVHD thành công!');
+      toast.success('Đã lưu phiếu đánh giá GVHD thành công!');
       setShowEvalModal(false);
       fetchData();
     } catch (err: any) {
-      alert('Lỗi: ' + (err.response?.data?.supervisor_score?.[0] || err.message));
+      toast.error('Lỗi: ' + (err.response?.data?.supervisor_score?.[0] || err.message));
     }
   };
 
@@ -134,13 +135,13 @@ export const UTCSupervisorGraduationView: React.FC = () => {
           reviewer_score: Number(revScore),
           reviewer_feedback: revFeedback,
         },
-        { headers: getHeaders()}
+        { headers: getHeaders() }
       );
-      alert('Đã lưu phiếu phản biện thành công!');
+      toast.success('Đã lưu phiếu phản biện thành công!');
       setShowReviewerModal(false);
       fetchData();
     } catch (err: any) {
-      alert('Lỗi: ' + (err.response?.data?.reviewer_score?.[0] || err.message));
+      toast.error('Lỗi: ' + (err.response?.data?.reviewer_score?.[0] || err.message));
     }
   };
 
@@ -157,15 +158,14 @@ export const UTCSupervisorGraduationView: React.FC = () => {
           { key: 'outlines', label: '2. Duyệt Đề cương', icon: '📝' },
           { key: 'weekly', label: '3. Báo cáo tuần & Đánh giá', icon: '📅' },
           { key: 'eval', label: '4. Đánh giá sơ khảo GVHD', icon: '⭐' },
-                  ].map((tab) => (
+        ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${
-              activeTab === tab.key
+            className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${activeTab === tab.key
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                 : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
-            }`}
+              }`}
           >
             <span>{tab.icon}</span>
             <span>{tab.label}</span>
@@ -228,11 +228,10 @@ export const UTCSupervisorGraduationView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs font-bold text-blue-400">{p.student_reg_no}</span>
                     <span className="font-semibold text-sm text-slate-100">{p.student_name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                      p.status === 'OUTLINE_APPROVED' ? 'bg-emerald-500/10 text-emerald-400' :
-                      p.status === 'OUTLINE_REVISION' ? 'bg-amber-500/10 text-amber-400' :
-                      'bg-blue-500/10 text-blue-400'
-                    }`}>
+                    <span className={`text-xs px-2 py-0.5 rounded font-semibold ${p.status === 'OUTLINE_APPROVED' ? 'bg-emerald-500/10 text-emerald-400' :
+                        p.status === 'OUTLINE_REVISION' ? 'bg-amber-500/10 text-amber-400' :
+                          'bg-blue-500/10 text-blue-400'
+                      }`}>
                       {p.status_display || p.status}
                     </span>
                   </div>

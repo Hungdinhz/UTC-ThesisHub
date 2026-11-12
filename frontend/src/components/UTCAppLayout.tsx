@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordModal from './ChangePasswordModal';
 import NotificationDropdown from './NotificationDropdown';
+import { toast } from './Toast';
 import { apiService } from '../services/api';
 import type { ProjectRoundItem } from '../types';
 import {
@@ -222,7 +223,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const handleAdminAdvancePhase = async (targetPhase?: string) => {
     if (activeRound?.supplementaryOpen) {
-      alert('Đợt đồ án đang mở đăng ký nguyện vọng bổ sung! Vui lòng đóng/kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn.');
+      toast.warning('Đợt đồ án đang mở đăng ký nguyện vọng bổ sung! Vui lòng đóng/kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn.');
       return;
     }
     try {
@@ -231,11 +232,12 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
       setActiveRound(updated);
       const st = getRoundStageNumber(updated.currentMilestone?.phaseType, updated.status);
       setRoundCurrentStage(st);
+      toast.success('Chuyển giai đoạn đồ án thành công!');
       window.dispatchEvent(new CustomEvent('utc-phase-change'));
     } catch (err: any) {
       console.error('Error advancing phase:', err);
       const msg = err?.response?.data?.message || (err instanceof Error ? err.message : 'Lỗi khi chuyển giai đoạn');
-      alert(msg);
+      toast.error(msg);
     } finally {
       setAdvancingPhase(false);
     }

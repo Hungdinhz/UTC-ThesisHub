@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
+import { toast } from './Toast';
 
 interface Template {
   id: number;
@@ -64,14 +65,14 @@ const TemplatesList: React.FC<TemplatesListProps> = ({ templateType }) => {
     if (!file) return;
 
     if (!semester) {
-      alert('Please select a semester first');
+      toast.warning('Vui lòng chọn học kỳ trước!');
       return;
     }
 
     // Client-side validation
     const validationError = validateFile(file);
     if (validationError) {
-      alert(validationError);
+      toast.error(validationError);
       e.target.value = '';
       return;
     }
@@ -84,14 +85,14 @@ const TemplatesList: React.FC<TemplatesListProps> = ({ templateType }) => {
     try {
       setUploading(true);
       await apiService.uploadTemplate(templateType, formData);
-      alert('Template uploaded successfully!');
+      toast.success('Tải lên biểu mẫu thành công!');
       await loadTemplates();
       e.target.value = '';
     } catch (error: any) {
       console.error('Failed to upload template:', error);
       // Extract error message from response
       const errorData = error.response?.data;
-      let errorMessage = 'Failed to upload template. Please try again.';
+      let errorMessage = 'Lỗi khi tải lên biểu mẫu. Vui lòng thử lại.';
       
       if (errorData) {
         if (errorData.uploaded_file) {
@@ -105,7 +106,7 @@ const TemplatesList: React.FC<TemplatesListProps> = ({ templateType }) => {
         }
       }
       
-      alert(errorMessage);
+      toast.error(errorMessage);
       e.target.value = '';
     } finally {
       setUploading(false);

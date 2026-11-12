@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { useTranslation } from 'react-i18next';
+import { toast } from '../components/Toast';
 import './LoginPage.css';
 import utcLogo from '../assets/images/utc_logo.webp';
 
@@ -15,7 +16,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   // Validation States
   const [fieldErrors, setFieldErrors] = useState<{ registrationNo?: string; email?: string; password?: string }>({});
   const [touched, setTouched] = useState<{ registrationNo?: boolean; email?: boolean; password?: boolean }>({});
@@ -45,8 +46,8 @@ const LoginPage: React.FC = () => {
 
     if (type === 'student') {
       if (!regNoVal.trim()) {
-        errors.registrationNo = i18n.language.startsWith('vi') 
-          ? 'Vui lòng nhập Mã sinh viên hoặc Tên đăng nhập UTC' 
+        errors.registrationNo = i18n.language.startsWith('vi')
+          ? 'Vui lòng nhập Mã sinh viên hoặc Tên đăng nhập UTC'
           : 'Please enter UTC Student ID or Username';
       } else if (regNoVal.trim().length < 3) {
         errors.registrationNo = i18n.language.startsWith('vi')
@@ -337,7 +338,7 @@ const LoginPage: React.FC = () => {
             }}>
               <div style={{ fontSize: '0.85rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.1rem' }}>🔑</span>
-                <span><strong>Chưa có tài khoản Quản trị viên?</strong><br/><span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Đăng ký tài khoản Admin mới với Admin API Key</span></span>
+                <span><strong>Chưa có tài khoản Quản trị viên?</strong><br /><span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Đăng ký tài khoản Admin mới với Admin API Key</span></span>
               </div>
               <button
                 type="button"
@@ -437,10 +438,30 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="utc-form-options">
-              <a href="#forgot" onClick={(e) => { e.preventDefault(); alert('Vui lòng liên hệ Giáo vụ Khoa UTC để lấy lại mật khẩu.'); }}>
+              <a
+                href="#forgot"
+                onClick={(e) => {
+                  e.preventDefault();
+                  toast.modal(
+                    'Để đảm bảo an toàn thông tin tài khoản học vụ, bạn vui lòng mang Thẻ sinh viên hoặc CCCD đến liên hệ trực tiếp Giáo vụ Khoa hoặc Ban Quản trị UTC để được cấp lại mật khẩu đăng nhập.',
+                    'Lấy lại mật khẩu tài khoản',
+                    'warning'
+                  );
+                }}
+              >
                 {t('portal.forgotPassword', 'Quên mật khẩu?')}
               </a>
-              <a href="#help" onClick={(e) => { e.preventDefault(); alert('Hỗ trợ kỹ thuật UTC: 024 3766 4078 | Email: dev@utc.edu.vn'); }}>
+              <a
+                href="#help"
+                onClick={(e) => {
+                  e.preventDefault();
+                  toast.modal(
+                    'CỔNG HỖ TRỢ KỸ THUẬT UTC-THESISHUB\n\n📞 Hotline: 024 3766 4078\n✉️ Email hỗ trợ: dev@utc.edu.vn\n🏢 Địa chỉ: Phòng Giáo vụ Khoa CNTT - Tầng 2 Nhà A9\n⏰ Giờ làm việc: 08:00 - 17:00 (Thứ 2 - Thứ 6)',
+                    'Hỗ trợ kỹ thuật UTC',
+                    'info'
+                  );
+                }}
+              >
                 ❓ {t('portal.help', 'Trợ giúp!')}
               </a>
             </div>
@@ -459,7 +480,11 @@ const LoginPage: React.FC = () => {
               type="button"
               className="utc-btn-sso"
               onClick={() => {
-                alert('Đăng nhập Microsoft SSO dành cho tài khoản @utc.edu.vn hoặc @sv.utc.edu.vn');
+                toast.info(
+                  'Cổng đăng nhập Microsoft Single Sign-On (SSO) dành cho cán bộ giảng viên và sinh viên có tài khoản email tên miền @utc.edu.vn hoặc @sv.utc.edu.vn.',
+                  5000,
+                  'Đăng nhập Microsoft SSO'
+                );
               }}
             >
               <span className="sso-icon">🌐</span> {t('portal.ssoBtn', 'Đăng nhập với Email UTC (@utc.edu.vn)')}

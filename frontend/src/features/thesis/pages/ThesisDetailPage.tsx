@@ -7,6 +7,7 @@ import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 import { defenseService } from '../../defense/services/defenseService';
 import type { GraduationResult } from '../../defense/types';
+import { toast } from '../../../components/Toast';
 
 export const ThesisDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -135,9 +136,9 @@ export const ThesisDetailPage: React.FC = () => {
         description: docDesc,
       });
       setDocuments((prev) => [doc, ...prev]);
-      alert('🎉 Đã tải lên tài liệu đồ án thành công!');
+      toast.success('Đã tải lên tài liệu đồ án thành công!');
     } catch {
-      alert('🎉 Đã tải lên tài liệu thành công!');
+      toast.success('Đã tải lên tài liệu thành công!');
       loadThesisData();
     }
     setShowUploadModal(false);
@@ -157,13 +158,13 @@ export const ThesisDetailPage: React.FC = () => {
     try {
       const updated = await thesisService.setDefenseEligible(thesis.id, newStatus);
       setThesis(updated);
-      alert(
-        newStatus
-          ? '✅ Đã xác nhận sinh viên ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!'
-          : '❌ Đã cập nhật sang trạng thái CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!'
-      );
+      if (newStatus) {
+        toast.success('Đã xác nhận sinh viên ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!');
+      } else {
+        toast.warning('Đã cập nhật sang trạng thái CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ.');
+      }
     } catch (err: any) {
-      alert('Không thể cập nhật trạng thái điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message));
+      toast.error('Không thể cập nhật trạng thái điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -308,10 +309,10 @@ export const ThesisDetailPage: React.FC = () => {
               {thesis.status === 'COMPLETED'
                 ? '✓ ĐÃ BẢO VỆ HOÀN THÀNH'
                 : thesis.status === 'DEFENSE_NOT_ELIGIBLE'
-                ? '❌ CHƯA ĐỦ ĐK BẢO VỆ (DEFENSE_NOT_ELIGIBLE)'
-                : thesis.defenseEligible
-                ? '🎓 ĐỦ ĐK BẢO VỆ (DEFENSE_READY)'
-                : '⏳ ĐANG THỰC HIỆN (IN_PROGRESS)'}
+                  ? '❌ CHƯA ĐỦ ĐK BẢO VỆ (DEFENSE_NOT_ELIGIBLE)'
+                  : thesis.defenseEligible
+                    ? '🎓 ĐỦ ĐK BẢO VỆ (DEFENSE_READY)'
+                    : '⏳ ĐANG THỰC HIỆN (IN_PROGRESS)'}
             </span>
           </div>
         </div>
@@ -367,9 +368,9 @@ export const ThesisDetailPage: React.FC = () => {
             }}>
               {graduationResult.finalResult === 'PASSED' ? '✅ ĐẠT TỐT NGHIỆP' : '❌ KHÔNG ĐẠT'} — Xếp loại: {
                 graduationResult.grade === 'EXCELLENT' ? 'Xuất sắc (A)' :
-                graduationResult.grade === 'VERY_GOOD' ? 'Giỏi (B+)' :
-                graduationResult.grade === 'GOOD' ? 'Khá (B)' :
-                graduationResult.grade === 'AVERAGE' ? 'Trung bình (C)' : 'Kém (F)'
+                  graduationResult.grade === 'VERY_GOOD' ? 'Giỏi (B+)' :
+                    graduationResult.grade === 'GOOD' ? 'Khá (B)' :
+                      graduationResult.grade === 'AVERAGE' ? 'Trung bình (C)' : 'Kém (F)'
               }
             </span>
           </div>

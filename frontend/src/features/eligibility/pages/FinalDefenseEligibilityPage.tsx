@@ -10,6 +10,7 @@ import type { ProjectRoundItem, StudentProjectRoundItem } from '../../../types';
 import { ReservationReviewModal } from '../components/ReservationReviewModal';
 import { AdminCreateReservationModal } from '../components/AdminCreateReservationModal';
 import { EditAcademicRecordModal } from '../components/EditAcademicRecordModal';
+import { toast } from '../../../components/Toast';
 import './EligibilityPages.css';
 
 export const FinalDefenseEligibilityPage: React.FC = () => {
@@ -197,10 +198,9 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         reviewNotes,
         reviewedBy,
       });
-      setNotification({
-        type: 'success',
-        message: `Đã ${status === 'APPROVED' ? 'chấp thuận' : 'từ chối'} đơn bảo lưu của sinh viên thành công`,
-      });
+      const msg = `Đã ${status === 'APPROVED' ? 'chấp thuận' : 'từ chối'} đơn bảo lưu của sinh viên thành công`;
+      setNotification({ type: 'success', message: msg });
+      toast.success(msg);
       if (selectedRoundId) {
         await loadRoundData(selectedRoundId);
       }
@@ -208,7 +208,9 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         await handleCheck(undefined, result.studentId, result.thesisId, result.studentCode);
       }
     } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Lỗi khi xử lý đơn bảo lưu' });
+      const errMsg = err?.message || 'Lỗi khi xử lý đơn bảo lưu';
+      setNotification({ type: 'error', message: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -216,10 +218,9 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
   const handleAdminCreateReservation = async (data: AdminCreateReservationRequest) => {
     try {
       await eligibilityService.createReservationByAdmin(data);
-      setNotification({
-        type: 'success',
-        message: 'Đã lập quyết định bảo lưu cho sinh viên thành công',
-      });
+      const msg = 'Đã lập quyết định bảo lưu cho sinh viên thành công';
+      setNotification({ type: 'success', message: msg });
+      toast.success(msg);
       if (selectedRoundId) {
         await loadRoundData(selectedRoundId);
       }
@@ -227,7 +228,9 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         await handleCheck(undefined, data.studentId, data.thesisId, result.studentCode);
       }
     } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Lỗi khi lập bảo lưu' });
+      const errMsg = err?.message || 'Lỗi khi lập bảo lưu';
+      setNotification({ type: 'error', message: errMsg });
+      toast.error(errMsg);
     }
   };
 
@@ -237,21 +240,38 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
       {notification && (
         <div
           style={{
-            padding: '12px 18px',
-            marginBottom: '16px',
-            borderRadius: '8px',
-            background: notification.type === 'success' ? '#dcfce7' : '#fee2e2',
-            color: notification.type === 'success' ? '#166534' : '#991b1b',
-            border: `1px solid ${notification.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+            padding: '14px 20px',
+            marginBottom: '18px',
+            borderRadius: '12px',
+            background: notification.type === 'success' ? 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)' : 'linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%)',
+            color: notification.type === 'success' ? '#065f46' : '#991b1b',
+            border: `1px solid ${notification.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
+            boxShadow: notification.type === 'success' ? '0 4px 12px rgba(16, 185, 129, 0.12)' : '0 4px 12px rgba(239, 68, 68, 0.12)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            fontSize: '0.95rem',
+            fontWeight: 500,
+            animation: 'utcFadeSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         >
-          <span>{notification.message}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.2rem' }}>{notification.type === 'success' ? '✅' : '⚠️'}</span>
+            <span>{notification.message}</span>
+          </div>
           <button
             onClick={() => setNotification(null)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '1rem',
+              color: notification.type === 'success' ? '#059669' : '#dc2626',
+              padding: '4px 8px',
+              borderRadius: '6px'
+            }}
+            title="Đóng thông báo"
           >
             ✕
           </button>
@@ -448,13 +468,12 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
             <div className="final-defense-result-card" style={{ marginTop: '20px' }}>
               {/* Status Header */}
               <div
-                className={`result-header-box ${
-                  result.reservationStatus === 'APPROVED'
+                className={`result-header-box ${result.reservationStatus === 'APPROVED'
                     ? 'result-header-reserved'
                     : result.eligibleForDefense
-                    ? 'result-header-eligible'
-                    : 'result-header-ineligible'
-                }`}
+                      ? 'result-header-eligible'
+                      : 'result-header-ineligible'
+                  }`}
               >
                 <div>
                   <div className="result-sub-title">Kết quả xét duyệt điều kiện bảo vệ cuối kỳ:</div>
@@ -462,10 +481,10 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     {result.reservationStatus === 'APPROVED'
                       ? '🟣 ĐÃ BẢO LƯU ĐỒ ÁN SANG ĐỢT SAU (RESERVED)'
                       : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
-                      ? (result.studentRoundStatus === 'INELIGIBLE' ? '🚫 KHÔNG ĐỦ ĐIỀU KIỆN THAM GIA ĐỢT ĐỒ ÁN' : '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN')
-                      : result.eligibleForDefense
-                      ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ'
-                      : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}
+                        ? (result.studentRoundStatus === 'INELIGIBLE' ? '🚫 KHÔNG ĐỦ ĐIỀU KIỆN THAM GIA ĐỢT ĐỒ ÁN' : '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN')
+                        : result.eligibleForDefense
+                          ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ'
+                          : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}
                   </h2>
                 </div>
                 <div>
@@ -473,10 +492,10 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     {result.reservationStatus === 'APPROVED'
                       ? 'BẢO LƯU'
                       : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
-                      ? (result.studentRoundStatus === 'INELIGIBLE' ? 'KHÔNG ĐỦ ĐK' : 'BỊ LOẠI')
-                      : result.eligibleForDefense
-                      ? 'ĐỦ ĐIỀU KIỆN'
-                      : 'KHÔNG ĐỦ ĐIỀU KIỆN'}
+                        ? (result.studentRoundStatus === 'INELIGIBLE' ? 'KHÔNG ĐỦ ĐK' : 'BỊ LOẠI')
+                        : result.eligibleForDefense
+                          ? 'ĐỦ ĐIỀU KIỆN'
+                          : 'KHÔNG ĐỦ ĐIỀU KIỆN'}
                   </span>
                 </div>
               </div>
@@ -913,18 +932,18 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                                 {!thesis
                                   ? 'Chưa có đề tài'
                                   : !hasAssignedThesisAndSupervisor
-                                  ? 'Chưa phân công GVHD'
-                                  : (st.debtCredits !== undefined && st.debtCredits > 0)
-                                  ? `Nợ ${st.debtCredits} tín chỉ`
-                                  : st.tuitionDebt
-                                  ? 'Còn nợ học phí'
-                                  : st.underDisciplinaryAction
-                                  ? 'Đang bị kỷ luật'
-                                  : !hasSupervisorApproved
-                                  ? 'GVHD chưa duyệt'
-                                  : !isThesisProgressComplete
-                                  ? `Tiến độ ${progressRate}%`
-                                  : 'Chưa đủ tiêu chí'}
+                                    ? 'Chưa phân công GVHD'
+                                    : (st.debtCredits !== undefined && st.debtCredits > 0)
+                                      ? `Nợ ${st.debtCredits} tín chỉ`
+                                      : st.tuitionDebt
+                                        ? 'Còn nợ học phí'
+                                        : st.underDisciplinaryAction
+                                          ? 'Đang bị kỷ luật'
+                                          : !hasSupervisorApproved
+                                            ? 'GVHD chưa duyệt'
+                                            : !isThesisProgressComplete
+                                              ? `Tiến độ ${progressRate}%`
+                                              : 'Chưa đủ tiêu chí'}
                               </div>
                             </div>
                           )}
@@ -1179,10 +1198,12 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         student={editingAcademicStudent}
         projectRoundId={selectedRoundId || 10}
         onSuccess={async () => {
+          const msg = `Cập nhật thông tin học vụ cho sinh viên ${editingAcademicStudent?.studentCode} thành công`;
           setNotification({
             type: 'success',
-            message: `Cập nhật thông tin học vụ cho sinh viên ${editingAcademicStudent?.studentCode} thành công`,
+            message: msg,
           });
+          toast.success(msg);
           if (selectedRoundId) {
             await loadRoundData(selectedRoundId);
           }

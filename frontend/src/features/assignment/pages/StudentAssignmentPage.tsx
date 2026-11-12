@@ -12,6 +12,7 @@ import {
 } from '../types';
 import { assignmentService } from '../services/assignmentService';
 import { StudentPreferenceForm } from '../components/StudentPreferenceForm';
+import { toast } from '../../../components/Toast';
 import '../assignment.css';
 
 interface Props {
@@ -278,9 +279,9 @@ export const StudentAssignmentPage: React.FC<Props> = ({
   }) => {
     if (!canEdit) {
       if (isRoundClosed) {
-        alert('Đợt đồ án này đã đóng. Không thể đăng ký hoặc thay đổi nguyện vọng.');
+        toast.warning('Đợt đồ án này đã đóng. Không thể đăng ký hoặc thay đổi nguyện vọng.');
       } else if (isRoundFinalized) {
-        alert('Kết quả phân công Giảng viên hướng dẫn đã được Khoa chốt chính thức. Bạn không thể chỉnh sửa nguyện vọng nữa.');
+        toast.warning('Kết quả phân công Giảng viên hướng dẫn đã được Khoa chốt chính thức. Bạn không thể chỉnh sửa nguyện vọng nữa.');
       }
       return;
     }

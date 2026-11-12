@@ -16,6 +16,7 @@ import UTCFypTimeline from '../components/UTCFypTimeline';
 import UTCEvaluationSheetModal from '../components/UTCEvaluationSheetModal';
 import { UTCSupervisorGraduationView } from '../components/UTCSupervisorGraduationView';
 import { SkeletonProfile, SkeletonEvaluationGrid } from '../components/SkeletonLoader';
+import { toast } from '../components/Toast';
 import './Dashboard.css';
 import '../components/EvaluationForm.css';
 import '../components/DocumentReview.css';
@@ -33,7 +34,7 @@ const SupervisorDashboard: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<SupervisorOfStudentGroup | null>(null);
   const [exporting, setExporting] = useState(false);
   const [showUTCSheet, setShowUTCSheet] = useState(false);
-  
+
   // Profile edit state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editFormData, setEditFormData] = useState({
@@ -80,10 +81,10 @@ const SupervisorDashboard: React.FC = () => {
     try {
       await apiService.respondToSupervisorRequest(id, 'accepted');
       await loadSupervisorRequests(); // Reload requests
-      alert('Request accepted successfully!');
+      toast.success('Đã chấp nhận yêu cầu hướng dẫn thành công!');
     } catch (error: any) {
       console.error('Failed to accept request:', error);
-      alert(error.response?.data?.message || 'Failed to accept request');
+      toast.error(error.response?.data?.message || 'Không thể chấp nhận yêu cầu');
     }
   };
 
@@ -91,10 +92,10 @@ const SupervisorDashboard: React.FC = () => {
     try {
       await apiService.respondToSupervisorRequest(id, 'rejected');
       await loadSupervisorRequests(); // Reload requests
-      alert('Request rejected');
+      toast.info('Đã từ chối yêu cầu hướng dẫn.');
     } catch (error: any) {
       console.error('Failed to reject request:', error);
-      alert(error.response?.data?.message || 'Failed to reject request');
+      toast.error(error.response?.data?.message || 'Không thể từ chối yêu cầu');
     }
   };
 
@@ -102,12 +103,12 @@ const SupervisorDashboard: React.FC = () => {
     try {
       setExporting(true);
       const blob = await apiService.exportReport();
-      
+
       // Generate filename with current date
       const today = new Date();
       const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
       const filename = `supervisor_report_${dateStr}.xlsx`;
-      
+
       // Create download link and trigger download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -115,15 +116,15 @@ const SupervisorDashboard: React.FC = () => {
       link.download = filename;
       document.body.appendChild(link);
       link.click();
-      
+
       // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
-      alert('Report exported successfully!');
+
+      toast.success('Xuất báo cáo thành công!');
     } catch (error: any) {
       console.error('Failed to export report:', error);
-      alert(error.response?.data?.message || 'Failed to export report. Please try again.');
+      toast.error(error.response?.data?.message || 'Lỗi khi xuất báo cáo. Vui lòng thử lại.');
     } finally {
       setExporting(false);
     }
@@ -154,10 +155,10 @@ const SupervisorDashboard: React.FC = () => {
       });
       setProfile(updatedProfile);
       setIsEditingProfile(false);
-      alert('Profile updated successfully!');
+      toast.success('Cập nhật hồ sơ thành công!');
     } catch (error: any) {
       console.error('Failed to update profile:', error);
-      alert(error.response?.data?.message || 'Failed to update profile. Please try again.');
+      toast.error(error.response?.data?.message || 'Không thể cập nhật hồ sơ. Vui lòng thử lại.');
     } finally {
       setSavingProfile(false);
     }
@@ -311,14 +312,14 @@ const SupervisorDashboard: React.FC = () => {
                   <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                     <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #e0e0e0' }}>
                       <h3 style={{ margin: 0 }}>Edit Profile</h3>
-                      <button 
+                      <button
                         onClick={handleCancelEdit}
                         style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#666' }}
                       >
                         ×
                       </button>
                     </div>
-                    
+
                     <div className="modal-body" style={{ padding: '20px' }}>
                       <div className="form-group" style={{ marginBottom: '16px' }}>
                         <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
@@ -340,7 +341,7 @@ const SupervisorDashboard: React.FC = () => {
                           }}
                         />
                       </div>
-                      
+
                       <div className="form-group" style={{ marginBottom: '16px' }}>
                         <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#333' }}>
                           Academic Background
@@ -362,24 +363,24 @@ const SupervisorDashboard: React.FC = () => {
                         />
                       </div>
                     </div>
-                    
-                    <div className="modal-footer" style={{ 
-                      display: 'flex', 
-                      justifyContent: 'flex-end', 
-                      gap: '12px', 
-                      padding: '16px 20px', 
+
+                    <div className="modal-footer" style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '12px',
+                      padding: '16px 20px',
                       borderTop: '1px solid #e0e0e0',
                       backgroundColor: '#f8f9fa',
                     }}>
-                      <button 
-                        className="btn btn-secondary" 
+                      <button
+                        className="btn btn-secondary"
                         onClick={handleCancelEdit}
                         disabled={savingProfile}
                       >
                         Cancel
                       </button>
-                      <button 
-                        className="btn btn-primary" 
+                      <button
+                        className="btn btn-primary"
                         onClick={handleSaveProfile}
                         disabled={savingProfile}
                         style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -457,7 +458,7 @@ const SupervisorDashboard: React.FC = () => {
                 }}
                 selectedGroupId={selectedGroup?.id}
               />
-              
+
               {/* Discussion Section for Selected Group */}
               {selectedGroup && (
                 <div style={{ marginTop: '30px' }}>
@@ -490,7 +491,7 @@ const SupervisorDashboard: React.FC = () => {
                   <div style={{ marginBottom: '20px' }}>
                     <h2>Evaluations for Group #{selectedGroup.id}</h2>
                     <p style={{ color: '#666', marginTop: '8px' }}>
-                      <strong>Project:</strong> {selectedGroup.project?.project_name || 'N/A'} | 
+                      <strong>Project:</strong> {selectedGroup.project?.project_name || 'N/A'} |
                       <strong> Students:</strong> {selectedGroup.group?.student_1_details?.user?.username || 'N/A'} & {selectedGroup.group?.student_2_details?.user?.username || 'N/A'}
                     </p>
                   </div>
@@ -564,10 +565,10 @@ const GroupsList: React.FC<{
   return (
     <div className="grid">
       {groups.map((group) => (
-        <div 
-          key={group.id} 
-          className="card" 
-          style={{ 
+        <div
+          key={group.id}
+          className="card"
+          style={{
             border: selectedGroupId === group.id ? '2px solid #007bff' : '1px solid #ddd',
             backgroundColor: selectedGroupId === group.id ? '#f0f8ff' : 'white',
           }}
@@ -578,13 +579,13 @@ const GroupsList: React.FC<{
             <strong>Students:</strong> {group.group?.student_1_details?.user?.username || 'N/A'} &{' '}
             {group.group?.student_2_details?.user?.username || 'N/A'}
           </p>
-          
+
           {/* Panel Assignment */}
           {group.project?.panel_info && (
-            <div style={{ 
-              marginTop: '10px', 
-              padding: '8px 12px', 
-              backgroundColor: '#e8f4f8', 
+            <div style={{
+              marginTop: '10px',
+              padding: '8px 12px',
+              backgroundColor: '#e8f4f8',
               borderRadius: '4px',
               border: '1px solid #bee5eb'
             }}>
@@ -593,14 +594,14 @@ const GroupsList: React.FC<{
               </p>
               {group.project.panel_info.members && group.project.panel_info.members.length > 0 && (
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#555' }}>
-                  Committee: {group.project.panel_info.members.map(m => 
+                  Committee: {group.project.panel_info.members.map(m =>
                     m.user.first_name || m.user.username
                   ).join(', ')}
                 </p>
               )}
             </div>
           )}
-          
+
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
             <button
               className="btn btn-secondary btn-sm"
@@ -666,7 +667,7 @@ const EvaluationsList: React.FC<{ groupId: number }> = ({ groupId }) => {
     for (const config of supervisorEvaluationConfigs) {
       try {
         const data = await config.getEvaluation(groupId);
-        
+
         // Calculate current marks
         let currentMarks = 0;
         let hasAnyValue = false;
@@ -736,7 +737,7 @@ const EvaluationsList: React.FC<{ groupId: number }> = ({ groupId }) => {
       <div className="evaluation-cards">
         {evaluations.map((evaluation) => {
           const percentage = (evaluation.currentMarks / evaluation.config.totalMaxMarks) * 100;
-          
+
           return (
             <div
               key={evaluation.config.id}
@@ -751,19 +752,19 @@ const EvaluationsList: React.FC<{ groupId: number }> = ({ groupId }) => {
                   {evaluation.status === 'completed' && 'Completed'}
                 </span>
               </div>
-              
+
               <div className="evaluation-card-marks">
                 <span className="current">{evaluation.currentMarks.toFixed(1)}</span>
                 <span className="max">/ {evaluation.config.totalMaxMarks}</span>
               </div>
-              
+
               <div className="evaluation-card-progress">
                 <div
                   className="evaluation-card-progress-bar"
                   style={{ width: `${Math.min(percentage, 100)}%` }}
                 />
               </div>
-              
+
               <div className="evaluation-card-action">
                 Click to {evaluation.status === 'not-started' ? 'start' : 'edit'} evaluation
               </div>

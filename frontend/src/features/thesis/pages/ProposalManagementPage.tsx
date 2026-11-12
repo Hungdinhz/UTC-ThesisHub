@@ -9,6 +9,7 @@ import type { ProjectRoundItem } from '../../../types';
 import { apiService } from '../../../services/api';
 import { assignmentService } from '../../assignment/services/assignmentService';
 import type { SupervisorAssignment } from '../../assignment/types';
+import { toast } from '../../../components/Toast';
 
 export const ProposalManagementPage: React.FC = () => {
   const navigate = useNavigate();
@@ -311,7 +312,7 @@ export const ProposalManagementPage: React.FC = () => {
 
   const handleOpenCreateModal = () => {
     if (isStudent && (!mySupervisorAssignment || !mySupervisorAssignment.lecturerId)) {
-      alert('Sinh viên chưa được phân công giảng viên hướng dẫn thì không thể tạo đề cương mới.');
+      toast.warning('Sinh viên chưa được phân công giảng viên hướng dẫn thì không thể tạo đề cương mới.');
       return;
     }
 
@@ -338,8 +339,10 @@ export const ProposalManagementPage: React.FC = () => {
           }
           return;
         } else {
-          alert(
-            `Bạn đã nộp đề cương "${myExisting.titleVn}" (trạng thái: ${myExisting.status}).\nTheo quy chế, sau khi nộp không thể tự ý chỉnh sửa; chỉ được chỉnh sửa khi GVHD hoặc Khoa yêu cầu sửa đổi.`
+          toast.modal(
+            `Bạn đã nộp đề cương "${myExisting.titleVn}" (trạng thái: ${myExisting.status}).\n\nTheo quy chế, sau khi nộp không thể tự ý chỉnh sửa; chỉ được chỉnh sửa khi GVHD hoặc Khoa yêu cầu sửa đổi.`,
+            'Đề cương đã được ghi nhận',
+            'info'
           );
           return;
         }
@@ -411,7 +414,7 @@ export const ProposalManagementPage: React.FC = () => {
           fileUrl: cleanFileUrl,
         });
         setBannerMsg('Đã tạo và nộp Đề cương đề tài thành công (Trạng thái: Chờ GVHD xác nhận)!');
-        alert('🎉 Đã tạo và nộp Đề cương thành công! Đề cương đã được gửi trực tiếp lên Giảng viên hướng dẫn xác nhận.');
+        toast.success('Đã tạo và nộp Đề cương thành công! Đề cương đã được gửi trực tiếp lên Giảng viên hướng dẫn xác nhận.');
       }
       setShowModal(false);
       setEditingProposal(null);
@@ -426,7 +429,7 @@ export const ProposalManagementPage: React.FC = () => {
     } catch (err: any) {
       console.error('Lỗi lưu đề cương:', err);
       const errMsg = err?.response?.data?.message || err?.message || 'Không thể lưu đề cương';
-      alert('Không thể lưu đề cương vào hệ thống: ' + errMsg);
+      toast.error('Không thể lưu đề cương vào hệ thống: ' + errMsg);
     }
   };
 
@@ -441,10 +444,10 @@ export const ProposalManagementPage: React.FC = () => {
     try {
       await thesisService.submitProposal(proposal.id);
       setBannerMsg(`Đã nộp đề cương "${proposal.titleVn}" thành công! Trạng thái chuyển sang SUBMITTED (Chờ GVHD xác nhận).`);
-      alert(`🚀 Đã nộp đề cương "${proposal.titleVn}" lên GVHD thành công! Trạng thái chuyển sang SUBMITTED.`);
+      toast.success(`Đã nộp đề cương "${proposal.titleVn}" lên GVHD thành công! Trạng thái chuyển sang SUBMITTED.`);
       await loadProposals();
     } catch (err: any) {
-      alert('Lỗi nộp đề cương: ' + (err?.response?.data?.message || err?.message));
+      toast.error('Lỗi nộp đề cương: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -453,8 +456,9 @@ export const ProposalManagementPage: React.FC = () => {
       await thesisService.supervisorApprove(proposal.id, true, 'GVHD đồng ý xác nhận đề tài, chuyển Khoa/Ban duyệt.');
       await loadProposals();
       setBannerMsg(`GVHD đã xác nhận đề tài của SV ${proposal.studentFullName} thành công!`);
+      toast.success(`GVHD đã xác nhận đề tài của SV ${proposal.studentFullName} thành công!`);
     } catch (err: any) {
-      alert('Lỗi xác nhận: ' + (err?.response?.data?.message || err?.message));
+      toast.error('Lỗi xác nhận: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -501,7 +505,7 @@ export const ProposalManagementPage: React.FC = () => {
       setTargetProposalForRevise(null);
       await loadProposals();
     } catch (err: any) {
-      alert('Lỗi gửi yêu cầu chỉnh sửa: ' + (err?.response?.data?.message || err?.message));
+      toast.error('Lỗi gửi yêu cầu chỉnh sửa: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -539,16 +543,17 @@ export const ProposalManagementPage: React.FC = () => {
         reviewStatus === 'APPROVED'
           ? `Khoa/Ban đã PHÊ DUYỆT đề tài của SV ${selectedProposal.studentFullName}. Hệ thống đã tự động tạo Đề tài tốt nghiệp chính thức!`
           : reviewStatus === 'REJECTED'
-          ? `Khoa/Ban đã TỪ CHỐI đề cương của SV ${selectedProposal.studentFullName}.`
-          : `Khoa/Ban đã YÊU CẦU CHỈNH SỬA lại đề cương của SV ${selectedProposal.studentFullName}.`;
+            ? `Khoa/Ban đã TỪ CHỐI đề cương của SV ${selectedProposal.studentFullName}.`
+            : `Khoa/Ban đã YÊU CẦU CHỈNH SỬA lại đề cương của SV ${selectedProposal.studentFullName}.`;
       setBannerMsg(statusText);
       setReviewModal(false);
       setSelectedProposal(null);
       setReviewNotes('');
       setReviewNotesError('');
       setReviewChecklist([]);
+      toast.success(statusText);
     } catch (err: any) {
-      alert('Lỗi đánh giá đề cương: ' + (err?.response?.data?.message || err?.message));
+      toast.error('Lỗi đánh giá đề cương: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -560,8 +565,9 @@ export const ProposalManagementPage: React.FC = () => {
         setPdfPreviewProposal(updated);
       }
       setBannerMsg(`Sinh viên ${proposal.studentFullName} đã ký nộp và Khoa CNTT đã lưu hồ sơ đề cương trên hệ thống!`);
+      toast.success(`Sinh viên ${proposal.studentFullName} đã ký nộp thành công!`);
     } catch (err: any) {
-      alert('Lỗi ký nộp đề cương: ' + (err?.response?.data?.message || err?.message));
+      toast.error('Lỗi ký nộp đề cương: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -1465,8 +1471,8 @@ export const ProposalManagementPage: React.FC = () => {
                   reviewStatus === 'REJECTED'
                     ? 'Bắt buộc nhập lý do từ chối đề cương...'
                     : reviewStatus === 'REVISE_REQUIRED'
-                    ? 'Bắt buộc nhập các điểm cần sinh viên chỉnh sửa đề cương...'
-                    : 'Nhập nội dung nhận xét hoặc các điểm cần sửa đổi...'
+                      ? 'Bắt buộc nhập các điểm cần sinh viên chỉnh sửa đề cương...'
+                      : 'Nhập nội dung nhận xét hoặc các điểm cần sửa đổi...'
                 }
                 style={{
                   width: '100%',

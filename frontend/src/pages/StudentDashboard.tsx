@@ -20,6 +20,7 @@ import UTCFypTimeline from '../components/UTCFypTimeline';
 import UTCEvaluationSheetModal from '../components/UTCEvaluationSheetModal';
 import { UTCStudentGraduationView } from '../components/UTCStudentGraduationView';
 import { SkeletonProfile, SkeletonCardGrid } from '../components/SkeletonLoader';
+import { toast } from '../components/Toast';
 import { assignmentService } from '../features/assignment/services/assignmentService';
 import type { SupervisorAssignment } from '../features/assignment/types';
 import './Dashboard.css';
@@ -210,21 +211,20 @@ const StudentDashboard: React.FC = () => {
 
   const handleGroupRequest = async (studentId: number, categoryId: number) => {
     try {
-      await apiService.createGroupRequest({ 
-        student_2: studentId, 
-        project_category: categoryId 
+      await apiService.createGroupRequest({
+        student_2: studentId,
+        project_category: categoryId
       });
       await loadGroupRequests(); // Reload group requests
       setShowGroupModal(false);
-      // Show success message (you can add a toast notification here)
-      alert('Group request sent successfully!');
+      toast.success('Gửi yêu cầu ghép nhóm thành công!');
     } catch (error: any) {
       console.error('Failed to create group request:', error);
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.non_field_errors?.[0] ||
-                          error.message || 
-                          'Failed to send group request';
-      alert(`Error: ${errorMessage}`);
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.non_field_errors?.[0] ||
+        error.message ||
+        'Gửi yêu cầu ghép nhóm thất bại';
+      toast.error(`Lỗi: ${errorMessage}`);
       throw error; // Re-throw to let modal handle it
     }
   };
@@ -234,9 +234,10 @@ const StudentDashboard: React.FC = () => {
       await apiService.updateGroupRequest(groupId, { status: 'accepted' });
       await loadGroupRequests(); // Reload group requests
       await loadData(); // Reload full data to update profile
+      toast.success('Đã chấp nhận yêu cầu nhóm thành công!');
     } catch (error) {
       console.error('Failed to accept group request:', error);
-      alert('Failed to accept group request. Please try again.');
+      toast.error('Không thể chấp thuận yêu cầu nhóm. Vui lòng thử lại!');
     }
   };
 
@@ -244,37 +245,38 @@ const StudentDashboard: React.FC = () => {
     try {
       await apiService.updateGroupRequest(groupId, { status: 'rejected' });
       await loadGroupRequests(); // Reload group requests
+      toast.info('Đã từ chối yêu cầu nhóm.');
     } catch (error) {
       console.error('Failed to reject group request:', error);
-      alert('Failed to reject group request. Please try again.');
+      toast.error('Không thể từ chối yêu cầu nhóm. Vui lòng thử lại!');
     }
   };
 
   const handleCancelGroupRequest = async (groupId: number) => {
-    const confirmed = window.confirm('Are you sure you want to cancel this group request? This action cannot be undone.');
+    const confirmed = window.confirm('Bạn có chắc chắn muốn hủy yêu cầu nhóm này?');
     if (!confirmed) return;
 
     try {
       await apiService.updateGroupRequest(groupId, { status: 'canceled' });
       await loadGroupRequests(); // Reload group requests
-      alert('Group request canceled successfully.');
+      toast.success('Đã hủy yêu cầu ghép nhóm thành công.');
     } catch (error) {
       console.error('Failed to cancel group request:', error);
-      alert('Failed to cancel group request. Please try again.');
+      toast.error('Không thể hủy yêu cầu ghép nhóm. Vui lòng thử lại!');
     }
   };
 
   const handleCancelSupervisorRequest = async (requestId: number) => {
-    const confirmed = window.confirm('Are you sure you want to cancel this supervisor request? This action cannot be undone.');
+    const confirmed = window.confirm('Bạn có chắc chắn muốn hủy yêu cầu giảng viên này?');
     if (!confirmed) return;
 
     try {
       await apiService.updateSupervisorRequest(requestId, { status: 'canceled' });
       await loadSupervisorRequests(); // Reload supervisor requests
-      alert('Supervisor request canceled successfully.');
+      toast.success('Đã hủy yêu cầu giảng viên hướng dẫn thành công.');
     } catch (error) {
       console.error('Failed to cancel supervisor request:', error);
-      alert('Failed to cancel supervisor request. Please try again.');
+      toast.error('Không thể hủy yêu cầu giảng viên hướng dẫn. Vui lòng thử lại!');
     }
   };
 
@@ -529,11 +531,11 @@ const StudentDashboard: React.FC = () => {
                           <h4 style={{ marginBottom: '10px', color: '#1e293b', fontWeight: 600 }}>Committee Members</h4>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                             {panel.members.map(member => (
-                              <div 
-                                key={member.id} 
-                                style={{ 
-                                  padding: '8px 12px', 
-                                  backgroundColor: '#f8fafc', 
+                              <div
+                                key={member.id}
+                                style={{
+                                  padding: '8px 12px',
+                                  backgroundColor: '#f8fafc',
                                   borderRadius: '6px',
                                   border: '1px solid #e2e8f0'
                                 }}
@@ -566,7 +568,7 @@ const StudentDashboard: React.FC = () => {
                     Send Group Request
                   </button>
                 </div>
-                
+
                 <div style={{ marginBottom: '30px' }}>
                   <h3 style={{ marginBottom: '15px', color: '#333' }}>Received Requests</h3>
                   {receivedRequests.length === 0 ? (
@@ -603,7 +605,7 @@ const StudentDashboard: React.FC = () => {
                     <h3 style={{ marginBottom: '15px', color: '#333' }}>Group Formation Discussion</h3>
                     {(() => {
                       // Show comments for the most recent pending group
-                      const pendingGroup = receivedRequests.find(r => r.status === 'pending') 
+                      const pendingGroup = receivedRequests.find(r => r.status === 'pending')
                         || sentRequests.find(r => r.status === 'pending');
                       if (pendingGroup) {
                         return (
@@ -713,7 +715,7 @@ const StudentDashboard: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    <SupervisorRequestsList 
+                    <SupervisorRequestsList
                       requests={supervisorRequests}
                       viewType="student"
                       onCancel={handleCancelSupervisorRequest}
@@ -733,12 +735,12 @@ const StudentDashboard: React.FC = () => {
                           if (acceptedGroup?.project?.panel_info) {
                             const panel = acceptedGroup.project.panel_info;
                             return (
-                              <div style={{ 
-                                marginTop: '20px', 
-                                padding: '15px', 
-                                backgroundColor: '#e8f4f8', 
-                                borderRadius: '4px', 
-                                border: '1px solid #bee5eb' 
+                              <div style={{
+                                marginTop: '20px',
+                                padding: '15px',
+                                backgroundColor: '#e8f4f8',
+                                borderRadius: '4px',
+                                border: '1px solid #bee5eb'
                               }}>
                                 <strong>📋 Evaluation Panel: {panel.name || `Panel #${panel.id}`}</strong>
                                 {panel.members && panel.members.length > 0 && (
@@ -757,7 +759,7 @@ const StudentDashboard: React.FC = () => {
                           }
                           return null;
                         })()}
-                        
+
                         {/* Supervisor-Student Discussion */}
                         <div style={{ marginTop: '30px' }}>
                           <h3 style={{ marginBottom: '15px', color: '#333' }}>Discussion with Supervisor</h3>
@@ -868,9 +870,9 @@ const StudentDashboard: React.FC = () => {
               <h2>External Evaluation Results</h2>
               {externalLoading ? (
                 <div className="loading-state" style={{ padding: '40px', textAlign: 'center' }}>
-                  <div className="loading-spinner" style={{ 
-                    width: '40px', 
-                    height: '40px', 
+                  <div className="loading-spinner" style={{
+                    width: '40px',
+                    height: '40px',
                     border: '3px solid #e2e8f0',
                     borderTopColor: '#3b82f6',
                     borderRadius: '50%',
