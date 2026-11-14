@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../../../services/api';
-import { getRoundStageNumber } from '../../../utils/phaseTracking';
+import {
+  getRoundStageNumber,
+  getStoredLecturerRoundId,
+  pickBestLecturerRound,
+} from '../../../utils/phaseTracking';
 import { daysUntil } from '../utils/homeMetrics';
 import type {
   ProjectRoundItem,
@@ -42,15 +46,30 @@ export function useRoundContext(role: string, roundIdOverride?: number): RoundCo
       let resolvedStage = 0;
       let resolvedCompletedStage = 0;
 
-      if (normalizedRole === 'academic_staff' || normalizedRole === 'admin') {
+      const isStaffOrAdmin = normalizedRole === 'academic_staff' || normalizedRole === 'admin';
+      const isLecturerRole =
+        normalizedRole === 'supervisor' ||
+        normalizedRole === 'lecturer' ||
+        normalizedRole === 'committee_member' ||
+        normalizedRole === 'committee';
+
+      let loadedRounds: ProjectRoundItem[] = [];
+      if (isStaffOrAdmin || isLecturerRole) {
         const roundsRes = await apiService.getProjectRounds().catch(() => []);
         if (Array.isArray(roundsRes)) {
+          loadedRounds = roundsRes;
           setAllRounds(roundsRes);
         }
       }
 
       if (roundIdOverride) {
-        resolvedRound = await apiService.getProjectRoundById(roundIdOverride).catch(() => null);
+        resolvedRound =
+          loadedRounds.find((r) => r.roundId === roundIdOverride) ||
+          (await apiService.getProjectRoundById(roundIdOverride).catch(() => null));
+      }
+
+      if (!resolvedRound && isLecturerRole && loadedRounds.length > 0) {
+        resolvedRound = pickBestLecturerRound(loadedRounds, getStoredLecturerRoundId());
       }
 
       if (normalizedRole === 'student' && !roundIdOverride) {

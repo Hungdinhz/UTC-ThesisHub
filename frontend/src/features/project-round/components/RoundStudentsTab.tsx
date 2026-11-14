@@ -618,9 +618,20 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         importPasswordMode === 'STUDENT_CODE'
           ? 'Mã sinh viên (MSSV)'
           : 'Số điện thoại (dự phòng Mã SV nếu thiếu SĐT)';
-      setImportResultMsg(
-        `Xử lý thành công ${result.totalProcessed} dòng. Tự động cấp ${result.newUsersCreated} tài khoản (Tên đăng nhập = Mã SV, Mật khẩu = ${passwordRuleText}) cho sinh viên đủ điều kiện, ${result.newStudentsCreated} hồ sơ Sinh viên, ghi danh ${result.enrolledInRound} vào đợt (bỏ qua ${result.skipped}).`
-      );
+      const detailNotes =
+        Array.isArray(result.messages) && result.messages.length > 0
+          ? ` Chi tiết: ${result.messages.join(' | ')}`
+          : '';
+      if (result.enrolledInRound === 0 && result.skipped > 0) {
+        setError(
+          `Không có sinh viên nào được ghi danh vào đợt (đã bỏ qua ${result.skipped}/${result.totalProcessed} dòng).${detailNotes}`
+        );
+        setImportResultMsg(null);
+      } else {
+        setImportResultMsg(
+          `Xử lý thành công ${result.totalProcessed} dòng. Tự động cấp ${result.newUsersCreated} tài khoản (Tên đăng nhập = Mã SV, Mật khẩu = ${passwordRuleText}) cho sinh viên đủ điều kiện, ${result.newStudentsCreated} hồ sơ Sinh viên, ghi danh ${result.enrolledInRound} vào đợt (bỏ qua ${result.skipped}).${detailNotes}`
+        );
+      }
       setPreviewData(null);
       setImportFile(null);
       loadStudents();

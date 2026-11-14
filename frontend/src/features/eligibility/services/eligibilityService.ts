@@ -274,11 +274,11 @@ class EligibilityService {
         params: queryParams,
         headers: authHeaders(),
       });
-      if (res.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+      if (res.data && Array.isArray(res.data.data)) {
         return res.data.data;
       }
     } catch {
-      // Fallback
+      // Fallback for offline unit tests / preview when backend is unreachable
     }
     let filtered = [...mockReservations];
     if (params?.status && params.status !== 'ALL') {

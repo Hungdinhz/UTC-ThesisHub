@@ -166,3 +166,40 @@ export function getStageNumberByTab(tab: string, role: string): number | null {
   }
   return null;
 }
+
+
+const LECTURER_ROUND_STORAGE_PREFIX = 'utc_lecturer_selected_round_';
+
+export function getStoredLecturerRoundId(userId?: string | number): number | undefined {
+  const key = `${LECTURER_ROUND_STORAGE_PREFIX}${userId ?? 'me'}`;
+  const raw = localStorage.getItem(key) ?? localStorage.getItem(`${LECTURER_ROUND_STORAGE_PREFIX}me`);
+  if (!raw) return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function setStoredLecturerRoundId(roundId: number, userId?: string | number): void {
+  const key = `${LECTURER_ROUND_STORAGE_PREFIX}${userId ?? 'me'}`;
+  localStorage.setItem(key, String(roundId));
+  if (userId !== undefined) {
+    localStorage.setItem(`${LECTURER_ROUND_STORAGE_PREFIX}me`, String(roundId));
+  }
+  window.dispatchEvent(new CustomEvent('utc-phase-change', { detail: { roundId } }));
+}
+
+export function pickBestLecturerRound<T extends { roundId?: number; status?: string }>(
+  rounds: T[],
+  preferredRoundId?: number
+): T | null {
+  if (!Array.isArray(rounds) || rounds.length === 0) return null;
+  if (preferredRoundId) {
+    const matched = rounds.find((r) => r.roundId === preferredRoundId);
+    if (matched) return matched;
+  }
+  return (
+    rounds.find((r) => (r.status || '').toUpperCase() === 'IN_PROGRESS') ||
+    rounds.find((r) => (r.status || '').toUpperCase() === 'OPEN') ||
+    rounds.find((r) => (r.status || '').toUpperCase() === 'DRAFT') ||
+    rounds[0]
+  );
+}

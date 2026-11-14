@@ -370,3 +370,274 @@
   font-size: 0.875rem;
   font-weight: 500;
 }
+
+
+/* Final Defense Eligibility Result Card (Tab 1) */
+.query-error-msg {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.final-defense-result-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.result-header-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 26px;
+  flex-wrap: wrap;
+}
+
+.result-header-eligible {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border-bottom: 2px solid #10b981;
+  color: #065f46;
+}
+
+.result-header-ineligible {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-bottom: 2px solid #ef4444;
+  color: #991b1b;
+}
+
+.result-header-reserved {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border-bottom: 2px solid #8b5cf6;
+  color: #5b21b6;
+}
+
+.result-sub-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.result-main-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.result-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  border: 1px solid currentColor;
+}
+
+.result-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  padding: 20px 26px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.meta-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+}
+
+.meta-val {
+  font-size: 0.95rem;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.criteria-container {
+  padding: 22px 26px;
+}
+
+.criteria-container .criteria-title {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.criteria-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.criteria-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.criteria-card.card-ok {
+  border-top: 4px solid #10b981;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 38%);
+}
+
+.criteria-card.card-fail {
+  border-top: 4px solid #ef4444;
+  background: linear-gradient(180deg, #fef2f2 0%, #ffffff 38%);
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.card-heading {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.card-desc {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
+  flex: 1;
+}
+
+.card-metric {
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 0.86rem;
+  color: #1e293b;
+}
+
+.result-reasons-box {
+  margin: 0 26px 24px 26px;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #0a3273;
+  border-radius: 10px;
+}
+
+.reasons-heading {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0a3273;
+  margin-bottom: 8px;
+}
+
+.reasons-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reason-item {
+  font-size: 0.875rem;
+  color: #334155;
+  line-height: 1.5;
+}
+
+
+/* Reservation Management Page Filter Toolbar & Toggle Group */
+.filter-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-group-toggle {
+  display: inline-flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  gap: 4px;
+}
+
+.toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.toggle-btn:hover {
+  color: #0a3273;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.toggle-btn.active {
+  background: #0a3273;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(10, 50, 115, 0.22);
+}
+
+.content-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}

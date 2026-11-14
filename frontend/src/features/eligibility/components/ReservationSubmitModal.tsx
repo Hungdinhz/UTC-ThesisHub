@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, Button } from '../../../components/ui';
 import type { ReservationSubmitRequest, ReservationReasonCategory } from '../types';
 
@@ -7,7 +7,11 @@ interface ReservationSubmitModalProps {
   onClose: () => void;
   onSubmit: (data: ReservationSubmitRequest) => Promise<void>;
   defaultStudentId?: number;
+  studentCode?: string;
+  studentName?: string;
   defaultThesisId?: number;
+  thesisCode?: string;
+  thesisTitle?: string;
   projectRoundId?: number;
   defaultCategory?: ReservationReasonCategory;
 }
@@ -17,7 +21,11 @@ export const ReservationSubmitModal: React.FC<ReservationSubmitModalProps> = ({
   onClose,
   onSubmit,
   defaultStudentId = 101,
+  studentCode,
+  studentName,
   defaultThesisId,
+  thesisCode,
+  thesisTitle,
   projectRoundId = 10,
   defaultCategory = 'INSUFFICIENT_CREDITS',
 }) => {
@@ -29,6 +37,14 @@ export const ReservationSubmitModal: React.FC<ReservationSubmitModalProps> = ({
   const [targetRoundCode, setTargetRoundCode] = useState('Đợt kế tiếp (Kỳ sau)');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setStudentId(defaultStudentId);
+  }, [defaultStudentId]);
+
+  useEffect(() => {
+    setThesisId(defaultThesisId);
+  }, [defaultThesisId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,29 +116,42 @@ export const ReservationSubmitModal: React.FC<ReservationSubmitModalProps> = ({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div className="form-group">
-            <label htmlFor="resStudentId">Mã định danh Sinh viên (ID):</label>
-            <input
-              id="resStudentId"
-              type="number"
-              className="form-control"
-              value={studentId}
-              onChange={(e) => setStudentId(Number(e.target.value))}
-              required
-            />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '12px',
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '10px',
+          padding: '12px 14px',
+          marginBottom: '14px',
+        }}>
+          <div>
+            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+              Sinh viên nộp đơn
+            </div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0a3273', marginTop: '3px' }}>
+              {studentCode || `SV #${studentId}`}
+            </div>
+            {studentName && (
+              <div style={{ fontSize: '12.5px', color: '#334155', marginTop: '1px' }}>
+                {studentName}
+              </div>
+            )}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="resThesisId">Mã Đề tài (nếu có):</label>
-            <input
-              id="resThesisId"
-              type="number"
-              className="form-control"
-              placeholder="VD: 101"
-              value={thesisId || ''}
-              onChange={(e) => setThesisId(e.target.value ? Number(e.target.value) : undefined)}
-            />
+          <div>
+            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+              Đề tài bảo lưu
+            </div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginTop: '3px' }}>
+              {thesisCode || (thesisId ? `#${thesisId}` : 'Chưa có đề tài')}
+            </div>
+            {thesisTitle && (
+              <div style={{ fontSize: '12.5px', color: '#334155', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={thesisTitle}>
+                {thesisTitle}
+              </div>
+            )}
           </div>
         </div>
 

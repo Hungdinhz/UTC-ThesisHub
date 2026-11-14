@@ -130,6 +130,32 @@ public class ProjectRoundService {
      */
     @Transactional(readOnly = true)
     public ProjectRoundResponseDTO getActiveRound() {
+        return getActiveRound(null);
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectRoundResponseDTO getActiveRound(UserPrincipal currentUser) {
+        if (currentUser != null && currentUser.getAuthorities() != null) {
+            boolean isAdmin = currentUser.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority())
+                            || "ROLE_FACULTY_ADMIN".equalsIgnoreCase(a.getAuthority()));
+            boolean isLecturer = currentUser.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_LECTURER".equalsIgnoreCase(a.getAuthority())
+                            || "ROLE_COMMITTEE".equalsIgnoreCase(a.getAuthority()));
+            if (!isAdmin && isLecturer) {
+                List<ProjectRoundResponseDTO> lecturerRounds = getRounds(null, null, currentUser);
+                if (!lecturerRounds.isEmpty()) {
+                    return lecturerRounds.stream()
+                            .filter(r -> "IN_PROGRESS".equalsIgnoreCase(r.getStatus()))
+                            .findFirst()
+                            .or(() -> lecturerRounds.stream()
+                                    .filter(r -> "OPEN".equalsIgnoreCase(r.getStatus()))
+                                    .findFirst())
+                            .orElse(lecturerRounds.get(0));
+                }
+            }
+        }
+
         ProjectRound round = projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("OPEN")
                 .or(() -> projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("IN_PROGRESS"))
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_ROUND_CLOSED));
@@ -1098,11 +1124,11 @@ public class ProjectRoundService {
                 continue;
             }
 
-            // Kiểm tra điều kiện GĐ4
+            // Kiểm tra điều kiện GĐ4: Ở GĐ5, nếu GVHD đã duyệt thì lên DEFENSE_READY; nếu chưa thì giữ IN_PROGRESS
+            // để Khoa/GVHD tiếp tục xét duyệt điều kiện bảo vệ hoặc lập quyết định bảo lưu (không đánh dấu DROPPED).
             if (targetStage >= 5 && !readyG4StudentIds.contains(sId)) {
                 if (!"DROPPED".equalsIgnoreCase(spr.getStatus())) {
-                    spr.setStatus("DROPPED");
-                    spr.setNote("Không hoàn thành GĐ4: Chưa đủ điều kiện bảo vệ đồ án tốt nghiệp trước hội đồng - Bị loại khỏi đợt đồ án (Không đạt)");
+                    spr.setStatus("IN_PROGRESS");
                     toSave.add(spr);
                 }
                 continue;

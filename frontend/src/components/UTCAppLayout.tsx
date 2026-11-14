@@ -12,6 +12,8 @@ import {
   STAGES,
   getRoundStageNumber,
   calculateStageStatus,
+  getStoredLecturerRoundId,
+  pickBestLecturerRound,
 } from '../utils/phaseTracking';
 import './UTCAppLayout.css';
 
@@ -187,7 +189,21 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         }
       }
 
-      const round = await apiService.getActiveProjectRound().catch(() => null);
+      let round: ProjectRoundItem | null = null;
+      if (
+        currentRole === 'supervisor' ||
+        currentRole === 'lecturer' ||
+        currentRole === 'committee_member' ||
+        currentRole === 'committee'
+      ) {
+        const lecturerRounds = await apiService.getProjectRounds().catch(() => []);
+        if (Array.isArray(lecturerRounds) && lecturerRounds.length > 0) {
+          round = pickBestLecturerRound(lecturerRounds, getStoredLecturerRoundId(currentUserId));
+        }
+      }
+      if (!round) {
+        round = await apiService.getActiveProjectRound().catch(() => null);
+      }
       if (round) {
         setActiveRound(round);
         const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
