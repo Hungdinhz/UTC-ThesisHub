@@ -71,7 +71,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ groupId }) => {
       clearInterval(pollingIntervalRef.current);
     }
     setConnectionStatus('polling');
-    pollingIntervalRef.current = setInterval(pollNewMessages, 3000);
+    pollingIntervalRef.current = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      pollNewMessages();
+    }, 3000);
   }, []);
 
   // Stop polling

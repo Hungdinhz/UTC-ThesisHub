@@ -27,10 +27,16 @@ public class NotificationController {
     private final NotificationService notificationService;
 
     private Long resolveUserId(UserPrincipal userPrincipal, Long fallbackUserId) {
-        if (userPrincipal != null && userPrincipal.getId() != null) {
-            return userPrincipal.getId();
+        if (userPrincipal == null || userPrincipal.getId() == null) {
+            throw new com.example.thesis_hub_api.common.exception.AppException(
+                    com.example.thesis_hub_api.common.exception.ErrorCode.UNAUTHENTICATED);
         }
-        return fallbackUserId != null ? fallbackUserId : 1L;
+        boolean isAdmin = userPrincipal.getAuthorities() != null && userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_ACADEMIC_STAFF".equals(a.getAuthority()));
+        if (isAdmin && fallbackUserId != null) {
+            return fallbackUserId;
+        }
+        return userPrincipal.getId();
     }
 
     @GetMapping

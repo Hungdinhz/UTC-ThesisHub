@@ -20,7 +20,7 @@ public class SubmissionController {
     private final SubmissionService submissionService;
 
     @PostMapping("/by-task/{taskId}")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN') and @accessControl.canAccessTask(#taskId)")
     public ApiResponse<SubmissionResponse> submitTask(
             @PathVariable Long taskId,
             @Valid @RequestBody CreateSubmissionRequest request) {
@@ -29,7 +29,7 @@ public class SubmissionController {
     }
 
     @PostMapping("/{id}/review")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'ACADEMIC_STAFF')")
     public ApiResponse<SubmissionResponse> reviewSubmission(
             @PathVariable Long id,
             @Valid @RequestBody ReviewSubmissionRequest request) {
@@ -38,11 +38,13 @@ public class SubmissionController {
     }
 
     @GetMapping("/by-task/{taskId}")
+    @PreAuthorize("@accessControl.canAccessTask(#taskId)")
     public ApiResponse<List<SubmissionResponse>> getSubmissionsByTask(@PathVariable Long taskId) {
         return ApiResponse.success(submissionService.getSubmissionsByTask(taskId));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@accessControl.canAccessSubmission(#id)")
     public ApiResponse<SubmissionResponse> getSubmissionById(@PathVariable Long id) {
         return ApiResponse.success(submissionService.getSubmissionById(id));
     }

@@ -45,12 +45,9 @@ public class StudentController {
         
         Long effectiveProgramId = trainingProgramId != null ? trainingProgramId : programId;
 
-        String[] sortParts = sort.split(",");
-        String sortField = sortParts[0];
-        Sort.Direction direction = (sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc"))
-                ? Sort.Direction.ASC : Sort.Direction.DESC;
-
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = com.example.thesis_hub_api.common.util.PaginationUtils.createSafePageable(
+                page, size, sort, "studentCode", Sort.Direction.ASC,
+                java.util.Set.of("id", "studentCode", "className", "gpa", "debtCredits", "majorId", "trainingProgramId"));
         PageResponse<StudentResponseDTO> result = studentService.getStudents(majorId, effectiveProgramId, className, search, projectRoundId, pageable);
         return ResponseEntity.ok(ApiResponse.success(result));
     }

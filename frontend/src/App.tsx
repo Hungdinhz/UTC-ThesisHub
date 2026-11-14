@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -6,30 +6,68 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import UTCAppLayout from './components/UTCAppLayout';
 import LoginPage from './pages/LoginPage';
-import AdminRegisterPage from './pages/AdminRegisterPage';
-import AdminDashboard from './pages/AdminDashboard';
-import ExternalDashboard from './pages/ExternalDashboard';
-import OrganizationManagementPage from './pages/OrganizationManagementPage';
-import ProjectRoundManagementPage from './pages/ProjectRoundManagementPage';
-import { AssignmentManagementPage } from './features/assignment/pages/AssignmentManagementPage';
-import { StudentAssignmentPage } from './features/assignment/pages/StudentAssignmentPage';
-import { ProposalManagementPage } from './features/thesis/pages/ProposalManagementPage';
-import { ThesisDetailPage } from './features/thesis/pages/ThesisDetailPage';
-import { TaskBoardPage } from './features/progress/pages/TaskBoardPage';
-import { ProgressReportPage } from './features/progress/pages/ProgressReportPage';
-import { ThesisEligibilityPage } from './features/eligibility/pages/ThesisEligibilityPage';
-import { FinalDefenseEligibilityPage } from './features/eligibility/pages/FinalDefenseEligibilityPage';
-import { ReservationManagementPage } from './features/eligibility/pages/ReservationManagementPage';
-import { CouncilManagementPage } from './features/defense/pages/CouncilManagementPage';
-import { DefenseSchedulePage } from './features/defense/pages/DefenseSchedulePage';
-import { DefenseScoringPage } from './features/defense/pages/DefenseScoringPage';
-import { ChatGroupPage } from './features/chat/pages/ChatGroupPage';
-import { EligibleStudentsPage } from './features/academic-staff/pages/EligibleStudentsPage';
-import { ClassGradeReportPage } from './features/academic-staff/pages/ClassGradeReportPage';
-import { StudentHomePage } from './features/home/pages/StudentHomePage';
-import { LecturerHomePage } from './features/home/pages/LecturerHomePage';
-import { AcademicStaffHomePage } from './features/home/pages/AcademicStaffHomePage';
 import './App.css';
+
+// Lazy-loaded route pages for optimal code splitting & initial load performance
+const AdminRegisterPage = lazy(() => import('./pages/AdminRegisterPage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const ExternalDashboard = lazy(() => import('./pages/ExternalDashboard'));
+const OrganizationManagementPage = lazy(() => import('./pages/OrganizationManagementPage'));
+const ProjectRoundManagementPage = lazy(() => import('./pages/ProjectRoundManagementPage'));
+const AssignmentManagementPage = lazy(() =>
+  import('./features/assignment/pages/AssignmentManagementPage').then((m) => ({ default: m.AssignmentManagementPage }))
+);
+const StudentAssignmentPage = lazy(() =>
+  import('./features/assignment/pages/StudentAssignmentPage').then((m) => ({ default: m.StudentAssignmentPage }))
+);
+const ProposalManagementPage = lazy(() =>
+  import('./features/thesis/pages/ProposalManagementPage').then((m) => ({ default: m.ProposalManagementPage }))
+);
+const ThesisDetailPage = lazy(() =>
+  import('./features/thesis/pages/ThesisDetailPage').then((m) => ({ default: m.ThesisDetailPage }))
+);
+const TaskBoardPage = lazy(() =>
+  import('./features/progress/pages/TaskBoardPage').then((m) => ({ default: m.TaskBoardPage }))
+);
+const ProgressReportPage = lazy(() =>
+  import('./features/progress/pages/ProgressReportPage').then((m) => ({ default: m.ProgressReportPage }))
+);
+const ThesisEligibilityPage = lazy(() =>
+  import('./features/eligibility/pages/ThesisEligibilityPage').then((m) => ({ default: m.ThesisEligibilityPage }))
+);
+const FinalDefenseEligibilityPage = lazy(() =>
+  import('./features/eligibility/pages/FinalDefenseEligibilityPage').then((m) => ({ default: m.FinalDefenseEligibilityPage }))
+);
+const ReservationManagementPage = lazy(() =>
+  import('./features/eligibility/pages/ReservationManagementPage').then((m) => ({ default: m.ReservationManagementPage }))
+);
+const CouncilManagementPage = lazy(() =>
+  import('./features/defense/pages/CouncilManagementPage').then((m) => ({ default: m.CouncilManagementPage }))
+);
+const DefenseSchedulePage = lazy(() =>
+  import('./features/defense/pages/DefenseSchedulePage').then((m) => ({ default: m.DefenseSchedulePage }))
+);
+const DefenseScoringPage = lazy(() =>
+  import('./features/defense/pages/DefenseScoringPage').then((m) => ({ default: m.DefenseScoringPage }))
+);
+const ChatGroupPage = lazy(() =>
+  import('./features/chat/pages/ChatGroupPage').then((m) => ({ default: m.ChatGroupPage }))
+);
+const EligibleStudentsPage = lazy(() =>
+  import('./features/academic-staff/pages/EligibleStudentsPage').then((m) => ({ default: m.EligibleStudentsPage }))
+);
+const ClassGradeReportPage = lazy(() =>
+  import('./features/academic-staff/pages/ClassGradeReportPage').then((m) => ({ default: m.ClassGradeReportPage }))
+);
+const StudentHomePage = lazy(() =>
+  import('./features/home/pages/StudentHomePage').then((m) => ({ default: m.StudentHomePage }))
+);
+const LecturerHomePage = lazy(() =>
+  import('./features/home/pages/LecturerHomePage').then((m) => ({ default: m.LecturerHomePage }))
+);
+const AcademicStaffHomePage = lazy(() =>
+  import('./features/home/pages/AcademicStaffHomePage').then((m) => ({ default: m.AcademicStaffHomePage }))
+);
 
 const getDefaultRouteForRole = (role?: string | null): string => {
   switch (role) {
@@ -74,7 +112,7 @@ const FullPageLoader: React.FC<{ message?: string }> = ({ message = 'Đang tải
       }}
     />
     <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1e293b' }}>{message}</span>
-    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(0deg); } }`}</style>
+    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
   </div>
 );
 
@@ -389,7 +427,9 @@ const App: React.FC = () => {
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
             <ToastProvider>
-              <AppRoutes />
+              <Suspense fallback={<FullPageLoader message="Đang tải trang..." />}>
+                <AppRoutes />
+              </Suspense>
             </ToastProvider>
           </AuthProvider>
         </Router>

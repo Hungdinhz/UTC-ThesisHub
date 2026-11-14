@@ -103,6 +103,9 @@ public class ProjectRoundService {
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     @Autowired(required = false)
     private com.example.thesis_hub_api.notification.service.NotificationService notificationService;
 
@@ -119,8 +122,7 @@ public class ProjectRoundService {
     private com.example.thesis_hub_api.defense.repository.GraduationResultRepository graduationResultRepository;
 
     @Autowired(required = false)
-    @org.springframework.context.annotation.Lazy
-    private com.example.thesis_hub_api.defense.service.DefenseService defenseService;
+    private org.springframework.beans.factory.ObjectProvider<RoundDefenseSynthesizer> defenseSynthesizerProvider;
 
     /**
      * CONTRACT 2: API Tra cứu Đợt đồ án đang hoạt động & Mốc thời gian (Timeline).
@@ -450,9 +452,10 @@ public class ProjectRoundService {
             try {
                 if (graduationResultRepository != null) {
                     java.util.Optional<com.example.thesis_hub_api.defense.entity.GraduationResult> grOpt = graduationResultRepository.findByThesisId(thesis.getId());
-                    if (grOpt.isEmpty() && defenseService != null && defenseService.canSynthesizeResult(thesis.getId())) {
+                    RoundDefenseSynthesizer defenseSynthesizer = defenseSynthesizerProvider != null ? defenseSynthesizerProvider.getIfAvailable() : null;
+                    if (grOpt.isEmpty() && defenseSynthesizer != null && defenseSynthesizer.canSynthesizeResult(thesis.getId())) {
                         try {
-                            defenseService.synthesizeResult(thesis.getId());
+                            defenseSynthesizer.synthesizeThesisResult(thesis.getId());
                             grOpt = graduationResultRepository.findByThesisId(thesis.getId());
                         } catch (Exception ignored) {}
                     }
@@ -1391,6 +1394,10 @@ public class ProjectRoundService {
         }
         log.info("Deleting project round: id={}, code={}, status={}", round.getId(), round.getRoundCode(), status);
 
+        if (entityManager != null) {
+            entityManager.flush();
+        }
+
         if (jdbcTemplate != null) {
             // Lấy danh sách sinh viên chỉ thuộc đợt đồ án này (không tham gia đợt nào khác) để xóa tài khoản sinh viên
             List<Long> studentIdsToDelete = new ArrayList<>();
@@ -1485,7 +1492,13 @@ public class ProjectRoundService {
             }
         }
 
-        projectRoundRepository.delete(round);
+        if (entityManager != null) {
+            entityManager.clear();
+            round = projectRoundRepository.findById(roundId).orElse(null);
+        }
+        if (round != null) {
+            projectRoundRepository.delete(round);
+        }
         log.info("Successfully deleted project round id={}", roundId);
     }
 }

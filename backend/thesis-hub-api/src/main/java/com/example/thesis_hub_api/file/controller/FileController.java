@@ -12,12 +12,14 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/files")
@@ -25,9 +27,17 @@ import java.util.Optional;
 @Tag(name = "File Storage", description = "API quản lý tải lên và tải xuống tập tin dùng chung")
 public class FileController {
 
+    private static final Set<String> SAFE_INLINE_MIME_TYPES = Set.of(
+            "application/pdf",
+            "image/png",
+            "image/jpeg",
+            "image/webp"
+    );
+
     private final FileStorageService fileStorageService;
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Tải tập tin lên hệ thống")
     public ResponseEntity<ApiResponse<FileUploadResponseDTO>> uploadFile(@RequestParam("file") MultipartFile file) {
         String fileName = fileStorageService.storeFile(file);
@@ -68,23 +78,25 @@ public class FileController {
         }
 
         String requestedDisposition = request.getParameter("disposition");
+        boolean isSafeForInline = contentType != null && SAFE_INLINE_MIME_TYPES.contains(contentType.toLowerCase());
         boolean isInline;
         if ("attachment".equalsIgnoreCase(requestedDisposition)) {
             isInline = false;
         } else {
-            isInline = "inline".equalsIgnoreCase(requestedDisposition)
-                    || "application/pdf".equalsIgnoreCase(contentType)
-                    || (contentType != null && contentType.startsWith("image/"));
+            isInline = isSafeForInline;
         }
 
         String downloadName = (dbMeta.isPresent() && StringUtils.hasText(dbMeta.get().getOriginalName()))
                 ? dbMeta.get().getOriginalName()
                 : (resource.getFilename() != null ? resource.getFilename() : fileName);
-        String disposition = (isInline ? "inline" : "attachment") + "; filename=\"" + downloadName.replace("\"", "") + "\"";
+        String safeDownloadName = downloadName.replaceAll("[\\r\\n\"\\\\]", "_");
+        String disposition = (isInline ? "inline" : "attachment") + "; filename=\"" + safeDownloadName + "\"";
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox")
                 .body(resource);
     }
 }

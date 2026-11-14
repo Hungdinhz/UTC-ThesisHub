@@ -20,8 +20,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = (token: string, refreshTokenOrType: string | UserType, type?: UserType) => {
     const actualUserType = (type ? type : refreshTokenOrType) as UserType;
+    const refreshToken = type ? refreshTokenOrType : undefined;
     localStorage.setItem('access_token', token);
-    localStorage.removeItem('refresh_token');
+    if (refreshToken && refreshToken !== token) {
+      localStorage.setItem('refresh_token', refreshToken);
+    } else if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken);
+    }
     localStorage.setItem('user_type', actualUserType);
     setUserType(actualUserType);
     refreshUser();

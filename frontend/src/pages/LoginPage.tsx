@@ -296,35 +296,37 @@ const LoginPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="utc-demo-accounts-box">
-            <div className="utc-demo-title">
-              <span>⚡</span> <span>Tài khoản mẫu để test (Click điền nhanh):</span>
+          {import.meta.env.DEV && (
+            <div className="utc-demo-accounts-box">
+              <div className="utc-demo-title">
+                <span>⚡</span> <span>Tài khoản mẫu để test (Click điền nhanh):</span>
+              </div>
+              <div className="utc-demo-grid" style={{ gridTemplateColumns: '1fr' }}>
+                <button
+                  type="button"
+                  className="utc-demo-btn admin"
+                  onClick={() => handleQuickFill('admin', 'admin', 'Password@123')}
+                  title="Click để điền tài khoản Quản trị viên"
+                  style={{ width: '100%' }}
+                >
+                  <span className="demo-role">👑 Quản trị viên</span>
+                  <span className="demo-cred">admin | Password@123</span>
+                </button>
+                <button
+                  type="button"
+                  className="utc-demo-btn"
+                  onClick={() => handleQuickFill('academic_staff', 'giaovu', 'Password@123')}
+                  title="Click để điền tài khoản Giáo vụ khoa"
+                  style={{ width: '100%' }}
+                >
+                  <span className="demo-role">📋 Giáo vụ khoa</span>
+                  <span className="demo-cred">giaovu | Password@123</span>
+                </button>
+              </div>
             </div>
-            <div className="utc-demo-grid" style={{ gridTemplateColumns: '1fr' }}>
-              <button
-                type="button"
-                className="utc-demo-btn admin"
-                onClick={() => handleQuickFill('admin', 'admin', 'Password@123')}
-                title="Click để điền tài khoản Quản trị viên"
-                style={{ width: '100%' }}
-              >
-                <span className="demo-role">👑 Quản trị viên</span>
-                <span className="demo-cred">admin | Password@123</span>
-              </button>
-              <button
-                type="button"
-                className="utc-demo-btn"
-                onClick={() => handleQuickFill('academic_staff', 'giaovu', 'Password@123')}
-                title="Click để điền tài khoản Giáo vụ khoa"
-                style={{ width: '100%' }}
-              >
-                <span className="demo-role">📋 Giáo vụ khoa</span>
-                <span className="demo-cred">giaovu | Password@123</span>
-              </button>
-            </div>
-          </div>
+          )}
 
-          {userType === 'admin' && (
+          {import.meta.env.DEV && userType === 'admin' && (
             <div className="utc-admin-register-prompt" style={{
               background: 'rgba(245, 158, 11, 0.12)',
               border: '1px solid rgba(245, 158, 11, 0.35)',

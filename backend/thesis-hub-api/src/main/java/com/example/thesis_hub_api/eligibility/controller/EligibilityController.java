@@ -21,7 +21,7 @@ public class EligibilityController {
      * API lấy danh sách kiểm tra điều kiện làm đồ án của toàn bộ sinh viên trong đợt
      */
     @GetMapping("/students")
-    @PreAuthorize("hasAnyRole('ADMIN', 'LECTURER', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LECTURER', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApiResponse<List<EligibilityCheckResponseDTO>>> getAllStudentsEligibility(
             @RequestParam(required = false) Long projectRoundId) {
         List<EligibilityCheckResponseDTO> result = eligibilityService.getAllStudentsEligibility(projectRoundId);
@@ -32,6 +32,7 @@ public class EligibilityController {
      * API kiểm tra điều kiện làm đồ án tốt nghiệp
      */
     @GetMapping("/check")
+    @PreAuthorize("@accessControl.isStudentOwnerOrStaff(#studentId)")
     public ResponseEntity<ApiResponse<EligibilityCheckResponseDTO>> checkThesisEligibility(
             @RequestParam Long studentId,
             @RequestParam(required = false) Long projectRoundId) {
@@ -43,7 +44,7 @@ public class EligibilityController {
      * API duyệt đặc cách (Force Approve) sinh viên vào đợt làm đồ án
      */
     @PostMapping("/force-approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApiResponse<EligibilityCheckResponseDTO>> forceApprove(
             @RequestBody ForceApproveRequestDTO request) {
         EligibilityCheckResponseDTO result = eligibilityService.forceApprove(request);
@@ -54,7 +55,7 @@ public class EligibilityController {
      * API loại sinh viên khỏi đợt làm đồ án
      */
     @PostMapping("/disqualify")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApiResponse<EligibilityCheckResponseDTO>> disqualify(
             @RequestBody DisqualifyRequestDTO request) {
         EligibilityCheckResponseDTO result = eligibilityService.disqualify(request);
@@ -65,7 +66,7 @@ public class EligibilityController {
      * API gửi đơn bảo lưu (Sinh viên hoặc Admin)
      */
     @PostMapping("/reservations")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') and @accessControl.isStudentOwnerOrStaff(#request.studentId)")
     public ResponseEntity<ApiResponse<ReservationResponseDTO>> submitReservation(
             @RequestBody ReservationSubmitRequestDTO request) {
         ReservationResponseDTO result = eligibilityService.submitReservation(request);
@@ -76,7 +77,7 @@ public class EligibilityController {
      * API Khoa/Admin trực tiếp lập quyết định bảo lưu cho sinh viên (khi nộp đơn giấy hoặc thiếu tín chỉ)
      */
     @PostMapping("/reservations/admin")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApiResponse<ReservationResponseDTO>> createReservationByAdmin(
             @RequestBody AdminCreateReservationRequestDTO request) {
         ReservationResponseDTO result = eligibilityService.createReservationByAdmin(request);
@@ -87,7 +88,7 @@ public class EligibilityController {
      * API Giảng viên hướng dẫn xác nhận/góp ý kiến cho đơn bảo lưu
      */
     @PutMapping("/reservations/{id}/supervisor-feedback")
-    @PreAuthorize("hasAnyRole('LECTURER', 'SUPERVISOR', 'ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'SUPERVISOR', 'ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApiResponse<ReservationResponseDTO>> submitSupervisorFeedback(
             @PathVariable Long id,
             @RequestBody SupervisorReservationFeedbackDTO feedback) {
@@ -99,7 +100,7 @@ public class EligibilityController {
      * API Khoa phê duyệt hoặc từ chối đơn bảo lưu
      */
     @PutMapping("/reservations/{id}/review")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApiResponse<ReservationResponseDTO>> reviewReservation(
             @PathVariable Long id,
             @RequestBody ReservationReviewRequestDTO request) {
@@ -111,6 +112,7 @@ public class EligibilityController {
      * API tra cứu danh sách đơn bảo lưu
      */
     @GetMapping("/reservations")
+    @PreAuthorize("@accessControl.isStudentOwnerOrStaff(#studentId)")
     public ResponseEntity<ApiResponse<List<ReservationResponseDTO>>> getReservations(
             @RequestParam(required = false) Long studentId,
             @RequestParam(required = false) Long projectRoundId,

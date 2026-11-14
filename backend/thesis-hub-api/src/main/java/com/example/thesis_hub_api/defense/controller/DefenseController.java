@@ -38,7 +38,7 @@ public class DefenseController {
         }
         for (GrantedAuthority ga : auth.getAuthorities()) {
             String role = ga.getAuthority();
-            if ("ROLE_ADMIN".equalsIgnoreCase(role) || "ROLE_FACULTY_ADMIN".equalsIgnoreCase(role)) {
+            if ("ROLE_ADMIN".equalsIgnoreCase(role) || "ROLE_FACULTY_ADMIN".equalsIgnoreCase(role) || "ROLE_ACADEMIC_STAFF".equalsIgnoreCase(role)) {
                 return true;
             }
         }
@@ -216,6 +216,7 @@ public class DefenseController {
      * Tra cứu điểm số của đề tài
      */
     @GetMapping("/scores")
+    @PreAuthorize("@accessControl.canAccessThesis(#thesisId)")
     public ResponseEntity<ApiResponse<List<ScoreResponseDTO>>> getScores(
             @RequestParam Long thesisId) {
         List<ScoreResponseDTO> result = defenseService.getScoresByThesis(thesisId);
@@ -226,6 +227,7 @@ public class DefenseController {
      * Xem trạng thái chữ ký của 5 thành viên Hội đồng trên biên bản bảo vệ (#22, #23)
      */
     @GetMapping("/results/{thesisId}/signatures")
+    @PreAuthorize("@accessControl.canAccessThesis(#thesisId)")
     public ResponseEntity<ApiResponse<List<MinutesSignatureItemDTO>>> getMinutesSignatures(
             @PathVariable Long thesisId) {
         List<MinutesSignatureItemDTO> result = defenseService.getMinutesSignatures(thesisId);
@@ -248,7 +250,7 @@ public class DefenseController {
      * 5. API Tổng hợp điểm, xuất kết quả tốt nghiệp cuối kỳ
      */
     @PostMapping("/results/synthesize")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApiResponse<GraduationResultResponseDTO>> synthesizeResult(
             @RequestBody SynthesizeResultRequestDTO request) {
         GraduationResultResponseDTO result = defenseService.synthesizeResult(request);
@@ -259,7 +261,7 @@ public class DefenseController {
      * Ký xuất Dữ liệu, công bố kết quả cho toàn bộ Sinh viên và hoàn tất đóng đợt đồ án (#25)
      */
     @GetMapping("/rounds/{roundId}/results")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'LECTURER', 'COMMITTEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF', 'LECTURER', 'COMMITTEE')")
     public ResponseEntity<ApiResponse<List<GraduationResultResponseDTO>>> getResultsByRound(
             @PathVariable Long roundId) {
         List<GraduationResultResponseDTO> result = defenseService.getGraduationResultsByRound(roundId);
@@ -267,7 +269,7 @@ public class DefenseController {
     }
 
     @PostMapping("/rounds/{roundId}/finalize-and-publish")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ResponseEntity<ApiResponse<List<GraduationResultResponseDTO>>> finalizeAndPublishRound(
             @PathVariable Long roundId) {
         List<GraduationResultResponseDTO> result = defenseService.finalizeAndPublishRound(roundId);
@@ -278,6 +280,7 @@ public class DefenseController {
      * Xem kết quả tốt nghiệp của đề tài
      */
     @GetMapping("/results/{thesisId}")
+    @PreAuthorize("@accessControl.canAccessThesis(#thesisId)")
     public ResponseEntity<ApiResponse<GraduationResultResponseDTO>> getResultByThesis(
             @PathVariable Long thesisId) {
         GraduationResultResponseDTO result = defenseService.getGraduationResultByThesis(thesisId);

@@ -64,7 +64,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ onNavigate 
   useEffect(() => {
     fetchUnreadCount();
 
-    pollIntervalRef.current = setInterval(fetchUnreadCount, 30000);
+    pollIntervalRef.current = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchUnreadCount();
+    }, 30000);
 
     return () => {
       if (pollIntervalRef.current) {

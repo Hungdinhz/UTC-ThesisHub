@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -145,15 +146,39 @@ public class ProgressReportServiceImpl implements ProgressReportService {
         List<Thesis> theses = roundId != null
                 ? thesisRepository.findByProjectRoundId(roundId)
                 : (lecturerId != null ? thesisRepository.findByLecturerId(lecturerId) : thesisRepository.findAll());
-        return theses.stream()
+        List<Thesis> filteredTheses = theses.stream()
                 .filter(t -> lecturerId == null || (t.getLecturer() != null && lecturerId.equals(t.getLecturer().getId())))
-                .map(this::buildSummaryForThesis)
+                .collect(Collectors.toList());
+
+        if (filteredTheses.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> thesisIds = filteredTheses.stream().map(Thesis::getId).collect(Collectors.toList());
+        Map<Long, List<Task>> tasksByThesis = taskRepository.findByThesisIdIn(thesisIds).stream()
+                .filter(t -> t.getThesis() != null)
+                .collect(Collectors.groupingBy(t -> t.getThesis().getId()));
+        Map<Long, List<ProgressReport>> reportsByThesis = progressReportRepository.findByThesisIdInOrderBySubmittedAtDesc(thesisIds).stream()
+                .filter(r -> r.getThesis() != null)
+                .collect(Collectors.groupingBy(r -> r.getThesis().getId()));
+
+        return filteredTheses.stream()
+                .map(t -> buildSummaryForThesis(
+                        t,
+                        tasksByThesis.getOrDefault(t.getId(), List.of()),
+                        reportsByThesis.getOrDefault(t.getId(), List.of())
+                ))
                 .collect(Collectors.toList());
     }
 
     private ThesisProgressSummaryResponse buildSummaryForThesis(Thesis thesis) {
         Long thesisId = thesis.getId();
         List<Task> tasks = taskRepository.findByThesisId(thesisId);
+        List<ProgressReport> reports = progressReportRepository.findByThesisIdOrderBySubmittedAtDesc(thesisId);
+        return buildSummaryForThesis(thesis, tasks, reports);
+    }
+
+    private ThesisProgressSummaryResponse buildSummaryForThesis(Thesis thesis, List<Task> tasks, List<ProgressReport> reports) {
         long totalTasks = tasks.size();
         long completedTasks = tasks.stream().filter(t -> "COMPLETED".equalsIgnoreCase(t.getStatus())).count();
         long submittedTasks = tasks.stream().filter(t -> "SUBMITTED".equalsIgnoreCase(t.getStatus())).count();
@@ -169,7 +194,6 @@ public class ProgressReportServiceImpl implements ProgressReportService {
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
-        List<ProgressReport> reports = progressReportRepository.findByThesisIdOrderBySubmittedAtDesc(thesisId);
         long totalReports = reports.size();
         long unreviewedReports = reports.stream()
                 .filter(r -> "SUBMITTED".equalsIgnoreCase(r.getStatus()) && r.getFeedback() == null)
