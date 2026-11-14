@@ -502,8 +502,8 @@ export const DefenseSchedulePage: React.FC = () => {
                       </span>
                     ))}
                   </div>
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#dc2626', fontStyle: 'italic' }}>
-                    🛡️ GVHD: {currentStudentDefense.studentDetail.advisorName} (Không tham gia Hội đồng theo quy chế UTC)
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b' }}>
+                    👨‍🏫 GVHD: {currentStudentDefense.studentDetail.advisorName}
                   </div>
                 </div>
               )}
