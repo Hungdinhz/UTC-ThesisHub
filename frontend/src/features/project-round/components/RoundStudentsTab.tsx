@@ -5,6 +5,7 @@ import type {
   StudentProjectRoundItem,
   StudentImportPreviewResponse,
   StudentImportRow,
+  StudentPasswordMode,
   CreateRoundStudentManualPayload,
   UpdateRoundStudentPayload,
 } from '../../../types';
@@ -117,6 +118,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   const [importLoading, setImportLoading] = useState(false);
   const [previewData, setPreviewData] = useState<StudentImportPreviewResponse | null>(null);
   const [importResultMsg, setImportResultMsg] = useState<string | null>(null);
+  const [importPasswordMode, setImportPasswordMode] = useState<StudentPasswordMode>('PHONE');
 
   // Modal Add Student Manually states
   const [showManualModal, setShowManualModal] = useState(false);
@@ -136,6 +138,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     missingPrerequisiteCount: 0,
     status: 'ELIGIBLE',
     note: '',
+    passwordMode: 'PHONE',
   });
 
   // Modal Edit Student & Academic Record states
@@ -608,10 +611,15 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setError(null);
       const result = await apiService.commitImportStudents(roundId, {
         rows: validRows,
+        passwordMode: importPasswordMode,
       });
 
+      const passwordRuleText =
+        importPasswordMode === 'STUDENT_CODE'
+          ? 'Mã sinh viên (MSSV)'
+          : 'Số điện thoại (dự phòng Mã SV nếu thiếu SĐT)';
       setImportResultMsg(
-        `Xử lý thành công ${result.totalProcessed} dòng. Tự động cấp ${result.newUsersCreated} tài khoản cho sinh viên đủ điều kiện (sinh viên không đủ điều kiện không được cấp tài khoản), ${result.newStudentsCreated} Sinh viên, ghi danh ${result.enrolledInRound} vào đợt (bỏ qua ${result.skipped}).`
+        `Xử lý thành công ${result.totalProcessed} dòng. Tự động cấp ${result.newUsersCreated} tài khoản (Tên đăng nhập = Mã SV, Mật khẩu = ${passwordRuleText}) cho sinh viên đủ điều kiện, ${result.newStudentsCreated} hồ sơ Sinh viên, ghi danh ${result.enrolledInRound} vào đợt (bỏ qua ${result.skipped}).`
       );
       setPreviewData(null);
       setImportFile(null);
@@ -676,6 +684,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setError(null);
       setManualModalError(null);
       const emailVal = manualForm.email?.trim() || `${code.toLowerCase()}@lms.utc.edu.vn`;
+      const selectedPasswordMode: StudentPasswordMode = manualForm.passwordMode || 'PHONE';
       await apiService.addStudentToRoundManually(roundId, {
         ...manualForm,
         studentCode: code,
@@ -686,9 +695,14 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         missingPrerequisiteCount: 0,
         tuitionDebt: Boolean(manualForm.tuitionDebt),
         underDisciplinaryAction: Boolean(manualForm.underDisciplinaryAction),
+        passwordMode: selectedPasswordMode,
       });
 
-      setSuccessMsg(`Thêm sinh viên ${code} thành công. Tài khoản hệ thống đã được cấp: Tên đăng nhập = ${code}, Mật khẩu mặc định = Password@123.`);
+      const resolvedPwdPreview =
+        selectedPasswordMode === 'STUDENT_CODE'
+          ? code
+          : (manualForm.phone?.trim() || `${code} (do chưa nhập SĐT)`);
+      setSuccessMsg(`Thêm sinh viên ${code} thành công. Tài khoản hệ thống đã được cấp: Tên đăng nhập = ${code}, Mật khẩu = ${resolvedPwdPreview}.`);
       setShowManualModal(false);
       setManualForm({
         studentCode: '',
@@ -705,6 +719,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         missingPrerequisiteCount: 0,
         status: 'ELIGIBLE',
         note: '',
+        passwordMode: 'PHONE',
       });
       setManualErrors({});
       setManualTouched({});
@@ -1390,8 +1405,66 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   </button>
                 </div>
                 <strong style={{ color: '#0a3273' }}>📌 Quy định dữ liệu:</strong> Mã sinh viên (MSSV) <strong>chỉ có đúng 9 số</strong>. Số tín chỉ nợ tối đa 10 tín (&lt;= 10) và không kỷ luật thì được tính là đủ điều kiện nhận đồ án.
-                <br />
-                <strong style={{ color: '#16a34a' }}>🔐 Cấp tài khoản sinh viên:</strong> Hệ thống tự động cấp tài khoản đăng nhập (Tên đăng nhập = Mã SV, Mật khẩu mặc định = Password@123) <strong>chỉ cho sinh viên ĐỦ ĐIỀU KIỆN</strong> nhận đồ án. Sinh viên không đủ điều kiện sẽ <strong>không được cấp tài khoản</strong>.
+                <div style={{ marginTop: '10px', padding: '12px 14px', borderRadius: '8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                  <div style={{ fontWeight: 700, color: '#15803d', marginBottom: '8px', fontSize: '0.84rem' }}>
+                    🔐 Cấp tài khoản sinh viên (Tên đăng nhập = Mã SV) — Chọn mật khẩu mặc định:
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        backgroundColor: importPasswordMode === 'PHONE' ? '#dcfce7' : '#fff',
+                        border: importPasswordMode === 'PHONE' ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+                        color: '#0f172a',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="importPasswordMode"
+                        value="PHONE"
+                        checked={importPasswordMode === 'PHONE'}
+                        onChange={() => setImportPasswordMode('PHONE')}
+                      />
+                      1. Số điện thoại (khuyên dùng)
+                    </label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        backgroundColor: importPasswordMode === 'STUDENT_CODE' ? '#dcfce7' : '#fff',
+                        border: importPasswordMode === 'STUDENT_CODE' ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+                        color: '#0f172a',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="importPasswordMode"
+                        value="STUDENT_CODE"
+                        checked={importPasswordMode === 'STUDENT_CODE'}
+                        onChange={() => setImportPasswordMode('STUDENT_CODE')}
+                      />
+                      2. Mã sinh viên (MSSV)
+                    </label>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#166534' }}>
+                    Hệ thống tự động cấp tài khoản đăng nhập (<strong>Tên đăng nhập = Mã SV</strong>,{' '}
+                    <strong>
+                      Mật khẩu = {importPasswordMode === 'PHONE' ? 'Số điện thoại (tự dự phòng Mã SV nếu thiếu SĐT)' : 'Mã sinh viên'}
+                    </strong>
+                    ) <strong>chỉ cho sinh viên ĐỦ ĐIỀU KIỆN</strong> nhận đồ án. Sinh viên không đủ điều kiện sẽ <strong>không được cấp tài khoản</strong>.
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1855,8 +1928,67 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               ➕ Thêm Sinh viên &amp; Dữ liệu Học vụ thủ công
             </h3>
 
-            <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '0.85rem', color: '#1e40af' }}>
-              🔐 <strong>Cấp tài khoản đăng nhập tự động:</strong> Khi lưu, hệ thống tự động tạo tài khoản Sinh viên với <strong>Tên đăng nhập = Mã SV</strong> và <strong>Mật khẩu mặc định = Password@123</strong>.
+            <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px', fontSize: '0.84rem', color: '#1e40af' }}>
+              <div style={{ fontWeight: 700, marginBottom: '8px' }}>
+                🔐 Cấp tài khoản đăng nhập tự động (Tên đăng nhập = Mã SV) — Chọn mật khẩu:
+              </div>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    backgroundColor: (manualForm.passwordMode || 'PHONE') === 'PHONE' ? '#dbeafe' : '#fff',
+                    border: (manualForm.passwordMode || 'PHONE') === 'PHONE' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                    color: '#0f172a',
+                    fontWeight: 600,
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="manualPasswordMode"
+                    value="PHONE"
+                    checked={(manualForm.passwordMode || 'PHONE') === 'PHONE'}
+                    onChange={() => setManualForm({ ...manualForm, passwordMode: 'PHONE' })}
+                  />
+                  1. Số điện thoại
+                </label>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    backgroundColor: manualForm.passwordMode === 'STUDENT_CODE' ? '#dbeafe' : '#fff',
+                    border: manualForm.passwordMode === 'STUDENT_CODE' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                    color: '#0f172a',
+                    fontWeight: 600,
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="manualPasswordMode"
+                    value="STUDENT_CODE"
+                    checked={manualForm.passwordMode === 'STUDENT_CODE'}
+                    onChange={() => setManualForm({ ...manualForm, passwordMode: 'STUDENT_CODE' })}
+                  />
+                  2. Mã sinh viên (MSSV)
+                </label>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#1e3a8a' }}>
+                Khi lưu, tài khoản mới sẽ có <strong>Tên đăng nhập = {manualForm.studentCode.trim() || 'Mã SV'}</strong>,{' '}
+                <strong>
+                  Mật khẩu ={' '}
+                  {manualForm.passwordMode === 'STUDENT_CODE'
+                    ? (manualForm.studentCode.trim() || 'Mã SV')
+                    : (manualForm.phone?.trim() || `${manualForm.studentCode.trim() || 'Mã SV'} (dự phòng khi chưa nhập SĐT)`)}
+                </strong>.
+              </div>
             </div>
 
             {manualModalError && (

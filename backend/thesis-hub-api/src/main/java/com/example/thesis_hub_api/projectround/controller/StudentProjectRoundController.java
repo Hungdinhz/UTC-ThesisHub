@@ -88,7 +88,7 @@ public class StudentProjectRoundController {
 
     @PostMapping("/{roundId}/students/manual")
     @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
-    @Operation(summary = "Thêm sinh viên thủ công vào đợt đồ án (Tự động cấp tài khoản MSSV/MSSV)")
+    @Operation(summary = "Thêm sinh viên thủ công vào đợt đồ án (Tự động cấp tài khoản MSSV, mật khẩu SĐT hoặc MSSV)")
     public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> addStudentManually(
             @PathVariable Long roundId,
             @Valid @RequestBody CreateRoundStudentManualDTO dto) {

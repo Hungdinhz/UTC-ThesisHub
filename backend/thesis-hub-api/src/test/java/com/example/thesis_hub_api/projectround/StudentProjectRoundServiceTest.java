@@ -12,6 +12,7 @@ import com.example.thesis_hub_api.organization.entity.TrainingProgram;
 import com.example.thesis_hub_api.organization.repository.MajorRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.organization.repository.TrainingProgramRepository;
+import com.example.thesis_hub_api.projectround.dto.request.CreateRoundStudentManualDTO;
 import com.example.thesis_hub_api.projectround.dto.request.StudentImportCommitRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.request.UpdateStudentRoundStatusRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreviewResponseDTO;
@@ -349,5 +350,97 @@ class StudentProjectRoundServiceTest {
 
         byte[] result = studentProjectRoundService.generateTemplate();
         assertArrayEquals(sampleBytes, result);
+    }
+
+    @Test
+    @DisplayName("Commit import sinh viên - Mật khẩu theo SĐT (dự phòng Mã SV nếu thiếu SĐT) hoặc Mã SV")
+    void commitImportStudents_PasswordModes() {
+        StudentImportRowDTO rowWithPhone = StudentImportRowDTO.builder()
+                .rowIndex(2).stt(1).studentCode("201200101").fullName("Nguyễn Văn An")
+                .majorCode("CNTT").className("CNTT 1").phone("0912345671").isValid(true).build();
+        StudentImportRowDTO rowNoPhone = StudentImportRowDTO.builder()
+                .rowIndex(3).stt(2).studentCode("201200102").fullName("Trần Thị Bình")
+                .majorCode("CNTT").className("CNTT 1").phone("").isValid(true).build();
+
+        when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
+        when(roleRepository.findByName("ROLE_STUDENT")).thenReturn(Optional.of(studentRole));
+        when(majorRepository.findAll()).thenReturn(List.of(sampleMajor));
+        when(passwordEncoder.encode(any())).thenAnswer(inv -> "ENC(" + inv.getArgument(0) + ")");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.setId("201200101".equals(u.getUsername()) ? 51L : 52L);
+            return u;
+        });
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> {
+            Student s = inv.getArgument(0);
+            s.setId("201200101".equals(s.getStudentCode()) ? 71L : 72L);
+            return s;
+        });
+        when(studentProjectRoundRepository.save(any(StudentProjectRound.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // 1. PHONE mode: uses phone when available, falls back to studentCode when blank
+        studentProjectRoundService.commitImportStudents(100L, StudentImportCommitRequestDTO.builder()
+                .rows(List.of(rowWithPhone, rowNoPhone))
+                .passwordMode("PHONE")
+                .build());
+        verify(passwordEncoder).encode("0912345671");
+        verify(passwordEncoder).encode("201200102");
+        verify(passwordEncoder, never()).encode("Password@123");
+
+        // 2. STUDENT_CODE mode: always encodes studentCode
+        clearInvocations(passwordEncoder);
+        studentProjectRoundService.commitImportStudents(100L, StudentImportCommitRequestDTO.builder()
+                .rows(List.of(rowWithPhone))
+                .passwordMode("STUDENT_CODE")
+                .build());
+        verify(passwordEncoder).encode("201200101");
+        verify(passwordEncoder, never()).encode("0912345671");
+    }
+
+    @Test
+    @DisplayName("Thêm sinh viên thủ công - Hỗ trợ 2 tùy chọn mật khẩu: Số điện thoại hoặc Mã SV")
+    void addStudentManually_PasswordModes() {
+        when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
+        when(roleRepository.findByName("ROLE_STUDENT")).thenReturn(Optional.of(studentRole));
+        when(passwordEncoder.encode(any())).thenAnswer(inv -> "ENC(" + inv.getArgument(0) + ")");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.setId(88L);
+            return u;
+        });
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> {
+            Student s = inv.getArgument(0);
+            s.setId(99L);
+            return s;
+        });
+        when(studentProjectRoundRepository.save(any(StudentProjectRound.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Mode 1: PHONE
+        CreateRoundStudentManualDTO phoneDto = CreateRoundStudentManualDTO.builder()
+                .studentCode("201200201")
+                .fullName("Lê Văn Cường")
+                .majorId(10L)
+                .phone("0988776655")
+                .gpa(3.2)
+                .completedCredits(170)
+                .passwordMode("PHONE")
+                .build();
+        studentProjectRoundService.addStudentManually(100L, phoneDto);
+        verify(passwordEncoder).encode("0988776655");
+
+        // Mode 2: STUDENT_CODE
+        clearInvocations(passwordEncoder);
+        CreateRoundStudentManualDTO codeDto = CreateRoundStudentManualDTO.builder()
+                .studentCode("201200202")
+                .fullName("Phạm Thị Dung")
+                .majorId(10L)
+                .phone("0988776644")
+                .gpa(3.4)
+                .completedCredits(170)
+                .passwordMode("STUDENT_CODE")
+                .build();
+        studentProjectRoundService.addStudentManually(100L, codeDto);
+        verify(passwordEncoder).encode("201200202");
+        verify(passwordEncoder, never()).encode("Password@123");
     }
 }
