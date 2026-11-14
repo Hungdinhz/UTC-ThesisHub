@@ -231,9 +231,9 @@ export const CouncilManagementPage: React.FC = () => {
     <div className="feature-page-container">
       <div className="feature-page-header">
         <div>
-          <h1 className="feature-page-title">GĐ5: Thành Lập Hội Đồng Bảo Vệ Đồ Án Tốt Nghiệp</h1>
+          <h1 className="feature-page-title">GĐ5: Thành Lập Hội Đồng Bảo Vệ Đồ Án</h1>
           <p className="feature-page-subtitle">
-            Cơ cấu chuẩn: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường. Chốt Hội đồng rồi chuyển sang Xếp lịch bảo vệ.
+            Cơ cấu: 1 Chủ tịch, 1 Thư ký, 2 Phản biện, 1 Ủy viên.
           </p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>

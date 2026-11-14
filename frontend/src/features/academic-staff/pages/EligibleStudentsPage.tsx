@@ -34,7 +34,7 @@ export const EligibleStudentsPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Danh sách sinh viên đủ điều kiện nhận đồ án</h1>
           <p className="feature-page-subtitle">
-            Giáo vụ quản lý danh sách sinh viên và dữ liệu học vụ xét điều kiện nhận đồ án theo đợt.
+            Quản lý danh sách sinh viên và dữ liệu học vụ nhận đồ án.
           </p>
         </div>
       </div>

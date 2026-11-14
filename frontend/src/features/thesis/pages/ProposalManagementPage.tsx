@@ -879,12 +879,9 @@ export const ProposalManagementPage: React.FC = () => {
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 6px 0', color: '#1a202c' }}>
-            Giai đoạn 3: Xây dựng, Xét duyệt Đề tài & Sinh Đề cương PDF
+          <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: 0, color: '#1a202c' }}>
+            Giai đoạn 3: Xét duyệt Đề tài & Sinh Đề cương PDF
           </h1>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-            Quy trình: GV & SV xác định đề tài (Draft) → GV xác nhận → Khoa/Ban duyệt đề tài → Sinh đề cương PDF → SV ký nộp & Khoa lưu hồ sơ.
-          </p>
         </div>
         {isStudent && !isRoundReadOnly && (
           <button

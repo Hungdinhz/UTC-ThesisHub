@@ -73,8 +73,6 @@ export const AdminDashboard: React.FC = () => {
       title: 'Khởi tạo Đợt Đồ án & Dữ liệu Tổ chức',
       icon: '🗓️',
       color: '#16a34a',
-      description:
-        'Tạo đợt đồ án mới, chọn CTĐT (Cử nhân / Kỹ sư), Import danh sách sinh viên đủ điều kiện từ Excel, cập nhật thông tin giảng viên, học vị và phân bổ khoa/bộ môn.',
       actions: [
         { label: 'Đợt đồ án & Import SV', route: '/admin/project-rounds' },
         { label: 'Khoa, Bộ môn, GV & SV', route: '/admin/organization' },
@@ -85,8 +83,6 @@ export const AdminDashboard: React.FC = () => {
       title: 'Chọn Hướng, Nguyện vọng NV1–NV3 & Phân công',
       icon: '🎯',
       color: '#0284c7',
-      description:
-        'Sinh viên chọn hướng đồ án & 3 nguyện vọng GVHD (kiểm tra chuẩn học vị Kỹ sư). Thuật toán phân bổ theo quota, xử lý nguyện vọng bổ sung và chốt danh sách.',
       actions: [
         { label: 'Phân công GVHD & Chốt', route: '/admin/assignments' },
         { label: 'Form SV Đăng ký NV', route: '/student/assignment' },
@@ -97,8 +93,6 @@ export const AdminDashboard: React.FC = () => {
       title: 'Công bố, Xây dựng Đề tài & Xuất Đề cương PDF',
       icon: '📑',
       color: '#7c3aed',
-      description:
-        'GVHD & SV phối hợp xây dựng tên đề tài, mục tiêu, phạm vi. Ban chủ nhiệm Khoa xét duyệt đề cương, xuất file PDF chuẩn mẫu UTC và sinh viên ký số lưu trữ.',
       actions: [
         { label: 'Duyệt Đề cương & Ký PDF', route: '/thesis/proposals' },
         { label: 'Chi tiết Đề tài', route: '/thesis/detail' },
@@ -109,8 +103,6 @@ export const AdminDashboard: React.FC = () => {
       title: 'Thực hiện Đồ án, Giao Task & Báo cáo Tiến độ',
       icon: '📋',
       color: '#0891b2',
-      description:
-        'Quản lý bảng công việc (Taskboard), sinh viên nộp bài theo deadline, GVHD phản hồi/yêu cầu chỉnh sửa, theo dõi báo cáo tiến độ tuần và chấm hoàn thành.',
       actions: [
         { label: 'Bảng Task & Review', route: '/progress/tasks' },
         { label: 'Báo cáo Tiến độ', route: '/progress/reports' },
@@ -121,8 +113,6 @@ export const AdminDashboard: React.FC = () => {
       title: 'Xét Bảo vệ, Hội đồng (1CT-1TK-2PB-1UV) & Tổng kết Điểm',
       icon: '🏆',
       color: '#dc2626',
-      description:
-        'GVHD xác nhận đủ ĐK bảo vệ, kiểm tra chuẩn học vụ cuối. Lập Hội đồng 5 thành viên (1CT-1TK-1PB1-1PB2-1UV), xếp lịch bảo vệ, chấm điểm và ký biên bản điện tử.',
       actions: [
         { label: 'Xét ĐK Bảo vệ Cuối', route: '/admin/final-eligibility' },
         { label: 'Lập HĐ (1CT-1TK-2PB-1UV)', route: '/admin/councils' },
@@ -170,7 +160,7 @@ export const AdminDashboard: React.FC = () => {
               </span>
             </div>
             <p style={{ margin: 0, color: '#475569', fontSize: '0.96rem', lineHeight: 1.5 }}>
-              Chào mừng trở lại, <strong>{user?.fullName || user?.username || 'Quản trị viên'}</strong>. Trung tâm chỉ huy và điều hành toàn trình <strong>5 Giai đoạn Đồ án Tốt nghiệp UTC</strong>.
+              Chào mừng trở lại, <strong>{user?.fullName || user?.username || 'Quản trị viên'}</strong>.
             </p>
           </div>
 
@@ -369,12 +359,9 @@ export const AdminDashboard: React.FC = () => {
                     </span>
                     <span style={{ fontSize: '1.6rem' }}>{item.icon}</span>
                   </div>
-                  <h4 style={{ margin: '0 0 8px 0', color: '#0f172a', fontSize: '1.05rem', fontWeight: 700 }}>
+                  <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1.05rem', fontWeight: 700 }}>
                     {item.title}
                   </h4>
-                  <p style={{ margin: 0, color: '#475569', fontSize: '0.88rem', lineHeight: 1.55 }}>
-                    {item.description}
-                  </p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingTop: '12px', borderTop: '1px dashed #e2e8f0' }}>

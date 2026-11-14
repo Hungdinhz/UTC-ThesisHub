@@ -560,7 +560,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
         >
           <span style={{ fontSize: '1.4rem' }}>🔒</span>
           <div>
-            <strong>Đợt đồ án đã đóng hoặc đã lưu trữ (Chế độ chỉ xem):</strong> Mọi thao tác ghi danh, phân công thuật toán, chốt kết quả, override và chỉnh sửa chỉ tiêu capacity đã bị khóa đối với đợt này.
+            <strong>Đợt đồ án đã đóng (Chế độ chỉ xem):</strong> Thao tác phân công và chỉnh sửa đã bị khóa.
           </div>
         </div>
       )}
@@ -601,7 +601,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
               </span>
             </div>
             <p style={{ margin: '6px 0 0 0', color: '#15803d', fontSize: '0.9rem', lineHeight: 1.5 }}>
-              Kết quả phân công Giảng viên hướng dẫn cho đợt <strong>{currentRound?.name || effectiveRoundId}</strong> đã được chốt và lưu chính thức vào cơ sở dữ liệu. Toàn bộ {proposals.length} sinh viên đã được bàn giao cho các Giảng viên để chuẩn bị bước sang <strong>Giai đoạn 3 (Đề cương & Duyệt đề tài)</strong>. Nút chốt kết quả phân công đã được khóa, tuy nhiên Khoa vẫn có thể bấm nút <strong>"✏️ Sửa phân công"</strong> ở từng sinh viên bên dưới để điều chỉnh thủ công nếu cần.
+              Đã chốt phân công GVHD cho <strong>{proposals.length}</strong> sinh viên. Bấm <strong>"✏️ Sửa phân công"</strong> ở từng sinh viên bên dưới nếu cần điều chỉnh.
               {stats?.droppedCount && stats.droppedCount > 0 ? (
                 <span style={{ display: 'block', marginTop: '4px', color: '#b91c1c', fontWeight: 600 }}>
                   ⚠️ Đã loại {stats.droppedCount} sinh viên không đăng ký nguyện vọng khỏi đợt đồ án theo quy chế.

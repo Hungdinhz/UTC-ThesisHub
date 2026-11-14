@@ -267,8 +267,8 @@ export const DefenseSchedulePage: React.FC = () => {
           </h1>
           <p className="feature-page-subtitle">
             {isStudent
-              ? 'Theo dõi lịch bảo vệ chính thức (Phòng, Ca, Hội đồng 5 thành viên) và kết quả tốt nghiệp được công bố cuối đợt.'
-              : 'Quản lý ca bảo vệ tự động hoặc thủ công, chọn sinh viên đủ điều kiện vào từng ca tránh trùng GVHD.'}
+              ? 'Lịch bảo vệ chính thức và kết quả tốt nghiệp.'
+              : 'Xếp lịch bảo vệ theo ca thi, phòng thi và hội đồng.'}
           </p>
         </div>
 
