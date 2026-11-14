@@ -389,8 +389,8 @@ public class StudentProjectRoundService {
         List<String> messages = new ArrayList<>();
         Set<Long> processedStudentIdsInBatch = new HashSet<>();
 
-        // Pre-compute default BCrypt password hash ONCE outside the row loop to avoid N * 100ms CPU blocking
-        String defaultEncodedPassword = passwordEncoder.encode("Password@123");
+        String passwordMode = normalizePasswordMode(requestDTO.getPasswordMode());
+        Map<String, String> encodedPasswordCache = new HashMap<>();
 
         for (StudentImportRowDTO row : requestDTO.getRows()) {
             totalProcessed++;
@@ -457,12 +457,15 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                         }
                     }
 
+                    String rawPassword = resolveStudentRawPassword(passwordMode, studentCode, row.getPhone());
+                    String encodedPassword = encodedPasswordCache.computeIfAbsent(rawPassword, passwordEncoder::encode);
+
                     user = User.builder()
                             .username(studentCode)
                             .fullName(fullName)
                             .email(targetEmail)
                             .phone(row.getPhone())
-                            .password(defaultEncodedPassword)
+                            .password(encodedPassword)
                             .role(studentRole)
                             .isActive(accountActive)
                             .build();
@@ -484,6 +487,10 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                         }
                     }
                     user.setIsActive(accountActive);
+                    if (!StringUtils.hasText(user.getPassword())) {
+                        String rawPassword = resolveStudentRawPassword(passwordMode, studentCode, row.getPhone());
+                        user.setPassword(encodedPasswordCache.computeIfAbsent(rawPassword, passwordEncoder::encode));
+                    }
                     user = userRepository.save(user);
                 }
 
@@ -609,8 +616,11 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
             }
         }
 
-        messages.add(String.format("Xử lý thành công %d sinh viên (Tạo mới %d tài khoản, %d hồ sơ sinh viên, ghi danh %d vào đợt đồ án).",
-                totalProcessed, newUsersCreated, newStudentsCreated, enrolledInRound));
+        String passwordPolicyLabel = "STUDENT_CODE".equals(passwordMode)
+                ? "Mã sinh viên (MSSV)"
+                : "Số điện thoại (dự phòng Mã SV nếu thiếu SĐT)";
+        messages.add(String.format("Xử lý thành công %d sinh viên (Tạo mới %d tài khoản [%s], %d hồ sơ sinh viên, ghi danh %d vào đợt đồ án).",
+                totalProcessed, newUsersCreated, passwordPolicyLabel, newStudentsCreated, enrolledInRound));
 
         return StudentImportResultResponseDTO.builder()
                 .totalProcessed(totalProcessed)
@@ -663,12 +673,13 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 }
             }
 
+            String rawPassword = resolveStudentRawPassword(dto.getPasswordMode(), studentCode, dto.getPhone());
             user = User.builder()
                     .username(studentCode)
                     .fullName(fullName)
                     .email(targetEmail)
                     .phone(dto.getPhone() != null ? dto.getPhone().trim() : null)
-                    .password(passwordEncoder.encode("Password@123"))
+                    .password(passwordEncoder.encode(rawPassword))
                     .role(studentRole)
                     .isActive(true)
                     .build();
@@ -686,7 +697,8 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 }
             }
             if (!StringUtils.hasText(user.getPassword())) {
-                user.setPassword(passwordEncoder.encode("Password@123"));
+                String rawPassword = resolveStudentRawPassword(dto.getPasswordMode(), studentCode, dto.getPhone());
+                user.setPassword(passwordEncoder.encode(rawPassword));
             }
             user.setIsActive(false); // Sẽ được cập nhật chính xác theo điều kiện học vụ bên dưới
             user = userRepository.save(user);
@@ -1227,5 +1239,22 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 .accountActive(isAccountActive)
                 .enrolledAt(spr.getCreatedAt())
                 .build();
+    }
+
+    private String normalizePasswordMode(String passwordMode) {
+        if ("STUDENT_CODE".equalsIgnoreCase(passwordMode)) {
+            return "STUDENT_CODE";
+        }
+        return "PHONE";
+    }
+
+    private String resolveStudentRawPassword(String passwordMode, String studentCode, String phone) {
+        if ("STUDENT_CODE".equalsIgnoreCase(passwordMode)) {
+            return studentCode;
+        }
+        if (StringUtils.hasText(phone)) {
+            return phone.trim();
+        }
+        return studentCode;
     }
 }

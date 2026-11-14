@@ -156,6 +156,19 @@ class ApiService {
   }
 
 
+  // Health / Warm-up Ping (for Render Free Tier wake-up)
+  async pingServer(timeoutMs = 12000): Promise<boolean> {
+    try {
+      await axios.get(`${API_BASE_URL}/auth/ping`, {
+        timeout: timeoutMs,
+        withCredentials: false,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // Admin Auth
   async adminRegister(payload: AdminRegisterPayload): Promise<any> {
     const response = await this.api.post(AUTH.ADMIN_REGISTER, {
@@ -1158,7 +1171,8 @@ class ApiService {
   async commitImportStudents(roundId: number, payload: StudentImportCommitPayload): Promise<StudentImportResultResponse> {
     const response = await this.api.post<StudentImportResultResponse>(
       PROJECT_ROUNDS.studentImportCommit(roundId),
-      payload
+      payload,
+      { timeout: 120000 }
     );
     return response.data;
   }

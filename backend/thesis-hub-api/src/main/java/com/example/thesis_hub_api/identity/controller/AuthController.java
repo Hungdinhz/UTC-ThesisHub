@@ -26,6 +26,12 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @GetMapping("/ping")
+    @Operation(summary = "Kiểm tra nhanh trạng thái máy chủ (Keep-Alive / Warm-up)")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> ping() {
+        return ResponseEntity.ok(ApiResponse.success("OK", java.util.Map.of("status", "UP")));
+    }
+
     @PostMapping("/login")
     @Operation(summary = "Đăng nhập hệ thống chung", description = "Đăng nhập bằng username, email hoặc mã số")
     public ResponseEntity<ApiResponse<LoginResponseDTO>> login(@Valid @RequestBody LoginRequestDTO request) {

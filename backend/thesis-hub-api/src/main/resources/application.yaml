@@ -91,3 +91,8 @@ app:
   admin:
     registration-key: ${ADMIN_REGISTRATION_KEY:}
     require-key-on-login: ${ADMIN_LOGIN_REQUIRE_KEY:false}
+
+management:
+  health:
+    mail:
+      enabled: false
