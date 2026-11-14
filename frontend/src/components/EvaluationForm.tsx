@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
+import { toast } from './Toast';
 import './EvaluationForm.css';
 
 // Status choices for evaluations
@@ -305,7 +306,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
       };
       
       await evaluationType.updateEvaluation(groupId, dataToSave);
-      alert('Evaluation saved successfully!');
+      toast.success('Đã lưu đánh giá thành công!');
       onSaved?.();
       onClose();
     } catch (err: any) {

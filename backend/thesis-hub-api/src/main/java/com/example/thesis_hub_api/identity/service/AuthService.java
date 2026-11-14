@@ -2,6 +2,7 @@ package com.example.thesis_hub_api.identity.service;
 
 import com.example.thesis_hub_api.common.exception.AppException;
 import com.example.thesis_hub_api.common.exception.ErrorCode;
+import com.example.thesis_hub_api.common.security.LoginRateLimiter;
 import com.example.thesis_hub_api.identity.dto.request.AdminLoginRequestDTO;
 import com.example.thesis_hub_api.identity.dto.request.AdminRegisterRequestDTO;
 import com.example.thesis_hub_api.identity.dto.request.ChangePasswordRequestDTO;
@@ -46,19 +47,41 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final StudentProjectRoundRepository studentProjectRoundRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private LoginRateLimiter loginRateLimiter;
 
-    @Value("${app.admin.registration-key:thesishub_admin_secret_key_2026_fit_utc}")
+    @Value("${app.admin.registration-key:}")
     private String adminRegistrationKey;
 
     @Value("${app.admin.require-key-on-login:false}")
     private boolean requireKeyOnLogin;
 
-    @Transactional(readOnly = true)
+    private void checkRateLimit(String key) {
+        if (loginRateLimiter != null) {
+            loginRateLimiter.checkAllowed(key);
+        }
+    }
+
+    private void recordLoginFailure(String key) {
+        if (loginRateLimiter != null) {
+            loginRateLimiter.recordFailure(key);
+        }
+    }
+
+    private void resetRateLimit(String key) {
+        if (loginRateLimiter != null) {
+            loginRateLimiter.reset(key);
+        }
+    }
+
+    @Transactional
     public LoginResponseDTO login(LoginRequestDTO request) {
         String identifier = request.getLoginIdentifier();
         if (!StringUtils.hasText(identifier) || !StringUtils.hasText(request.getPassword())) {
             throw new AppException(ErrorCode.VALIDATION_FAILED);
         }
+
+        checkRateLimit(identifier);
 
         // Try locating user by username or email
         Optional<User> userOpt = userRepository.findByUsernameOrEmail(identifier, identifier);
@@ -73,7 +96,20 @@ public class AuthService {
             userOpt = lecturerRepository.findByLecturerCode(identifier).map(Lecturer::getUser);
         }
 
-        User user = userOpt.orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        if (userOpt.isEmpty()) {
+            recordLoginFailure(identifier);
+            throw new AppException(ErrorCode.USER_NOT_EXISTED);
+        }
+
+        User user = userOpt.get();
+
+        // Verify password BEFORE checking eligibility or lock status to prevent pre-auth user enumeration & academic info leak
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            recordLoginFailure(identifier);
+            throw new AppException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        resetRateLimit(identifier);
 
         // Quy định UTC: Sinh viên ở trạng thái Không đủ điều kiện nhận đồ án (nợ học phí, kỷ luật, nợ tín >= 10, GPA < 2.0)
         // sẽ không được cấp tài khoản / không thể đăng nhập.
@@ -131,31 +167,7 @@ public class AuthService {
             throw new AppException(ErrorCode.USER_LOCKED, "Tài khoản của bạn đã bị khóa hoặc chưa được cấp phép.");
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new AppException(ErrorCode.INVALID_PASSWORD);
-        }
-
-        UserPrincipal principal = UserPrincipal.create(user);
-        String token = jwtTokenProvider.generateTokenFromUser(principal);
-
-        Instant expiresAt = Instant.now().plus(jwtTokenProvider.getExpirationMs(), ChronoUnit.MILLIS);
-        String expireTimeStr = expiresAt.toString();
-
-        return LoginResponseDTO.builder()
-                .token(token)
-                .access(token)
-                .refreshToken(token)
-                .refresh(token)
-                .type("Bearer")
-                .userId(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .role(user.getRole() != null ? user.getRole().getName() : "ROLE_STUDENT")
-                .expiresIn(jwtTokenProvider.getExpirationMs())
-                .expireTime(expireTimeStr)
-                .expireTimeSnake(expireTimeStr)
-                .build();
+        return buildLoginResponse(user);
     }
 
     @Transactional
@@ -208,26 +220,7 @@ public class AuthService {
         log.info("Registered new Admin account successfully: {} ({})", user.getUsername(), user.getEmail());
 
         // 6. Return LoginResponseDTO
-        UserPrincipal principal = UserPrincipal.create(user);
-        String token = jwtTokenProvider.generateTokenFromUser(principal);
-        Instant expiresAt = Instant.now().plus(jwtTokenProvider.getExpirationMs(), ChronoUnit.MILLIS);
-        String expireTimeStr = expiresAt.toString();
-
-        return LoginResponseDTO.builder()
-                .token(token)
-                .access(token)
-                .refreshToken(token)
-                .refresh(token)
-                .type("Bearer")
-                .userId(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .role(user.getRole().getName())
-                .expiresIn(jwtTokenProvider.getExpirationMs())
-                .expireTime(expireTimeStr)
-                .expireTimeSnake(expireTimeStr)
-                .build();
+        return buildLoginResponse(user);
     }
 
     @Transactional(readOnly = true)
@@ -237,6 +230,8 @@ public class AuthService {
             throw new AppException(ErrorCode.VALIDATION_FAILED);
         }
 
+        checkRateLimit("admin:" + identifier);
+
         // 1. If requireKeyOnLogin is enabled, verify admin secret key
         if (requireKeyOnLogin) {
             if (!StringUtils.hasText(request.getAdminSecretKey())
@@ -244,49 +239,39 @@ public class AuthService {
                     || !MessageDigest.isEqual(
                             request.getAdminSecretKey().trim().getBytes(StandardCharsets.UTF_8),
                             adminRegistrationKey.trim().getBytes(StandardCharsets.UTF_8))) {
+                recordLoginFailure("admin:" + identifier);
                 throw new AppException(ErrorCode.INVALID_ADMIN_SECRET_KEY);
             }
         }
 
         // 2. Find user by username or email
-        User user = userRepository.findByUsernameOrEmail(identifier, identifier)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        Optional<User> userOpt = userRepository.findByUsernameOrEmail(identifier, identifier);
+        if (userOpt.isEmpty()) {
+            recordLoginFailure("admin:" + identifier);
+            throw new AppException(ErrorCode.USER_NOT_EXISTED);
+        }
+        User user = userOpt.get();
+
+        // 3. Verify password first before revealing role or lock status
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            recordLoginFailure("admin:" + identifier);
+            throw new AppException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        // 4. Verify role must be ROLE_ADMIN
+        if (user.getRole() == null || !"ROLE_ADMIN".equalsIgnoreCase(user.getRole().getName())) {
+            recordLoginFailure("admin:" + identifier);
+            throw new AppException(ErrorCode.NOT_AN_ADMIN_ACCOUNT);
+        }
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new AppException(ErrorCode.USER_LOCKED);
         }
 
-        // 3. Verify role must be ROLE_ADMIN
-        if (user.getRole() == null || !"ROLE_ADMIN".equalsIgnoreCase(user.getRole().getName())) {
-            throw new AppException(ErrorCode.NOT_AN_ADMIN_ACCOUNT);
-        }
-
-        // 4. Verify password
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new AppException(ErrorCode.INVALID_PASSWORD);
-        }
+        resetRateLimit("admin:" + identifier);
 
         // 5. Generate token
-        UserPrincipal principal = UserPrincipal.create(user);
-        String token = jwtTokenProvider.generateTokenFromUser(principal);
-        Instant expiresAt = Instant.now().plus(jwtTokenProvider.getExpirationMs(), ChronoUnit.MILLIS);
-        String expireTimeStr = expiresAt.toString();
-
-        return LoginResponseDTO.builder()
-                .token(token)
-                .access(token)
-                .refreshToken(token)
-                .refresh(token)
-                .type("Bearer")
-                .userId(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .role(user.getRole().getName())
-                .expiresIn(jwtTokenProvider.getExpirationMs())
-                .expireTime(expireTimeStr)
-                .expireTimeSnake(expireTimeStr)
-                .build();
+        return buildLoginResponse(user);
     }
 
     @Transactional
@@ -345,16 +330,24 @@ public class AuthService {
             throw new AppException(ErrorCode.USER_LOCKED);
         }
 
+        return buildLoginResponse(user);
+    }
+
+    private LoginResponseDTO buildLoginResponse(User user) {
         UserPrincipal principal = UserPrincipal.create(user);
-        String newToken = jwtTokenProvider.generateTokenFromUser(principal);
+        String accessToken = jwtTokenProvider.generateTokenFromUser(principal);
+        String refreshToken = jwtTokenProvider.generateRefreshTokenFromUser(principal);
+        if (!StringUtils.hasText(refreshToken)) {
+            refreshToken = accessToken;
+        }
         Instant expiresAt = Instant.now().plus(jwtTokenProvider.getExpirationMs(), ChronoUnit.MILLIS);
         String expireTimeStr = expiresAt.toString();
 
         return LoginResponseDTO.builder()
-                .token(newToken)
-                .access(newToken)
-                .refreshToken(newToken)
-                .refresh(newToken)
+                .token(accessToken)
+                .access(accessToken)
+                .refreshToken(refreshToken)
+                .refresh(refreshToken)
                 .type("Bearer")
                 .userId(user.getId())
                 .username(user.getUsername())

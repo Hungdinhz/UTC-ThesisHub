@@ -14,6 +14,7 @@ import DocumentRequirementsManager from '../components/DocumentRequirementsManag
 import UTCFacultyAnalytics from '../components/UTCFacultyAnalytics';
 import { UTCCouncilLiveDefenseView } from '../components/UTCCouncilLiveDefenseView';
 import { SkeletonProfile, SkeletonCardGrid, SkeletonEvaluationGrid } from '../components/SkeletonLoader';
+import { toast } from '../components/Toast';
 import './Dashboard.css';
 import '../components/EvaluationForm.css';
 import '../components/SkeletonLoader.css';
@@ -69,9 +70,10 @@ const CommitteeMemberDashboard: React.FC = () => {
   const handleExportConsolidatedReport = async () => {
     try {
       await apiService.downloadConsolidatedReport();
+      toast.success('Đang tải xuống báo cáo tổng hợp...');
     } catch (err) {
       console.error('Failed to download report:', err);
-      alert('Failed to download report. Please try again.');
+      toast.error('Lỗi khi tải xuống báo cáo tổng hợp. Vui lòng thử lại!');
     }
   };
 
@@ -679,7 +681,7 @@ const GroupDocumentsList: React.FC<{ groupId: number }> = ({ groupId }) => {
       await apiService.downloadDocument(fileUrl, fileName);
     } catch (err) {
       console.error('Failed to download document:', err);
-      alert('Failed to download document');
+      toast.error('Lỗi khi tải xuống tài liệu!');
     }
   };
 

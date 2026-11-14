@@ -7,6 +7,8 @@ import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
 import { defenseService } from '../../defense/services/defenseService';
 import type { GraduationResult } from '../../defense/types';
+import { getStoredLecturerRoundId } from '../../../utils/phaseTracking';
+import { toast } from '../../../components/Toast';
 
 export const ThesisDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -19,6 +21,7 @@ export const ThesisDetailPage: React.FC = () => {
   const isLecturerOrAdmin = isSupervisor || userType === 'committee_member' || userType === 'admin';
 
   const [thesis, setThesis] = useState<Thesis | null>(null);
+  const [supervisedTheses, setSupervisedTheses] = useState<Thesis[]>([]);
   const [documents, setDocuments] = useState<ThesisDocument[]>([]);
   const [graduationResult, setGraduationResult] = useState<GraduationResult | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -87,13 +90,20 @@ export const ThesisDetailPage: React.FC = () => {
         const lecturerId = (user as any).lecturer?.id || (user as any).lecturer_id || user.id;
         const lecturerCode = (user as any).lecturer?.lecturer_code || (user as any).lecturerCode || (user as any).registration_no || user.username;
         const lecturerFullName = (user.fullName || (user as any).full_name || '').trim().toLowerCase();
+        const storedRoundId = getStoredLecturerRoundId(user.id || (user as any).user_id || user.username);
 
-        const myTheses = (allTheses || []).filter((t) =>
+        const allMyTheses = (allTheses || []).filter((t) =>
           (lecturerId && (t.lecturerId === lecturerId || String(t.lecturerId) === String(lecturerId))) ||
           (lecturerCode && t.lecturerCode === String(lecturerCode)) ||
           (lecturerFullName && t.lecturerFullName && t.lecturerFullName.trim().toLowerCase() === lecturerFullName)
         );
 
+        const roundFiltered = storedRoundId
+          ? allMyTheses.filter((t) => t.projectRoundId === storedRoundId)
+          : allMyTheses;
+        const myTheses = roundFiltered.length > 0 ? roundFiltered : allMyTheses;
+
+        setSupervisedTheses(myTheses);
         if (myTheses.length > 0) {
           setThesis(myTheses[0]);
           const dList = await thesisService.getDocumentsByThesis(myTheses[0].id).catch(() => []);
@@ -106,6 +116,7 @@ export const ThesisDetailPage: React.FC = () => {
       }
 
       // For admin or committee member without param, show first thesis if available
+      setSupervisedTheses(allTheses || []);
       if (allTheses && allTheses.length > 0) {
         setThesis(allTheses[0]);
         const dList = await thesisService.getDocumentsByThesis(allTheses[0].id).catch(() => []);
@@ -135,9 +146,9 @@ export const ThesisDetailPage: React.FC = () => {
         description: docDesc,
       });
       setDocuments((prev) => [doc, ...prev]);
-      alert('🎉 Đã tải lên tài liệu đồ án thành công!');
+      toast.success('Đã tải lên tài liệu đồ án thành công!');
     } catch {
-      alert('🎉 Đã tải lên tài liệu thành công!');
+      toast.success('Đã tải lên tài liệu thành công!');
       loadThesisData();
     }
     setShowUploadModal(false);
@@ -157,13 +168,14 @@ export const ThesisDetailPage: React.FC = () => {
     try {
       const updated = await thesisService.setDefenseEligible(thesis.id, newStatus);
       setThesis(updated);
-      alert(
-        newStatus
-          ? '✅ Đã xác nhận sinh viên ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!'
-          : '❌ Đã cập nhật sang trạng thái CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!'
-      );
+      setSupervisedTheses((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      if (newStatus) {
+        toast.success('Đã xác nhận sinh viên ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!');
+      } else {
+        toast.warning('Đã cập nhật sang trạng thái CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ.');
+      }
     } catch (err: any) {
-      alert('Không thể cập nhật trạng thái điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message));
+      toast.error('Không thể cập nhật trạng thái điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message));
     }
   };
 
@@ -283,8 +295,85 @@ export const ThesisDetailPage: React.FC = () => {
     );
   }
 
+  const handleSelectThesis = async (item: Thesis) => {
+    setThesis(item);
+    const dList = await thesisService.getDocumentsByThesis(item.id).catch(() => []);
+    setDocuments(dList || []);
+  };
+
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+      {/* Multi-student switcher for Supervisor / Admin */}
+      {!isStudent && supervisedTheses.length > 0 && (
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '18px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: '#0a3273' }}>
+              👨‍🎓 Danh sách sinh viên phụ trách ({supervisedTheses.length} sinh viên)
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748b' }}>
+              Chọn từng sinh viên để xem chi tiết đề tài và xác nhận đủ điều kiện bảo vệ
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {supervisedTheses.map((item) => {
+              const isSelected = thesis?.id === item.id;
+              const isOk = item.defenseEligible || item.status === 'DEFENSE_READY' || item.status === 'COMPLETED';
+              const isNo = item.status === 'DEFENSE_NOT_ELIGIBLE';
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelectThesis(item)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    border: isSelected ? '2px solid #0a3273' : '1px solid #cbd5e1',
+                    background: isSelected ? '#eff6ff' : '#f8fafc',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: isSelected ? '#0a3273' : '#0f172a' }}>
+                      {item.studentFullName || 'Sinh viên'} ({item.studentCode})
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: '#64748b', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.thesisCode} • {item.titleVn}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: '999px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: isOk ? '#dcfce7' : isNo ? '#fee2e2' : '#fef3c7',
+                      color: isOk ? '#15803d' : isNo ? '#b91c1c' : '#92400e',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {isOk ? '✓ Đủ ĐK' : isNo ? '✗ Chưa ĐK' : '⏳ Chờ xét'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>

@@ -7,6 +7,7 @@ import { assignmentService } from '../../assignment/services/assignmentService';
 import { thesisService } from '../../thesis/services/thesisService';
 import { eligibilityService } from '../../eligibility/services/eligibilityService';
 import { downloadBlob, extractErrorMessage } from '../../academic-staff/utils/download';
+import { toast } from '../../../components/Toast';
 import {
   daysUntil,
   sortTodoByUrgency,
@@ -167,7 +168,7 @@ export const AcademicStaffHomePage: React.FC = () => {
         err,
         'Không thể xuất file Excel danh sách đủ điều kiện'
       );
-      alert(msg);
+      toast.error(msg);
     } finally {
       setExportingEligible(false);
     }
@@ -180,12 +181,13 @@ export const AcademicStaffHomePage: React.FC = () => {
       const blob = await apiService.exportGradeReport(activeRoundId);
       const code = round?.roundCode || activeRoundId;
       downloadBlob(blob, `Bang_Diem_Do_An_Theo_Lop_${code}.xlsx`);
+      toast.success('Xuất file Excel bảng điểm theo lớp thành công!');
     } catch (err) {
       const msg = await extractErrorMessage(
         err,
         'Không thể xuất file Excel bảng điểm theo lớp'
       );
-      alert(msg);
+      toast.error(msg);
     } finally {
       setExportingGrades(false);
     }

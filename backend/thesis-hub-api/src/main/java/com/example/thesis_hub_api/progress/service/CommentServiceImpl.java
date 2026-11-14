@@ -36,24 +36,20 @@ public class CommentServiceImpl implements CommentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", taskId));
 
         User user = null;
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal && principal.getId() != null) {
-                user = userRepository.findById(principal.getId()).orElse(null);
-            }
-        } catch (Exception ignored) {}
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = false;
+        if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal && principal.getId() != null) {
+            user = userRepository.findById(principal.getId()).orElse(null);
+            isAdmin = auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_ACADEMIC_STAFF".equals(a.getAuthority()));
+        }
 
-        if (user == null && request.getUserId() != null) {
-            user = userRepository.findById(request.getUserId()).orElse(null);
-        }
-        if (user == null && task.getAssignedTo() != null) {
-            user = task.getAssignedTo();
-        }
-        if (user == null && task.getCreatedBy() != null) {
-            user = task.getCreatedBy();
+        if (isAdmin && request.getUserId() != null) {
+            user = userRepository.findById(request.getUserId()).orElse(user);
         }
         if (user == null) {
-            throw new ResourceNotFoundException("User", request.getUserId());
+            throw new com.example.thesis_hub_api.common.exception.AppException(
+                    com.example.thesis_hub_api.common.exception.ErrorCode.UNAUTHENTICATED);
         }
 
         Comment parent = null;

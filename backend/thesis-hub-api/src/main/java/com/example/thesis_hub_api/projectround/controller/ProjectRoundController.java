@@ -39,8 +39,9 @@ public class ProjectRoundController {
             summary = "Tra cứu đợt đồ án đang mở (Contract 2)",
             description = "Trả về thông tin đợt đồ án đang ở trạng thái OPEN hoặc IN_PROGRESS kèm toàn bộ các mốc timeline và trạng thái isActive từng mốc"
     )
-    public ResponseEntity<ApiResponse<ProjectRoundResponseDTO>> getActiveRound() {
-        ProjectRoundResponseDTO activeRound = projectRoundService.getActiveRound();
+    public ResponseEntity<ApiResponse<ProjectRoundResponseDTO>> getActiveRound(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        ProjectRoundResponseDTO activeRound = projectRoundService.getActiveRound(currentUser);
         return ResponseEntity.ok(ApiResponse.success(activeRound));
     }
 

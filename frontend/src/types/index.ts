@@ -840,8 +840,11 @@ export interface StudentImportPreviewResponse {
   rows: StudentImportRow[];
 }
 
+export type StudentPasswordMode = 'PHONE' | 'STUDENT_CODE';
+
 export interface StudentImportCommitPayload {
   rows: StudentImportRow[];
+  passwordMode?: StudentPasswordMode;
 }
 
 export interface StudentImportResultResponse {
@@ -1105,6 +1108,7 @@ export interface CreateRoundStudentManualPayload {
   missingPrerequisiteCount?: number;
   status?: string;
   note?: string;
+  passwordMode?: StudentPasswordMode;
 }
 
 export interface StudentRoundStatusResponse {

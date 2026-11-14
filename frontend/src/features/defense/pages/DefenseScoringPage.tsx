@@ -840,8 +840,30 @@ export const DefenseScoringPage: React.FC = () => {
               📦 Bảng Tổng hợp Dữ liệu Cuối kỳ &amp; Công bố Kết quả Đợt đồ án
             </h3>
             <p style={{ color: '#475569', fontSize: '13.5px', marginBottom: '16px' }}>
-              Khi bấm <strong>"Ký xuất Dữ liệu &amp; Hoàn tất Đợt đồ án"</strong>, hệ thống sẽ tự động tổng hợp điểm cuối kỳ cho các đề tài đủ đầu điểm, đóng đợt đồ án và gửi thông báo kết quả chính thức tới từng Sinh viên.
+              Khi bấm <strong>"Ký xuất Dữ liệu &amp; Hoàn tất Đợt đồ án"</strong>, hệ thống sẽ chốt kết quả cuối kỳ, công bố kết quả tốt nghiệp chính thức tới từng Sinh viên và đóng đợt đồ án. <strong>Lưu ý:</strong> Chỉ có thể chốt khi toàn bộ sinh viên đủ điều kiện bảo vệ trong đợt đã được chấm đủ và tổng kết điểm.
             </p>
+            {(() => {
+              const missingCount = roundExportResults.filter((item) => !item.result).length;
+              if (roundExportResults.length === 0) {
+                return (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
+                    ⚠️ Chưa có sinh viên nào đủ điều kiện bảo vệ trong đợt để chốt kết quả.
+                  </div>
+                );
+              }
+              if (missingCount > 0) {
+                return (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
+                    ⚠️ Còn {missingCount}/{roundExportResults.length} sinh viên chưa tổng kết điểm cuối kỳ. Vui lòng chấm và tổng hợp điểm cho toàn bộ sinh viên trước khi chốt đợt!
+                  </div>
+                );
+              }
+              return (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
+                  ✅ Đã tổng kết đủ điểm cho toàn bộ {roundExportResults.length} sinh viên. Sẵn sàng chốt và công bố kết quả tốt nghiệp!
+                </div>
+              );
+            })()}
             <div style={{ width: '100%', overflowX: 'auto' }}>
               <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '20px' }}>
                 <thead>
@@ -904,15 +926,29 @@ export const DefenseScoringPage: React.FC = () => {
               </button>
               <button
                 onClick={handleFinalizeAndPublishRound}
-                disabled={publishingRound}
+                disabled={
+                  publishingRound ||
+                  roundExportResults.length === 0 ||
+                  roundExportResults.some((item) => !item.result)
+                }
                 style={{
                   padding: '8px 16px',
                   borderRadius: '6px',
                   border: 'none',
-                  background: '#16a34a',
+                  background:
+                    publishingRound ||
+                    roundExportResults.length === 0 ||
+                    roundExportResults.some((item) => !item.result)
+                      ? '#94a3b8'
+                      : '#16a34a',
                   color: '#fff',
                   fontWeight: 700,
-                  cursor: publishingRound ? 'wait' : 'pointer',
+                  cursor:
+                    publishingRound ||
+                    roundExportResults.length === 0 ||
+                    roundExportResults.some((item) => !item.result)
+                      ? 'not-allowed'
+                      : 'pointer',
                 }}
               >
                 {publishingRound ? 'Đang công bố & đóng đợt...' : '✅ Ký xuất Dữ liệu & Hoàn tất Đợt đồ án'}

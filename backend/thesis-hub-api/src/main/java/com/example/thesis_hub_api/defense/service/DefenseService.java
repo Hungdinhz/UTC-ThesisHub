@@ -16,12 +16,12 @@ import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.service.ProjectRoundService;
+import com.example.thesis_hub_api.projectround.service.RoundDefenseSynthesizer;
 import com.example.thesis_hub_api.notification.service.NotificationService;
 import com.example.thesis_hub_api.thesis.entity.Thesis;
 import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class DefenseService {
+public class DefenseService implements RoundDefenseSynthesizer {
 
     private final DefenseCouncilRepository councilRepository;
     private final CouncilMemberRepository memberRepository;
@@ -70,7 +70,6 @@ public class DefenseService {
     private ProjectRoundRepository projectRoundRepository;
 
     @Autowired(required = false)
-    @Lazy
     private ProjectRoundService projectRoundService;
 
     @Autowired(required = false)
@@ -923,9 +922,14 @@ public class DefenseService {
         } else if (projectRoundId != null) {
             List<Long> councilIds = councilRepository.findByProjectRoundId(projectRoundId)
                     .stream().map(DefenseCouncil::getId).collect(Collectors.toList());
-            list = scheduleRepository.findAll().stream()
-                    .filter(s -> councilIds.contains(s.getCouncilId()))
-                    .collect(Collectors.toList());
+            if (councilIds.isEmpty()) {
+                list = Collections.emptyList();
+            } else {
+                List<DefenseSchedule> byCouncils = scheduleRepository.findByCouncilIdIn(councilIds);
+                list = byCouncils != null ? byCouncils : scheduleRepository.findAll().stream()
+                        .filter(s -> councilIds.contains(s.getCouncilId()))
+                        .collect(Collectors.toList());
+            }
         } else {
             list = scheduleRepository.findAll();
         }
@@ -1049,7 +1053,18 @@ public class DefenseService {
                 ? thesisRepository.findByProjectRoundId(projectRoundId)
                 : thesisRepository.findAll();
 
-        Map<Long, ReviewerAssignment> reviewerByThesis = reviewerAssignmentRepository.findAll().stream()
+        if (theses.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> thesisIds = theses.stream().map(Thesis::getId).filter(Objects::nonNull).toList();
+        List<ReviewerAssignment> revList = thesisIds.isEmpty()
+                ? Collections.emptyList()
+                : reviewerAssignmentRepository.findByThesisIdIn(thesisIds);
+        if (revList == null || revList.isEmpty()) {
+            revList = reviewerAssignmentRepository.findAll();
+        }
+        Map<Long, ReviewerAssignment> reviewerByThesis = revList.stream()
                 .filter(r -> r.getThesisId() != null)
                 .collect(Collectors.toMap(ReviewerAssignment::getThesisId, r -> r, (a, b) -> b));
 
@@ -1061,17 +1076,22 @@ public class DefenseService {
             }
         }
 
+        Map<Long, String> lecturerNameCache = new HashMap<>();
+        Map<Long, List<CouncilMember>> councilMembersCache = new HashMap<>();
+
         List<MyScoringThesisDTO> result = new ArrayList<>();
         for (Thesis t : theses) {
             boolean eligible = isThesisDefenseEligible(t);
             Long advisorId = t.getLecturer() != null ? t.getLecturer().getId() : null;
             String advisorName = (t.getLecturer() != null && t.getLecturer().getUser() != null)
                     ? t.getLecturer().getUser().getFullName()
-                    : (advisorId != null ? resolveLecturerName(advisorId) : "—");
+                    : (advisorId != null ? lecturerNameCache.computeIfAbsent(advisorId, this::resolveLecturerName) : "—");
 
             ReviewerAssignment rev = reviewerByThesis.get(t.getId());
             Long reviewerId = rev != null ? rev.getReviewerId() : null;
-            String reviewerName = reviewerId != null ? resolveLecturerName(reviewerId) : null;
+            String reviewerName = reviewerId != null
+                    ? lecturerNameCache.computeIfAbsent(reviewerId, this::resolveLecturerName)
+                    : null;
 
             DefenseCouncil council = resolveCouncilForThesis(t);
             Long councilId = council != null ? council.getId() : null;
@@ -1119,7 +1139,9 @@ public class DefenseService {
 
             CouncilMember myCouncilMembership = null;
             if (council != null && eligible && !isAdvisor) {
-                myCouncilMembership = memberRepository.findByCouncilId(council.getId()).stream()
+                List<CouncilMember> members = councilMembersCache.computeIfAbsent(
+                        council.getId(), memberRepository::findByCouncilId);
+                myCouncilMembership = members.stream()
                         .filter(m -> Objects.equals(m.getLecturerId(), myLecId))
                         .findFirst()
                         .orElse(null);
@@ -1395,6 +1417,12 @@ public class DefenseService {
         return hasSupervisor && hasCouncil;
     }
 
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = {IllegalArgumentException.class})
+    public void synthesizeThesisResult(Long thesisId) {
+        synthesizeResult(thesisId);
+    }
+
     /**
      * 5. API Tổng hợp điểm, xuất kết quả tốt nghiệp cuối kỳ (#24, #25)
      */
@@ -1531,11 +1559,17 @@ public class DefenseService {
             return Collections.emptyList();
         }
         List<Long> thesisIds = roundTheses.stream().map(Thesis::getId).toList();
-        List<GraduationResult> allResults = graduationResultRepository != null
-                ? graduationResultRepository.findAll().stream()
-                    .filter(gr -> gr.getThesisId() != null && thesisIds.contains(gr.getThesisId()))
-                    .toList()
-                : Collections.emptyList();
+        List<GraduationResult> allResults = Collections.emptyList();
+        if (graduationResultRepository != null && !thesisIds.isEmpty()) {
+            List<GraduationResult> byIds = graduationResultRepository.findByThesisIdIn(thesisIds);
+            if (byIds != null && !byIds.isEmpty()) {
+                allResults = byIds;
+            } else {
+                allResults = graduationResultRepository.findAll().stream()
+                        .filter(gr -> gr.getThesisId() != null && thesisIds.contains(gr.getThesisId()))
+                        .toList();
+            }
+        }
 
         Map<Long, Thesis> thesisMap = roundTheses.stream()
                 .collect(Collectors.toMap(Thesis::getId, t -> t, (t1, t2) -> t1));
@@ -1585,15 +1619,43 @@ public class DefenseService {
             return Collections.emptyList();
         }
         List<Thesis> roundTheses = thesisRepository.findByProjectRoundId(roundId);
+        List<Thesis> eligibleTheses = roundTheses.stream()
+                .filter(this::isThesisDefenseEligible)
+                .toList();
 
-        // 1. Synthesize thesis results (once) for eligible theses that have scores
-        for (Thesis t : roundTheses) {
-            if (!isThesisDefenseEligible(t)) continue;
+        if (eligibleTheses.isEmpty()) {
+            throw new IllegalStateException("Chưa có sinh viên/đề tài nào đủ điều kiện bảo vệ trong đợt để chốt và công bố kết quả.");
+        }
+
+        // 1. Synthesize thesis results (once) for eligible theses that have all required scores
+        for (Thesis t : eligibleTheses) {
+            if (graduationResultRepository != null && graduationResultRepository.findByThesisId(t.getId()).isPresent()) {
+                continue;
+            }
             if (!canSynthesizeResult(t.getId())) continue;
             try {
                 synthesizeResult(t.getId());
             } catch (Exception ignored) {
             }
+        }
+
+        // 1b. Require all eligible students/theses in the round to have a synthesized final result before finalizing
+        List<String> missingTheses = new ArrayList<>();
+        for (Thesis t : eligibleTheses) {
+            boolean hasResult = graduationResultRepository != null
+                    && graduationResultRepository.findByThesisId(t.getId()).isPresent();
+            if (!hasResult) {
+                String studentLabel = t.getStudent() != null && t.getStudent().getStudentCode() != null
+                        ? t.getStudent().getStudentCode()
+                        : (t.getThesisCode() != null ? t.getThesisCode() : ("#" + t.getId()));
+                missingTheses.add(studentLabel);
+            }
+        }
+        if (!missingTheses.isEmpty()) {
+            throw new IllegalStateException(
+                    "Chưa thể chốt và công bố kết quả: còn " + missingTheses.size()
+                            + " sinh viên chưa được chấm đủ điểm hoặc chưa tổng kết điểm cuối kỳ ("
+                            + String.join(", ", missingTheses) + ").");
         }
 
         // 2. Close round and publish notifications/results

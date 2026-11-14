@@ -26,6 +26,12 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @GetMapping("/ping")
+    @Operation(summary = "Kiểm tra nhanh trạng thái máy chủ (Keep-Alive / Warm-up)")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> ping() {
+        return ResponseEntity.ok(ApiResponse.success("OK", java.util.Map.of("status", "UP")));
+    }
+
     @PostMapping("/login")
     @Operation(summary = "Đăng nhập hệ thống chung", description = "Đăng nhập bằng username, email hoặc mã số")
     public ResponseEntity<ApiResponse<LoginResponseDTO>> login(@Valid @RequestBody LoginRequestDTO request) {
@@ -94,10 +100,15 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "Làm mới JWT token", description = "Cấp mới token từ token hiện tại")
+    @Operation(summary = "Làm mới JWT token", description = "Cấp mới token từ refresh token hiện tại")
     public ResponseEntity<ApiResponse<LoginResponseDTO>> refreshToken(
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
-        LoginResponseDTO response = authService.refreshToken(authHeader);
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String tokenCandidate = authHeader;
+        if (!org.springframework.util.StringUtils.hasText(tokenCandidate) && body != null) {
+            tokenCandidate = body.getOrDefault("refreshToken", body.get("refresh"));
+        }
+        LoginResponseDTO response = authService.refreshToken(tokenCandidate);
         return ResponseEntity.ok(ApiResponse.success("Làm mới token thành công", response));
     }
 }

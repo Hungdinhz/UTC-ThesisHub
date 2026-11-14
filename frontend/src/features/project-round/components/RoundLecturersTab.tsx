@@ -7,6 +7,7 @@ import {
   type ProjectDirection,
 } from '../../assignment/types';
 import type { Department, LecturerItem } from '../../../types';
+import { toast } from '../../../components/Toast';
 
 interface RoundLecturersTabProps {
   roundId: number;
@@ -149,19 +150,23 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
   const handleAddLecturersSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedLecturerIds.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 giảng viên để thêm vào đợt!');
+      toast.warning('Vui lòng chọn ít nhất 1 giảng viên để thêm vào đợt!');
       return;
     }
     try {
       setAddLoading(true);
       await assignmentService.addLecturersToRound(roundId, selectedLecturerIds, defaultQuota, customQuotas);
-      setSuccessMsg(`Đã thêm thành công ${selectedLecturerIds.length} giảng viên vào đợt đồ án!`);
+      const msg = `Đã thêm thành công ${selectedLecturerIds.length} giảng viên vào đợt đồ án!`;
+      setSuccessMsg(msg);
+      toast.success(msg);
       setShowAddModal(false);
       await loadData();
       onRefresh?.();
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi thêm giảng viên vào đợt');
+      const errMsg = err instanceof Error ? err.message : 'Lỗi khi thêm giảng viên vào đợt';
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setAddLoading(false);
     }
@@ -170,11 +175,11 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
   // Delete / Remove capacity
   const handleRemoveCapacity = async (c: LecturerCapacity) => {
     if (isRoundClosed) {
-      alert('Đợt đồ án đã đóng. Không thể xóa giảng viên khỏi đợt.');
+      toast.warning('Đợt đồ án đã đóng. Không thể xóa giảng viên khỏi đợt.');
       return;
     }
     if (c.currentAssigned != null && c.currentAssigned > 0) {
-      alert(`Không thể xóa: Giảng viên ${c.fullName} (${c.lecturerCode}) đã được phân công hướng dẫn ${c.currentAssigned} sinh viên trong đợt này. Cần hủy phân công trước khi xóa khỏi đợt.`);
+      toast.warning(`Không thể xóa: Giảng viên ${c.fullName} (${c.lecturerCode}) đã được phân công hướng dẫn ${c.currentAssigned} sinh viên trong đợt này. Cần hủy phân công trước khi xóa khỏi đợt.`);
       return;
     }
     if (!window.confirm(`Bạn có chắc chắn muốn xóa giảng viên ${c.fullName} (${c.lecturerCode}) khỏi đợt đồ án này?`)) {
@@ -184,13 +189,14 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
       setLoading(true);
       await assignmentService.deleteCapacity(c.id, roundId, c.lecturerId);
       setSuccessMsg(`Đã xóa giảng viên ${c.fullName} khỏi đợt đồ án thành công.`);
+      toast.success(`Đã xóa giảng viên ${c.fullName} khỏi đợt đồ án thành công.`);
       await loadData();
       onRefresh?.();
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Lỗi khi xóa giảng viên khỏi đợt';
       setError(msg);
-      alert(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

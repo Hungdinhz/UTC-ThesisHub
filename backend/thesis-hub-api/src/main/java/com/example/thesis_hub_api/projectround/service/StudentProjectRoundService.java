@@ -389,6 +389,9 @@ public class StudentProjectRoundService {
         List<String> messages = new ArrayList<>();
         Set<Long> processedStudentIdsInBatch = new HashSet<>();
 
+        String passwordMode = normalizePasswordMode(requestDTO.getPasswordMode());
+        Map<String, String> encodedPasswordCache = new HashMap<>();
+
         for (StudentImportRowDTO row : requestDTO.getRows()) {
             totalProcessed++;
 
@@ -411,14 +414,18 @@ public class StudentProjectRoundService {
                         ? row.getEmail().trim().toLowerCase()
                         : studentCode.toLowerCase() + "@lms.utc.edu.vn";
 
-                // Đánh giá điều kiện học vụ: Nợ tín khóa cứng theo tín chỉ tích lũy (tối đa 170 tín với Kỹ sư, 132 tín với Cử nhân)
+                // Đánh giá điều kiện học vụ: ưu tiên số tín chỉ nợ từ file Excel (khớp với bước Preview)
+                // để không xảy ra trường hợp Preview báo Hợp lệ nhưng Commit lại tự suy ra nợ > 10 từ tín chỉ tích lũy.
                 int maxRoundCredits = getMaxCreditsForRound(round);
                 int completedCredits = row.getCompletedCredits() != null
-                        ? Math.min(row.getCompletedCredits(), maxRoundCredits)
+                        ? Math.min(Math.max(0, row.getCompletedCredits()), maxRoundCredits)
                         : (row.getDebtCredits() != null ? Math.max(0, maxRoundCredits - row.getDebtCredits()) : maxRoundCredits);
-                int debtCredits = Math.max(0, maxRoundCredits - completedCredits);
+                int debtCredits = row.getDebtCredits() != null
+                        ? Math.max(0, row.getDebtCredits())
+                        : Math.max(0, maxRoundCredits - completedCredits);
                 if (debtCredits > 10) {
                     log.info("Loại sinh viên {} khỏi đợt do nợ {} tín chỉ (> 10)", studentCode, debtCredits);
+                    messages.add("Bỏ qua " + studentCode + ": nợ " + debtCredits + " tín chỉ (> 10 tín chỉ).");
                     skipped++;
                     continue;
                 }
@@ -454,12 +461,15 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                         }
                     }
 
+                    String rawPassword = resolveStudentRawPassword(passwordMode, studentCode, row.getPhone());
+                    String encodedPassword = encodedPasswordCache.computeIfAbsent(rawPassword, passwordEncoder::encode);
+
                     user = User.builder()
                             .username(studentCode)
                             .fullName(fullName)
                             .email(targetEmail)
                             .phone(row.getPhone())
-                            .password(passwordEncoder.encode("Password@123"))
+                            .password(encodedPassword)
                             .role(studentRole)
                             .isActive(accountActive)
                             .build();
@@ -481,6 +491,10 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                         }
                     }
                     user.setIsActive(accountActive);
+                    if (!StringUtils.hasText(user.getPassword())) {
+                        String rawPassword = resolveStudentRawPassword(passwordMode, studentCode, row.getPhone());
+                        user.setPassword(encodedPasswordCache.computeIfAbsent(rawPassword, passwordEncoder::encode));
+                    }
                     user = userRepository.save(user);
                 }
 
@@ -531,6 +545,7 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 // 3. Ghi danh vào StudentProjectRound nếu đủ điều kiện
                 Optional<String> eligibilityErr = validateStudentRoundEligibility(student, round);
                 if (eligibilityErr.isPresent()) {
+                    messages.add("Bỏ qua " + studentCode + ": " + eligibilityErr.get());
                     skipped++;
                     continue;
                 }
@@ -606,8 +621,11 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
             }
         }
 
-        messages.add(String.format("Xử lý thành công %d sinh viên (Tạo mới %d tài khoản, %d hồ sơ sinh viên, ghi danh %d vào đợt đồ án).",
-                totalProcessed, newUsersCreated, newStudentsCreated, enrolledInRound));
+        String passwordPolicyLabel = "STUDENT_CODE".equals(passwordMode)
+                ? "Mã sinh viên (MSSV)"
+                : "Số điện thoại (dự phòng Mã SV nếu thiếu SĐT)";
+        messages.add(String.format("Xử lý thành công %d sinh viên (Tạo mới %d tài khoản [%s], %d hồ sơ sinh viên, ghi danh %d vào đợt đồ án).",
+                totalProcessed, newUsersCreated, passwordPolicyLabel, newStudentsCreated, enrolledInRound));
 
         return StudentImportResultResponseDTO.builder()
                 .totalProcessed(totalProcessed)
@@ -660,12 +678,13 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 }
             }
 
+            String rawPassword = resolveStudentRawPassword(dto.getPasswordMode(), studentCode, dto.getPhone());
             user = User.builder()
                     .username(studentCode)
                     .fullName(fullName)
                     .email(targetEmail)
                     .phone(dto.getPhone() != null ? dto.getPhone().trim() : null)
-                    .password(passwordEncoder.encode("Password@123"))
+                    .password(passwordEncoder.encode(rawPassword))
                     .role(studentRole)
                     .isActive(true)
                     .build();
@@ -682,7 +701,10 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                     user.setEmail(email);
                 }
             }
-            user.setPassword(passwordEncoder.encode("Password@123"));
+            if (!StringUtils.hasText(user.getPassword())) {
+                String rawPassword = resolveStudentRawPassword(dto.getPasswordMode(), studentCode, dto.getPhone());
+                user.setPassword(passwordEncoder.encode(rawPassword));
+            }
             user.setIsActive(false); // Sẽ được cập nhật chính xác theo điều kiện học vụ bên dưới
             user = userRepository.save(user);
         }
@@ -971,7 +993,9 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         int completedCredits = dto.getCompletedCredits() != null
                 ? dto.getCompletedCredits()
                 : (dto.getDebtCredits() != null ? Math.max(0, maxCredits - dto.getDebtCredits()) : (student.getDebtCredits() != null ? Math.max(0, maxCredits - student.getDebtCredits()) : maxCredits));
-        int debtCredits = Math.max(0, maxCredits - completedCredits);
+        int debtCredits = dto.getDebtCredits() != null
+                ? Math.max(0, dto.getDebtCredits())
+                : Math.max(0, maxCredits - completedCredits);
         student.setDebtCredits(debtCredits);
         student = studentRepository.save(student);
         Double gpa = dto.getGpa() != null ? dto.getGpa() : student.getGpa();
@@ -1075,11 +1099,15 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
      */
     @Transactional
     public void removeStudentFromRound(Long roundId, Long studentId) {
-        ProjectRound round = getAndValidateActiveRound(roundId);
+        getAndValidateActiveRound(roundId);
         StudentProjectRound spr = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
 
         studentProjectRoundRepository.delete(spr);
+        if (academicRecordRepository != null) {
+            academicRecordRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+                    .ifPresent(academicRecordRepository::delete);
+        }
     }
 
     /**
@@ -1088,12 +1116,9 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
     public byte[] generateTemplate() {
         try {
             Set<String> existingCodes = studentRepository != null
-                    ? studentRepository.findAll().stream()
-                            .map(Student::getStudentCode)
-                            .filter(Objects::nonNull)
-                            .collect(Collectors.toSet())
+                    ? studentRepository.findAllStudentCodes()
                     : Collections.emptySet();
-            if (existingCodes.isEmpty()) {
+            if (existingCodes == null || existingCodes.isEmpty()) {
                 return studentExcelParser.generateTemplate();
             }
             return studentExcelParser.generateTemplate(existingCodes);
@@ -1170,8 +1195,11 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                         : (student != null && student.getDebtCredits() != null
                                 ? Math.max(0, maxRoundCredits - student.getDebtCredits())
                                 : maxRoundCredits));
-        // Khóa cứng nợ tín theo tín chỉ tích lũy (Cử nhân 132 tín, Kỹ sư 170 tín)
-        Integer debtCredits = Math.max(0, maxRoundCredits - completedCredits);
+        Integer debtCredits = record != null && record.getDebtCredits() != null
+                ? Math.max(0, record.getDebtCredits())
+                : (student != null && student.getDebtCredits() != null
+                        ? Math.max(0, student.getDebtCredits())
+                        : Math.max(0, maxRoundCredits - completedCredits));
         Double gpa = record != null && record.getGpa() != null
                 ? record.getGpa()
                 : (spr.getGpa() != null ? spr.getGpa() : (student != null ? student.getGpa() : null));
@@ -1180,6 +1208,27 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         Integer missingPrerequisiteCount = 0;
         EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, underDisciplinaryAction, missingPrerequisiteCount, gpa);
         String finalStatus = spr.getStatus();
+        String note = StringUtils.hasText(spr.getNote()) ? spr.getNote() : (record != null ? record.getNote() : null);
+
+        if ("DROPPED".equalsIgnoreCase(finalStatus)
+                && note != null && note.contains("Không hoàn thành GĐ4")
+                && thesisRepository != null && student != null && student.getId() != null && spr.getProjectRound() != null) {
+            try {
+                boolean hasApprovedThesis = thesisRepository.findByStudentIdAndProjectRoundId(student.getId(), spr.getProjectRound().getId())
+                        .map(t -> Boolean.TRUE.equals(t.getDefenseEligible())
+                                || "DEFENSE_READY".equalsIgnoreCase(t.getStatus())
+                                || "COMPLETED".equalsIgnoreCase(t.getStatus()))
+                        .orElse(false);
+                if (hasApprovedThesis) {
+                    finalStatus = "DEFENSE_READY";
+                    note = null;
+                } else {
+                    finalStatus = "IN_PROGRESS";
+                    note = null;
+                }
+            } catch (Exception ignored) {}
+        }
+
         if (!eval.isEligible() && !"FORCE_APPROVED".equalsIgnoreCase(finalStatus)) {
             finalStatus = "INELIGIBLE";
         } else if (thesisRepository != null && student != null && student.getId() != null && spr.getProjectRound() != null) {
@@ -1190,7 +1239,6 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 }
             } catch (Exception ignored) {}
         }
-        String note = StringUtils.hasText(spr.getNote()) ? spr.getNote() : (record != null ? record.getNote() : null);
         if (StringUtils.hasText(spr.getNote()) && spr.getNote().toLowerCase().contains("chưa đăng ký")) {
             finalStatus = "DROPPED";
             note = spr.getNote();
@@ -1225,5 +1273,22 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 .accountActive(isAccountActive)
                 .enrolledAt(spr.getCreatedAt())
                 .build();
+    }
+
+    private String normalizePasswordMode(String passwordMode) {
+        if ("STUDENT_CODE".equalsIgnoreCase(passwordMode)) {
+            return "STUDENT_CODE";
+        }
+        return "PHONE";
+    }
+
+    private String resolveStudentRawPassword(String passwordMode, String studentCode, String phone) {
+        if ("STUDENT_CODE".equalsIgnoreCase(passwordMode)) {
+            return studentCode;
+        }
+        if (StringUtils.hasText(phone)) {
+            return phone.trim();
+        }
+        return studentCode;
     }
 }

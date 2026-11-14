@@ -9,14 +9,22 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface StudentRepository extends JpaRepository<Student, Long> {
     @Override
     @EntityGraph(attributePaths = {"user"})
     List<Student> findAll();
+
+    @EntityGraph(attributePaths = {"user"})
+    List<Student> findByIdIn(Collection<Long> ids);
+
+    @Query("SELECT s.studentCode FROM Student s WHERE s.studentCode IS NOT NULL")
+    Set<String> findAllStudentCodes();
 
     @EntityGraph(attributePaths = {"user"})
     Optional<Student> findByUserId(Long userId);

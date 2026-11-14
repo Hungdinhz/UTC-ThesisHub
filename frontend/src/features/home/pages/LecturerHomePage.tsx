@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useRoundContext } from '../hooks/useRoundContext';
+import {
+  getStoredLecturerRoundId,
+  setStoredLecturerRoundId,
+} from '../../../utils/phaseTracking';
 import { thesisService } from '../../thesis/services/thesisService';
 import { progressService } from '../../progress/services/progressService';
 import { defenseService } from '../../defense/services/defenseService';
@@ -61,15 +65,20 @@ export const LecturerHomePage: React.FC = () => {
     userType === 'committee_member' ||
     (user as any)?.role?.name?.toLowerCase()?.includes('committee');
 
+  const [selectedRoundId, setSelectedRoundId] = useState<number | undefined>(() =>
+    getStoredLecturerRoundId(user?.id || (user as any)?.user_id || user?.username)
+  );
+
   const {
     round,
+    allRounds,
     milestones,
     roundStage,
     userCompletedStage,
     currentMilestone,
     daysLeftInMilestone,
     loading: roundLoading,
-  } = useRoundContext(isCommitteeRole ? 'committee_member' : 'supervisor');
+  } = useRoundContext(isCommitteeRole ? 'committee_member' : 'supervisor', selectedRoundId);
 
   const [studentRows, setStudentRows] = useState<StudentRowItem[]>([]);
   const [pendingProposals, setPendingProposals] = useState<Proposal[]>([]);
@@ -482,6 +491,37 @@ export const LecturerHomePage: React.FC = () => {
         }
         actions={
           <>
+            {allRounds.length > 0 && (
+              <select
+                aria-label="Chọn đợt đồ án"
+                value={round?.roundId || selectedRoundId || ''}
+                onChange={(e) => {
+                  const nextId = e.target.value ? Number(e.target.value) : undefined;
+                  setSelectedRoundId(nextId);
+                  if (nextId) {
+                    setStoredLecturerRoundId(
+                      nextId,
+                      user?.id || (user as any)?.user_id || user?.username
+                    );
+                  }
+                }}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  backgroundColor: '#ffffff',
+                }}
+              >
+                {allRounds.map((r) => (
+                  <option key={r.roundId} value={r.roundId}>
+                    {r.name} ({r.roundCode}) — {r.status}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
               className="utc-home-btn utc-home-btn-secondary"

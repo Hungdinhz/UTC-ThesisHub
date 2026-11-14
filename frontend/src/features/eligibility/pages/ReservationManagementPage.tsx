@@ -5,6 +5,8 @@ import type { Column } from '../../../components/ui';
 import { ReservationReviewModal } from '../components/ReservationReviewModal';
 import { ReservationSubmitModal } from '../components/ReservationSubmitModal';
 import { eligibilityService } from '../services/eligibilityService';
+import { thesisService } from '../../thesis/services/thesisService';
+import { apiService } from '../../../services/api';
 import type { ReservationRequestItem } from '../types';
 import './EligibilityPages.css';
 
@@ -20,17 +22,61 @@ export const ReservationManagementPage: React.FC = () => {
   const [selectedForReview, setSelectedForReview] = useState<ReservationRequestItem | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [studentContext, setStudentContext] = useState<{
+    roundId?: number;
+    studentId?: number;
+    studentCode?: string;
+    studentName?: string;
+    thesisId?: number;
+    thesisCode?: string;
+    thesisTitle?: string;
+  }>({});
+
+  useEffect(() => {
+    const loadStudentContext = async () => {
+      if (!isStudent) return;
+      try {
+        const myStatus = await apiService.getMyRoundStatus().catch(() => null);
+        const rId = myStatus?.roundId;
+        const sId = myStatus?.studentId || (user as any)?.student?.id || user?.student_id || user?.id;
+        const sCode = myStatus?.studentCode || (user as any)?.student?.student_code || user?.studentCode || user?.username;
+        const sName = user?.fullName || (user as any)?.full_name;
+        let resolvedThesis: any = null;
+        if (sId && rId) {
+          resolvedThesis = await thesisService.getThesisByStudentAndRound(Number(sId), rId).catch(() => null);
+        }
+        if (!resolvedThesis && rId) {
+          const list = await thesisService.searchTheses({ roundId: rId }).catch(() => []);
+          resolvedThesis = list.find(
+            (t) => (sId && Number(t.studentId) === Number(sId)) || (sCode && t.studentCode === String(sCode))
+          ) || null;
+        }
+        setStudentContext({
+          roundId: rId,
+          studentId: sId ? Number(sId) : undefined,
+          studentCode: sCode ? String(sCode) : undefined,
+          studentName: sName,
+          thesisId: resolvedThesis?.id,
+          thesisCode: resolvedThesis?.thesisCode,
+          thesisTitle: resolvedThesis?.titleVn,
+        });
+      } catch {
+        // ignore
+      }
+    };
+    loadStudentContext();
+  }, [isStudent, user?.id]);
 
   useEffect(() => {
     loadReservations();
-  }, [statusFilter, categoryFilter]);
+  }, [statusFilter, categoryFilter, studentContext.roundId, studentContext.studentId]);
 
   const loadReservations = async () => {
     try {
       setLoading(true);
-      const studentId = user?.id || user?.student_id;
+      const studentId = studentContext.studentId || user?.id || user?.student_id;
       const data = await eligibilityService.getReservations({
-        projectRoundId: 10,
+        projectRoundId: studentContext.roundId || (isStudent ? undefined : 10),
         studentId: isStudent && studentId ? studentId : undefined,
         status: statusFilter !== 'ALL' ? statusFilter : undefined,
         category: categoryFilter !== 'ALL' ? categoryFilter : undefined,
@@ -322,8 +368,13 @@ export const ReservationManagementPage: React.FC = () => {
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
         onSubmit={handleSubmitNew}
-        defaultStudentId={user?.id || user?.student_id || 101}
-        projectRoundId={10}
+        defaultStudentId={studentContext.studentId || user?.id || user?.student_id || 101}
+        studentCode={studentContext.studentCode || user?.studentCode || user?.username}
+        studentName={studentContext.studentName || user?.fullName}
+        defaultThesisId={studentContext.thesisId}
+        thesisCode={studentContext.thesisCode}
+        thesisTitle={studentContext.thesisTitle}
+        projectRoundId={studentContext.roundId || 10}
       />
     </div>
   );

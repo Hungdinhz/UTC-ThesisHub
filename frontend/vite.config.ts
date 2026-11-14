@@ -25,6 +25,14 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       emptyOutDir: true,
       sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-utils': ['axios', 'i18next', 'react-i18next'],
+          },
+        },
+      },
     },
 
     server: {

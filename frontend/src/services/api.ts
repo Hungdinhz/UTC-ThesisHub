@@ -122,12 +122,24 @@ class ApiService {
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
           try {
-            // Send request to refresh token endpoint
-            const response = await axios.post(`${API_BASE_URL}${AUTH.TOKEN_REFRESH}`, {}, { withCredentials: true });
+            // Send request to refresh token endpoint with stored refresh_token
+            const refreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('access_token');
+            const response = await axios.post(
+              `${API_BASE_URL}${AUTH.TOKEN_REFRESH}`,
+              { refreshToken, refresh: refreshToken },
+              {
+                withCredentials: true,
+                headers: refreshToken ? { Authorization: `Bearer ${refreshToken}` } : undefined,
+              }
+            );
             const rawData = response.data?.data || response.data;
             const access = rawData?.access || rawData?.token;
+            const newRefresh = rawData?.refreshToken || rawData?.refresh;
             if (access) {
               localStorage.setItem('access_token', access);
+              if (newRefresh) {
+                localStorage.setItem('refresh_token', newRefresh);
+              }
               if (originalRequest.headers) {
                 originalRequest.headers.Authorization = `Bearer ${access}`;
               }
@@ -143,6 +155,19 @@ class ApiService {
     );
   }
 
+
+  // Health / Warm-up Ping (for Render Free Tier wake-up)
+  async pingServer(timeoutMs = 12000): Promise<boolean> {
+    try {
+      await axios.get(`${API_BASE_URL}/auth/ping`, {
+        timeout: timeoutMs,
+        withCredentials: false,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   // Admin Auth
   async adminRegister(payload: AdminRegisterPayload): Promise<any> {
@@ -1146,7 +1171,8 @@ class ApiService {
   async commitImportStudents(roundId: number, payload: StudentImportCommitPayload): Promise<StudentImportResultResponse> {
     const response = await this.api.post<StudentImportResultResponse>(
       PROJECT_ROUNDS.studentImportCommit(roundId),
-      payload
+      payload,
+      { timeout: 120000 }
     );
     return response.data;
   }

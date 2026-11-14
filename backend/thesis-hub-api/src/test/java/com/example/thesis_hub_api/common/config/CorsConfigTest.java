@@ -93,6 +93,7 @@ class CorsConfigTest {
     }
 
     @Test
+    @WithMockUser(roles = "STUDENT")
     void testActualGetRequestFromVercelFrontend() throws Exception {
         mockMvc.perform(get("/api/v1/defense/councils")
                         .header(HttpHeaders.ORIGIN, "https://utc-thesishub.vercel.app")
@@ -100,6 +101,14 @@ class CorsConfigTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://utc-thesishub.vercel.app"))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+    }
+
+    @Test
+    void testUnauthenticatedGetRequestReturns401() throws Exception {
+        mockMvc.perform(get("/api/v1/defense/councils")
+                        .header(HttpHeaders.ORIGIN, "https://utc-thesishub.vercel.app")
+                        .param("projectRoundId", "10"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
