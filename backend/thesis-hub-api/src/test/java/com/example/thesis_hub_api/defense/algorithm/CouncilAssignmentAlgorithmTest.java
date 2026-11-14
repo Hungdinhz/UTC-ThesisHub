@@ -28,10 +28,10 @@ public class CouncilAssignmentAlgorithmTest {
         
         req.setStudents(Arrays.asList(s1));
         
-        // 5 eligible lecturers
+        // 5 eligible lecturers: 1 President, 1 Secretary, 2 Reviewers, 1 Member
         CouncilSchedulingRequestDTO.LecturerInfo l1 = createLecturer("L1", true, false, false);
         CouncilSchedulingRequestDTO.LecturerInfo l2 = createLecturer("L2", false, true, false);
-        CouncilSchedulingRequestDTO.LecturerInfo l3 = createLecturer("L3", false, true, false);
+        CouncilSchedulingRequestDTO.LecturerInfo l3 = createLecturer("L3", false, false, true);
         CouncilSchedulingRequestDTO.LecturerInfo l4 = createLecturer("L4", false, false, true);
         CouncilSchedulingRequestDTO.LecturerInfo l5 = createLecturer("L5", false, false, true);
         
@@ -41,7 +41,10 @@ public class CouncilAssignmentAlgorithmTest {
         
         assertEquals(1, res.getCouncils().size());
         assertEquals("L1", res.getCouncils().get(0).getPresidentId());
-        assertTrue(Arrays.asList("L2", "L3").contains(res.getCouncils().get(0).getSecretary1Id()));
+        assertEquals("L2", res.getCouncils().get(0).getSecretaryId());
+        assertNotNull(res.getCouncils().get(0).getReviewer1Id());
+        assertNotNull(res.getCouncils().get(0).getReviewer2Id());
+        assertNotNull(res.getCouncils().get(0).getMemberId());
     }
 
     @Test
@@ -54,10 +57,10 @@ public class CouncilAssignmentAlgorithmTest {
         
         req.setStudents(Arrays.asList(s1));
         
-        // L1 is the only president initially, but is also advisor
+        // L1 is president initially, but is also advisor
         CouncilSchedulingRequestDTO.LecturerInfo l1 = createLecturer("L1", true, false, false);
         CouncilSchedulingRequestDTO.LecturerInfo l2 = createLecturer("L2", false, true, false);
-        CouncilSchedulingRequestDTO.LecturerInfo l3 = createLecturer("L3", false, true, false);
+        CouncilSchedulingRequestDTO.LecturerInfo l3 = createLecturer("L3", false, false, true);
         CouncilSchedulingRequestDTO.LecturerInfo l4 = createLecturer("L4", false, false, true);
         CouncilSchedulingRequestDTO.LecturerInfo l5 = createLecturer("L5", false, false, true);
         

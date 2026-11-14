@@ -10,6 +10,7 @@ import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fil
 import { apiService } from '../../../services/api';
 import type { ProjectRoundItem } from '../../../types';
 import { defenseService } from '../../defense/services/defenseService';
+import { toast } from '../../../components/Toast';
 
 export const TaskBoardPage: React.FC = () => {
   const { userType, user } = useAuth();
@@ -463,17 +464,17 @@ export const TaskBoardPage: React.FC = () => {
         });
         setShowReviseForm(false);
         setSubmitSuccessMsg('✅ Đã nộp bài sửa thành công! Trạng thái công việc trong cột Cần Sửa đã chuyển sang màu xanh (Đã sửa - Chờ GVHD duyệt).');
-        alert('✅ Đã nộp bài sửa thành công! Nhiệm vụ vẫn ở cột Cần Sửa (Revise) với nhãn màu xanh "ĐÃ SỬA BÀI" chờ GVHD duyệt.');
+        toast.success('Đã nộp bài sửa thành công! Nhiệm vụ đang ở cột Cần Sửa với trạng thái "ĐÃ SỬA BÀI" chờ GVHD duyệt.');
       } else {
         setSubmitSuccessMsg('🎉 Nộp bài thành công! File và báo cáo kết quả của bạn đã được ghi nhận.');
-        alert('🎉 Nộp bài thành công! Task đã chuyển sang trạng thái ĐÃ NỘP BÀI (SUBMITTED) chờ GVHD nghiệm thu.');
+        toast.success('Nộp bài thành công! Task đã chuyển sang trạng thái ĐÃ NỘP BÀI chờ GVHD nghiệm thu.');
       }
       setSubmissionContent('');
       setSubmissionFileUrl('');
     } catch (err: any) {
       console.error('Lỗi khi nộp bài:', err);
       const errMsg = err?.response?.data?.message || err?.message || 'Lỗi kết nối máy chủ';
-      alert('Không thể nộp bài vào hệ thống: ' + errMsg);
+      toast.error('Không thể nộp bài vào hệ thống: ' + errMsg);
     }
   };
 
@@ -486,7 +487,7 @@ export const TaskBoardPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Lỗi khi cập nhật trạng thái công việc:', err);
-      alert('Không thể cập nhật trạng thái công việc: ' + (err?.response?.data?.message || err?.message || 'Lỗi kết nối'));
+      toast.error('Không thể cập nhật trạng thái công việc: ' + (err?.response?.data?.message || err?.message || 'Lỗi kết nối'));
       if (selectedThesisId) {
         progressService.getTasksByThesis(selectedThesisId).then(setTasks).catch(() => {});
       }
@@ -541,7 +542,7 @@ export const TaskBoardPage: React.FC = () => {
           setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, completionRate: newRate } : t));
         } catch {}
 
-        alert(`✅ Đã nghiệm thu ĐẠT! Task đã chuyển sang HOÀN THÀNH. Tiến độ đề tài tăng lên ${newRate}%.`);
+        toast.success(`Đã nghiệm thu ĐẠT! Task đã chuyển sang HOÀN THÀNH. Tiến độ đề tài tăng lên ${newRate}%.`);
       } else {
         setRevisedTaskIds(prev => {
           const next = { ...prev, [selectedTask.id]: false };
@@ -552,11 +553,11 @@ export const TaskBoardPage: React.FC = () => {
         });
         setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'REVISE', latestSubmissionStatus: 'REVISE_REQUIRED' } : t));
         setSelectedTask(prev => prev ? { ...prev, status: 'REVISE', latestSubmissionStatus: 'REVISE_REQUIRED' } : null);
-        alert('⚠️ Đã gửi yêu cầu sửa lại (REVISE_REQUIRED). Task đã chuyển về cột CẦN SỬA (REVISE) để sinh viên làm lại.');
+        toast.warning('Đã gửi yêu cầu sửa lại (REVISE_REQUIRED). Task đã chuyển về cột CẦN SỬA để sinh viên làm lại.');
       }
     } catch (err: any) {
       console.error('Lỗi khi đánh giá bài nộp:', err);
-      alert('Không thể lưu kết quả đánh giá bài nộp: ' + (err?.response?.data?.message || err?.message || 'Lỗi máy chủ'));
+      toast.error('Không thể lưu kết quả đánh giá bài nộp: ' + (err?.response?.data?.message || err?.message || 'Lỗi máy chủ'));
     } finally {
       setReviewLoading(false);
       setReviewModalSubmission(null);
@@ -600,12 +601,12 @@ export const TaskBoardPage: React.FC = () => {
       const updated = await thesisService.setDefenseEligible(selectedThesisId, false);
       setCurrentThesis({ ...updated, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' });
       setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' } : t));
-      alert(`❌ Đã xác nhận sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp.`);
+      toast.warning(`Đã xác nhận sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp.`);
     } catch (err: any) {
       console.error('Lỗi khi cập nhật trạng thái không đủ điều kiện bảo vệ:', err);
       setCurrentThesis({ ...currentThesis, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' });
       setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' } : t));
-      alert(`❌ Đã cập nhật trạng thái: CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ cho sinh viên ${currentThesis.studentFullName}.`);
+      toast.warning(`Đã cập nhật trạng thái: CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ cho sinh viên ${currentThesis.studentFullName}.`);
     } finally {
       setDefenseReadyLoading(false);
     }
@@ -618,9 +619,9 @@ export const TaskBoardPage: React.FC = () => {
       const updated = await thesisService.updateThesis(selectedThesisId, { status: 'IN_PROGRESS' as any });
       setCurrentThesis({ ...updated, defenseEligible: false, status: 'IN_PROGRESS' });
       setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'IN_PROGRESS' } : t));
-      alert(`Đã mở lại trạng thái ĐANG THỰC HIỆN (IN_PROGRESS) cho sinh viên ${currentThesis.studentFullName}.`);
+      toast.info(`Đã mở lại trạng thái ĐANG THỰC HIỆN cho sinh viên ${currentThesis.studentFullName}.`);
     } catch (err: any) {
-      alert('Không thể cập nhật trạng thái: ' + (err?.message || 'Lỗi'));
+      toast.error('Không thể cập nhật trạng thái: ' + (err?.message || 'Lỗi'));
     } finally {
       setDefenseReadyLoading(false);
     }
@@ -630,11 +631,11 @@ export const TaskBoardPage: React.FC = () => {
     e.preventDefault();
     if (!currentThesis) return;
     if (supScoreInput < 0 || supScoreInput > 10) {
-      alert('Điểm số phải từ 0.0 đến 10.0');
+      toast.warning('Điểm số phải từ 0.0 đến 10.0');
       return;
     }
     if (!supFeedbackInput.trim()) {
-      alert('Vui lòng nhập nhận xét / đánh giá của GVHD');
+      toast.warning('Vui lòng nhập nhận xét / đánh giá của GVHD');
       return;
     }
 
@@ -661,10 +662,14 @@ export const TaskBoardPage: React.FC = () => {
         graderName: user?.fullName || 'GVHD',
       });
       setShowDefenseReadyModal(false);
-      alert(`🎉 ĐÃ CHẤM ĐIỂM GVHD & XÁC NHẬN BẢO VỆ THÀNH CÔNG!\nĐiểm hướng dẫn: ${supScoreInput} / 10 đ\nĐề tài đã chuyển sang trạng thái ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY).`);
+      toast.modal(
+        `ĐÃ CHẤM ĐIỂM GVHD & XÁC NHẬN BẢO VỆ THÀNH CÔNG!\n\n• Điểm hướng dẫn: ${supScoreInput} / 10 điểm\n• Đề tài đã chuyển sang trạng thái ĐỦ ĐIỀU KIỆN BẢO VỆ (DEFENSE_READY).\n• Sinh viên đã đủ điều kiện tiến vào Giai đoạn 5 (Bảo vệ đồ án tốt nghiệp).`,
+        'Xác nhận đủ điều kiện bảo vệ',
+        'success'
+      );
     } catch (err: any) {
       console.error('Lỗi khi chấm điểm GVHD và xác nhận bảo vệ:', err);
-      alert('Không thể lưu điểm và xác nhận đủ điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message || 'Lỗi máy chủ'));
+      toast.error('Không thể lưu điểm và xác nhận đủ điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message || 'Lỗi máy chủ'));
     } finally {
       setDefenseReadyLoading(false);
     }
@@ -674,7 +679,7 @@ export const TaskBoardPage: React.FC = () => {
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedThesisId || selectedThesisId <= 0) {
-      alert('Vui lòng chọn một đề tài hợp lệ trước khi giao việc!');
+      toast.warning('Vui lòng chọn một đề tài hợp lệ trước khi giao việc!');
       return;
     }
     const effectiveCreatedById = user?.id || 2;
@@ -692,10 +697,10 @@ export const TaskBoardPage: React.FC = () => {
       });
       setTasks(prev => [...prev, created]);
       await loadTasks(selectedThesisId);
-      alert(`🎉 Đã giao nhiệm vụ mới "${newTaskTitle}" thành công!`);
+      toast.success(`Đã giao nhiệm vụ mới "${newTaskTitle}" thành công!`);
     } catch (err: any) {
       console.error('Lỗi khi tạo công việc:', err);
-      alert('Không thể lưu công việc vào hệ thống: ' + (err?.response?.data?.message || err?.message || 'Lỗi kết nối'));
+      toast.error('Không thể lưu công việc vào hệ thống: ' + (err?.response?.data?.message || err?.message || 'Lỗi kết nối'));
       return;
     }
     setShowCreateModal(false);
@@ -739,9 +744,31 @@ export const TaskBoardPage: React.FC = () => {
 
   const completedTasksCount = tasks.filter(t => t.status === 'COMPLETED').length;
   const computedProgressPercent = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : (currentThesis?.completionRate || 0);
+  const currentRoundForBoard = projectRounds.find(r => r.roundId === (currentThesis?.projectRoundId || (selectedRoundId !== 'ALL' ? Number(selectedRoundId) : undefined)));
+  const isBoardReadOnly =
+    currentRoundForBoard?.status === 'CLOSED' ||
+    currentRoundForBoard?.status === 'ARCHIVED' ||
+    currentThesis?.status === 'COMPLETED';
 
   return (
     <div style={{ padding: '24px', maxWidth: '1500px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+      {isBoardReadOnly && (
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            borderLeft: '4px solid #0a3273',
+            color: '#334155',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '13.5px',
+            fontWeight: 600,
+          }}
+        >
+          🔒 Đợt đồ án đã chốt kết quả / Đề tài đã hoàn thành tốt nghiệp — bạn đang ở chế độ <strong>Chỉ xem</strong> (không thể giao việc mới, chỉnh sửa hoặc nộp bài).
+        </div>
+      )}
       {/* Top Header & Thesis Switcher */}
       <div style={{ background: '#fff', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.04)', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
@@ -908,7 +935,7 @@ export const TaskBoardPage: React.FC = () => {
               </div>
             )}
 
-            {canCreateTask && currentThesis && (
+            {canCreateTask && currentThesis && !isBoardReadOnly && (
               <button
                 onClick={() => setShowCreateModal(true)}
                 style={{
@@ -1692,7 +1719,7 @@ export const TaskBoardPage: React.FC = () => {
             {/* Status Selector (Phân quyền theo vai trò) */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Trạng thái công việc:</span>
-              {isStudent && (selectedTask.status === 'TODO' || selectedTask.status === 'IN_PROGRESS') ? (
+              {!isBoardReadOnly && isStudent && (selectedTask.status === 'TODO' || selectedTask.status === 'IN_PROGRESS') ? (
                 <select
                   value={selectedTask.status}
                   onChange={e => handleStatusChange(selectedTask.id, e.target.value as any)}

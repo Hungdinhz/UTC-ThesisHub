@@ -6,6 +6,7 @@ import type {
   ExternalGroupCreate,
   SupervisorOfStudentGroup 
 } from '../types';
+import { toast } from './Toast';
 import './ExternalManagement.css';
 
 const ExternalManagement: React.FC = () => {
@@ -72,7 +73,7 @@ const ExternalManagement: React.FC = () => {
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedExaminer) {
-      alert('Please select an external examiner');
+      toast.warning('Vui lòng chọn cán bộ chấm thi ngoài trường!');
       return;
     }
     
@@ -81,7 +82,7 @@ const ExternalManagement: React.FC = () => {
         ...groupForm,
         external_examiner: selectedExaminer
       } as any);
-      alert('External group created successfully!');
+      toast.success('Tạo nhóm cán bộ ngoài thành công!');
       setShowCreateGroup(false);
       setGroupForm({
         name: '',
@@ -94,7 +95,7 @@ const ExternalManagement: React.FC = () => {
       setSelectedExaminer(null);
       loadData();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to create group');
+      toast.error(error.response?.data?.message || 'Không thể tạo nhóm cán bộ ngoài');
     }
   };
 
@@ -104,22 +105,22 @@ const ExternalManagement: React.FC = () => {
         external_group: externalGroupId,
         supervisor_group: supervisorGroupId
       });
-      alert('Student group assigned successfully!');
+      toast.success('Đã phân công nhóm sinh viên thành công!');
       loadData();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to assign group');
+      toast.error(error.response?.data?.message || 'Không thể phân công nhóm');
     }
   };
 
   const handleDeleteGroup = async (groupId: number) => {
-    if (!window.confirm('Are you sure you want to delete this external group?')) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xóa nhóm cán bộ ngoài này?')) return;
     
     try {
       await apiService.deleteExternalGroup(groupId);
-      alert('Group deleted successfully!');
+      toast.success('Đã xóa nhóm thành công!');
       loadData();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete group');
+      toast.error(error.response?.data?.message || 'Không thể xóa nhóm');
     }
   };
 

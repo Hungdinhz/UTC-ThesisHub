@@ -29,7 +29,8 @@ public enum ErrorCode {
     INVALID_ADMIN_SECRET_KEY(1021, "Mã bí mật xác nhận Quản trị viên (Admin API Key) không chính xác", HttpStatus.FORBIDDEN),
     NOT_AN_ADMIN_ACCOUNT(1022, "Tài khoản không có quyền truy cập vào cổng Quản trị viên", HttpStatus.FORBIDDEN),
     ASSIGNMENT_ALREADY_FINALIZED(1023, "Kết quả phân công GVHD của đợt đồ án đã được chốt, không thể thay đổi nguyện vọng", HttpStatus.BAD_REQUEST),
-    INVALID_STATUS_TRANSITION(1024, "Không thể chuyển trạng thái đợt đồ án do chưa thỏa mãn điều kiện", HttpStatus.BAD_REQUEST);
+    INVALID_STATUS_TRANSITION(1024, "Không thể chuyển trạng thái đợt đồ án do chưa thỏa mãn điều kiện", HttpStatus.BAD_REQUEST),
+    TOO_MANY_REQUESTS(1025, "Quá nhiều lần thử đăng nhập không thành công. Vui lòng thử lại sau ít phút", HttpStatus.TOO_MANY_REQUESTS);
 
     private final int code;
     private final String message;

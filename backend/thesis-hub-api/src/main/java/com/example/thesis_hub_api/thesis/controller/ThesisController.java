@@ -21,6 +21,7 @@ public class ThesisController {
     private final ThesisService thesisService;
 
     @GetMapping("/{id}")
+    @PreAuthorize("@accessControl.canAccessThesis(#id)")
     public ApiResponse<ThesisResponse> getThesisById(@PathVariable Long id) {
         return ApiResponse.success(thesisService.getThesisById(id));
     }
@@ -31,6 +32,7 @@ public class ThesisController {
     }
 
     @GetMapping("/by-student-and-round")
+    @PreAuthorize("@accessControl.isStudentOwnerOrStaff(#studentId)")
     public ApiResponse<ThesisResponse> getThesisByStudentAndRound(
             @RequestParam Long studentId,
             @RequestParam Long roundId) {
@@ -38,7 +40,7 @@ public class ThesisController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'ACADEMIC_STAFF')")
     public ApiResponse<ThesisResponse> updateThesis(
             @PathVariable Long id,
             @Valid @RequestBody UpdateThesisRequest request) {
@@ -46,7 +48,7 @@ public class ThesisController {
     }
 
     @PatchMapping("/{id}/completion-rate")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'ACADEMIC_STAFF')")
     public ApiResponse<ThesisResponse> updateCompletionRate(
             @PathVariable Long id,
             @RequestParam BigDecimal rate) {
@@ -55,7 +57,7 @@ public class ThesisController {
     }
 
     @PatchMapping("/{id}/defense-eligible")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'ACADEMIC_STAFF')")
     public ApiResponse<ThesisResponse> setDefenseEligible(
             @PathVariable Long id,
             @RequestParam boolean eligible) {
@@ -70,7 +72,9 @@ public class ThesisController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Boolean defenseEligible,
             @RequestParam(required = false) String search,
-            Pageable pageable) {
-        return ApiResponse.success(thesisService.searchTheses(roundId, lecturerId, status, defenseEligible, search, pageable));
+            @org.springframework.data.web.PageableDefault(size = 200, sort = "id", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
+        Pageable safePageable = com.example.thesis_hub_api.common.util.PaginationUtils.clampPageable(
+                pageable, 500, "id", java.util.Set.of("id", "thesisCode", "titleVn", "status", "completionRate", "createdAt", "updatedAt"));
+        return ApiResponse.success(thesisService.searchTheses(roundId, lecturerId, status, defenseEligible, search, safePageable));
     }
 }

@@ -8,6 +8,7 @@ import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.progress.dto.*;
 import com.example.thesis_hub_api.progress.entity.ProgressFeedback;
 import com.example.thesis_hub_api.progress.entity.ProgressReport;
+import com.example.thesis_hub_api.progress.entity.Task;
 import com.example.thesis_hub_api.progress.repository.ProgressFeedbackRepository;
 import com.example.thesis_hub_api.progress.repository.ProgressReportRepository;
 import com.example.thesis_hub_api.progress.repository.TaskRepository;
@@ -26,7 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -136,9 +137,56 @@ public class ProgressReportServiceImpl implements ProgressReportService {
     public ThesisProgressSummaryResponse getProgressSummaryByThesis(Long thesisId) {
         Thesis thesis = thesisRepository.findById(thesisId)
                 .orElseThrow(() -> new ResourceNotFoundException("Thesis", thesisId));
+        return buildSummaryForThesis(thesis);
+    }
 
-        long totalTasks = taskRepository.countByThesisId(thesisId);
-        long completedTasks = taskRepository.countByThesisIdAndStatus(thesisId, "COMPLETED");
+    @Override
+    @Transactional(readOnly = true)
+    public List<ThesisProgressSummaryResponse> getProgressSummariesByRoundAndLecturer(Long roundId, Long lecturerId) {
+        List<Thesis> theses = roundId != null
+                ? thesisRepository.findByProjectRoundId(roundId)
+                : (lecturerId != null ? thesisRepository.findByLecturerId(lecturerId) : thesisRepository.findAll());
+        List<Thesis> filteredTheses = theses.stream()
+                .filter(t -> lecturerId == null || (t.getLecturer() != null && lecturerId.equals(t.getLecturer().getId())))
+                .collect(Collectors.toList());
+
+        if (filteredTheses.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> thesisIds = filteredTheses.stream().map(Thesis::getId).collect(Collectors.toList());
+        Map<Long, List<Task>> tasksByThesis = taskRepository.findByThesisIdIn(thesisIds).stream()
+                .filter(t -> t.getThesis() != null)
+                .collect(Collectors.groupingBy(t -> t.getThesis().getId()));
+        Map<Long, List<ProgressReport>> reportsByThesis = progressReportRepository.findByThesisIdInOrderBySubmittedAtDesc(thesisIds).stream()
+                .filter(r -> r.getThesis() != null)
+                .collect(Collectors.groupingBy(r -> r.getThesis().getId()));
+
+        return filteredTheses.stream()
+                .map(t -> buildSummaryForThesis(
+                        t,
+                        tasksByThesis.getOrDefault(t.getId(), List.of()),
+                        reportsByThesis.getOrDefault(t.getId(), List.of())
+                ))
+                .collect(Collectors.toList());
+    }
+
+    private ThesisProgressSummaryResponse buildSummaryForThesis(Thesis thesis) {
+        Long thesisId = thesis.getId();
+        List<Task> tasks = taskRepository.findByThesisId(thesisId);
+        List<ProgressReport> reports = progressReportRepository.findByThesisIdOrderBySubmittedAtDesc(thesisId);
+        return buildSummaryForThesis(thesis, tasks, reports);
+    }
+
+    private ThesisProgressSummaryResponse buildSummaryForThesis(Thesis thesis, List<Task> tasks, List<ProgressReport> reports) {
+        long totalTasks = tasks.size();
+        long completedTasks = tasks.stream().filter(t -> "COMPLETED".equalsIgnoreCase(t.getStatus())).count();
+        long submittedTasks = tasks.stream().filter(t -> "SUBMITTED".equalsIgnoreCase(t.getStatus())).count();
+        Instant now = Instant.now();
+        long overdueTasks = tasks.stream()
+                .filter(t -> !"COMPLETED".equalsIgnoreCase(t.getStatus()) && !"CANCELLED".equalsIgnoreCase(t.getStatus()))
+                .filter(t -> t.getDueDate() != null && t.getDueDate().isBefore(now))
+                .count();
 
         BigDecimal taskCompletionPercent = BigDecimal.ZERO;
         if (totalTasks > 0) {
@@ -146,34 +194,38 @@ public class ProgressReportServiceImpl implements ProgressReportService {
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
-        List<ProgressReport> reports = progressReportRepository.findByThesisIdOrderBySubmittedAtDesc(thesisId);
         long totalReports = reports.size();
+        long unreviewedReports = reports.stream()
+                .filter(r -> "SUBMITTED".equalsIgnoreCase(r.getStatus()) && r.getFeedback() == null)
+                .count();
 
         Integer latestReportPercent = null;
         String latestAssessment = null;
+        Instant latestReportAt = null;
 
         if (!reports.isEmpty()) {
             ProgressReport latest = reports.get(0);
             latestReportPercent = latest.getProgressPercent();
+            latestReportAt = latest.getSubmittedAt();
             if (latest.getFeedback() != null) {
                 latestAssessment = latest.getFeedback().getAssessment();
             }
         }
 
-        // Ready for defense condition: >= 80% completion rate AND defenseEligible
         boolean readyForDefense = Boolean.TRUE.equals(thesis.getDefenseEligible())
                 || (thesis.getCompletionRate() != null && thesis.getCompletionRate().compareTo(BigDecimal.valueOf(80.0)) >= 0);
 
-        String studentName = thesis.getStudent().getUser() != null ? thesis.getStudent().getUser().getFullName() : null;
-        String lecturerName = thesis.getLecturer().getUser() != null ? thesis.getLecturer().getUser().getFullName() : null;
+        String studentName = thesis.getStudent() != null && thesis.getStudent().getUser() != null ? thesis.getStudent().getUser().getFullName() : null;
+        String lecturerName = thesis.getLecturer() != null && thesis.getLecturer().getUser() != null ? thesis.getLecturer().getUser().getFullName() : null;
 
         return ThesisProgressSummaryResponse.builder()
                 .thesisId(thesis.getId())
                 .thesisCode(thesis.getThesisCode())
-                .studentId(thesis.getStudent().getId())
-                .studentCode(thesis.getStudent().getStudentCode())
+                .thesisTitle(thesis.getTitleVn())
+                .studentId(thesis.getStudent() != null ? thesis.getStudent().getId() : null)
+                .studentCode(thesis.getStudent() != null ? thesis.getStudent().getStudentCode() : null)
                 .studentFullName(studentName)
-                .lecturerId(thesis.getLecturer().getId())
+                .lecturerId(thesis.getLecturer() != null ? thesis.getLecturer().getId() : null)
                 .lecturerFullName(lecturerName)
                 .status(thesis.getStatus())
                 .completionRate(thesis.getCompletionRate())
@@ -183,6 +235,10 @@ public class ProgressReportServiceImpl implements ProgressReportService {
                 .totalProgressReports(totalReports)
                 .latestReportPercent(latestReportPercent)
                 .latestAssessment(latestAssessment)
+                .latestReportAt(latestReportAt)
+                .submittedTasksCount(submittedTasks)
+                .overdueTasksCount(overdueTasks)
+                .unreviewedReportsCount(unreviewedReports)
                 .defenseEligible(thesis.getDefenseEligible())
                 .readyForDefense(readyForDefense)
                 .build();

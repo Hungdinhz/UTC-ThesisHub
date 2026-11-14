@@ -103,6 +103,9 @@ public class ProjectRoundService {
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     @Autowired(required = false)
     private com.example.thesis_hub_api.notification.service.NotificationService notificationService;
 
@@ -119,8 +122,7 @@ public class ProjectRoundService {
     private com.example.thesis_hub_api.defense.repository.GraduationResultRepository graduationResultRepository;
 
     @Autowired(required = false)
-    @org.springframework.context.annotation.Lazy
-    private com.example.thesis_hub_api.defense.service.DefenseService defenseService;
+    private org.springframework.beans.factory.ObjectProvider<RoundDefenseSynthesizer> defenseSynthesizerProvider;
 
     /**
      * CONTRACT 2: API Tra cứu Đợt đồ án đang hoạt động & Mốc thời gian (Timeline).
@@ -128,6 +130,32 @@ public class ProjectRoundService {
      */
     @Transactional(readOnly = true)
     public ProjectRoundResponseDTO getActiveRound() {
+        return getActiveRound(null);
+    }
+
+    @Transactional(readOnly = true)
+    public ProjectRoundResponseDTO getActiveRound(UserPrincipal currentUser) {
+        if (currentUser != null && currentUser.getAuthorities() != null) {
+            boolean isAdmin = currentUser.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority())
+                            || "ROLE_FACULTY_ADMIN".equalsIgnoreCase(a.getAuthority()));
+            boolean isLecturer = currentUser.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_LECTURER".equalsIgnoreCase(a.getAuthority())
+                            || "ROLE_COMMITTEE".equalsIgnoreCase(a.getAuthority()));
+            if (!isAdmin && isLecturer) {
+                List<ProjectRoundResponseDTO> lecturerRounds = getRounds(null, null, currentUser);
+                if (!lecturerRounds.isEmpty()) {
+                    return lecturerRounds.stream()
+                            .filter(r -> "IN_PROGRESS".equalsIgnoreCase(r.getStatus()))
+                            .findFirst()
+                            .or(() -> lecturerRounds.stream()
+                                    .filter(r -> "OPEN".equalsIgnoreCase(r.getStatus()))
+                                    .findFirst())
+                            .orElse(lecturerRounds.get(0));
+                }
+            }
+        }
+
         ProjectRound round = projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("OPEN")
                 .or(() -> projectRoundRepository.findFirstByStatusOrderByCreatedAtDesc("IN_PROGRESS"))
                 .orElseThrow(() -> new AppException(ErrorCode.PROJECT_ROUND_CLOSED));
@@ -357,9 +385,38 @@ public class ProjectRoundService {
             validateTransitionToOpen(round);
         }
 
-        // 2. Chuyển từ OPEN -> IN_PROGRESS
+        // 2. Chuyển từ OPEN -> IN_PROGRESS: Tự động kích hoạt mốc timeline GĐ3 (PROPOSAL_SUBMISSION)
         if ("OPEN".equalsIgnoreCase(currentStatus) && "IN_PROGRESS".equalsIgnoreCase(cleanStatus)) {
             validateTransitionToInProgress(round);
+
+            List<TimelineMilestone> milestones = timelineMilestoneRepository
+                    .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(id);
+            if (milestones != null && !milestones.isEmpty()) {
+                int propIndex = -1;
+                for (int i = 0; i < milestones.size(); i++) {
+                    if ("PROPOSAL_SUBMISSION".equalsIgnoreCase(milestones.get(i).getPhaseType())) {
+                        propIndex = i;
+                        break;
+                    }
+                }
+                if (propIndex >= 0) {
+                    Instant now = Instant.now();
+                    for (int i = 0; i < milestones.size(); i++) {
+                        TimelineMilestone m = milestones.get(i);
+                        if (i < propIndex) {
+                            m.setStartDate(now.minus(Duration.ofDays(14 * (propIndex - i + 1))));
+                            m.setEndDate(now.minusSeconds(60));
+                        } else if (i == propIndex) {
+                            m.setStartDate(now.minusSeconds(60));
+                            m.setEndDate(now.plus(Duration.ofDays(14)));
+                        } else {
+                            m.setStartDate(now.plus(Duration.ofDays(14 * (i - propIndex))));
+                            m.setEndDate(now.plus(Duration.ofDays(14 * (i - propIndex + 1))));
+                        }
+                    }
+                    timelineMilestoneRepository.saveAll(milestones);
+                }
+            }
         }
 
         if (Boolean.TRUE.equals(round.getSupplementaryOpen())
@@ -415,54 +472,65 @@ public class ProjectRoundService {
         }
         List<com.example.thesis_hub_api.thesis.entity.Thesis> theses = thesisRepository.findByProjectRoundId(round.getId());
         for (com.example.thesis_hub_api.thesis.entity.Thesis thesis : theses) {
-            if (thesis.getId() == null) {
+            if (thesis == null || thesis.getId() == null) {
                 continue;
             }
-            if (graduationResultRepository != null) {
-                java.util.Optional<com.example.thesis_hub_api.defense.entity.GraduationResult> grOpt = graduationResultRepository.findByThesisId(thesis.getId());
-                if (grOpt.isEmpty() && defenseService != null && defenseService.canSynthesizeResult(thesis.getId())) {
-                    try {
-                        defenseService.synthesizeResult(thesis.getId());
-                        grOpt = graduationResultRepository.findByThesisId(thesis.getId());
-                    } catch (Exception ignored) {}
-                }
-                grOpt.ifPresent(gr -> {
-                    gr.setPublishedAt(Instant.now());
-                    graduationResultRepository.save(gr);
-
-                    boolean passed = "PASSED".equalsIgnoreCase(gr.getFinalResult());
-                    if (passed) {
-                        thesis.setStatus("COMPLETED");
-                        thesisRepository.save(thesis);
-                    }
-
-                    if (studentProjectRoundRepository != null && thesis.getStudent() != null && thesis.getStudent().getId() != null) {
-                        studentProjectRoundRepository.findByStudentIdAndProjectRoundId(thesis.getStudent().getId(), round.getId())
-                                .ifPresent(spr -> {
-                                    spr.setStatus(passed ? "DEFENDED" : "DROPPED");
-                                    spr.setNote("Kết quả bảo vệ: " + (gr.getFinalScore() != null ? gr.getFinalScore() : "--") + "/10 (" + (passed ? "ĐẠT" : "KHÔNG ĐẠT") + ")");
-                                    studentProjectRoundRepository.save(spr);
-                                });
-                    }
-
-                    if (notificationService != null && thesis.getStudent() != null
-                            && thesis.getStudent().getUser() != null
-                            && thesis.getStudent().getUser().getId() != null) {
+            try {
+                if (graduationResultRepository != null) {
+                    java.util.Optional<com.example.thesis_hub_api.defense.entity.GraduationResult> grOpt = graduationResultRepository.findByThesisId(thesis.getId());
+                    RoundDefenseSynthesizer defenseSynthesizer = defenseSynthesizerProvider != null ? defenseSynthesizerProvider.getIfAvailable() : null;
+                    if (grOpt.isEmpty() && defenseSynthesizer != null && defenseSynthesizer.canSynthesizeResult(thesis.getId())) {
                         try {
-                            String scoreStr = gr.getFinalScore() != null ? gr.getFinalScore().toPlainString() : "--";
-                            String gradeLabel = formatGradeVi(gr.getGrade());
-                            String resultLabel = passed ? "ĐẠT" : "KHÔNG ĐẠT";
-                            notificationService.createNotification(
-                                    thesis.getStudent().getUser().getId(),
-                                    "🎓 Công bố kết quả bảo vệ đồ án [" + round.getRoundCode() + "]",
-                                    "Kết quả bảo vệ đồ án tốt nghiệp của bạn đã được công bố chính thức: Điểm tổng kết "
-                                            + scoreStr + "/10 — Xếp loại: " + gradeLabel + " (" + resultLabel + ").",
-                                    "DEFENSE_RESULT",
-                                    "/admin/defense-schedules"
-                            );
+                            defenseSynthesizer.synthesizeThesisResult(thesis.getId());
+                            grOpt = graduationResultRepository.findByThesisId(thesis.getId());
                         } catch (Exception ignored) {}
                     }
-                });
+                    grOpt.ifPresent(gr -> {
+                        gr.setPublishedAt(Instant.now());
+                        graduationResultRepository.save(gr);
+
+                        boolean passed = "PASSED".equalsIgnoreCase(gr.getFinalResult());
+                        if (passed) {
+                            thesis.setStatus("COMPLETED");
+                            thesisRepository.save(thesis);
+                        }
+
+                        try {
+                            if (studentProjectRoundRepository != null && thesis.getStudent() != null && thesis.getStudent().getId() != null) {
+                                studentProjectRoundRepository.findByStudentIdAndProjectRoundId(thesis.getStudent().getId(), round.getId())
+                                        .ifPresent(spr -> {
+                                            spr.setStatus(passed ? "DEFENDED" : "DROPPED");
+                                            spr.setNote("Kết quả bảo vệ: " + (gr.getFinalScore() != null ? gr.getFinalScore() : "--") + "/10 (" + (passed ? "ĐẠT" : "KHÔNG ĐẠT") + ")");
+                                            studentProjectRoundRepository.save(spr);
+                                        });
+                            }
+                        } catch (Exception sprEx) {
+                            log.warn("Không thể cập nhật StudentProjectRound cho đề tài {}: {}", thesis.getId(), sprEx.getMessage());
+                        }
+
+                        try {
+                            if (notificationService != null && thesis.getStudent() != null
+                                    && thesis.getStudent().getUser() != null
+                                    && thesis.getStudent().getUser().getId() != null) {
+                                String scoreStr = gr.getFinalScore() != null ? gr.getFinalScore().toPlainString() : "--";
+                                String gradeLabel = formatGradeVi(gr.getGrade());
+                                String resultLabel = passed ? "ĐẠT" : "KHÔNG ĐẠT";
+                                notificationService.createNotification(
+                                        thesis.getStudent().getUser().getId(),
+                                        "🎓 Công bố kết quả bảo vệ đồ án [" + round.getRoundCode() + "]",
+                                        "Kết quả bảo vệ đồ án tốt nghiệp của bạn đã được công bố chính thức: Điểm tổng kết "
+                                                + scoreStr + "/10 — Xếp loại: " + gradeLabel + " (" + resultLabel + ").",
+                                        "DEFENSE_RESULT",
+                                        "/admin/defense-schedules"
+                                );
+                            }
+                        } catch (Exception notifEx) {
+                            log.warn("Không thể gửi thông báo kết quả cho đề tài {}: {}", thesis.getId(), notifEx.getMessage());
+                        }
+                    });
+                }
+            } catch (Exception thEx) {
+                log.error("Lỗi khi xử lý tổng kết bảo vệ cho đề tài {}: {}", thesis.getId(), thEx.getMessage());
             }
         }
     }
@@ -876,6 +944,34 @@ public class ProjectRoundService {
         return 2;
     }
 
+    private int calculateRoundStage(ProjectRound round, List<TimelineMilestone> milestones) {
+        if (round == null) return 1;
+        String roundStatus = round.getStatus() != null ? round.getStatus().toUpperCase() : "DRAFT";
+        if ("DRAFT".equals(roundStatus)) {
+            return 1;
+        }
+        if ("OPEN".equals(roundStatus)) {
+            return 2;
+        }
+        if ("CLOSED".equals(roundStatus)) {
+            return 5;
+        }
+        // IN_PROGRESS: xác định theo milestone active đầu tiên (tối thiểu là 3)
+        Instant now = Instant.now();
+        if (milestones != null && !milestones.isEmpty()) {
+            TimelineMilestone activeMilestone = milestones.stream()
+                    .sorted(Comparator.comparing(TimelineMilestone::getOrderIndex)
+                            .thenComparing(TimelineMilestone::getStartDate))
+                    .filter(m -> !now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate()))
+                    .findFirst()
+                    .orElse(null);
+            if (activeMilestone != null && StringUtils.hasText(activeMilestone.getPhaseType())) {
+                return Math.max(3, getStageNumberFromPhase(activeMilestone.getPhaseType()));
+            }
+        }
+        return 3;
+    }
+
     /**
      * Tự động đánh giá kết quả đạt / không đạt của toàn bộ sinh viên trong đợt khi kết thúc giai đoạn.
      * Sinh viên chưa làm nhiệm vụ của giai đoạn trước sẽ bị loại (DROPPED - Không đạt).
@@ -1028,11 +1124,11 @@ public class ProjectRoundService {
                 continue;
             }
 
-            // Kiểm tra điều kiện GĐ4
+            // Kiểm tra điều kiện GĐ4: Ở GĐ5, nếu GVHD đã duyệt thì lên DEFENSE_READY; nếu chưa thì giữ IN_PROGRESS
+            // để Khoa/GVHD tiếp tục xét duyệt điều kiện bảo vệ hoặc lập quyết định bảo lưu (không đánh dấu DROPPED).
             if (targetStage >= 5 && !readyG4StudentIds.contains(sId)) {
                 if (!"DROPPED".equalsIgnoreCase(spr.getStatus())) {
-                    spr.setStatus("DROPPED");
-                    spr.setNote("Không hoàn thành GĐ4: Chưa đủ điều kiện bảo vệ đồ án tốt nghiệp trước hội đồng - Bị loại khỏi đợt đồ án (Không đạt)");
+                    spr.setStatus("IN_PROGRESS");
                     toSave.add(spr);
                 }
                 continue;
@@ -1150,13 +1246,7 @@ public class ProjectRoundService {
 
         List<TimelineMilestone> milestones = timelineMilestoneRepository
                 .findByProjectRoundIdOrderByOrderIndexAscStartDateAsc(roundId);
-        int currentRoundStage = 2;
-        Instant now = Instant.now();
-        for (TimelineMilestone m : milestones) {
-            if (!now.isBefore(m.getStartDate()) && !now.isAfter(m.getEndDate())) {
-                currentRoundStage = Math.max(currentRoundStage, getStageNumberFromPhase(m.getPhaseType()));
-            }
-        }
+        int currentRoundStage = calculateRoundStage(activeRound, milestones);
 
         boolean hasDefenseEligibleThesis = false;
         boolean hasThesisOrApprovedProposal = false;
@@ -1174,13 +1264,13 @@ public class ProjectRoundService {
         }
 
         if (!isDropped) {
-            if ("DEFENSE_READY".equalsIgnoreCase(status) || "DEFENDED".equalsIgnoreCase(status)
-                    || hasDefenseEligibleThesis || currentRoundStage >= 5) {
+            if ("DEFENDED".equalsIgnoreCase(status)) {
+                completedStage = 5;
+            } else if ("DEFENSE_READY".equalsIgnoreCase(status) || hasDefenseEligibleThesis) {
                 completedStage = 4;
-                currentRoundStage = Math.max(currentRoundStage, 5);
-            } else if ("IN_PROGRESS".equalsIgnoreCase(status) || hasThesisOrApprovedProposal || currentRoundStage >= 4) {
+            } else if ("IN_PROGRESS".equalsIgnoreCase(status) || hasThesisOrApprovedProposal) {
                 completedStage = 3;
-            } else if ("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status) || currentRoundStage >= 3) {
+            } else if (("ASSIGNED".equalsIgnoreCase(status) || "REGISTERED".equalsIgnoreCase(status)) && currentRoundStage >= 3) {
                 completedStage = 2;
             } else {
                 completedStage = 1;
@@ -1282,6 +1372,42 @@ public class ProjectRoundService {
                 .build();
     }
 
+    private void safeExecuteUpdate(String sql, Object... args) {
+        if (jdbcTemplate == null) {
+            return;
+        }
+        try {
+            if (jdbcTemplate.getDataSource() == null) {
+                jdbcTemplate.update(sql, args);
+                return;
+            }
+            jdbcTemplate.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) conn -> {
+                java.sql.Savepoint sp = null;
+                try {
+                    sp = conn.setSavepoint();
+                    try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+                        for (int i = 0; i < args.length; i++) {
+                            ps.setObject(i + 1, args[i]);
+                        }
+                        ps.executeUpdate();
+                    }
+                    conn.releaseSavepoint(sp);
+                } catch (Exception ex) {
+                    if (sp != null) {
+                        try {
+                            conn.rollback(sp);
+                        } catch (Exception ignored) {
+                        }
+                    }
+                    log.warn("Bỏ qua lỗi SQL khi dọn dẹp dữ liệu đợt đồ án [{}]: {}", sql, ex.getMessage());
+                }
+                return null;
+            });
+        } catch (Exception ex) {
+            log.warn("Cảnh báo dọn dẹp SQL [{}]: {}", sql, ex.getMessage());
+        }
+    }
+
     @Transactional
     public void deleteRound(Long roundId) {
         ProjectRound round = projectRoundRepository.findById(roundId)
@@ -1294,100 +1420,111 @@ public class ProjectRoundService {
         }
         log.info("Deleting project round: id={}, code={}, status={}", round.getId(), round.getRoundCode(), status);
 
+        if (entityManager != null) {
+            entityManager.flush();
+        }
+
         if (jdbcTemplate != null) {
             // Lấy danh sách sinh viên chỉ thuộc đợt đồ án này (không tham gia đợt nào khác) để xóa tài khoản sinh viên
-            List<Long> studentIdsToDelete = jdbcTemplate.queryForList(
-                    "SELECT spr.student_id FROM student_project_rounds spr WHERE spr.project_round_id = ? " +
-                    "AND spr.student_id IS NOT NULL " +
-                    "AND NOT EXISTS (SELECT 1 FROM student_project_rounds spr2 WHERE spr2.student_id = spr.student_id AND spr2.project_round_id <> ?)",
-                    Long.class, roundId, roundId
-            );
+            List<Long> studentIdsToDelete = new ArrayList<>();
+            try {
+                List<Long> queriedStudents = jdbcTemplate.queryForList(
+                        "SELECT spr.student_id FROM student_project_rounds spr WHERE spr.project_round_id = ? " +
+                        "AND spr.student_id IS NOT NULL " +
+                        "AND NOT EXISTS (SELECT 1 FROM student_project_rounds spr2 WHERE spr2.student_id = spr.student_id AND spr2.project_round_id <> ?)",
+                        Long.class, roundId, roundId
+                );
+                if (queriedStudents != null) {
+                    studentIdsToDelete.addAll(queriedStudents);
+                }
+            } catch (Exception ex) {
+                log.warn("Không thể truy vấn danh sách sinh viên cần xóa cho đợt {}: {}", roundId, ex.getMessage());
+            }
+
             List<Long> userIdsToDelete = new ArrayList<>();
             if (!studentIdsToDelete.isEmpty()) {
                 String inStudentIds = studentIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
-                userIdsToDelete = jdbcTemplate.queryForList(
-                        "SELECT s.user_id FROM students s WHERE s.id IN (" + inStudentIds + ") AND s.user_id IS NOT NULL " +
-                        "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = s.user_id)",
-                        Long.class
-                );
+                try {
+                    List<Long> queriedUsers = jdbcTemplate.queryForList(
+                            "SELECT s.user_id FROM students s WHERE s.id IN (" + inStudentIds + ") AND s.user_id IS NOT NULL " +
+                            "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = s.user_id)",
+                            Long.class
+                    );
+                    if (queriedUsers != null) {
+                        userIdsToDelete.addAll(queriedUsers);
+                    }
+                } catch (Exception ex) {
+                    log.warn("Không thể truy vấn danh sách user_id sinh viên cần xóa cho đợt {}: {}", roundId, ex.getMessage());
+                }
             }
 
-            // Cleanup dependent tables without explicit ON DELETE CASCADE
-            try {
-                jdbcTemplate.update("DELETE FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
-            } catch (Exception ignored) {}
-            try {
-                jdbcTemplate.update("DELETE FROM chat_messages WHERE project_round_id = ?", roundId);
-            } catch (Exception ignored) {}
-            try {
-                jdbcTemplate.update("DELETE FROM defense_minutes_signatures WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            } catch (Exception ignored) {}
-            try {
-                jdbcTemplate.update("DELETE FROM defense_schedule_theses WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            } catch (Exception ignored) {}
-            jdbcTemplate.update("DELETE FROM scores WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM reviewer_assignments WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM graduation_results WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM submissions WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
-            jdbcTemplate.update("DELETE FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM documents WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM progress_feedbacks WHERE progress_report_id IN (SELECT id FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
-            jdbcTemplate.update("DELETE FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM progress_reports WHERE milestone_id IN (SELECT id FROM timeline_milestones WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM theses WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM proposal_review_assignments WHERE proposal_id IN (SELECT id FROM proposals WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM proposals WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM council_members WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM defense_schedules WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
-            jdbcTemplate.update("DELETE FROM defense_councils WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM reservation_requests WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM supervisor_assignments WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM preferences WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM direction_registrations WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM lecturer_capacities WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM student_project_rounds WHERE project_round_id = ?", roundId);
-            jdbcTemplate.update("DELETE FROM timeline_milestones WHERE project_round_id = ?", roundId);
+            // Cleanup dependent tables using savepoint-protected SQL so PostgreSQL never aborts the transaction
+            safeExecuteUpdate("DELETE FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            safeExecuteUpdate("DELETE FROM chat_messages WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM defense_minutes_signatures WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?) OR council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId, roundId);
+            safeExecuteUpdate("DELETE FROM defense_schedule_theses WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?) OR schedule_id IN (SELECT id FROM defense_schedules WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?))", roundId, roundId);
+            safeExecuteUpdate("DELETE FROM scores WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM reviewer_assignments WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM graduation_results WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM submissions WHERE task_id IN (SELECT id FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            safeExecuteUpdate("DELETE FROM tasks WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM documents WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM progress_feedbacks WHERE progress_report_id IN (SELECT id FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?))", roundId);
+            safeExecuteUpdate("DELETE FROM progress_reports WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM progress_reports WHERE milestone_id IN (SELECT id FROM timeline_milestones WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM reservation_requests WHERE thesis_id IN (SELECT id FROM theses WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM theses WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM proposal_review_assignments WHERE proposal_id IN (SELECT id FROM proposals WHERE project_round_id = ?) OR review_group_id IN (SELECT id FROM review_groups WHERE project_round_id = ?)", roundId, roundId);
+            safeExecuteUpdate("DELETE FROM proposals WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM review_group_members WHERE review_group_id IN (SELECT id FROM review_groups WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM review_groups WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM council_members WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM defense_schedules WHERE council_id IN (SELECT id FROM defense_councils WHERE project_round_id = ?)", roundId);
+            safeExecuteUpdate("DELETE FROM defense_councils WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM reservation_requests WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM supervisor_assignments WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM preferences WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM direction_registrations WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM lecturer_capacities WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM academic_records WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM student_project_rounds WHERE project_round_id = ?", roundId);
+            safeExecuteUpdate("DELETE FROM timeline_milestones WHERE project_round_id = ?", roundId);
 
             // Xóa tài khoản sinh viên thuộc đợt đồ án này (tuyệt đối không xóa tài khoản giảng viên)
             if (!studentIdsToDelete.isEmpty()) {
                 String inStudentIds = studentIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
-                try {
-                    jdbcTemplate.update("DELETE FROM preferences WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM direction_registrations WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM supervisor_assignments WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM reservation_requests WHERE student_id IN (" + inStudentIds + ")");
-                    try {
-                        jdbcTemplate.update("DELETE FROM academic_records WHERE student_id IN (" + inStudentIds + ")");
-                    } catch (Exception ignored) {}
-                    jdbcTemplate.update("DELETE FROM proposals WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM theses WHERE student_id IN (" + inStudentIds + ")");
-                    jdbcTemplate.update("DELETE FROM students WHERE id IN (" + inStudentIds + ")");
-                } catch (Exception ex) {
-                    log.warn("Lỗi khi dọn dẹp bảng students cho đợt {}: {}", roundId, ex.getMessage());
-                }
+                safeExecuteUpdate("DELETE FROM preferences WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM direction_registrations WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM supervisor_assignments WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM reservation_requests WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM academic_records WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM submissions WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM progress_reports WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM proposals WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM theses WHERE student_id IN (" + inStudentIds + ")");
+                safeExecuteUpdate("DELETE FROM students WHERE id IN (" + inStudentIds + ")");
             }
             if (!userIdsToDelete.isEmpty()) {
                 String inUserIds = userIdsToDelete.stream().map(String::valueOf).collect(Collectors.joining(","));
-                try {
-                    jdbcTemplate.update("DELETE FROM notifications WHERE user_id IN (" + inUserIds + ")");
-                } catch (Exception ignored) {}
-                try {
-                    jdbcTemplate.update("DELETE FROM comments WHERE author_id IN (" + inUserIds + ")");
-                } catch (Exception ignored) {}
-                try {
-                    jdbcTemplate.update("DELETE FROM user_roles WHERE user_id IN (" + inUserIds + ") " +
-                            "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = user_roles.user_id)");
-                    jdbcTemplate.update("DELETE FROM users WHERE id IN (" + inUserIds + ") " +
-                            "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = users.id) " +
-                            "AND NOT EXISTS (SELECT 1 FROM students s WHERE s.user_id = users.id)");
-                    log.info("Đã xóa {} tài khoản sinh viên khi xóa đợt đồ án id={}", userIdsToDelete.size(), roundId);
-                } catch (Exception ex) {
-                    log.warn("Lỗi khi dọn dẹp bảng users cho sinh viên đợt {}: {}", roundId, ex.getMessage());
-                }
+                safeExecuteUpdate("DELETE FROM notifications WHERE user_id IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM comments WHERE user_id IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM chat_messages WHERE sender_user_id IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM documents WHERE uploader_id IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM tasks WHERE created_by IN (" + inUserIds + ") OR assigned_to IN (" + inUserIds + ")");
+                safeExecuteUpdate("DELETE FROM users WHERE id IN (" + inUserIds + ") " +
+                        "AND NOT EXISTS (SELECT 1 FROM lecturers l WHERE l.user_id = users.id) " +
+                        "AND NOT EXISTS (SELECT 1 FROM students s WHERE s.user_id = users.id)");
+                log.info("Đã xóa {} tài khoản sinh viên khi xóa đợt đồ án id={}", userIdsToDelete.size(), roundId);
             }
         }
 
-        projectRoundRepository.delete(round);
+        if (entityManager != null) {
+            entityManager.clear();
+            round = projectRoundRepository.findById(roundId).orElse(null);
+        }
+        if (round != null) {
+            projectRoundRepository.delete(round);
+        }
         log.info("Successfully deleted project round id={}", roundId);
     }
 }

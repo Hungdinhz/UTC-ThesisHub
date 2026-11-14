@@ -19,6 +19,8 @@ import com.example.thesis_hub_api.projectround.repository.AcademicRecordReposito
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.util.AcademicRecordExcelParser;
+import com.example.thesis_hub_api.notification.service.NotificationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -44,6 +46,9 @@ public class AcademicRecordService {
     private final StudentProjectRoundRepository studentProjectRoundRepository;
     private final MajorRepository majorRepository;
     private final AcademicRecordExcelParser academicRecordExcelParser;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     private ProjectRound getAndValidateActiveRound(Long roundId) {
         ProjectRound round = projectRoundRepository.findById(roundId)
@@ -158,6 +163,7 @@ public class AcademicRecordService {
                 record.setTuitionDebt(row.getTuitionDebt());
                 record.setUnderDisciplinaryAction(row.getUnderDisciplinaryAction());
                 record.setMissingPrerequisiteCount(row.getMissingPrerequisiteCount());
+                record.setDebtCredits(row.getDebtCredits() != null ? row.getDebtCredits() : 0);
                 record.setNote(row.getNote());
                 record.setImportedAt(Instant.now());
                 recordsUpdated++;
@@ -170,6 +176,7 @@ public class AcademicRecordService {
                         .tuitionDebt(row.getTuitionDebt())
                         .underDisciplinaryAction(row.getUnderDisciplinaryAction())
                         .missingPrerequisiteCount(row.getMissingPrerequisiteCount())
+                        .debtCredits(row.getDebtCredits() != null ? row.getDebtCredits() : 0)
                         .note(row.getNote())
                         .importedAt(Instant.now())
                         .build();
@@ -177,6 +184,18 @@ public class AcademicRecordService {
             }
 
             academicRecordRepository.save(record);
+
+            if (record.getDebtCredits() != null && record.getDebtCredits() > 10 && notificationService != null && student.getUser() != null) {
+                try {
+                    notificationService.createNotification(
+                            student.getUser().getId(),
+                            "Cảnh báo học vụ: Không đủ điều kiện làm đồ án",
+                            "Hệ thống ghi nhận bạn đang nợ " + record.getDebtCredits() + " tín chỉ (> 10 tín chỉ quy định). Bạn không đủ điều kiện nhận đề tài đồ án tốt nghiệp đợt này. Vui lòng liên hệ Giáo vụ Khoa để được hướng dẫn.",
+                            "ACADEMIC",
+                            "/student/profile"
+                    );
+                } catch (Exception ignored) {}
+            }
         }
 
         messages.add(String.format("Lưu trữ thành công %d kết quả học vụ (Thêm mới: %d, Cập nhật: %d, Bỏ qua: %d).",
@@ -293,6 +312,7 @@ public class AcademicRecordService {
             record.setTuitionDebt(dto.getTuitionDebt() != null ? dto.getTuitionDebt() : false);
             record.setUnderDisciplinaryAction(dto.getUnderDisciplinaryAction() != null ? dto.getUnderDisciplinaryAction() : false);
             record.setMissingPrerequisiteCount(dto.getMissingPrerequisiteCount() != null ? dto.getMissingPrerequisiteCount() : 0);
+            record.setDebtCredits(dto.getDebtCredits() != null ? dto.getDebtCredits() : 0);
             record.setNote(dto.getNote());
             record.setImportedAt(Instant.now());
         } else {
@@ -304,6 +324,7 @@ public class AcademicRecordService {
                     .tuitionDebt(dto.getTuitionDebt() != null ? dto.getTuitionDebt() : false)
                     .underDisciplinaryAction(dto.getUnderDisciplinaryAction() != null ? dto.getUnderDisciplinaryAction() : false)
                     .missingPrerequisiteCount(dto.getMissingPrerequisiteCount() != null ? dto.getMissingPrerequisiteCount() : 0)
+                    .debtCredits(dto.getDebtCredits() != null ? dto.getDebtCredits() : 0)
                     .note(dto.getNote())
                     .importedAt(Instant.now())
                     .build();
@@ -340,6 +361,7 @@ public class AcademicRecordService {
                 .tuitionDebt(r.getTuitionDebt())
                 .underDisciplinaryAction(r.getUnderDisciplinaryAction())
                 .missingPrerequisiteCount(r.getMissingPrerequisiteCount())
+                .debtCredits(r.getDebtCredits())
                 .note(r.getNote())
                 .importedAt(r.getImportedAt())
                 .build();

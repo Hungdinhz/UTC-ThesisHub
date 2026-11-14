@@ -28,7 +28,7 @@ public class TaskController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'STUDENT', 'ADMIN', 'ACADEMIC_STAFF') and @accessControl.canAccessTask(#id)")
     public ApiResponse<TaskResponse> updateTask(
             @PathVariable Long id,
             @Valid @RequestBody UpdateTaskRequest request) {
@@ -36,11 +36,13 @@ public class TaskController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@accessControl.canAccessTask(#id)")
     public ApiResponse<TaskResponse> getTaskById(@PathVariable Long id) {
         return ApiResponse.success(taskService.getTaskById(id));
     }
 
     @GetMapping("/by-thesis/{thesisId}")
+    @PreAuthorize("@accessControl.canAccessThesis(#thesisId)")
     public ApiResponse<List<TaskResponse>> getTasksByThesis(@PathVariable Long thesisId) {
         return ApiResponse.success(taskService.getTasksByThesis(thesisId));
     }

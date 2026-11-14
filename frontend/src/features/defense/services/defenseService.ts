@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { COUNCIL_ROLES } from '../types';
 import type {
   DefenseCouncil,
   CouncilMember,
@@ -33,6 +34,26 @@ function extractApiError(err: any, fallback: string): string {
   return err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
 }
 
+function normalizeLegacyCouncil(council: DefenseCouncil): DefenseCouncil {
+  const members = council.members;
+  if (council.status !== 'ACTIVE' || !Array.isArray(members) || members.length !== 5) return council;
+
+  const presidents = members.filter((m) => m.role === 'PRESIDENT');
+  const secretaries = members.filter((m) => m.role === 'SECRETARY').sort((a, b) => a.id - b.id);
+  const regularMembers = members.filter((m) => m.role === 'MEMBER').sort((a, b) => a.id - b.id);
+  if (presidents.length !== 1 || secretaries.length !== 2 || regularMembers.length !== 2) return council;
+
+  // Older councils used 1 president, 2 secretaries and 2 members. Preserve the
+  // first secretary and last member; promote the other two to reviewer slots.
+  const normalized = members.map((member) => {
+    if (member.id === secretaries[1].id) return { ...member, role: 'REVIEWER_1' as const };
+    if (member.id === regularMembers[0].id) return { ...member, role: 'REVIEWER_2' as const };
+    return member;
+  });
+  normalized.sort((a, b) => COUNCIL_ROLES.indexOf(a.role) - COUNCIL_ROLES.indexOf(b.role));
+  return { ...council, members: normalized };
+}
+
 export const mockLecturers: LecturerOption[] = [
   { lecturerId: 501, fullName: 'PGS. TS. Trần Văn Minh', degree: 'Phó Giáo sư', canBePresident: true, canBeSecretary: true, canBeMember: true, currentLoad: 2 },
   { lecturerId: 502, fullName: 'TS. Lê Thị Mai', degree: 'Tiến sĩ', canBePresident: true, canBeSecretary: true, canBeMember: true, currentLoad: 1 },
@@ -52,13 +73,17 @@ const mockCouncils: DefenseCouncil[] = [
     code: 'HD-10-01',
     name: 'Hội đồng đánh giá luận văn HD-10-01',
     status: 'ACTIVE',
-    description: 'Hội đồng sinh tự động bằng thuật toán CSP (1CT - 2TK - 2UV)',
+    description: 'Hội đồng sinh tự động bằng thuật toán CSP (1CT - 1TK - 1PB1 - 1PB2 - 1UV)',
     studentIds: [101, 104],
+    assignedStudents: [
+      { studentId: 101, studentName: 'Nguyễn Văn An', studentCode: 'SV2021001', thesisId: 101, thesisTitle: 'Nghiên cứu ứng dụng Deep Learning trong nhận diện cử chỉ tay', advisorId: 502, advisorName: 'TS. Lê Thị Mai' },
+      { studentId: 104, studentName: 'Trần Minh Anh', studentCode: 'SV2021004', thesisId: 104, thesisTitle: 'Xây dựng hệ thống quản lý đồ án', advisorId: 508, advisorName: 'TS. Vũ Anh Tuấn' },
+    ],
     members: [
       { id: 1, councilId: 1, lecturerId: 501, lecturerName: 'PGS. TS. Trần Văn Minh', role: 'PRESIDENT', confirmed: true },
       { id: 2, councilId: 1, lecturerId: 503, lecturerName: 'ThS. Hoàng Quốc Bảo', role: 'SECRETARY', confirmed: true },
-      { id: 3, councilId: 1, lecturerId: 504, lecturerName: 'ThS. Đỗ Thùy Linh', role: 'SECRETARY', confirmed: true },
-      { id: 4, councilId: 1, lecturerId: 505, lecturerName: 'TS. Phạm Hải Nam', role: 'MEMBER', confirmed: true },
+      { id: 3, councilId: 1, lecturerId: 504, lecturerName: 'ThS. Đỗ Thùy Linh', role: 'REVIEWER_1', confirmed: true },
+      { id: 4, councilId: 1, lecturerId: 505, lecturerName: 'TS. Phạm Hải Nam', role: 'REVIEWER_2', confirmed: true },
       { id: 5, councilId: 1, lecturerId: 506, lecturerName: 'ThS. Bùi Quang Huy', role: 'MEMBER', confirmed: true },
     ],
   },
@@ -122,7 +147,7 @@ class DefenseService {
   async getLecturers(): Promise<LecturerOption[]> {
     try {
       const res = await axios.get(`${BASE_URL}/lecturers`, { headers: authHeaders() });
-      const list = res.data?.data || res.data;
+      const list = res.data?.data ?? res.data;
       if (Array.isArray(list)) {
         const mapped = list.map((l: any) => {
           const deg = String(l.academicDegree || '').toUpperCase();
@@ -136,8 +161,9 @@ class DefenseService {
             deg.includes('GIÁO SƯ') ||
             deg.includes('PHD');
           return {
-            lecturerId: l.lecturerId || l.id,
+            lecturerId: l.lecturerId ?? l.id,
             fullName: l.fullName,
+            email: l.email,
             degree: l.academicDegree || 'Giảng viên',
             canBePresident: canBePres,
             canBeSecretary: true,
@@ -152,12 +178,13 @@ class DefenseService {
         }
         return mapped;
       }
+      throw new Error('Dữ liệu danh sách giảng viên không hợp lệ. Vui lòng tải lại trước khi đổi thành viên.');
     } catch (err) {
       if (!IS_TEST_ENV) {
-        return [];
+        throw new Error(extractApiError(err, 'Không thể tải danh sách giảng viên để đổi thành viên Hội đồng'));
       }
+      return mockLecturers;
     }
-    return mockLecturers;
   }
 
   async getCouncils(projectRoundId: number = 10): Promise<DefenseCouncil[]> {
@@ -167,7 +194,7 @@ class DefenseService {
         headers: authHeaders(),
       });
       if (Array.isArray(res.data?.data)) {
-        return res.data.data;
+        return res.data.data.map(normalizeLegacyCouncil);
       }
       return [];
     } catch (err) {
@@ -181,7 +208,7 @@ class DefenseService {
   async getCouncilById(id: number): Promise<DefenseCouncil> {
     try {
       const res = await axios.get(`${API_BASE}/councils/${id}`, { headers: authHeaders() });
-      if (res.data?.data) return res.data.data;
+      if (res.data?.data) return normalizeLegacyCouncil(res.data.data);
     } catch (err) {
       if (!IS_TEST_ENV) {
         throw new Error(extractApiError(err, 'Không tìm thấy hội đồng'));
@@ -195,7 +222,7 @@ class DefenseService {
   async generateCouncils(request: CouncilGenerationRequest): Promise<DefenseCouncil[]> {
     try {
       const res = await axios.post(`${API_BASE}/councils/generate`, request, { headers: authHeaders() });
-      if (Array.isArray(res.data?.data)) return res.data.data;
+      if (Array.isArray(res.data?.data)) return res.data.data.map(normalizeLegacyCouncil);
       return [];
     } catch (err) {
       if (!IS_TEST_ENV) {
@@ -222,13 +249,30 @@ class DefenseService {
     throw new Error('Không tìm thấy hội đồng');
   }
 
-  async updateCouncilMembers(councilId: number, updatedMembers: CouncilMember[]): Promise<DefenseCouncil> {
-    const presidents = updatedMembers.filter((m) => m.role === 'PRESIDENT');
-    const secretaries = updatedMembers.filter((m) => m.role === 'SECRETARY');
-    const members = updatedMembers.filter((m) => m.role === 'MEMBER');
+  async reopenCouncil(councilId: number): Promise<DefenseCouncil> {
+    try {
+      const res = await axios.post(`${API_BASE}/councils/${councilId}/reopen`, {}, { headers: authHeaders() });
+      if (res.data?.data) return res.data.data;
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Không thể mở khóa Hội đồng'));
+      }
+    }
+    const council = mockCouncils.find((c) => c.id === councilId);
+    if (council) {
+      council.status = 'ACTIVE';
+      return council;
+    }
+    throw new Error('Không tìm thấy hội đồng');
+  }
 
-    if (presidents.length !== 1 || secretaries.length !== 2 || members.length !== 2) {
-      throw new Error('Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch, 2 Thư ký, 2 Ủy viên!');
+  async updateCouncilMembers(councilId: number, updatedMembers: CouncilMember[]): Promise<DefenseCouncil> {
+    if (updatedMembers.length !== COUNCIL_ROLES.length ||
+        COUNCIL_ROLES.some((role) => updatedMembers.filter((m) => m.role === role).length !== 1)) {
+      throw new Error('Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường!');
+    }
+    if (new Set(updatedMembers.map((m) => m.lecturerId)).size !== updatedMembers.length) {
+      throw new Error('Mỗi giảng viên chỉ được đảm nhiệm một vai trò trong Hội đồng!');
     }
 
     try {
@@ -242,6 +286,10 @@ class DefenseService {
 
     const council = mockCouncils.find((c) => c.id === councilId);
     if (!council) throw new Error('Không tìm thấy hội đồng');
+    if (council.status === 'FINALIZED') throw new Error('Hội đồng đã chốt (FINALIZED), không thể thay đổi thành viên!');
+    if (updatedMembers.some((m) => council.assignedStudents?.some((s) => s.advisorId === m.lecturerId))) {
+      throw new Error('Giảng viên hướng dẫn không được ngồi trong Hội đồng chấm sinh viên của mình!');
+    }
     council.members = updatedMembers;
     return council;
   }

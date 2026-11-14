@@ -1,0 +1,28 @@
+name: Keep Render Backend Awake
+
+on:
+  schedule:
+    # Render Free Tier spins down after 15 minutes of inactivity; ping every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Backend Health Endpoint
+        run: |
+          BACKEND_URL="${{ vars.BACKEND_URL }}"
+          if [ -z "$BACKEND_URL" ]; then
+            BACKEND_URL="https://utc-thesishub.onrender.com"
+          fi
+          TARGET_URL="${BACKEND_URL%/}/api/v1/auth/ping"
+          echo "Pinging $TARGET_URL ..."
+          HTTP_CODE=$(curl -sS -o /tmp/ping_resp.txt -w "%{http_code}" --connect-timeout 20 --max-time 90 --retry 2 --retry-delay 5 "$TARGET_URL" || echo "000")
+          echo "Response HTTP status: $HTTP_CODE"
+          cat /tmp/ping_resp.txt || true
+          echo ""
+          if [ "$HTTP_CODE" -ge 500 ] || [ "$HTTP_CODE" -eq 000 ]; then
+            echo "Warning: backend still waking up or returned $HTTP_CODE"
+            exit 0
+          fi

@@ -19,6 +19,8 @@ public class EligibilityCheckResponseDTO {
     private String status; // ELIGIBLE, INELIGIBLE, FORCE_APPROVED, DISQUALIFIED
     private int completedCredits;
     private int requiredCredits;
+    private int debtCredits;
+    private int maxDebtCredits; // Ngưỡng nợ tín chỉ tối đa (không tính) để được nhận đồ án: nợ < ngưỡng
     private double gpa;
     private double requiredGpa;
     private boolean tuitionDebt;

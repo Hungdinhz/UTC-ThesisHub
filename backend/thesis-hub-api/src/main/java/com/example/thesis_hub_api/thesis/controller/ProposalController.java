@@ -2,7 +2,6 @@ package com.example.thesis_hub_api.thesis.controller;
 
 import com.example.thesis_hub_api.common.response.ApiResponse;
 import com.example.thesis_hub_api.identity.security.UserPrincipal;
-import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.thesis.dto.*;
 import com.example.thesis_hub_api.thesis.service.ProposalService;
 import jakarta.validation.Valid;
@@ -13,22 +12,23 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+
 @RestController
 @RequestMapping("/api/v1/proposals")
 @RequiredArgsConstructor
 public class ProposalController {
 
     private final ProposalService proposalService;
-    private final StudentRepository studentRepository;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN') and @accessControl.isStudentOwnerOrStaff(#request.studentId)")
     public ApiResponse<ProposalResponse> createProposal(@Valid @RequestBody CreateProposalRequest request) {
         return ApiResponse.success("Tạo đề cương thành công", proposalService.createProposal(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN') and @accessControl.canAccessProposal(#id)")
     public ApiResponse<ProposalResponse> updateProposal(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProposalRequest request) {
@@ -36,23 +36,25 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN') and @accessControl.canAccessProposal(#id)")
     public ApiResponse<ProposalResponse> submitProposal(@PathVariable Long id) {
         return ApiResponse.success("Nộp đề cương thành công", proposalService.submitProposal(id));
     }
 
     @PostMapping("/{id}/supervisor-approve")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ApiResponse<ProposalResponse> supervisorApprove(
             @PathVariable Long id,
             @RequestParam boolean approved,
-            @RequestParam(required = false) String comment) {
+            @RequestParam(required = false) String comment,
+            @RequestParam(required = false) String checklist,
+            @RequestParam(required = false) Instant deadline) {
         return ApiResponse.success("Phê duyệt đề cương bởi GVHD thành công",
-                proposalService.supervisorApprove(id, approved, comment));
+                proposalService.supervisorApprove(id, approved, comment, checklist, deadline));
     }
 
     @PostMapping("/{id}/assign-review-group")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ACADEMIC_STAFF', 'FACULTY_ADMIN')")
     public ApiResponse<ProposalResponse> assignToReviewGroup(
             @PathVariable Long id,
             @RequestParam Long reviewGroupId,
@@ -62,7 +64,7 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/reviews")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     public ApiResponse<ProposalResponse> reviewProposal(
             @PathVariable Long id,
             @Valid @RequestBody ReviewProposalRequest request) {
@@ -71,7 +73,7 @@ public class ProposalController {
     }
 
     @PostMapping("/{id}/sign")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN') and @accessControl.canAccessProposal(#id)")
     public ApiResponse<ProposalResponse> signProposal(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal currentUser) {
@@ -80,11 +82,13 @@ public class ProposalController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@accessControl.canAccessProposal(#id)")
     public ApiResponse<ProposalResponse> getProposalById(@PathVariable Long id) {
         return ApiResponse.success(proposalService.getProposalById(id));
     }
 
     @GetMapping("/by-student-and-round")
+    @PreAuthorize("@accessControl.isStudentOwnerOrStaff(#studentId)")
     public ApiResponse<ProposalResponse> getProposalByStudentAndRound(
             @RequestParam Long studentId,
             @RequestParam Long roundId) {
@@ -102,9 +106,7 @@ public class ProposalController {
             Pageable pageable) {
         Long effectiveStudentId = studentId;
         if (currentUser != null && currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"))) {
-            effectiveStudentId = studentRepository.findByUserId(currentUser.getId())
-                    .map(com.example.thesis_hub_api.organization.entity.Student::getId)
-                    .orElse(currentUser.getId());
+            effectiveStudentId = proposalService.resolveStudentIdForUser(currentUser.getId());
         }
         return ApiResponse.success(proposalService.searchProposals(roundId, lecturerId, effectiveStudentId, status, search, pageable));
     }

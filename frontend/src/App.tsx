@@ -1,40 +1,87 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 import UTCAppLayout from './components/UTCAppLayout';
 import LoginPage from './pages/LoginPage';
-import AdminRegisterPage from './pages/AdminRegisterPage';
-import AdminDashboard from './pages/AdminDashboard';
-import ExternalDashboard from './pages/ExternalDashboard';
-import OrganizationManagementPage from './pages/OrganizationManagementPage';
-import ProjectRoundManagementPage from './pages/ProjectRoundManagementPage';
-import { AssignmentManagementPage } from './features/assignment/pages/AssignmentManagementPage';
-import { StudentAssignmentPage } from './features/assignment/pages/StudentAssignmentPage';
-import { ProposalManagementPage } from './features/thesis/pages/ProposalManagementPage';
-import { ThesisDetailPage } from './features/thesis/pages/ThesisDetailPage';
-import { TaskBoardPage } from './features/progress/pages/TaskBoardPage';
-import { ProgressReportPage } from './features/progress/pages/ProgressReportPage';
-import { ThesisEligibilityPage } from './features/eligibility/pages/ThesisEligibilityPage';
-import { FinalDefenseEligibilityPage } from './features/eligibility/pages/FinalDefenseEligibilityPage';
-import { CouncilManagementPage } from './features/defense/pages/CouncilManagementPage';
-import { DefenseSchedulePage } from './features/defense/pages/DefenseSchedulePage';
-import { DefenseScoringPage } from './features/defense/pages/DefenseScoringPage';
-import { ChatGroupPage } from './features/chat/pages/ChatGroupPage';
 import './App.css';
+
+// Lazy-loaded route pages for optimal code splitting & initial load performance
+const AdminRegisterPage = lazy(() => import('./pages/AdminRegisterPage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const ExternalDashboard = lazy(() => import('./pages/ExternalDashboard'));
+const OrganizationManagementPage = lazy(() => import('./pages/OrganizationManagementPage'));
+const ProjectRoundManagementPage = lazy(() => import('./pages/ProjectRoundManagementPage'));
+const AssignmentManagementPage = lazy(() =>
+  import('./features/assignment/pages/AssignmentManagementPage').then((m) => ({ default: m.AssignmentManagementPage }))
+);
+const StudentAssignmentPage = lazy(() =>
+  import('./features/assignment/pages/StudentAssignmentPage').then((m) => ({ default: m.StudentAssignmentPage }))
+);
+const ProposalManagementPage = lazy(() =>
+  import('./features/thesis/pages/ProposalManagementPage').then((m) => ({ default: m.ProposalManagementPage }))
+);
+const ThesisDetailPage = lazy(() =>
+  import('./features/thesis/pages/ThesisDetailPage').then((m) => ({ default: m.ThesisDetailPage }))
+);
+const TaskBoardPage = lazy(() =>
+  import('./features/progress/pages/TaskBoardPage').then((m) => ({ default: m.TaskBoardPage }))
+);
+const ProgressReportPage = lazy(() =>
+  import('./features/progress/pages/ProgressReportPage').then((m) => ({ default: m.ProgressReportPage }))
+);
+const ThesisEligibilityPage = lazy(() =>
+  import('./features/eligibility/pages/ThesisEligibilityPage').then((m) => ({ default: m.ThesisEligibilityPage }))
+);
+const FinalDefenseEligibilityPage = lazy(() =>
+  import('./features/eligibility/pages/FinalDefenseEligibilityPage').then((m) => ({ default: m.FinalDefenseEligibilityPage }))
+);
+const ReservationManagementPage = lazy(() =>
+  import('./features/eligibility/pages/ReservationManagementPage').then((m) => ({ default: m.ReservationManagementPage }))
+);
+const CouncilManagementPage = lazy(() =>
+  import('./features/defense/pages/CouncilManagementPage').then((m) => ({ default: m.CouncilManagementPage }))
+);
+const DefenseSchedulePage = lazy(() =>
+  import('./features/defense/pages/DefenseSchedulePage').then((m) => ({ default: m.DefenseSchedulePage }))
+);
+const DefenseScoringPage = lazy(() =>
+  import('./features/defense/pages/DefenseScoringPage').then((m) => ({ default: m.DefenseScoringPage }))
+);
+const ChatGroupPage = lazy(() =>
+  import('./features/chat/pages/ChatGroupPage').then((m) => ({ default: m.ChatGroupPage }))
+);
+const EligibleStudentsPage = lazy(() =>
+  import('./features/academic-staff/pages/EligibleStudentsPage').then((m) => ({ default: m.EligibleStudentsPage }))
+);
+const ClassGradeReportPage = lazy(() =>
+  import('./features/academic-staff/pages/ClassGradeReportPage').then((m) => ({ default: m.ClassGradeReportPage }))
+);
+const StudentHomePage = lazy(() =>
+  import('./features/home/pages/StudentHomePage').then((m) => ({ default: m.StudentHomePage }))
+);
+const LecturerHomePage = lazy(() =>
+  import('./features/home/pages/LecturerHomePage').then((m) => ({ default: m.LecturerHomePage }))
+);
+const AcademicStaffHomePage = lazy(() =>
+  import('./features/home/pages/AcademicStaffHomePage').then((m) => ({ default: m.AcademicStaffHomePage }))
+);
 
 const getDefaultRouteForRole = (role?: string | null): string => {
   switch (role) {
     case 'admin':
       return '/admin/dashboard';
     case 'student':
-      return '/student/assignment';
+      return '/student/home';
     case 'supervisor':
     case 'committee_member':
-      return '/thesis/proposals';
+      return '/lecturer/home';
     case 'external_examiner':
       return '/external_examiner/dashboard';
+    case 'academic_staff':
+      return '/academic-staff/home';
     default:
       return '/login';
   }
@@ -114,7 +161,7 @@ const AppRoutes: React.FC = () => {
         element={userType ? <Navigate to={getDefaultRouteForRole(userType)} replace /> : <LoginPage />}
       />
 
-      {/* Redirect removed Overview dashboards directly to functional pages (#26) */}
+      {/* Role Homepages */}
       <Route
         path="/admin/dashboard"
         element={
@@ -123,9 +170,41 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      <Route path="/student/dashboard" element={<Navigate to="/student/assignment" replace />} />
-      <Route path="/supervisor/dashboard" element={<Navigate to="/admin/assignments" replace />} />
-      <Route path="/committee_member/dashboard" element={<Navigate to="/admin/assignments" replace />} />
+      <Route
+        path="/student/home"
+        element={
+          <ProtectedRoute allowedTypes={['student', 'admin']}>
+            <LayoutPageWrapper activeTab="home" pageTitle="Trang chủ Sinh viên — Theo dõi Lộ trình & Tiến độ Đồ án">
+              <StudentHomePage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/lecturer/home"
+        element={
+          <ProtectedRoute allowedTypes={['supervisor', 'committee_member', 'admin']}>
+            <LayoutPageWrapper activeTab="home" pageTitle="Trang chủ Giảng viên & Hội đồng — Điều hành Hướng dẫn & Bảo vệ">
+              <LecturerHomePage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/academic-staff/home"
+        element={
+          <ProtectedRoute allowedTypes={['academic_staff', 'admin']}>
+            <LayoutPageWrapper activeTab="home" pageTitle="Trang chủ Giáo vụ Khoa — Quản lý Học vụ & Đợt Đồ án">
+              <AcademicStaffHomePage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Legacy dashboard routes redirect to the new role homepages */}
+      <Route path="/student/dashboard" element={<Navigate to="/student/home" replace />} />
+      <Route path="/supervisor/dashboard" element={<Navigate to="/lecturer/home" replace />} />
+      <Route path="/committee_member/dashboard" element={<Navigate to="/lecturer/home" replace />} />
 
       <Route
         path="/external_examiner/dashboard"
@@ -246,7 +325,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/admin/final-eligibility"
         element={
-          <ProtectedRoute allowedTypes={['admin', 'supervisor', 'committee_member']}>
+          <ProtectedRoute allowedTypes={['admin', 'academic_staff', 'supervisor', 'committee_member']}>
             <LayoutPageWrapper activeTab="final-eligibility" pageTitle="Giai đoạn 5: Kiểm tra Điều kiện Bảo vệ Cuối kỳ">
               <FinalDefenseEligibilityPage />
             </LayoutPageWrapper>
@@ -254,15 +333,33 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* Redirect removed Reservation routes (#27) */}
-      <Route path="/admin/reservations" element={<Navigate to="/admin/project-rounds" replace />} />
-      <Route path="/student/reservation" element={<Navigate to="/student/assignment" replace />} />
+      {/* Phase 5: Reservation Management */}
+      <Route
+        path="/admin/reservations"
+        element={
+          <ProtectedRoute allowedTypes={['admin', 'academic_staff', 'supervisor']}>
+            <LayoutPageWrapper activeTab="reservations" pageTitle="Giai đoạn 5: Quản lý & Phê duyệt Đơn bảo lưu">
+              <ReservationManagementPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/reservation"
+        element={
+          <ProtectedRoute allowedTypes={['student']}>
+            <LayoutPageWrapper activeTab="student-reservation" pageTitle="Giai đoạn 5: Đơn xin bảo lưu đồ án tốt nghiệp">
+              <ReservationManagementPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/admin/councils"
         element={
-          <ProtectedRoute allowedTypes={['admin']}>
-            <LayoutPageWrapper activeTab="councils" pageTitle="Giai đoạn 5: Thành lập Hội đồng (1CT-2TK-2UV)">
+          <ProtectedRoute allowedTypes={['admin', 'committee_member']}>
+            <LayoutPageWrapper activeTab="councils" pageTitle="Giai đoạn 5: Thành lập Hội đồng (1CT-1TK-2PB-1UV)">
               <CouncilManagementPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
@@ -289,11 +386,34 @@ const AppRoutes: React.FC = () => {
         }
       />
 
+      {/* Giáo vụ khoa: DS đủ điều kiện nhận đồ án & in điểm đồ án theo lớp */}
+      <Route
+        path="/academic-staff/eligible-students"
+        element={
+          <ProtectedRoute allowedTypes={['academic_staff', 'admin']}>
+            <LayoutPageWrapper activeTab="staff-eligible" pageTitle="Giáo vụ: Danh sách sinh viên đủ điều kiện nhận đồ án">
+              <EligibleStudentsPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/academic-staff/class-grades"
+        element={
+          <ProtectedRoute allowedTypes={['academic_staff', 'admin']}>
+            <LayoutPageWrapper activeTab="staff-grades" pageTitle="Giáo vụ: In danh sách điểm đồ án theo lớp">
+              <ClassGradeReportPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/student" element={<Navigate to="/student/assignment" replace />} />
-      <Route path="/supervisor" element={<Navigate to="/thesis/proposals" replace />} />
-      <Route path="/committee" element={<Navigate to="/thesis/proposals" replace />} />
-      <Route path="/committee_member" element={<Navigate to="/thesis/proposals" replace />} />
+      <Route path="/student" element={<Navigate to="/student/home" replace />} />
+      <Route path="/supervisor" element={<Navigate to="/lecturer/home" replace />} />
+      <Route path="/committee" element={<Navigate to="/lecturer/home" replace />} />
+      <Route path="/committee_member" element={<Navigate to="/lecturer/home" replace />} />
+      <Route path="/academic-staff" element={<Navigate to="/academic-staff/home" replace />} />
       <Route path="/" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
       <Route path="*" element={<Navigate to={userType ? getDefaultRouteForRole(userType) : '/login'} replace />} />
     </Routes>
@@ -306,7 +426,11 @@ const App: React.FC = () => {
       <ThemeProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
-            <AppRoutes />
+            <ToastProvider>
+              <Suspense fallback={<FullPageLoader message="Đang tải trang..." />}>
+                <AppRoutes />
+              </Suspense>
+            </ToastProvider>
           </AuthProvider>
         </Router>
       </ThemeProvider>

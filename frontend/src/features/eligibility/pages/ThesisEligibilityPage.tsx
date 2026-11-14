@@ -162,20 +162,10 @@ export const ThesisEligibilityPage: React.FC = () => {
       align: 'center',
       width: '100px',
       render: (val: number) => (
-        <span className={val >= 110 ? 'text-success' : 'text-warning font-semibold'}>
-          {val} / 110
+        <span className={val >= 132 ? 'text-success' : 'text-warning font-semibold'}>
+          {val} / 142
         </span>
       ),
-    },
-    {
-      key: 'unpassedPrerequisites',
-      title: 'Môn nợ / Tiên quyết',
-      render: (val: string[]) =>
-        val && val.length > 0 ? (
-          <span className="badge-debt">{val.join(', ')}</span>
-        ) : (
-          <span className="text-muted">Không có</span>
-        ),
     },
     {
       key: 'status',
@@ -230,7 +220,7 @@ export const ThesisEligibilityPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Xét duyệt điều kiện làm đồ án tốt nghiệp</h1>
           <p className="feature-page-subtitle">
-            Hệ thống xét duyệt điều kiện làm đồ án dựa trên kết quả tích lũy GPA, số tín chỉ và nợ môn tiên quyết.
+            Hệ thống xét duyệt điều kiện làm đồ án dựa trên kết quả tích lũy GPA và số tín chỉ nợ (tối đa 10 tín chỉ).
           </p>
         </div>
         <Button variant="primary" onClick={() => loadStudents(selectedRoundId || undefined)} loading={loading}>

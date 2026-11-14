@@ -103,7 +103,7 @@ public class GlobalExceptionHandler {
             if (cause.contains("violates unique constraint") || cause.contains("duplicate key")) {
                 detailMessage = "Dữ liệu bị trùng lặp trong hệ thống (đã tồn tại mã số hoặc email này)";
             } else if (cause.contains("violates check constraint")) {
-                detailMessage = "Vi phạm ràng buộc dữ liệu: " + cause;
+                detailMessage = "Dữ liệu không hợp lệ hoặc vi phạm điều kiện ràng buộc của hệ thống";
             }
         }
         ApiResponse<Object> response = ApiResponse.error(ErrorCode.DUPLICATE_RESOURCE.getCode(), detailMessage);
@@ -127,7 +127,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
         log.error("Unhandled exception caught in GlobalExceptionHandler: ", ex);
-        ApiResponse<Object> response = ApiResponse.error(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode(), "Lỗi hệ thống: " + ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(
+                ErrorCode.UNCATEGORIZED_EXCEPTION.getCode(),
+                "Đã xảy ra lỗi hệ thống trong quá trình xử lý yêu cầu. Vui lòng thử lại sau."
+        );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

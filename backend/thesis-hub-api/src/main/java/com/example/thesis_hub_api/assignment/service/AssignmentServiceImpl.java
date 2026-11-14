@@ -58,6 +58,9 @@ public class AssignmentServiceImpl implements AssignmentService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.thesis_hub_api.notification.service.NotificationService notificationService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.projectround.repository.AcademicRecordRepository academicRecordRepository;
+
     private ProjectRound getAndValidateActiveRound(Long projectRoundId) {
         ProjectRound round = projectRoundRepository.findById(projectRoundId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đợt đồ án với ID: " + projectRoundId));
@@ -81,9 +84,13 @@ public class AssignmentServiceImpl implements AssignmentService {
         Map<Long, String> deptNames = departmentRepository.findAll().stream()
                 .collect(Collectors.toMap(Department::getId, Department::getName, (a, b) -> a));
 
+        Map<Long, Long> lecturerCountByDirection = lecturerDirectionRepository.findAll().stream()
+                .filter(ld -> ld.getDirectionId() != null)
+                .collect(Collectors.groupingBy(LecturerDirection::getDirectionId, Collectors.counting()));
+
         return list.stream().map(d -> {
             String deptName = d.getDepartmentId() != null ? deptNames.get(d.getDepartmentId()) : null;
-            int count = lecturerDirectionRepository.findByDirectionId(d.getId()).size();
+            int count = lecturerCountByDirection.getOrDefault(d.getId(), 0L).intValue();
             return mapper.toDirectionResponse(d, deptName, count);
         }).collect(Collectors.toList());
     }
@@ -997,16 +1004,25 @@ public class AssignmentServiceImpl implements AssignmentService {
             list = assignmentRepository.findByProjectRoundId(projectRoundId);
         }
 
-        Map<Long, Student> studentMap = studentRepository.findAll().stream()
-                .collect(Collectors.toMap(Student::getId, s -> s));
+        if (list.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<Long> studentIds = list.stream().map(SupervisorAssignment::getStudentId).filter(Objects::nonNull).collect(Collectors.toSet());
+        List<Student> fetchedStudents = studentIds.isEmpty() ? Collections.emptyList() : studentRepository.findByIdIn(studentIds);
+        if (fetchedStudents == null || fetchedStudents.isEmpty()) {
+            fetchedStudents = studentRepository.findAll();
+        }
+        Map<Long, Student> studentMap = fetchedStudents.stream()
+                .collect(Collectors.toMap(Student::getId, s -> s, (a, b) -> a));
         Map<Long, Lecturer> lecturerMap = lecturerRepository.findAll().stream()
-                .collect(Collectors.toMap(Lecturer::getId, l -> l));
+                .collect(Collectors.toMap(Lecturer::getId, l -> l, (a, b) -> a));
         Map<Long, Department> deptMap = departmentRepository.findAll().stream()
-                .collect(Collectors.toMap(Department::getId, d -> d));
+                .collect(Collectors.toMap(Department::getId, d -> d, (a, b) -> a));
         Map<Long, ProjectDirection> directionMap = directionRepository.findAll().stream()
-                .collect(Collectors.toMap(ProjectDirection::getId, d -> d));
+                .collect(Collectors.toMap(ProjectDirection::getId, d -> d, (a, b) -> a));
         Map<Long, TrainingProgram> tpMap = trainingProgramRepository.findAll().stream()
-                .collect(Collectors.toMap(TrainingProgram::getId, tp -> tp));
+                .collect(Collectors.toMap(TrainingProgram::getId, tp -> tp, (a, b) -> a));
 
         return list.stream().map(sa -> {
             Student s = studentMap.get(sa.getStudentId());
@@ -1103,7 +1119,26 @@ public class AssignmentServiceImpl implements AssignmentService {
             }
         }
 
-        // Những sinh viên chưa đăng kí sau khi đã chốt phân công thì loại khỏi đợt đồ án
+        // Khi chốt phân công lần 1: Loại bỏ những sinh viên không đủ điều kiện (chưa cấp TK) khỏi danh sách đợt đồ án
+        if (studentProjectRoundRepository != null) {
+            List<StudentProjectRound> ineligibleList = studentProjectRoundRepository.findByProjectRoundId(roundId).stream()
+                    .filter(spr -> "INELIGIBLE".equalsIgnoreCase(spr.getStatus())
+                            || (spr.getStudent() != null && spr.getStudent().getUser() != null
+                                && Boolean.FALSE.equals(spr.getStudent().getUser().getIsActive())
+                                && !"ASSIGNED".equalsIgnoreCase(spr.getStatus())
+                                && !"REGISTERED".equalsIgnoreCase(spr.getStatus())))
+                    .toList();
+            for (StudentProjectRound inel : ineligibleList) {
+                if (academicRecordRepository != null && inel.getStudent() != null && inel.getStudent().getId() != null) {
+                    academicRecordRepository.findByStudentIdAndProjectRoundId(inel.getStudent().getId(), roundId)
+                            .ifPresent(academicRecordRepository::delete);
+                }
+                studentProjectRoundRepository.delete(inel);
+            }
+            log.info("Chốt phân công lần 1 đợt {}: Đã loại bỏ {} sinh viên không đủ điều kiện khỏi danh sách", roundId, ineligibleList.size());
+        }
+
+        // Những sinh viên chưa đăng kí hướng sau khi đã chốt phân công lần 1
         if (studentProjectRoundRepository != null) {
             Set<Long> registeredStudentIds = registrationRepository.findByProjectRoundId(roundId).stream()
                     .map(DirectionRegistration::getStudentId)
@@ -1126,12 +1161,30 @@ public class AssignmentServiceImpl implements AssignmentService {
                 // Nếu sinh viên chưa từng đăng ký hướng/nguyện vọng và chưa bị loại/bảo lưu từ trước
                 if (!hasRegistered && !"DROPPED".equalsIgnoreCase(spr.getStatus()) && !"RESERVED".equalsIgnoreCase(spr.getStatus())) {
                     spr.setStatus("DROPPED");
-                    spr.setNote("Chưa đăng ký nguyện vọng đồ án khi đã chốt phân công - Bị loại khỏi đợt");
+                    spr.setNote("Chưa đăng ký hướng");
                     studentProjectRoundRepository.save(spr);
+                    if (academicRecordRepository != null) {
+                        academicRecordRepository.findByStudentIdAndProjectRoundId(sId, roundId).ifPresent(ar -> {
+                            ar.setNote("Chưa đăng ký hướng");
+                            academicRecordRepository.save(ar);
+                        });
+                    }
                     droppedCount++;
+
+                    if (notificationService != null && spr.getStudent().getUser() != null && spr.getStudent().getUser().getId() != null) {
+                        try {
+                            notificationService.createNotification(
+                                    spr.getStudent().getUser().getId(),
+                                    "Thông báo chưa đăng ký hướng đồ án",
+                                    "Bạn chưa đăng ký hướng đồ án khi Khoa đã chốt phân công đợt 1. Vui lòng chờ đợt đăng ký bổ sung hoặc liên hệ Khoa.",
+                                    "ASSIGNMENT",
+                                    "/student/assignment"
+                            );
+                        } catch (Exception ignored) {}
+                    }
                 }
             }
-            log.info("Chốt phân công đợt {}: Đã loại {} sinh viên chưa đăng ký khỏi đợt đồ án", roundId, droppedCount);
+            log.info("Chốt phân công đợt {}: Đã ghi nhận {} sinh viên chưa đăng ký hướng", roundId, droppedCount);
         }
 
         log.info("Finalized {} supervisor assignments for project round {}", assignments.size(), roundId);

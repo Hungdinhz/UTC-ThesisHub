@@ -25,14 +25,23 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @Service
 public class FileStorageService {
 
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+            ".png", ".jpg", ".jpeg", ".webp", ".zip", ".rar", ".txt", ".csv"
+    );
+
     @Value("${app.file.storage-path:./uploads}")
     private String uploadDir;
+
+    @Value("${app.file.max-db-bytes:10485760}")
+    private long maxDbBytes;
 
     private Path fileStorageLocation;
 
@@ -60,16 +69,22 @@ public class FileStorageService {
             throw new AppException(ErrorCode.FILE_STORAGE_ERROR, "Tên tập tin chứa đường dẫn không hợp lệ: " + originalFileName);
         }
 
+        String lowerName = originalFileName.toLowerCase();
+        int dotIndex = lowerName.lastIndexOf('.');
+        String ext = dotIndex >= 0 ? lowerName.substring(dotIndex) : "";
+        if (!ALLOWED_EXTENSIONS.contains(ext)) {
+            throw new AppException(ErrorCode.INVALID_FILE_FORMAT,
+                    "Định dạng tập tin '" + ext + "' không được phép tải lên. Chỉ chấp nhận: PDF, Word, Excel, PowerPoint, Ảnh (PNG/JPG/WEBP), ZIP/RAR.");
+        }
+
         String storedFileName = UUID.randomUUID() + "_" + originalFileName.replaceAll("[^a-zA-Z0-9.-]", "_");
 
         try {
             byte[] fileBytes = file.getBytes();
-            String contentType = StringUtils.hasText(file.getContentType())
-                    ? file.getContentType()
-                    : inferContentType(originalFileName);
+            String contentType = inferContentType(originalFileName);
 
             boolean savedToDb = false;
-            if (storedFileRepository != null) {
+            if (storedFileRepository != null && fileBytes.length <= maxDbBytes) {
                 try {
                     StoredFile sf = StoredFile.builder()
                             .fileName(storedFileName)
@@ -88,7 +103,10 @@ public class FileStorageService {
 
             if (this.fileStorageLocation != null) {
                 try {
-                    Path targetLocation = this.fileStorageLocation.resolve(storedFileName);
+                    Path targetLocation = this.fileStorageLocation.resolve(storedFileName).normalize();
+                    if (!targetLocation.startsWith(this.fileStorageLocation)) {
+                        throw new AppException(ErrorCode.FILE_STORAGE_ERROR, "Đường dẫn lưu trữ tập tin không hợp lệ");
+                    }
                     Files.copy(new ByteArrayInputStream(fileBytes), targetLocation, StandardCopyOption.REPLACE_EXISTING);
                 } catch (IOException diskEx) {
                     if (!savedToDb) {
@@ -136,6 +154,9 @@ public class FileStorageService {
 
         try {
             Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
+            if (!filePath.startsWith(this.fileStorageLocation)) {
+                throw new AppException(ErrorCode.FILE_STORAGE_ERROR, "Đường dẫn tập tin không hợp lệ");
+            }
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
@@ -148,6 +169,9 @@ public class FileStorageService {
     }
 
     public boolean deleteFile(String fileName) {
+        if (fileName != null && fileName.contains("..")) {
+            throw new AppException(ErrorCode.FILE_STORAGE_ERROR, "Đường dẫn tập tin không hợp lệ");
+        }
         boolean deletedDb = false;
         if (storedFileRepository != null) {
             try {
@@ -160,6 +184,9 @@ public class FileStorageService {
         }
         try {
             Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
+            if (!filePath.startsWith(this.fileStorageLocation)) {
+                return deletedDb;
+            }
             boolean deletedDisk = Files.deleteIfExists(filePath);
             return deletedDb || deletedDisk;
         } catch (IOException ex) {

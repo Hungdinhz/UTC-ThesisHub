@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import utcLogo from '../assets/images/utc_logo.webp';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordModal from './ChangePasswordModal';
 import NotificationDropdown from './NotificationDropdown';
+import { toast } from './Toast';
 import { apiService } from '../services/api';
 import type { ProjectRoundItem } from '../types';
 import {
   STAGES,
   getRoundStageNumber,
   calculateStageStatus,
+  getStoredLecturerRoundId,
+  pickBestLecturerRound,
 } from '../utils/phaseTracking';
 import './UTCAppLayout.css';
 
@@ -34,8 +36,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   hideHeroBanner = false,
   pageTitle,
 }) => {
-  const { t, i18n } = useTranslation();
-  const { toggleTheme, isDark } = useTheme();
+  const { t } = useTranslation();
   const { user: authUser, userType: authUserType, logout: authLogout } = useAuth();
   const navigate = useNavigate();
 
@@ -73,14 +74,16 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     switch (currentRole) {
       case 'admin':
         return '/admin/dashboard';
+      case 'academic_staff':
+        return '/academic-staff/home';
       case 'student':
-        return '/student/assignment';
+        return '/student/home';
       case 'supervisor':
       case 'lecturer':
-        return '/thesis/proposals';
+        return '/lecturer/home';
       case 'committee_member':
       case 'committee':
-        return '/thesis/proposals';
+        return '/lecturer/home';
       default:
         return '/';
     }
@@ -88,11 +91,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (i18n.language.startsWith('en')) {
-      if (hour < 12) return 'Good morning,';
-      if (hour < 18) return 'Good afternoon,';
-      return 'Good evening,';
-    }
     if (hour < 12) return 'Chào buổi sáng,';
     if (hour < 18) return 'Chào buổi trưa,';
     return 'Chào buổi tối,';
@@ -100,20 +98,12 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const getCurrentDateString = () => {
     const now = new Date();
-    if (i18n.language.startsWith('en')) {
-      return now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    }
     const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
     const dayName = days[now.getDay()];
     const date = now.getDate().toString().padStart(2, '0');
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
     return `${dayName}, ngày ${date}/${month}/${year}`;
-  };
-
-  const toggleLanguage = () => {
-    const nextLng = i18n.language.startsWith('vi') ? 'en' : 'vi';
-    i18n.changeLanguage(nextLng);
   };
 
   const getUserDisplayName = () => {
@@ -135,6 +125,8 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
     switch (currentRole) {
       case 'admin':
         return 'Quản trị viên Khoa (ADMIN)';
+      case 'academic_staff':
+        return 'Giáo vụ khoa (ACADEMIC STAFF)';
       case 'student':
         return 'Sinh viên (STUDENT)';
       case 'supervisor':
@@ -174,7 +166,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 if (studentRound) {
                   setActiveRound(studentRound);
                   const st = getRoundStageNumber(studentRound.currentMilestone?.phaseType, studentRound.status);
-                  finalRoundStage = Math.max(myStatus.roundCurrentStage || 1, st);
+                  finalRoundStage = myStatus.roundCurrentStage || st;
                   setRoundCurrentStage(finalRoundStage);
                 }
               } catch {
@@ -189,11 +181,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               completedStage: myStatus.completedStage,
               status: myStatus.status,
             });
-            if (myStatus.isDropped) {
-              setUserCompletedStageState(myStatus.completedStage || 1);
-            } else {
-              setUserCompletedStageState(Math.max(myStatus.completedStage || 1, finalRoundStage - 1));
-            }
+            setUserCompletedStageState(myStatus.completedStage || 1);
             return;
           }
         } catch {
@@ -201,19 +189,34 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
         }
       }
 
-      const round = await apiService.getActiveProjectRound().catch(() => null);
+      let round: ProjectRoundItem | null = null;
+      if (
+        currentRole === 'supervisor' ||
+        currentRole === 'lecturer' ||
+        currentRole === 'committee_member' ||
+        currentRole === 'committee'
+      ) {
+        const lecturerRounds = await apiService.getProjectRounds().catch(() => []);
+        if (Array.isArray(lecturerRounds) && lecturerRounds.length > 0) {
+          round = pickBestLecturerRound(lecturerRounds, getStoredLecturerRoundId(currentUserId));
+        }
+      }
+      if (!round) {
+        round = await apiService.getActiveProjectRound().catch(() => null);
+      }
       if (round) {
         setActiveRound(round);
         const st = getRoundStageNumber(round.currentMilestone?.phaseType, round.status);
         setRoundCurrentStage(st);
         if (
-          currentRole === 'student' ||
           currentRole === 'supervisor' ||
           currentRole === 'lecturer' ||
           currentRole === 'committee_member' ||
           currentRole === 'committee'
         ) {
           setUserCompletedStageState(Math.max(st - 1, 1));
+        } else if (currentRole === 'student') {
+          setUserCompletedStageState(1);
         }
       }
     } catch {
@@ -236,7 +239,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
 
   const handleAdminAdvancePhase = async (targetPhase?: string) => {
     if (activeRound?.supplementaryOpen) {
-      alert('Đợt đồ án đang mở đăng ký nguyện vọng bổ sung! Vui lòng đóng/kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn.');
+      toast.warning('Đợt đồ án đang mở đăng ký nguyện vọng bổ sung! Vui lòng đóng/kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn.');
       return;
     }
     try {
@@ -245,11 +248,12 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
       setActiveRound(updated);
       const st = getRoundStageNumber(updated.currentMilestone?.phaseType, updated.status);
       setRoundCurrentStage(st);
+      toast.success('Chuyển giai đoạn đồ án thành công!');
       window.dispatchEvent(new CustomEvent('utc-phase-change'));
     } catch (err: any) {
       console.error('Error advancing phase:', err);
       const msg = err?.response?.data?.message || (err instanceof Error ? err.message : 'Lỗi khi chuyển giai đoạn');
-      alert(msg);
+      toast.error(msg);
     } finally {
       setAdvancingPhase(false);
     }
@@ -391,7 +395,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/project-rounds', true)}
               >
                 <span className="utc-nav-icon">🗓️</span>
-                <span className="utc-nav-label">GĐ1: Đợt đồ án &amp; Import SV</span>
+                <span className="utc-nav-label">GĐ1: Quản trị Đợt đồ án &amp; Mốc thời gian</span>
               </div>
 
               <div
@@ -427,11 +431,11 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               </div>
 
               <div
-                className={`utc-nav-item ${activeTab === 'final-eligibility' ? 'active' : ''}`}
+                className={`utc-nav-item ${activeTab === 'final-eligibility' || activeTab === 'reservations' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/admin/final-eligibility', true)}
               >
                 <span className="utc-nav-icon">🔍</span>
-                <span className="utc-nav-label">GĐ5: Xét ĐK Bảo vệ Cuối</span>
+                <span className="utc-nav-label">GĐ5: Xét ĐK Bảo vệ &amp; Bảo lưu</span>
               </div>
 
               <div
@@ -439,7 +443,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/councils', true)}
               >
                 <span className="utc-nav-icon">⚖️</span>
-                <span className="utc-nav-label">GĐ5: Hội đồng (1CT-2TK-2UV)</span>
+                <span className="utc-nav-label">GĐ5: Hội đồng (1CT-1TK-2PB-1UV)</span>
               </div>
 
               <div
@@ -460,9 +464,50 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
             </>
           )}
 
-          {/* MENU DÀNH CHO SINH VIÊN (#26 bỏ Trang chủ, #27 bỏ Bảo lưu, #28 thêm Nhóm Chat) */}
+          {/* MENU DÀNH CHO GIÁO VỤ KHOA */}
+          {currentRole === 'academic_staff' && (
+            <>
+              <div
+                className={`utc-nav-item ${activeTab === 'home' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/academic-staff/home', true)}
+              >
+                <span className="utc-nav-icon">🏠</span>
+                <span className="utc-nav-label">Trang chủ</span>
+              </div>
+              <div
+                className={`utc-nav-item ${activeTab === 'staff-eligible' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/academic-staff/eligible-students', true)}
+              >
+                <span className="utc-nav-icon">📋</span>
+                <span className="utc-nav-label">GĐ1: Quản lý &amp; Lập DS SV nhận đồ án</span>
+              </div>
+              <div
+                className={`utc-nav-item ${activeTab === 'final-eligibility' || activeTab === 'reservations' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/admin/final-eligibility', true)}
+              >
+                <span className="utc-nav-icon">🔍</span>
+                <span className="utc-nav-label">GĐ5: Rà soát ĐK bảo vệ cuối &amp; Bảo lưu</span>
+              </div>
+              <div
+                className={`utc-nav-item ${activeTab === 'staff-grades' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/academic-staff/class-grades', true)}
+              >
+                <span className="utc-nav-icon">🖨️</span>
+                <span className="utc-nav-label">GĐ5: In điểm đồ án theo lớp</span>
+              </div>
+            </>
+          )}
+
+          {/* MENU DÀNH CHO SINH VIÊN */}
           {currentRole === 'student' && (
             <>
+              <div
+                className={`utc-nav-item ${activeTab === 'home' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/student/home', true)}
+              >
+                <span className="utc-nav-icon">🏠</span>
+                <span className="utc-nav-label">Trang chủ</span>
+              </div>
               <div
                 className={`utc-nav-item ${activeTab === 'student-assignment' ? 'active' : ''} ${isStageLocked(2) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/student/assignment', true, 2)}
@@ -488,6 +533,15 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 <span className="utc-nav-icon">📋</span>
                 <span className="utc-nav-label">GĐ4: Nhận Task &amp; Nộp kết quả</span>
                 {renderStageBadge(4)}
+              </div>
+
+              <div
+                className={`utc-nav-item ${activeTab === 'student-reservation' || activeTab === 'final-eligibility' ? 'active' : ''} ${isStageLocked(5) ? 'utc-nav-locked' : ''}`}
+                onClick={() => handleNavClick('/student/reservation', true, 5)}
+              >
+                <span className="utc-nav-icon">⏸️</span>
+                <span className="utc-nav-label">GĐ5: ĐK Bảo vệ &amp; Đơn bảo lưu</span>
+                {renderStageBadge(5)}
               </div>
 
               <div
@@ -535,9 +589,16 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
             </>
           )}
 
-          {/* MENU DÀNH CHO GIẢNG VIÊN (SUPERVISOR) (#26 bỏ Tổng quan, #28 thêm Nhóm Chat) */}
+          {/* MENU DÀNH CHO GIẢNG VIÊN (SUPERVISOR) */}
           {(currentRole === 'supervisor' || currentRole === 'lecturer') && (
             <>
+              <div
+                className={`utc-nav-item ${activeTab === 'home' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/lecturer/home', true)}
+              >
+                <span className="utc-nav-icon">🏠</span>
+                <span className="utc-nav-label">Trang chủ</span>
+              </div>
               <div
                 className={`utc-nav-item ${activeTab === 'proposals' ? 'active' : ''} ${isStageLocked(3) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/thesis/proposals', true, 3)}
@@ -593,9 +654,16 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
             </>
           )}
 
-          {/* MENU DÀNH CHO HỘI ĐỒNG (COMMITTEE MEMBER) (#26 bỏ Tổng quan, #28 thêm Nhóm Chat) */}
+          {/* MENU DÀNH CHO HỘI ĐỒNG (COMMITTEE MEMBER) */}
           {(currentRole === 'committee_member' || currentRole === 'committee') && (
             <>
+              <div
+                className={`utc-nav-item ${activeTab === 'home' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/lecturer/home', true)}
+              >
+                <span className="utc-nav-icon">🏠</span>
+                <span className="utc-nav-label">Trang chủ</span>
+              </div>
               <div
                 className={`utc-nav-item ${activeTab === 'proposals' ? 'active' : ''} ${isStageLocked(3) ? 'utc-nav-locked' : ''}`}
                 onClick={() => handleNavClick('/thesis/proposals', true, 3)}
@@ -628,7 +696,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 onClick={() => handleNavClick('/admin/councils', true)}
               >
                 <span className="utc-nav-icon">⚖️</span>
-                <span className="utc-nav-label">GĐ5: Hội đồng chấm (1CT-2TK-2UV)</span>
+                <span className="utc-nav-label">GĐ5: Hội đồng chấm (1CT-1TK-2PB-1UV)</span>
               </div>
 
               <div
@@ -686,14 +754,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
           </div>
 
           <div className="utc-topbar-right">
-            <button className="utc-top-btn" onClick={toggleLanguage} title="Language">
-              {i18n.language.startsWith('vi') ? '🇻🇳 VI' : '🇬🇧 EN'}
-            </button>
-
-            <button className="utc-top-btn" onClick={toggleTheme} title="Theme">
-              {isDark ? '☀️' : '🌙'}
-            </button>
-
             <NotificationDropdown onNavigate={handleNotificationNavigate} />
 
             <div className="utc-user-profile-menu">

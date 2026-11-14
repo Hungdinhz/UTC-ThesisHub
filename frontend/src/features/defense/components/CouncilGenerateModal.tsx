@@ -57,9 +57,10 @@ export const CouncilGenerateModal: React.FC<CouncilGenerateModalProps> = ({
         <div className="csp-info-box">
           <h4>Quy tắc nghiệp vụ & Giải thuật:</h4>
           <ul>
-            <li><strong>Cơ cấu chuẩn:</strong> Mỗi Hội đồng gồm 5 Giảng viên: 1 Chủ tịch, 2 Thư ký, 2 Ủy viên.</li>
+            <li><strong>Cơ cấu chuẩn:</strong> Mỗi Hội đồng gồm 5 Giảng viên: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường.</li>
             <li><strong>Ràng buộc cứng (Hard constraint):</strong> Giảng viên hướng dẫn (GVHD) tuyệt đối KHÔNG được ngồi trong Hội đồng chấm chính sinh viên đó: <code>GVHD ∉ Council</code>.</li>
             <li><strong>Ràng buộc mềm (Greedy):</strong> Thuật toán ưu tiên chọn GV có tải thấp nhất để cân bằng số lượng chấm.</li>
+            <li>Hội đồng sinh tự động ở trạng thái ACTIVE có thể đổi giảng viên thủ công trước khi chốt. Sau khi chốt (FINALIZED), danh sách thành viên bị khóa.</li>
           </ul>
         </div>
 
@@ -102,7 +103,7 @@ export const CouncilGenerateModal: React.FC<CouncilGenerateModalProps> = ({
             <option value={5}>Chia nhiều hội đồng (Tối đa 5 SV / Hội đồng)</option>
             <option value={10}>Chia nhiều hội đồng (Tối đa 10 SV / Hội đồng)</option>
           </select>
-          <small className="form-hint">Theo quy chế, mỗi đợt phân công 1 Hội đồng chuẩn (1CT - 2TK - 2UV) để chấm tất cả SV đủ điều kiện</small>
+          <small className="form-hint">Theo quy chế, mỗi đợt phân công 1 Hội đồng chuẩn (1CT - 1TK - 1PB1 - 1PB2 - 1UV) để chấm tất cả SV đủ điều kiện</small>
         </div>
 
 

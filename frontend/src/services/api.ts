@@ -51,11 +51,14 @@ import type {
   StudentImportResultResponse,
   StudentProjectRoundItem,
   CreateRoundStudentManualPayload,
+  UpdateRoundStudentPayload,
   StudentEligibilityCheckResponse,
   AcademicRecordImportPreviewResponse,
   AcademicRecordImportCommitPayload,
   AcademicRecordImportResultResponse,
   AcademicRecordItem,
+  EligibleStudentListResponse,
+  ClassGradeReportResponse,
   CreateAcademicRecordManualPayload,
   StudentRoundStatusResponse,
 } from '../types';
@@ -64,7 +67,7 @@ import {
   GROUPS, SUPERVISOR_STUDENT, PROJECTS, DOCUMENTS,
   EVALUATIONS, CHAT, TEMPLATES, NOTIFICATIONS,
   AUDIT_LOGS, EXTERNAL, SCHEDULES, EXPORT, ORGANIZATION,
-  PROJECT_ROUNDS, ACADEMIC_RECORDS,
+  PROJECT_ROUNDS, ACADEMIC_RECORDS, ACADEMIC_STAFF,
 } from './endpoints';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -119,12 +122,24 @@ class ApiService {
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
           try {
-            // Send request to refresh token endpoint
-            const response = await axios.post(`${API_BASE_URL}${AUTH.TOKEN_REFRESH}`, {}, { withCredentials: true });
+            // Send request to refresh token endpoint with stored refresh_token
+            const refreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('access_token');
+            const response = await axios.post(
+              `${API_BASE_URL}${AUTH.TOKEN_REFRESH}`,
+              { refreshToken, refresh: refreshToken },
+              {
+                withCredentials: true,
+                headers: refreshToken ? { Authorization: `Bearer ${refreshToken}` } : undefined,
+              }
+            );
             const rawData = response.data?.data || response.data;
             const access = rawData?.access || rawData?.token;
+            const newRefresh = rawData?.refreshToken || rawData?.refresh;
             if (access) {
               localStorage.setItem('access_token', access);
+              if (newRefresh) {
+                localStorage.setItem('refresh_token', newRefresh);
+              }
               if (originalRequest.headers) {
                 originalRequest.headers.Authorization = `Bearer ${access}`;
               }
@@ -140,6 +155,19 @@ class ApiService {
     );
   }
 
+
+  // Health / Warm-up Ping (for Render Free Tier wake-up)
+  async pingServer(timeoutMs = 12000): Promise<boolean> {
+    try {
+      await axios.get(`${API_BASE_URL}/auth/ping`, {
+        timeout: timeoutMs,
+        withCredentials: false,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   // Admin Auth
   async adminRegister(payload: AdminRegisterPayload): Promise<any> {
@@ -1143,7 +1171,8 @@ class ApiService {
   async commitImportStudents(roundId: number, payload: StudentImportCommitPayload): Promise<StudentImportResultResponse> {
     const response = await this.api.post<StudentImportResultResponse>(
       PROJECT_ROUNDS.studentImportCommit(roundId),
-      payload
+      payload,
+      { timeout: 120000 }
     );
     return response.data;
   }
@@ -1153,6 +1182,7 @@ class ApiService {
     params?: {
       majorId?: number;
       status?: string;
+      onlyEligible?: boolean;
       search?: string;
       page?: number;
       size?: number;
@@ -1163,6 +1193,30 @@ class ApiService {
       { params }
     );
     return response.data;
+  }
+
+  async updateStudentInRound(
+    roundId: number,
+    studentId: number,
+    payload: UpdateRoundStudentPayload
+  ): Promise<StudentProjectRoundItem> {
+    try {
+      const response = await this.api.put<StudentProjectRoundItem>(
+        PROJECT_ROUNDS.studentDetail(roundId, studentId),
+        payload
+      );
+      return response.data;
+    } catch (err: any) {
+      if (err?.response?.status === 405) {
+        // Fallback to PATCH if PUT is blocked by proxy or older route
+        const response = await this.api.patch<StudentProjectRoundItem>(
+          PROJECT_ROUNDS.studentDetail(roundId, studentId),
+          payload
+        );
+        return response.data;
+      }
+      throw err;
+    }
   }
 
   async updateStudentRoundStatus(
@@ -1270,6 +1324,43 @@ class ApiService {
       payload
     );
     return response.data;
+  }
+
+  // ─── Academic Staff APIs (Giáo vụ khoa) ─────
+  async getEligibleStudents(roundId: number, onlyEligible = false): Promise<EligibleStudentListResponse> {
+    const response = await this.api.get<EligibleStudentListResponse>(
+      ACADEMIC_STAFF.eligibleStudents(roundId),
+      { params: { onlyEligible } }
+    );
+    return response.data;
+  }
+
+  async exportEligibleStudents(roundId: number): Promise<Blob> {
+    const response = await this.api.get(ACADEMIC_STAFF.eligibleStudentsExport(roundId), {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async getGradeReport(roundId: number, className?: string): Promise<ClassGradeReportResponse> {
+    const response = await this.api.get<ClassGradeReportResponse>(
+      ACADEMIC_STAFF.grades(roundId),
+      { params: { className: className || undefined } }
+    );
+    return response.data;
+  }
+
+  async exportGradeReport(roundId: number, className?: string): Promise<Blob> {
+    const response = await this.api.get(ACADEMIC_STAFF.gradesExport(roundId), {
+      params: { className: className || undefined },
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async clearStudentDebt(roundId: number, studentId: number): Promise<string> {
+    const response = await this.api.post(ACADEMIC_STAFF.clearDebt(roundId, studentId));
+    return response.data.message || 'Thành công';
   }
 
   // Utility

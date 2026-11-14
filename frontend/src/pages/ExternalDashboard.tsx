@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import UTCAppLayout from '../components/UTCAppLayout';
 import { SkeletonProfile, SkeletonCardGrid } from '../components/SkeletonLoader';
+import { toast } from '../components/Toast';
 import './Dashboard.css';
 import './ExternalDashboard.css';
 
@@ -577,11 +578,11 @@ const ExternalEvaluationFormInline: React.FC<EvaluationFormProps> = ({
         assignment: assignment.id,
         ...formData
       });
-      alert('Evaluation submitted successfully!');
+      toast.success('Đã gửi đánh giá thành công!');
       onComplete();
     } catch (error: any) {
       console.error('Failed to submit evaluation:', error);
-      alert(error.response?.data?.detail || 'Failed to submit evaluation');
+      toast.error(error.response?.data?.detail || 'Không thể gửi đánh giá');
     } finally {
       setSubmitting(false);
     }

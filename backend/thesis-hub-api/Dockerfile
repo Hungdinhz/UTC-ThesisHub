@@ -39,8 +39,8 @@ USER spring
 # Expose the default Spring Boot port
 EXPOSE 8080
 
-# Configure JVM flags optimized for containerized environments
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+# Configure JVM flags optimized for containerized environments and faster cold start
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:TieredStopAtLevel=1 -Djava.security.egd=file:/dev/./urandom"
 
 # Launch the Spring Boot application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

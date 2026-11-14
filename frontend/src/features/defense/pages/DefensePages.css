@@ -410,3 +410,69 @@
   color: var(--text-secondary, #475569);
   line-height: 1.4;
 }
+
+
+/* Enhanced Defense Scoring Polish */
+.select-thesis-bar {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.select-thesis-bar label {
+  font-weight: 700;
+  color: #0a3273;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.select-thesis-bar .thesis-dropdown {
+  flex: 1;
+  min-width: 280px;
+  font-weight: 600;
+  border-radius: 8px;
+  border-color: #cbd5e1;
+  padding: 8px 12px;
+}
+
+.scoring-grid-layout {
+  grid-template-columns: minmax(380px, 1fr) minmax(460px, 1.3fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.scoring-form-section,
+.scores-list-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+.scores-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 14px;
+}
+
+.scores-table-header h3 {
+  font-size: 1.02rem;
+  color: #0a3273;
+}
+
+@media (max-width: 1080px) {
+  .scoring-grid-layout {
+    grid-template-columns: 1fr;
+  }
+}

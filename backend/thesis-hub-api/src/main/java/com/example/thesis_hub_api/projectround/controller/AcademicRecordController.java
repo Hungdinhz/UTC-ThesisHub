@@ -42,7 +42,7 @@ public class AcademicRecordController {
     }
 
     @PostMapping(value = "/project-rounds/{roundId}/academic-records/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(summary = "Xem trước phân tích dữ liệu file Excel học vụ")
     public ResponseEntity<ApiResponse<AcademicRecordImportPreviewResponseDTO>> previewImport(
             @PathVariable Long roundId,
@@ -53,7 +53,7 @@ public class AcademicRecordController {
     }
 
     @PostMapping("/project-rounds/{roundId}/academic-records/import-commit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(summary = "Xác nhận lưu trữ kết quả học vụ vào CSDL")
     public ResponseEntity<ApiResponse<AcademicRecordImportResultResponseDTO>> commitImport(
             @PathVariable Long roundId,
@@ -64,7 +64,7 @@ public class AcademicRecordController {
     }
 
     @PostMapping("/project-rounds/{roundId}/academic-records/manual")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(summary = "Thêm hoặc cập nhật kết quả học vụ thủ công cho sinh viên (Admin)")
     public ResponseEntity<ApiResponse<AcademicRecordResponseDTO>> saveManualRecord(
             @PathVariable Long roundId,

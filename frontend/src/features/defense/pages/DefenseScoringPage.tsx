@@ -6,6 +6,7 @@ import { ScoreEntryForm } from '../components/ScoreEntryForm';
 import { ResultSynthesisModal } from '../components/ResultSynthesisModal';
 import { defenseService } from '../services/defenseService';
 import { apiService } from '../../../services/api';
+import { getCouncilRoleLabel } from '../types';
 import type {
   ScoreItem,
   ScoreType,
@@ -289,7 +290,7 @@ export const DefenseScoringPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Chấm điểm và Tổng hợp Kết quả Tốt nghiệp</h1>
           <p className="feature-page-subtitle">
-            Cơ cấu điểm chuẩn UTC: GVHD (40%), Hội đồng 5 thành viên (60% - 1CT-2TK-2UV). Phân quyền nghiêm ngặt theo vai trò được giao.
+            Cơ cấu điểm chuẩn UTC: GVHD (40%), Hội đồng 5 thành viên (60% - 1CT-1TK-1PB1-1PB2-1UV). Phân quyền nghiêm ngặt theo vai trò được giao.
           </p>
         </div>
 
@@ -396,7 +397,7 @@ export const DefenseScoringPage: React.FC = () => {
             >
               {scoringTheses.map((t) => {
                 const roleTags: string[] = [];
-                if (t.canScoreCouncil || t.isCouncilMember) roleTags.push('Hội đồng');
+                if (t.canScoreCouncil || t.isCouncilMember) roleTags.push(getCouncilRoleLabel(t.myCouncilRole, 'Hội đồng'));
                 
                 if (t.canScoreSupervisor) roleTags.push('GVHD');
                 const suffix = roleTags.length > 0 ? ` — [Vai trò: ${roleTags.join(', ')}]` : '';
@@ -651,8 +652,8 @@ export const DefenseScoringPage: React.FC = () => {
                   {signingMinutes
                     ? 'Đang ký số...'
                     : mySignatureItem?.signed
-                    ? `✓ Đã ký (${mySignatureItem.slotLabel})`
-                    : `✍️ Ký xác nhận biên bản (${mySignatureItem?.slotLabel || 'Thành viên HĐ'})`}
+                    ? `✓ Đã ký (${getCouncilRoleLabel(mySignatureItem.role, mySignatureItem.slotLabel)})`
+                    : `✍️ Ký xác nhận biên bản (${getCouncilRoleLabel(mySignatureItem?.role, mySignatureItem?.slotLabel || 'Thành viên HĐ')})`}
                 </button>
                 <button
                   onClick={() => window.print()}
@@ -715,7 +716,7 @@ export const DefenseScoringPage: React.FC = () => {
                 <strong>3. Giảng viên hướng dẫn:</strong> {selectedThesis.advisorName || '—'}
               </p>
               <p style={{ margin: '10px 0 6px 0' }}>
-                <strong>4. Kết quả chấm điểm của GVHD và Hội đồng (1 Chủ tịch - 2 Thư ký - 2 Ủy viên):</strong>
+                <strong>4. Kết quả chấm điểm của GVHD và Hội đồng (1CT - 1TK - 1PB1 - 1PB2 - 1UV):</strong>
               </p>
 
               <div style={{ width: '100%', overflowX: 'auto' }}>
@@ -793,7 +794,7 @@ export const DefenseScoringPage: React.FC = () => {
                     }}
                   >
                     <div style={{ fontWeight: 700, fontSize: '12.5px', color: '#0a3273', textTransform: 'uppercase' }}>
-                      {sig.slotLabel}
+                      {getCouncilRoleLabel(sig.role, sig.slotLabel)}
                     </div>
                     <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#0f172a', margin: '6px 0' }}>
                       {sig.lecturerName}
@@ -839,8 +840,30 @@ export const DefenseScoringPage: React.FC = () => {
               📦 Bảng Tổng hợp Dữ liệu Cuối kỳ &amp; Công bố Kết quả Đợt đồ án
             </h3>
             <p style={{ color: '#475569', fontSize: '13.5px', marginBottom: '16px' }}>
-              Khi bấm <strong>"Ký xuất Dữ liệu &amp; Hoàn tất Đợt đồ án"</strong>, hệ thống sẽ tự động tổng hợp điểm cuối kỳ cho các đề tài đủ đầu điểm, đóng đợt đồ án và gửi thông báo kết quả chính thức tới từng Sinh viên.
+              Khi bấm <strong>"Ký xuất Dữ liệu &amp; Hoàn tất Đợt đồ án"</strong>, hệ thống sẽ chốt kết quả cuối kỳ, công bố kết quả tốt nghiệp chính thức tới từng Sinh viên và đóng đợt đồ án. <strong>Lưu ý:</strong> Chỉ có thể chốt khi toàn bộ sinh viên đủ điều kiện bảo vệ trong đợt đã được chấm đủ và tổng kết điểm.
             </p>
+            {(() => {
+              const missingCount = roundExportResults.filter((item) => !item.result).length;
+              if (roundExportResults.length === 0) {
+                return (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
+                    ⚠️ Chưa có sinh viên nào đủ điều kiện bảo vệ trong đợt để chốt kết quả.
+                  </div>
+                );
+              }
+              if (missingCount > 0) {
+                return (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
+                    ⚠️ Còn {missingCount}/{roundExportResults.length} sinh viên chưa tổng kết điểm cuối kỳ. Vui lòng chấm và tổng hợp điểm cho toàn bộ sinh viên trước khi chốt đợt!
+                  </div>
+                );
+              }
+              return (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
+                  ✅ Đã tổng kết đủ điểm cho toàn bộ {roundExportResults.length} sinh viên. Sẵn sàng chốt và công bố kết quả tốt nghiệp!
+                </div>
+              );
+            })()}
             <div style={{ width: '100%', overflowX: 'auto' }}>
               <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '20px' }}>
                 <thead>
@@ -903,15 +926,29 @@ export const DefenseScoringPage: React.FC = () => {
               </button>
               <button
                 onClick={handleFinalizeAndPublishRound}
-                disabled={publishingRound}
+                disabled={
+                  publishingRound ||
+                  roundExportResults.length === 0 ||
+                  roundExportResults.some((item) => !item.result)
+                }
                 style={{
                   padding: '8px 16px',
                   borderRadius: '6px',
                   border: 'none',
-                  background: '#16a34a',
+                  background:
+                    publishingRound ||
+                    roundExportResults.length === 0 ||
+                    roundExportResults.some((item) => !item.result)
+                      ? '#94a3b8'
+                      : '#16a34a',
                   color: '#fff',
                   fontWeight: 700,
-                  cursor: publishingRound ? 'wait' : 'pointer',
+                  cursor:
+                    publishingRound ||
+                    roundExportResults.length === 0 ||
+                    roundExportResults.some((item) => !item.result)
+                      ? 'not-allowed'
+                      : 'pointer',
                 }}
               >
                 {publishingRound ? 'Đang công bố & đóng đợt...' : '✅ Ký xuất Dữ liệu & Hoàn tất Đợt đồ án'}

@@ -47,18 +47,33 @@ export const thesisService = {
     return res.data.data;
   },
 
-  async supervisorApprove(id: number, approved: boolean, comment?: string): Promise<Proposal> {
+  async supervisorApprove(
+    id: number,
+    approved: boolean,
+    comment?: string,
+    checklist?: string,
+    deadline?: string
+  ): Promise<Proposal> {
     const res = await apiClient.post(`/proposals/${id}/supervisor-approve`, null, {
-      params: { approved, comment }
+      params: { approved, comment, checklist, deadline }
     });
     return res.data.data;
   },
 
-  async reviewProposal(id: number, reviewGroupId: number, status: string, evaluationNotes?: string): Promise<Proposal> {
+  async reviewProposal(
+    id: number,
+    reviewGroupId: number,
+    status: string,
+    evaluationNotes?: string,
+    revisionChecklist?: string,
+    revisionDeadline?: string
+  ): Promise<Proposal> {
     const res = await apiClient.post(`/proposals/${id}/reviews`, {
       reviewGroupId,
       status,
-      evaluationNotes
+      evaluationNotes,
+      revisionChecklist,
+      revisionDeadline
     });
     return res.data.data;
   },
@@ -116,8 +131,10 @@ export const thesisService = {
     return res.data.data;
   },
 
-  async searchTheses(params?: { roundId?: number; lecturerId?: number; status?: string; search?: string }): Promise<Thesis[]> {
-    const res = await apiClient.get('/theses', { params });
+  async searchTheses(params?: { roundId?: number; lecturerId?: number; status?: string; search?: string; page?: number; size?: number }): Promise<Thesis[]> {
+    const res = await apiClient.get('/theses', {
+      params: { size: 1000, ...params }
+    });
     return res.data.data.content || res.data.data;
   },
 

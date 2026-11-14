@@ -1,4 +1,4 @@
-export type UserType = 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin';
+export type UserType = 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' | 'academic_staff';
 
 export interface AdminUser {
   id: number;
@@ -820,6 +820,12 @@ export interface StudentImportRow {
   phone?: string;
   email?: string;
   gpa?: number;
+  completedCredits?: number;
+  debtCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
+  academicStatus?: 'ELIGIBLE' | 'INELIGIBLE' | string;
   isValid: boolean;
   errors: string[];
 }
@@ -834,8 +840,11 @@ export interface StudentImportPreviewResponse {
   rows: StudentImportRow[];
 }
 
+export type StudentPasswordMode = 'PHONE' | 'STUDENT_CODE';
+
 export interface StudentImportCommitPayload {
   rows: StudentImportRow[];
+  passwordMode?: StudentPasswordMode;
 }
 
 export interface StudentImportResultResponse {
@@ -863,6 +872,10 @@ export interface StudentProjectRoundItem {
   status: string;
   debtCredits: number;
   gpa?: number;
+  completedCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
   note?: string;
   enrolledAt?: string;
   accountActive?: boolean;
@@ -893,6 +906,7 @@ export interface AcademicRecordImportRow {
   tuitionDebt: boolean;
   underDisciplinaryAction: boolean;
   missingPrerequisiteCount: number;
+  debtCredits?: number;
   note?: string;
   isValid: boolean;
   errors: string[];
@@ -934,6 +948,7 @@ export interface AcademicRecordItem {
   tuitionDebt: boolean;
   underDisciplinaryAction: boolean;
   missingPrerequisiteCount: number;
+  debtCredits?: number;
   note?: string;
   importedAt: string;
 }
@@ -946,7 +961,69 @@ export interface CreateAcademicRecordManualPayload {
   tuitionDebt?: boolean;
   underDisciplinaryAction?: boolean;
   missingPrerequisiteCount?: number;
+  debtCredits?: number;
   note?: string;
+}
+
+// ─── Academic Staff (Giáo vụ khoa) Types ─────
+export interface EligibleStudentRow {
+  studentId: number;
+  studentCode: string;
+  fullName?: string;
+  className?: string;
+  majorName?: string;
+  completedCredits?: number | null;
+  debtCredits?: number | null;
+  gpa?: number | null;
+  status: string; // ELIGIBLE, FORCE_APPROVED, INELIGIBLE, RESERVED, DISQUALIFIED, NO_DATA
+  eligible: boolean;
+  reasons: string[];
+}
+
+export interface EligibleStudentListResponse {
+  roundId: number;
+  roundCode: string;
+  roundName: string;
+  maxDebtCredits: number;
+  totalStudents: number;
+  eligibleCount: number;
+  ineligibleCount: number;
+  noDataCount: number;
+  students: EligibleStudentRow[];
+}
+
+export interface ClassGradeRow {
+  thesisId: number;
+  thesisCode?: string;
+  thesisTitle?: string;
+  studentCode?: string;
+  studentName?: string;
+  studentClass?: string;
+  advisorName?: string;
+  supervisorScore?: number | null;
+  reviewerScore?: number | null;
+  councilScore?: number | null;
+  finalScore?: number | null;
+  grade?: string;
+  finalResult?: string; // PASSED, FAILED
+}
+
+export interface ClassGradeGroup {
+  className: string;
+  totalStudents: number;
+  passedCount: number;
+  failedCount: number;
+  averageScore?: number | null;
+  rows: ClassGradeRow[];
+}
+
+export interface ClassGradeReportResponse {
+  roundId: number;
+  roundCode: string;
+  roundName: string;
+  roundStatus?: string;
+  totalStudents: number;
+  classes: ClassGradeGroup[];
 }
 
 
@@ -1001,6 +1078,21 @@ export interface UpdateStudentPayload {
 }
 
 
+export interface UpdateRoundStudentPayload {
+  fullName?: string;
+  className?: string;
+  majorId?: number;
+  email?: string;
+  phone?: string;
+  gpa?: number;
+  completedCredits?: number;
+  debtCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
+  note?: string;
+}
+
 export interface CreateRoundStudentManualPayload {
   studentCode: string;
   fullName: string;
@@ -1009,8 +1101,14 @@ export interface CreateRoundStudentManualPayload {
   majorId: number;
   phone?: string;
   gpa?: number;
+  completedCredits?: number;
+  debtCredits?: number;
+  tuitionDebt?: boolean;
+  underDisciplinaryAction?: boolean;
+  missingPrerequisiteCount?: number;
   status?: string;
   note?: string;
+  passwordMode?: StudentPasswordMode;
 }
 
 export interface StudentRoundStatusResponse {

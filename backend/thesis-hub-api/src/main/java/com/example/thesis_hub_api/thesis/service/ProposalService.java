@@ -4,6 +4,8 @@ import com.example.thesis_hub_api.thesis.dto.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Instant;
+
 public interface ProposalService {
 
     ProposalResponse createProposal(CreateProposalRequest request);
@@ -13,6 +15,8 @@ public interface ProposalService {
     ProposalResponse submitProposal(Long id);
 
     ProposalResponse supervisorApprove(Long id, boolean approved, String comment);
+
+    ProposalResponse supervisorApprove(Long id, boolean approved, String comment, String checklist, Instant deadline);
 
     ProposalResponse assignToReviewGroup(Long proposalId, Long reviewGroupId, Long assignedById);
 
@@ -27,4 +31,8 @@ public interface ProposalService {
     Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, String status, String search, Pageable pageable);
 
     Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, Long studentId, String status, String search, Pageable pageable);
+
+    default Long resolveStudentIdForUser(Long userId) {
+        return userId;
+    }
 }

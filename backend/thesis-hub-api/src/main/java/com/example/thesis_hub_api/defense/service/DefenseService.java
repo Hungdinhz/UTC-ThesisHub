@@ -16,11 +16,12 @@ import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.service.ProjectRoundService;
+import com.example.thesis_hub_api.projectround.service.RoundDefenseSynthesizer;
+import com.example.thesis_hub_api.notification.service.NotificationService;
 import com.example.thesis_hub_api.thesis.entity.Thesis;
 import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class DefenseService {
+public class DefenseService implements RoundDefenseSynthesizer {
 
     private final DefenseCouncilRepository councilRepository;
     private final CouncilMemberRepository memberRepository;
@@ -69,11 +70,20 @@ public class DefenseService {
     private ProjectRoundRepository projectRoundRepository;
 
     @Autowired(required = false)
-    @Lazy
     private ProjectRoundService projectRoundService;
 
+    @Autowired(required = false)
+    private NotificationService notificationService;
+
     private boolean isThesisDefenseEligible(Thesis t) {
-        return t != null && (Boolean.TRUE.equals(t.getDefenseEligible()) || "COMPLETED".equalsIgnoreCase(t.getStatus()));
+        if (t == null) return false;
+        if ("RESERVED".equalsIgnoreCase(t.getStatus())
+                || "DEFENSE_NOT_ELIGIBLE".equalsIgnoreCase(t.getStatus())
+                || "CANCELLED".equalsIgnoreCase(t.getStatus())
+                || "CANCELED".equalsIgnoreCase(t.getStatus())) {
+            return false;
+        }
+        return Boolean.TRUE.equals(t.getDefenseEligible()) || "COMPLETED".equalsIgnoreCase(t.getStatus());
     }
 
     private String resolveLecturerName(Long lecturerId) {
@@ -200,10 +210,10 @@ public class DefenseService {
                     .map(CouncilSchedulingRequestDTO.StudentInfo::getStudentId)
                     .collect(Collectors.toList()));
             fallbackCr.setPresidentId(sortedPool.get(0).getLecturerId());
-            fallbackCr.setSecretary1Id(sortedPool.get(1).getLecturerId());
-            fallbackCr.setSecretary2Id(sortedPool.get(2).getLecturerId());
-            fallbackCr.setMember1Id(sortedPool.get(3).getLecturerId());
-            fallbackCr.setMember2Id(sortedPool.get(4).getLecturerId());
+            fallbackCr.setSecretaryId(sortedPool.get(1).getLecturerId());
+            fallbackCr.setReviewer1Id(sortedPool.get(2).getLecturerId());
+            fallbackCr.setReviewer2Id(sortedPool.get(3).getLecturerId());
+            fallbackCr.setMemberId(sortedPool.get(4).getLecturerId());
             schedulerResult.getCouncils().add(fallbackCr);
         }
 
@@ -241,7 +251,7 @@ public class DefenseService {
                     .code(code)
                     .name(name)
                     .status("ACTIVE")
-                    .description("Hội đồng sinh tự động bằng thuật toán CSP Backtracking + Greedy (1CT - 2TK - 2UV)")
+                    .description("Hội đồng sinh tự động bằng thuật toán CSP Backtracking + Greedy (1CT - 1TK - 1PB1 - 1PB2 - 1UV)")
                     .build();
             DefenseCouncil savedCouncil = councilRepository.save(council);
             nextNum++;
@@ -249,13 +259,15 @@ public class DefenseService {
             List<CouncilMemberDTO> memberDTOs = new ArrayList<>();
 
             // 1 President
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getPresidentId()), "PRESIDENT"));
-            // 2 Secretaries
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getSecretary1Id()), "SECRETARY"));
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getSecretary2Id()), "SECRETARY"));
-            // 2 Members
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMember1Id()), "MEMBER"));
-            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMember2Id()), "MEMBER"));
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getPresidentId()), CouncilRoles.PRESIDENT));
+            // 1 Secretary
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getSecretaryId()), CouncilRoles.SECRETARY));
+            // 1 Reviewer 1
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getReviewer1Id()), CouncilRoles.REVIEWER_1));
+            // 1 Reviewer 2
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getReviewer2Id()), CouncilRoles.REVIEWER_2));
+            // 1 Member
+            memberDTOs.add(saveCouncilMember(savedCouncil.getId(), Long.parseLong(cr.getMemberId()), CouncilRoles.MEMBER));
 
             CouncilResponseDTO councilResp = mapToCouncilResponse(savedCouncil);
             if (councilResp.getMembers() == null || councilResp.getMembers().isEmpty()) {
@@ -306,6 +318,45 @@ public class DefenseService {
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
         council.setStatus("FINALIZED");
         DefenseCouncil saved = councilRepository.save(council);
+
+        if (notificationService != null && lecturerRepository != null) {
+            List<CouncilMember> members = memberRepository.findByCouncilId(id);
+            for (CouncilMember m : members) {
+                if (m.getLecturerId() != null) {
+                    lecturerRepository.findById(m.getLecturerId()).ifPresent(lec -> {
+                        if (lec.getUser() != null && lec.getUser().getId() != null) {
+                            try {
+                                String roleVn = switch (m.getRole() != null ? m.getRole().toUpperCase() : "") {
+                                    case "PRESIDENT" -> "Chủ tịch Hội đồng";
+                                    case "SECRETARY" -> "Thư ký Hội đồng";
+                                    case "REVIEWER_1" -> "Ủy viên Phản biện 1";
+                                    case "REVIEWER_2" -> "Ủy viên Phản biện 2";
+                                    case "MEMBER" -> "Ủy viên Hội đồng";
+                                    default -> "Thành viên Hội đồng";
+                                };
+                                notificationService.createNotification(
+                                        lec.getUser().getId(),
+                                        "Quyết định thành lập Hội đồng bảo vệ",
+                                        "Thầy/Cô đã được phân công tham gia " + council.getName() + " với vai trò: " + roleVn + ".",
+                                        "DEFENSE",
+                                        "/defense-councils"
+                                );
+                            } catch (Exception ignored) {}
+                        }
+                    });
+                }
+            }
+        }
+
+        return mapToCouncilResponse(saved);
+    }
+
+    @Transactional
+    public CouncilResponseDTO reopenCouncil(Long id) {
+        DefenseCouncil council = councilRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
+        council.setStatus("ACTIVE");
+        DefenseCouncil saved = councilRepository.save(council);
         return mapToCouncilResponse(saved);
     }
 
@@ -318,12 +369,23 @@ public class DefenseService {
             throw new IllegalStateException("Hội đồng đã được chốt (FINALIZED), không thể thay đổi thành viên!");
         }
 
-        long presidents = updatedMembers.stream().filter(m -> "PRESIDENT".equalsIgnoreCase(m.getRole())).count();
-        long secretaries = updatedMembers.stream().filter(m -> "SECRETARY".equalsIgnoreCase(m.getRole())).count();
-        long regularMembers = updatedMembers.stream().filter(m -> "MEMBER".equalsIgnoreCase(m.getRole())).count();
+        if (updatedMembers == null || updatedMembers.size() != 5) {
+            throw new IllegalArgumentException("Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường!");
+        }
 
-        if (presidents != 1 || secretaries != 2 || regularMembers != 2) {
-            throw new IllegalArgumentException("Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch, 2 Thư ký, 2 Ủy viên!");
+        long presidents = updatedMembers.stream().filter(m -> CouncilRoles.PRESIDENT.equalsIgnoreCase(m.getRole())).count();
+        long secretaries = updatedMembers.stream().filter(m -> CouncilRoles.SECRETARY.equalsIgnoreCase(m.getRole())).count();
+        long reviewer1 = updatedMembers.stream().filter(m -> CouncilRoles.REVIEWER_1.equalsIgnoreCase(m.getRole())).count();
+        long reviewer2 = updatedMembers.stream().filter(m -> CouncilRoles.REVIEWER_2.equalsIgnoreCase(m.getRole())).count();
+        long regularMembers = updatedMembers.stream().filter(m -> CouncilRoles.MEMBER.equalsIgnoreCase(m.getRole())).count();
+
+        if (presidents != 1 || secretaries != 1 || reviewer1 != 1 || reviewer2 != 1 || regularMembers != 1) {
+            throw new IllegalArgumentException("Cơ cấu hội đồng bắt buộc đúng 5 người: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường!");
+        }
+
+        Set<Long> uniqueLecturers = updatedMembers.stream().map(CouncilMemberDTO::getLecturerId).filter(Objects::nonNull).collect(Collectors.toSet());
+        if (uniqueLecturers.size() != 5) {
+            throw new IllegalArgumentException("Mỗi giảng viên chỉ được đảm nhiệm một vai trò trong Hội đồng!");
         }
 
         // Only block advisors of students explicitly scheduled into this council's sessions (if any),
@@ -357,6 +419,8 @@ public class DefenseService {
         }
 
         memberRepository.deleteByCouncilId(councilId);
+        // IDENTITY inserts run before deferred deletes; release the council/lecturer unique keys first.
+        memberRepository.flush();
         for (CouncilMemberDTO m : updatedMembers) {
             saveCouncilMember(councilId, m.getLecturerId(), m.getRole());
         }
@@ -701,6 +765,60 @@ public class DefenseService {
                     .build();
             scheduleThesisRepository.save(dst);
         }
+
+        if (notificationService != null) {
+            StringBuilder timeSb = new StringBuilder();
+            if (savedSchedule.getDefenseDate() != null) {
+                timeSb.append("ngày ").append(savedSchedule.getDefenseDate());
+            }
+            if (savedSchedule.getRoom() != null && !savedSchedule.getRoom().isBlank()) {
+                timeSb.append(", phòng ").append(savedSchedule.getRoom().trim());
+            }
+            if (savedSchedule.getStartTime() != null) {
+                timeSb.append(" (bắt đầu ").append(savedSchedule.getStartTime()).append(")");
+            }
+            String timeDetail = timeSb.toString();
+
+            if (thesisRepository != null) {
+                for (Long tId : uniqueIds) {
+                    if (tId == null) continue;
+                    thesisRepository.findById(tId).ifPresent(th -> {
+                        if (th.getStudent() != null && th.getStudent().getUser() != null) {
+                            try {
+                                notificationService.createNotification(
+                                        th.getStudent().getUser().getId(),
+                                        "Lịch bảo vệ đồ án tốt nghiệp chính thức",
+                                        "Đề tài [" + th.getTitleVn() + "] của bạn đã được xếp lịch bảo vệ vào " + timeDetail + ". Vui lòng chuẩn bị và có mặt đúng giờ.",
+                                        "DEFENSE",
+                                        "/my-defense"
+                                );
+                            } catch (Exception ignored) {}
+                        }
+                    });
+                }
+            }
+
+            if (lecturerRepository != null && savedSchedule.getCouncilId() != null) {
+                List<CouncilMember> members = memberRepository.findByCouncilId(savedSchedule.getCouncilId());
+                for (CouncilMember m : members) {
+                    if (m.getLecturerId() != null) {
+                        lecturerRepository.findById(m.getLecturerId()).ifPresent(lec -> {
+                            if (lec.getUser() != null && lec.getUser().getId() != null) {
+                                try {
+                                    notificationService.createNotification(
+                                            lec.getUser().getId(),
+                                            "Lịch bảo vệ đồ án của Hội đồng",
+                                            "Hội đồng của Thầy/Cô đã có lịch bảo vệ cho " + uniqueIds.size() + " sinh viên vào " + timeDetail + ".",
+                                            "DEFENSE",
+                                            "/defense-schedules"
+                                    );
+                                } catch (Exception ignored) {}
+                            }
+                        });
+                    }
+                }
+            }
+        }
     }
 
     @Transactional
@@ -804,9 +922,14 @@ public class DefenseService {
         } else if (projectRoundId != null) {
             List<Long> councilIds = councilRepository.findByProjectRoundId(projectRoundId)
                     .stream().map(DefenseCouncil::getId).collect(Collectors.toList());
-            list = scheduleRepository.findAll().stream()
-                    .filter(s -> councilIds.contains(s.getCouncilId()))
-                    .collect(Collectors.toList());
+            if (councilIds.isEmpty()) {
+                list = Collections.emptyList();
+            } else {
+                List<DefenseSchedule> byCouncils = scheduleRepository.findByCouncilIdIn(councilIds);
+                list = byCouncils != null ? byCouncils : scheduleRepository.findAll().stream()
+                        .filter(s -> councilIds.contains(s.getCouncilId()))
+                        .collect(Collectors.toList());
+            }
         } else {
             list = scheduleRepository.findAll();
         }
@@ -930,7 +1053,18 @@ public class DefenseService {
                 ? thesisRepository.findByProjectRoundId(projectRoundId)
                 : thesisRepository.findAll();
 
-        Map<Long, ReviewerAssignment> reviewerByThesis = reviewerAssignmentRepository.findAll().stream()
+        if (theses.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> thesisIds = theses.stream().map(Thesis::getId).filter(Objects::nonNull).toList();
+        List<ReviewerAssignment> revList = thesisIds.isEmpty()
+                ? Collections.emptyList()
+                : reviewerAssignmentRepository.findByThesisIdIn(thesisIds);
+        if (revList == null || revList.isEmpty()) {
+            revList = reviewerAssignmentRepository.findAll();
+        }
+        Map<Long, ReviewerAssignment> reviewerByThesis = revList.stream()
                 .filter(r -> r.getThesisId() != null)
                 .collect(Collectors.toMap(ReviewerAssignment::getThesisId, r -> r, (a, b) -> b));
 
@@ -942,17 +1076,22 @@ public class DefenseService {
             }
         }
 
+        Map<Long, String> lecturerNameCache = new HashMap<>();
+        Map<Long, List<CouncilMember>> councilMembersCache = new HashMap<>();
+
         List<MyScoringThesisDTO> result = new ArrayList<>();
         for (Thesis t : theses) {
             boolean eligible = isThesisDefenseEligible(t);
             Long advisorId = t.getLecturer() != null ? t.getLecturer().getId() : null;
             String advisorName = (t.getLecturer() != null && t.getLecturer().getUser() != null)
                     ? t.getLecturer().getUser().getFullName()
-                    : (advisorId != null ? resolveLecturerName(advisorId) : "—");
+                    : (advisorId != null ? lecturerNameCache.computeIfAbsent(advisorId, this::resolveLecturerName) : "—");
 
             ReviewerAssignment rev = reviewerByThesis.get(t.getId());
             Long reviewerId = rev != null ? rev.getReviewerId() : null;
-            String reviewerName = reviewerId != null ? resolveLecturerName(reviewerId) : null;
+            String reviewerName = reviewerId != null
+                    ? lecturerNameCache.computeIfAbsent(reviewerId, this::resolveLecturerName)
+                    : null;
 
             DefenseCouncil council = resolveCouncilForThesis(t);
             Long councilId = council != null ? council.getId() : null;
@@ -1000,7 +1139,9 @@ public class DefenseService {
 
             CouncilMember myCouncilMembership = null;
             if (council != null && eligible && !isAdvisor) {
-                myCouncilMembership = memberRepository.findByCouncilId(council.getId()).stream()
+                List<CouncilMember> members = councilMembersCache.computeIfAbsent(
+                        council.getId(), memberRepository::findByCouncilId);
+                myCouncilMembership = members.stream()
                         .filter(m -> Objects.equals(m.getLecturerId(), myLecId))
                         .findFirst()
                         .orElse(null);
@@ -1187,31 +1328,17 @@ public class DefenseService {
         }
 
         List<CouncilMember> members = new ArrayList<>(memberRepository.findByCouncilId(council.getId()));
-        members.sort(Comparator.comparingInt((CouncilMember m) -> {
-            if ("PRESIDENT".equalsIgnoreCase(m.getRole())) return 0;
-            if ("SECRETARY".equalsIgnoreCase(m.getRole())) return 1;
-            return 2;
-        }).thenComparing(m -> m.getId() != null ? m.getId() : 0L));
+        members.sort(Comparator.comparingInt((CouncilMember m) -> CouncilRoles.order(m.getRole()))
+                .thenComparing(m -> m.getId() != null ? m.getId() : 0L));
 
         Map<Long, DefenseMinutesSignature> sigMap = minutesSignatureRepository != null
                 ? minutesSignatureRepository.findByThesisId(thesisId).stream()
                         .collect(Collectors.toMap(DefenseMinutesSignature::getLecturerId, s -> s, (a, b) -> b))
                 : Collections.emptyMap();
 
-        int secCount = 0;
-        int memCount = 0;
         List<MinutesSignatureItemDTO> items = new ArrayList<>();
         for (CouncilMember m : members) {
-            String slotLabel;
-            if ("PRESIDENT".equalsIgnoreCase(m.getRole())) {
-                slotLabel = "Chủ tịch Hội đồng";
-            } else if ("SECRETARY".equalsIgnoreCase(m.getRole())) {
-                secCount++;
-                slotLabel = "Ủy viên Thư ký " + secCount;
-            } else {
-                memCount++;
-                slotLabel = "Ủy viên " + memCount;
-            }
+            String slotLabel = CouncilRoles.label(m.getRole());
             DefenseMinutesSignature sig = sigMap.get(m.getLecturerId());
             items.add(MinutesSignatureItemDTO.builder()
                     .memberId(m.getId())
@@ -1288,6 +1415,12 @@ public class DefenseService {
             }
         }
         return hasSupervisor && hasCouncil;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = {IllegalArgumentException.class})
+    public void synthesizeThesisResult(Long thesisId) {
+        synthesizeResult(thesisId);
     }
 
     /**
@@ -1388,6 +1521,22 @@ public class DefenseService {
         entity.setNotes(request.getNotes() != null ? request.getNotes() : "Đã tổng hợp điểm tốt nghiệp");
 
         GraduationResult saved = graduationResultRepository.save(entity);
+        if (notificationService != null && thesisRepository != null) {
+            thesisRepository.findById(thesisId).ifPresent(t -> {
+                if (t.getStudent() != null && t.getStudent().getUser() != null) {
+                    try {
+                        String resultStatusVi = "PASSED".equalsIgnoreCase(finalResult) ? "ĐẠT (Qua môn)" : "KHÔNG ĐẠT";
+                        notificationService.createNotification(
+                                t.getStudent().getUser().getId(),
+                                "Kết quả bảo vệ đồ án tốt nghiệp",
+                                "Điểm bảo vệ đồ án [" + t.getTitleVn() + "] của bạn: " + finalScore + " điểm. Kết quả: " + resultStatusVi + " (Xếp loại: " + grade + ").",
+                                "DEFENSE_RESULT",
+                                "/my-defense"
+                        );
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
         return enrichGraduationResultDTO(saved);
     }
 
@@ -1410,11 +1559,17 @@ public class DefenseService {
             return Collections.emptyList();
         }
         List<Long> thesisIds = roundTheses.stream().map(Thesis::getId).toList();
-        List<GraduationResult> allResults = graduationResultRepository != null
-                ? graduationResultRepository.findAll().stream()
-                    .filter(gr -> gr.getThesisId() != null && thesisIds.contains(gr.getThesisId()))
-                    .toList()
-                : Collections.emptyList();
+        List<GraduationResult> allResults = Collections.emptyList();
+        if (graduationResultRepository != null && !thesisIds.isEmpty()) {
+            List<GraduationResult> byIds = graduationResultRepository.findByThesisIdIn(thesisIds);
+            if (byIds != null && !byIds.isEmpty()) {
+                allResults = byIds;
+            } else {
+                allResults = graduationResultRepository.findAll().stream()
+                        .filter(gr -> gr.getThesisId() != null && thesisIds.contains(gr.getThesisId()))
+                        .toList();
+            }
+        }
 
         Map<Long, Thesis> thesisMap = roundTheses.stream()
                 .collect(Collectors.toMap(Thesis::getId, t -> t, (t1, t2) -> t1));
@@ -1464,15 +1619,43 @@ public class DefenseService {
             return Collections.emptyList();
         }
         List<Thesis> roundTheses = thesisRepository.findByProjectRoundId(roundId);
+        List<Thesis> eligibleTheses = roundTheses.stream()
+                .filter(this::isThesisDefenseEligible)
+                .toList();
 
-        // 1. Synthesize thesis results (once) for eligible theses that have scores
-        for (Thesis t : roundTheses) {
-            if (!isThesisDefenseEligible(t)) continue;
+        if (eligibleTheses.isEmpty()) {
+            throw new IllegalStateException("Chưa có sinh viên/đề tài nào đủ điều kiện bảo vệ trong đợt để chốt và công bố kết quả.");
+        }
+
+        // 1. Synthesize thesis results (once) for eligible theses that have all required scores
+        for (Thesis t : eligibleTheses) {
+            if (graduationResultRepository != null && graduationResultRepository.findByThesisId(t.getId()).isPresent()) {
+                continue;
+            }
             if (!canSynthesizeResult(t.getId())) continue;
             try {
                 synthesizeResult(t.getId());
             } catch (Exception ignored) {
             }
+        }
+
+        // 1b. Require all eligible students/theses in the round to have a synthesized final result before finalizing
+        List<String> missingTheses = new ArrayList<>();
+        for (Thesis t : eligibleTheses) {
+            boolean hasResult = graduationResultRepository != null
+                    && graduationResultRepository.findByThesisId(t.getId()).isPresent();
+            if (!hasResult) {
+                String studentLabel = t.getStudent() != null && t.getStudent().getStudentCode() != null
+                        ? t.getStudent().getStudentCode()
+                        : (t.getThesisCode() != null ? t.getThesisCode() : ("#" + t.getId()));
+                missingTheses.add(studentLabel);
+            }
+        }
+        if (!missingTheses.isEmpty()) {
+            throw new IllegalStateException(
+                    "Chưa thể chốt và công bố kết quả: còn " + missingTheses.size()
+                            + " sinh viên chưa được chấm đủ điểm hoặc chưa tổng kết điểm cuối kỳ ("
+                            + String.join(", ", missingTheses) + ").");
         }
 
         // 2. Close round and publish notifications/results

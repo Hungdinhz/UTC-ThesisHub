@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 import type { Document, DocumentRequirement } from '../types';
+import { toast } from './Toast';
 import './DocumentsList.css';
 
 interface DocumentsListProps {
@@ -35,17 +36,18 @@ const DocumentRow: React.FC<DocumentRowProps> = ({
     onSubmittedToCommittee(document.id);
     try {
       await apiService.submitDocumentToCommittee(documentType, document.id);
+      toast.success('Đã nộp tài liệu lên hội đồng thành công!');
       onSubmittedToCommittee(null);
     } catch (error: any) {
       onSubmittedToCommittee(null);
-      const msg = error.response?.data?.message || 'Failed to submit to committee.';
-      alert(msg);
+      const msg = error.response?.data?.message || 'Không thể nộp lên hội đồng.';
+      toast.error(msg);
     }
   };
 
   const handleDownload = async () => {
     if (!document.uploaded_file) {
-      alert('No file available for download');
+      toast.warning('Tài liệu chưa có file đính kèm để tải xuống');
       return;
     }
 
@@ -58,7 +60,7 @@ const DocumentRow: React.FC<DocumentRowProps> = ({
       await apiService.downloadDocument(document.uploaded_file, fileName);
     } catch (error: any) {
       console.error('Download failed:', error);
-      alert('Failed to download document. Please try again.');
+      toast.error('Lỗi khi tải xuống tài liệu. Vui lòng thử lại!');
     } finally {
       setDownloading(false);
     }
@@ -280,7 +282,7 @@ const DocumentsList: React.FC<DocumentsListProps> = ({ groupId }) => {
     try {
       setUploading(true);
       await apiService.uploadDocument(documentType, formData);
-      alert('Document uploaded successfully!');
+      toast.success('Tải lên tài liệu thành công!');
       setSelectedFile(null);
       // Reset file input
       const fileInput = document.getElementById('document-file-input') as HTMLInputElement;

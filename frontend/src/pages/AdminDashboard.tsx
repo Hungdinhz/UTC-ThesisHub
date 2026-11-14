@@ -118,14 +118,14 @@ export const AdminDashboard: React.FC = () => {
     },
     {
       stage: 'Giai đoạn 5',
-      title: 'Xét Bảo vệ, Hội đồng (1CT-2TK-2UV) & Tổng kết Điểm',
+      title: 'Xét Bảo vệ, Hội đồng (1CT-1TK-2PB-1UV) & Tổng kết Điểm',
       icon: '🏆',
       color: '#dc2626',
       description:
-        'GVHD xác nhận đủ ĐK bảo vệ, kiểm tra chuẩn học vụ cuối. Lập Hội đồng 5 thành viên (1CT-2TK-2UV), xếp lịch bảo vệ, chấm điểm và ký biên bản điện tử.',
+        'GVHD xác nhận đủ ĐK bảo vệ, kiểm tra chuẩn học vụ cuối. Lập Hội đồng 5 thành viên (1CT-1TK-1PB1-1PB2-1UV), xếp lịch bảo vệ, chấm điểm và ký biên bản điện tử.',
       actions: [
         { label: 'Xét ĐK Bảo vệ Cuối', route: '/admin/final-eligibility' },
-        { label: 'Lập HĐ (1CT-2TK-2UV)', route: '/admin/councils' },
+        { label: 'Lập HĐ (1CT-1TK-2PB-1UV)', route: '/admin/councils' },
         { label: 'Xếp lịch Bảo vệ', route: '/admin/defense-schedules' },
         { label: 'Chấm điểm & Biên bản PDF', route: '/admin/defense-scoring' },
       ],
@@ -193,24 +193,6 @@ export const AdminDashboard: React.FC = () => {
               }}
             >
               <span>🗓️</span> Quản lý Đợt đồ án
-            </button>
-            <button
-              onClick={() => navigate('/chat')}
-              style={{
-                backgroundColor: '#f8fafc',
-                color: '#0a3273',
-                border: '1px solid #cbd5e1',
-                padding: '9px 16px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span>💬</span> Nhóm Chat GV–SV
             </button>
           </div>
         </div>

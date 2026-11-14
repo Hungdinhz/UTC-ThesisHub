@@ -48,6 +48,9 @@ public class ProposalServiceImpl implements ProposalService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository supervisorAssignmentRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository studentProjectRoundRepository;
+
     @Override
     @Transactional
     public ProposalResponse createProposal(CreateProposalRequest request) {
@@ -100,6 +103,7 @@ public class ProposalServiceImpl implements ProposalService {
                 if (request.getExpectedResults() != null) existing.setExpectedResults(request.getExpectedResults());
                 if (request.getResearchContent() != null) existing.setResearchContent(request.getResearchContent());
                 if (request.getFileUrl() != null) existing.setFileUrl(request.getFileUrl());
+                if (request.getRebuttalNotes() != null) existing.setRebuttalNotes(request.getRebuttalNotes());
                 existing.setStatus("SUBMITTED");
                 existing.setSubmittedAt(Instant.now());
                 existing.setSupervisorApproved(false);
@@ -123,6 +127,7 @@ public class ProposalServiceImpl implements ProposalService {
                 .expectedResults(request.getExpectedResults())
                 .researchContent(request.getResearchContent())
                 .fileUrl(request.getFileUrl())
+                .rebuttalNotes(request.getRebuttalNotes())
                 .status("SUBMITTED")
                 .submittedAt(Instant.now())
                 .supervisorApproved(false)
@@ -142,7 +147,7 @@ public class ProposalServiceImpl implements ProposalService {
         Proposal proposal = proposalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Proposal", id));
 
-        if (!"REVISE_REQUIRED".equals(proposal.getStatus())) {
+        if (!"REVISE_REQUIRED".equals(proposal.getStatus()) && !"DRAFT".equals(proposal.getStatus())) {
             throw new AppException(ErrorCode.VALIDATION_FAILED, "Đề cương đã nộp không thể tự ý chỉnh sửa. Chỉ được phép chỉnh sửa khi Giảng viên hướng dẫn hoặc Khoa yêu cầu sửa đổi (REVISE_REQUIRED).");
         }
 
@@ -153,6 +158,7 @@ public class ProposalServiceImpl implements ProposalService {
         if (request.getExpectedResults() != null) proposal.setExpectedResults(request.getExpectedResults());
         if (request.getResearchContent() != null) proposal.setResearchContent(request.getResearchContent());
         if (request.getFileUrl() != null) proposal.setFileUrl(request.getFileUrl());
+        if (request.getRebuttalNotes() != null) proposal.setRebuttalNotes(request.getRebuttalNotes());
 
         proposal.setVersion(proposal.getVersion() + 1);
         proposal.setStatus("SUBMITTED");
@@ -180,6 +186,12 @@ public class ProposalServiceImpl implements ProposalService {
     @Override
     @Transactional
     public ProposalResponse supervisorApprove(Long id, boolean approved, String comment) {
+        return supervisorApprove(id, approved, comment, null, null);
+    }
+
+    @Override
+    @Transactional
+    public ProposalResponse supervisorApprove(Long id, boolean approved, String comment, String checklist, Instant deadline) {
         Proposal proposal = proposalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Proposal", id));
 
@@ -191,6 +203,12 @@ public class ProposalServiceImpl implements ProposalService {
             }
         } else {
             proposal.setStatus("REVISE_REQUIRED");
+            if (checklist != null) {
+                proposal.setRevisionChecklist(checklist);
+            }
+            if (deadline != null) {
+                proposal.setRevisionDeadline(deadline);
+            }
             proposal.setStudentSigned(false);
             proposal.setStudentSignedAt(null);
         }
@@ -303,14 +321,30 @@ public class ProposalServiceImpl implements ProposalService {
             proposal.setSupervisorApproved(true);
         } else if ("REVISE_REQUIRED".equalsIgnoreCase(request.getStatus()) || "REJECTED".equalsIgnoreCase(request.getStatus())) {
             proposal.setSupervisorApproved(false);
+            proposal.setCouncilComment(request.getEvaluationNotes());
+            if (request.getRevisionChecklist() != null) {
+                proposal.setRevisionChecklist(request.getRevisionChecklist());
+            }
+            if (request.getRevisionDeadline() != null) {
+                proposal.setRevisionDeadline(request.getRevisionDeadline());
+            }
             proposal.setStudentSigned(false);
             proposal.setStudentSignedAt(null);
         }
         Proposal savedProposal = proposalRepository.save(proposal);
 
-        // Auto-generate official Thesis when Proposal is APPROVED
+        // Auto-generate official Thesis when Proposal is APPROVED and advance student status to IN_PROGRESS (Đã duyệt đề tài)
         if ("APPROVED".equalsIgnoreCase(request.getStatus())) {
             ensureThesisCreatedForProposal(savedProposal);
+            if (studentProjectRoundRepository != null && savedProposal.getStudent() != null && savedProposal.getProjectRound() != null) {
+                studentProjectRoundRepository.findByStudentIdAndProjectRoundId(
+                        savedProposal.getStudent().getId(),
+                        savedProposal.getProjectRound().getId()
+                ).ifPresent(spr -> {
+                    spr.setStatus("IN_PROGRESS");
+                    studentProjectRoundRepository.save(spr);
+                });
+            }
         }
 
         // Gửi thông báo kết quả xét duyệt đề cương cho Sinh viên
@@ -461,6 +495,13 @@ public class ProposalServiceImpl implements ProposalService {
                 .map(this::mapToResponse);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Long resolveStudentIdForUser(Long userId) {
+        if (userId == null || studentRepository == null) return userId;
+        return studentRepository.findByUserId(userId).map(Student::getId).orElse(userId);
+    }
+
     private Long resolveStudentId(Long studentId) {
         if (studentId == null || studentRepository == null) return studentId;
         if (studentRepository.existsById(studentId)) return studentId;
@@ -476,6 +517,14 @@ public class ProposalServiceImpl implements ProposalService {
     private ProposalResponse mapToResponse(Proposal proposal) {
         String studentName = proposal.getStudent().getUser() != null ? proposal.getStudent().getUser().getFullName() : null;
         String lecturerName = proposal.getLecturer().getUser() != null ? proposal.getLecturer().getUser().getFullName() : null;
+
+        String councilComment = proposal.getCouncilComment();
+        if (councilComment == null || councilComment.isBlank()) {
+            java.util.List<ProposalReviewAssignment> assignments = reviewAssignmentRepository.findByProposalId(proposal.getId());
+            if (!assignments.isEmpty() && assignments.get(0).getEvaluationNotes() != null) {
+                councilComment = assignments.get(0).getEvaluationNotes();
+            }
+        }
 
         return ProposalResponse.builder()
                 .id(proposal.getId())
@@ -499,6 +548,10 @@ public class ProposalServiceImpl implements ProposalService {
                 .status(proposal.getStatus())
                 .supervisorApproved(proposal.getSupervisorApproved())
                 .supervisorComment(proposal.getSupervisorComment())
+                .rebuttalNotes(proposal.getRebuttalNotes())
+                .revisionChecklist(proposal.getRevisionChecklist())
+                .councilComment(councilComment)
+                .revisionDeadline(proposal.getRevisionDeadline())
                 .version(proposal.getVersion())
                 .submittedAt(proposal.getSubmittedAt())
                 .studentSigned(Boolean.TRUE.equals(proposal.getStudentSigned()))

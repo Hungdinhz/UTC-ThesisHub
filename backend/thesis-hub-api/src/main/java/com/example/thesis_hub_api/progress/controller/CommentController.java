@@ -6,6 +6,7 @@ import com.example.thesis_hub_api.progress.dto.CreateCommentRequest;
 import com.example.thesis_hub_api.progress.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ public class CommentController {
     private final CommentService commentService;
 
     @PostMapping("/by-task/{taskId}")
+    @PreAuthorize("@accessControl.canAccessTask(#taskId)")
     public ApiResponse<CommentResponse> addComment(
             @PathVariable Long taskId,
             @Valid @RequestBody CreateCommentRequest request) {
@@ -25,11 +27,13 @@ public class CommentController {
     }
 
     @GetMapping("/by-task/{taskId}")
+    @PreAuthorize("@accessControl.canAccessTask(#taskId)")
     public ApiResponse<List<CommentResponse>> getCommentsByTask(@PathVariable Long taskId) {
         return ApiResponse.success(commentService.getCommentsByTask(taskId));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@accessControl.canDeleteComment(#id)")
     public ApiResponse<Void> deleteComment(@PathVariable Long id) {
         commentService.deleteComment(id);
         return ApiResponse.success("Xóa bình luận thành công", null);

@@ -44,6 +44,31 @@ public class ReservationRequest {
     private String reason;
 
     /**
+     * Category of reservation reason:
+     * INSUFFICIENT_CREDITS (Đạt GVHD nhưng thiếu tín chỉ/nợ môn),
+     * SUPERVISOR_NOT_ELIGIBLE (GVHD xét không đủ điều kiện/tiến độ),
+     * RESEARCH_PROGRESS, HEALTH_REASONS, INTERNSHIP_WORK, FAMILY_CIRCUMSTANCES, OTHER.
+     */
+    @Column(name = "reason_category", length = 50)
+    @Builder.Default
+    private String reasonCategory = "OTHER";
+
+    @Column(name = "evidence_file_url", columnDefinition = "TEXT")
+    private String evidenceFileUrl;
+
+    @Column(name = "evidence_file_name", length = 255)
+    private String evidenceFileName;
+
+    @Column(name = "supervisor_approved")
+    private Boolean supervisorApproved;
+
+    @Column(name = "supervisor_comment", columnDefinition = "TEXT")
+    private String supervisorComment;
+
+    @Column(name = "target_round_code", length = 50)
+    private String targetRoundCode;
+
+    /**
      * Status of the request: PENDING, APPROVED, REJECTED, CANCELLED.
      */
     @Column(name = "status", nullable = false, length = 30)
@@ -88,6 +113,9 @@ public class ReservationRequest {
         }
         if (this.status == null) {
             this.status = "PENDING";
+        }
+        if (this.reasonCategory == null) {
+            this.reasonCategory = "OTHER";
         }
     }
 

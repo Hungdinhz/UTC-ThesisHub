@@ -101,6 +101,7 @@ const CommentsSection: React.FC<CommentsSectionProps> = ({
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       loadComments(1, false);
     }, refreshInterval);
 

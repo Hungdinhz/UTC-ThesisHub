@@ -15,6 +15,7 @@ import com.example.thesis_hub_api.identity.security.JwtTokenProvider;
 import com.example.thesis_hub_api.identity.service.AuthService;
 import com.example.thesis_hub_api.organization.repository.LecturerRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
+import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -134,6 +135,7 @@ class AuthServiceTest {
 
         when(userRepository.findByUsernameOrEmail("student01", "student01"))
                 .thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("password123", "$2a$10$hashedPassword")).thenReturn(true);
 
         AppException ex = assertThrows(AppException.class, () -> authService.login(request));
         assertEquals(ErrorCode.USER_LOCKED, ex.getErrorCode());
@@ -277,6 +279,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByUsernameOrEmail("student01", "student01")).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("password123", "$2a$10$hashedPassword")).thenReturn(true);
 
         AppException ex = assertThrows(AppException.class, () -> authService.adminLogin(request));
         assertEquals(ErrorCode.NOT_AN_ADMIN_ACCOUNT, ex.getErrorCode());

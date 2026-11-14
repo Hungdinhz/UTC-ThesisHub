@@ -3,18 +3,22 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { useTranslation } from 'react-i18next';
+import { toast } from '../components/Toast';
 import './LoginPage.css';
 import utcLogo from '../assets/images/utc_logo.webp';
 
 const LoginPage: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const [userType, setUserType] = useState<'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin'>('student');
+  const [userType, setUserType] = useState<'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' | 'academic_staff'>('student');
   const [registrationNo, setRegistrationNo] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'checking' | 'ready' | 'waking'>('checking');
+  const [wakeStatusText, setWakeStatusText] = useState('');
+  const isMountedRef = React.useRef(true);
   
   // Validation States
   const [fieldErrors, setFieldErrors] = useState<{ registrationNo?: string; email?: string; password?: string }>({});
@@ -25,6 +29,28 @@ const LoginPage: React.FC = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const warmUpServer = async () => {
+      const ok = await apiService.pingServer(10000);
+      if (!isMountedRef.current) return;
+      if (ok) {
+        setServerStatus('ready');
+      } else {
+        setServerStatus('waking');
+        pollTimer = setTimeout(warmUpServer, 5000);
+      }
+    };
+
+    warmUpServer();
+    return () => {
+      isMountedRef.current = false;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, []);
 
   React.useEffect(() => {
     const state = location.state as any;
@@ -38,10 +64,6 @@ const LoginPage: React.FC = () => {
   }, [location.state]);
 
 
-  const toggleLanguage = () => {
-    const nextLng = i18n.language.startsWith('vi') ? 'en' : 'vi';
-    i18n.changeLanguage(nextLng);
-  };
 
   // Field validation rules
   const validateFields = (type: string, regNoVal: string, emailVal: string, passVal: string) => {
@@ -88,7 +110,7 @@ const LoginPage: React.FC = () => {
     setFieldErrors(errors);
   };
 
-  const handleUserTypeChange = (newRole: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin') => {
+  const handleUserTypeChange = (newRole: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' | 'academic_staff') => {
     setUserType(newRole);
     const currentIdent = registrationNo || email;
     setRegistrationNo(currentIdent);
@@ -99,7 +121,7 @@ const LoginPage: React.FC = () => {
   };
 
   const handleQuickFill = (
-    role: 'student' | 'supervisor' | 'committee_member' | 'admin',
+    role: 'student' | 'supervisor' | 'committee_member' | 'admin' | 'academic_staff',
     account: string,
     pass: string
   ) => {
@@ -112,9 +134,75 @@ const LoginPage: React.FC = () => {
     setTouched({});
   };
 
+  const performLoginRequest = async (identifier: string) => {
+    let response: any;
+    if (userType === 'student') {
+      response = await apiService.studentLogin(identifier, password);
+    } else if (userType === 'supervisor') {
+      response = await apiService.supervisorLogin(identifier, password);
+    } else if (userType === 'committee_member') {
+      response = await apiService.committeeMemberLogin(identifier, password);
+    } else if (userType === 'admin') {
+      response = await apiService.adminLogin(identifier, password);
+    } else if (userType === 'academic_staff') {
+      response = await apiService.login(identifier, password);
+    } else {
+      response = await apiService.externalExaminerLogin(identifier, password);
+    }
+
+    const accessToken = response?.access || (response as any)?.token || (response as any)?.data?.access || (response as any)?.data?.token;
+    const refreshToken = response?.refresh || (response as any)?.refreshToken || '';
+
+    const backendRole = response?.role || (response as any)?.data?.role;
+    let resolvedUserType: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' | 'academic_staff' = userType;
+    if (backendRole === 'ROLE_ADMIN' || backendRole === 'ROLE_FACULTY_ADMIN') {
+      resolvedUserType = 'admin';
+    } else if (backendRole === 'ROLE_LECTURER' || backendRole === 'ROLE_COMMITTEE') {
+      resolvedUserType = 'supervisor';
+    } else if (backendRole === 'ROLE_STUDENT') {
+      resolvedUserType = 'student';
+    } else if (backendRole === 'ROLE_EXTERNAL') {
+      resolvedUserType = 'external_examiner';
+    } else if (backendRole === 'ROLE_ACADEMIC_STAFF') {
+      resolvedUserType = 'academic_staff';
+    }
+
+    login(accessToken, refreshToken, resolvedUserType);
+    const roleLandingMap: Record<string, string> = {
+      admin: '/admin/dashboard',
+      student: '/student/assignment',
+      supervisor: '/thesis/proposals',
+      committee_member: '/thesis/proposals',
+      external_examiner: '/external_examiner/dashboard',
+      academic_staff: '/academic-staff/eligible-students',
+    };
+    navigate(roleLandingMap[resolvedUserType] || '/login');
+  };
+
+  const waitForServerWakeAndRetry = async (identifier: string) => {
+    const maxWaitMs = 180000;
+    const startedAt = Date.now();
+    while (isMountedRef.current && Date.now() - startedAt < maxWaitMs) {
+      const elapsedSec = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+      setServerStatus('waking');
+      setWakeStatusText(`Máy chủ đang khởi động, hệ thống đang tự động kết nối và đăng nhập lại... (${elapsedSec}s)`);
+      const awake = await apiService.pingServer(10000);
+      if (!isMountedRef.current) return false;
+      if (awake) {
+        setServerStatus('ready');
+        setWakeStatusText('Máy chủ đã sẵn sàng! Đang đăng nhập...');
+        await performLoginRequest(identifier);
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return false;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setWakeStatusText('');
 
     setTouched({ registrationNo: true, email: true, password: true });
     const errors = validateFields(userType, registrationNo, email, password);
@@ -127,60 +215,58 @@ const LoginPage: React.FC = () => {
     }
 
     setLoading(true);
+    const identifier = (registrationNo || email).trim();
 
     try {
-      const identifier = (registrationNo || email).trim();
-      let response: any;
-      if (userType === 'student') {
-        response = await apiService.studentLogin(identifier, password);
-      } else if (userType === 'supervisor') {
-        response = await apiService.supervisorLogin(identifier, password);
-      } else if (userType === 'committee_member') {
-        response = await apiService.committeeMemberLogin(identifier, password);
-      } else if (userType === 'admin') {
-        response = await apiService.adminLogin(identifier, password);
-      } else {
-        response = await apiService.externalExaminerLogin(identifier, password);
+      await performLoginRequest(identifier);
+      if (isMountedRef.current) {
+        setServerStatus('ready');
       }
-
-      const accessToken = response?.access || (response as any)?.token || (response as any)?.data?.access || (response as any)?.data?.token;
-      const refreshToken = response?.refresh || (response as any)?.refreshToken || '';
-
-      const backendRole = response?.role || (response as any)?.data?.role;
-      let resolvedUserType: 'student' | 'supervisor' | 'committee_member' | 'external_examiner' | 'admin' = userType;
-      if (backendRole === 'ROLE_ADMIN' || backendRole === 'ROLE_FACULTY_ADMIN') {
-        resolvedUserType = 'admin';
-      } else if (backendRole === 'ROLE_LECTURER' || backendRole === 'ROLE_COMMITTEE') {
-        resolvedUserType = 'supervisor';
-      } else if (backendRole === 'ROLE_STUDENT') {
-        resolvedUserType = 'student';
-      } else if (backendRole === 'ROLE_EXTERNAL') {
-        resolvedUserType = 'external_examiner';
-      }
-
-      login(accessToken, refreshToken, resolvedUserType);
-      const roleLandingMap: Record<string, string> = {
-        admin: '/admin/dashboard',
-        student: '/student/assignment',
-        supervisor: '/thesis/proposals',
-        committee_member: '/thesis/proposals',
-        external_examiner: '/external_examiner/dashboard',
-      };
-      navigate(roleLandingMap[resolvedUserType] || '/login');
     } catch (err: any) {
-      if (err.response?.status === 429) {
+      const isColdStartOrGateway =
+        err.code === 'ECONNABORTED' ||
+        err.message?.includes('timeout') ||
+        !err.response ||
+        [502, 503, 504].includes(err.response?.status);
+
+      if (isColdStartOrGateway) {
+        try {
+          const retriedOk = await waitForServerWakeAndRetry(identifier);
+          if (retriedOk) return;
+          if (isMountedRef.current) {
+            setError('Không thể kết nối tới máy chủ sau thời gian chờ. Vui lòng kiểm tra kết nối mạng hoặc thử lại.');
+          }
+        } catch (retryErr: any) {
+          if (isMountedRef.current) {
+            if (retryErr.response?.status === 429) {
+              const detail = retryErr.response?.data?.detail || '';
+              const seconds = detail.match(/\d+/)?.[0] || '60';
+              setError(t('login.throttled', `Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ${seconds} giây.`));
+            } else {
+              setError(
+                retryErr.response?.data?.message ||
+                retryErr.response?.data?.detail ||
+                t('login.loginFailed', 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản.')
+              );
+            }
+          }
+        }
+      } else if (err.response?.status === 429) {
         const detail = err.response?.data?.detail || '';
         const seconds = detail.match(/\d+/)?.[0] || '60';
         setError(t('login.throttled', `Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ${seconds} giây.`));
-      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || !err.response) {
-        setError('Máy chủ đang khởi động (Cold Start trên Render). Vui lòng đợi khoảng 200-300 giây rồi thử đăng nhập lại!');
       } else {
         setError(err.response?.data?.message || err.response?.data?.detail || t('login.loginFailed', 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản.'));
       }
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 500);
+      if (isMountedRef.current) {
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 500);
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setWakeStatusText('');
+        setLoading(false);
+      }
     }
   };
 
@@ -198,9 +284,7 @@ const LoginPage: React.FC = () => {
               <span className="utc-school-name-sub">{t('portal.schoolSub', 'UNIVERSITY OF TRANSPORT AND COMMUNICATIONS')}</span>
             </div>
           </div>
-          <button onClick={toggleLanguage} className="utc-lang-btn">
-            {i18n.language.startsWith('vi') ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
-          </button>
+
         </div>
 
         <div className="utc-portal-title-block">
@@ -265,6 +349,31 @@ const LoginPage: React.FC = () => {
 
           <h2 className="utc-login-title">{t('portal.loginFormTitle', 'ĐĂNG NHẬP HỆ THỐNG')}</h2>
 
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 12px',
+              borderRadius: '999px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              margin: '0 auto 12px',
+              backgroundColor: serverStatus === 'ready' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+              color: serverStatus === 'ready' ? '#047857' : '#b45309',
+              border: `1px solid ${serverStatus === 'ready' ? 'rgba(16, 185, 129, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
+            }}
+          >
+            <span>{serverStatus === 'ready' ? '🟢' : '🟡'}</span>
+            <span>
+              {serverStatus === 'ready'
+                ? 'Máy chủ sẵn sàng'
+                : serverStatus === 'waking'
+                  ? 'Đang đánh thức máy chủ...'
+                  : 'Đang kiểm tra kết nối máy chủ...'}
+            </span>
+          </div>
+
           <div className="utc-role-tabs">
             <button
               type="button"
@@ -287,11 +396,18 @@ const LoginPage: React.FC = () => {
             >
               👑 Quản trị viên
             </button>
+            <button
+              type="button"
+              className={`utc-role-tab ${userType === 'academic_staff' ? 'active' : ''}`}
+              onClick={() => handleUserTypeChange('academic_staff')}
+            >
+              📋 Giáo vụ
+            </button>
           </div>
 
           <div className="utc-demo-accounts-box">
             <div className="utc-demo-title">
-              <span>⚡</span> <span>Tài khoản mẫu để test (Click điền nhanh):</span>
+              <span>⚡</span> <span>Tài khoản mẫu để demo (Click điền nhanh):</span>
             </div>
             <div className="utc-demo-grid" style={{ gridTemplateColumns: '1fr' }}>
               <button
@@ -304,10 +420,20 @@ const LoginPage: React.FC = () => {
                 <span className="demo-role">👑 Quản trị viên</span>
                 <span className="demo-cred">admin | Password@123</span>
               </button>
+              <button
+                type="button"
+                className="utc-demo-btn"
+                onClick={() => handleQuickFill('academic_staff', 'giaovu', 'Password@123')}
+                title="Click để điền tài khoản Giáo vụ khoa"
+                style={{ width: '100%' }}
+              >
+                <span className="demo-role">📋 Giáo vụ khoa</span>
+                <span className="demo-cred">giaovu | Password@123</span>
+              </button>
             </div>
           </div>
 
-          {userType === 'admin' && (
+          {import.meta.env.DEV && userType === 'admin' && (
             <div className="utc-admin-register-prompt" style={{
               background: 'rgba(245, 158, 11, 0.12)',
               border: '1px solid rgba(245, 158, 11, 0.35)',
@@ -421,13 +547,51 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="utc-form-options">
-              <a href="#forgot" onClick={(e) => { e.preventDefault(); alert('Vui lòng liên hệ Giáo vụ Khoa UTC để lấy lại mật khẩu.'); }}>
+              <a
+                href="#forgot"
+                onClick={(e) => {
+                  e.preventDefault();
+                  toast.modal(
+                    'Để đảm bảo an toàn thông tin tài khoản học vụ, bạn vui lòng mang Thẻ sinh viên hoặc CCCD đến liên hệ trực tiếp Giáo vụ Khoa hoặc Ban Quản trị UTC để được cấp lại mật khẩu đăng nhập.',
+                    'Lấy lại mật khẩu tài khoản',
+                    'warning'
+                  );
+                }}
+              >
                 {t('portal.forgotPassword', 'Quên mật khẩu?')}
               </a>
-              <a href="#help" onClick={(e) => { e.preventDefault(); alert('Hỗ trợ kỹ thuật UTC: 024 3766 4078 | Email: dev@utc.edu.vn'); }}>
+              <a
+                href="#help"
+                onClick={(e) => {
+                  e.preventDefault();
+                  toast.modal(
+                    'CỔNG HỖ TRỢ KỸ THUẬT UTC-THESISHUB\n\n📞 Hotline: 024 3766 4078\n✉️ Email hỗ trợ: dev@utc.edu.vn\n🏢 Địa chỉ: Phòng Giáo vụ Khoa CNTT - Tầng 2 Nhà A9\n⏰ Giờ làm việc: 08:00 - 17:00 (Thứ 2 - Thứ 6)',
+                    'Hỗ trợ kỹ thuật UTC',
+                    'info'
+                  );
+                }}
+              >
                 ❓ {t('portal.help', 'Trợ giúp!')}
               </a>
             </div>
+
+            {wakeStatusText && (
+              <div
+                style={{
+                  backgroundColor: '#fef3c7',
+                  border: '1px solid #f59e0b',
+                  color: '#92400e',
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  marginBottom: '12px',
+                  textAlign: 'center',
+                }}
+              >
+                ⏳ {wakeStatusText}
+              </div>
+            )}
 
             {error && <div className="utc-error-box">{error}</div>}
 
@@ -443,7 +607,11 @@ const LoginPage: React.FC = () => {
               type="button"
               className="utc-btn-sso"
               onClick={() => {
-                alert('Đăng nhập Microsoft SSO dành cho tài khoản @utc.edu.vn hoặc @sv.utc.edu.vn');
+                toast.info(
+                  'Cổng đăng nhập Microsoft Single Sign-On (SSO) dành cho cán bộ giảng viên và sinh viên có tài khoản email tên miền @utc.edu.vn hoặc @sv.utc.edu.vn.',
+                  5000,
+                  'Đăng nhập Microsoft SSO'
+                );
               }}
             >
               <span className="sso-icon">🌐</span> {t('portal.ssoBtn', 'Đăng nhập với Email UTC (@utc.edu.vn)')}

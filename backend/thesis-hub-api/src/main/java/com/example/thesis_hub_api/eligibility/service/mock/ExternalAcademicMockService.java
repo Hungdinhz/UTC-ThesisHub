@@ -29,6 +29,7 @@ public class ExternalAcademicMockService {
         private boolean tuitionDebt;
         private boolean underDisciplinaryAction;
         private int missingPrerequisiteCount;
+        private int debtCredits;
         private double thesisProgressPercentage;
         private boolean supervisorApprovedForDefense;
     }
@@ -59,6 +60,7 @@ public class ExternalAcademicMockService {
                 .tuitionDebt(true)
                 .underDisciplinaryAction(false)
                 .missingPrerequisiteCount(2)
+                .debtCredits(15)
                 .thesisProgressPercentage(60.0)
                 .supervisorApprovedForDefense(false)
                 .build());

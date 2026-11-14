@@ -8,16 +8,22 @@ import com.example.thesis_hub_api.eligibility.entity.ReservationRequest;
 import com.example.thesis_hub_api.eligibility.repository.ReservationRequestRepository;
 import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockService;
 import com.example.thesis_hub_api.eligibility.service.mock.ExternalAcademicMockService.StudentAcademicRecord;
+import com.example.thesis_hub_api.identity.entity.User;
+import com.example.thesis_hub_api.identity.repository.UserRepository;
+import com.example.thesis_hub_api.notification.service.NotificationService;
 import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
+import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.AcademicRecordRepository;
+import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import com.example.thesis_hub_api.thesis.entity.Thesis;
 import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +53,27 @@ public class EligibilityService {
 
     @Autowired(required = false)
     private ThesisRepository thesisRepository;
+
+    @Autowired(required = false)
+    private ProjectRoundRepository projectRoundRepository;
+
+    @Autowired(required = false)
+    private UserRepository userRepository;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
+
+    /** Nhận đồ án: nợ tín chỉ phải < ngưỡng này (mặc định 10). */
+    @Value("${app.eligibility.max-debt-credits-to-start:10}")
+    private int maxDebtCreditsToStart = 10;
+
+    /** Bảo vệ: nợ tín chỉ phải <= ngưỡng này (mặc định 0 = trả hết nợ). */
+    @Value("${app.eligibility.max-debt-credits-to-defend:0}")
+    private int maxDebtCreditsToDefend = 0;
+
+    public int getMaxDebtCreditsToStart() {
+        return maxDebtCreditsToStart;
+    }
 
     // Track overrides in-memory for testing and decoupling
     private final Map<String, String> statusOverrides = new ConcurrentHashMap<>();
@@ -92,26 +119,49 @@ public class EligibilityService {
                         .tuitionDebt(Boolean.TRUE.equals(ar.getTuitionDebt()))
                         .underDisciplinaryAction(Boolean.TRUE.equals(ar.getUnderDisciplinaryAction()))
                         .missingPrerequisiteCount(ar.getMissingPrerequisiteCount() != null ? ar.getMissingPrerequisiteCount() : 0)
+                        .debtCredits(ar.getDebtCredits() != null ? ar.getDebtCredits() : 0)
                         .thesisProgressPercentage(100.0)
                         .supervisorApprovedForDefense(true)
                         .build();
             }
         }
 
-        StudentAcademicRecord mockRecord = academicMockService.getRecord(studentId);
         if (studentRepository != null && studentId != null) {
-            studentRepository.findById(studentId).ifPresent(s -> {
-                if (s.getStudentCode() != null && !s.getStudentCode().isBlank()) {
-                    mockRecord.setStudentCode(s.getStudentCode());
+            Optional<Student> realStudentOpt = studentRepository.findById(studentId);
+            if (realStudentOpt.isPresent()) {
+                Student s = realStudentOpt.get();
+                double studentGpa = s.getGpa() != null ? s.getGpa() : 0.0;
+                if (studentProjectRoundRepository != null && projectRoundId != null) {
+                    Optional<StudentProjectRound> sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
+                    if (sprOpt.isPresent() && sprOpt.get().getGpa() != null) {
+                        studentGpa = sprOpt.get().getGpa();
+                    }
                 }
-                if (s.getUser() != null && s.getUser().getFullName() != null && !s.getUser().getFullName().isBlank()) {
-                    mockRecord.setFullName(s.getUser().getFullName());
-                }
-                if (s.getGpa() != null) {
-                    mockRecord.setGpa(s.getGpa());
-                }
-            });
+                return StudentAcademicRecord.builder()
+                        .studentId(studentId)
+                        .studentCode(s.getStudentCode() != null && !s.getStudentCode().isBlank() ? s.getStudentCode() : ("SV" + studentId))
+                        .fullName(s.getUser() != null && s.getUser().getFullName() != null ? s.getUser().getFullName() : ("Student " + studentId))
+                        .completedCredits(0)
+                        .gpa(studentGpa)
+                        .tuitionDebt(false)
+                        .underDisciplinaryAction(false)
+                        .missingPrerequisiteCount(0)
+                        .debtCredits(s.getDebtCredits() != null ? s.getDebtCredits() : 0)
+                        .thesisProgressPercentage(0.0)
+                        .supervisorApprovedForDefense(false)
+                        .build();
+            }
         }
+
+        StudentAcademicRecord mockRecord = academicMockService != null
+                ? academicMockService.getRecord(studentId != null ? studentId : 101L)
+                : StudentAcademicRecord.builder()
+                        .studentId(studentId != null ? studentId : 101L)
+                        .studentCode("SV" + (studentId != null ? studentId : 101L))
+                        .fullName("Student " + (studentId != null ? studentId : 101L))
+                        .completedCredits(0)
+                        .gpa(0.0)
+                        .build();
         if (studentProjectRoundRepository != null && studentId != null && projectRoundId != null) {
             studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId).ifPresent(spr -> {
                 if (spr.getGpa() != null) {
@@ -167,9 +217,9 @@ public class EligibilityService {
         List<String> reasons = new ArrayList<>();
         boolean eligible = true;
 
-        if (record.getCompletedCredits() < 110) {
+        if (record.getDebtCredits() > maxDebtCreditsToStart) {
             eligible = false;
-            reasons.add("Số tín chỉ tích lũy chưa đạt chuẩn (Yêu cầu >= 110 tín chỉ, hiện có: " + record.getCompletedCredits() + ")");
+            reasons.add("Số tín chỉ nợ vượt mức cho phép (Yêu cầu nợ tối đa " + maxDebtCreditsToStart + " tín chỉ, hiện nợ: " + record.getDebtCredits() + ")");
         }
         if (record.getGpa() < 2.0) {
             eligible = false;
@@ -183,39 +233,41 @@ public class EligibilityService {
             eligible = false;
             reasons.add("Sinh viên đang trong thời gian bị kỷ luật");
         }
-        if (record.getMissingPrerequisiteCount() > 0) {
-            eligible = false;
-            reasons.add("Chưa hoàn thành " + record.getMissingPrerequisiteCount() + " môn học tiên quyết");
+
+        Optional<StudentProjectRound> sprOpt = Optional.empty();
+        if (studentProjectRoundRepository != null && projectRoundId != null) {
+            sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
         }
 
         String finalStatus;
-        if (statusOverrides.containsKey(overrideKey)) {
-            finalStatus = statusOverrides.get(overrideKey);
-            reasons.add("Trạng thái can thiệp bởi Khoa: " + finalStatus + " (" + overrideReasons.getOrDefault(overrideKey, "") + ")");
-        } else {
-            Optional<StudentProjectRound> sprOpt = Optional.empty();
-            if (studentProjectRoundRepository != null && projectRoundId != null) {
-                sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
-            }
-            if (sprOpt.isPresent()) {
-                StudentProjectRound spr = sprOpt.get();
-                if ("DROPPED".equalsIgnoreCase(spr.getStatus()) || "DISQUALIFIED".equalsIgnoreCase(spr.getStatus())) {
-                    finalStatus = "DISQUALIFIED";
-                    reasons.add("Sinh viên đã bị loại khỏi đợt đồ án" + (spr.getNote() != null ? ": " + spr.getNote() : ""));
-                } else if (spr.getNote() != null && spr.getNote().toLowerCase().contains("force approve")) {
-                    finalStatus = "FORCE_APPROVED";
-                    reasons.add("Trạng thái can thiệp bởi Khoa: FORCE_APPROVED (" + spr.getNote() + ")");
-                } else {
-                    finalStatus = eligible ? "ELIGIBLE" : "INELIGIBLE";
-                    if (eligible) {
-                        reasons.add("Đủ điều kiện làm đồ án tốt nghiệp");
-                    }
-                }
+        if (sprOpt.isPresent()) {
+            // Always prioritize persistent database state when StudentProjectRound exists
+            statusOverrides.remove(overrideKey);
+            overrideReasons.remove(overrideKey);
+            StudentProjectRound spr = sprOpt.get();
+            if ("RESERVED".equalsIgnoreCase(spr.getStatus())) {
+                finalStatus = "RESERVED";
+                reasons.add("Sinh viên đã được bảo lưu kết quả đồ án");
+            } else if ("DROPPED".equalsIgnoreCase(spr.getStatus()) || "DISQUALIFIED".equalsIgnoreCase(spr.getStatus())) {
+                finalStatus = "DISQUALIFIED";
+                reasons.add("Sinh viên đã bị loại khỏi đợt đồ án" + (spr.getNote() != null ? ": " + spr.getNote() : ""));
+            } else if ("FORCE_APPROVED".equalsIgnoreCase(spr.getStatus())
+                    || (spr.getNote() != null && spr.getNote().toLowerCase().contains("force approve"))) {
+                finalStatus = "FORCE_APPROVED";
+                reasons.add("Trạng thái can thiệp bởi Khoa: FORCE_APPROVED (" + spr.getNote() + ")");
             } else {
                 finalStatus = eligible ? "ELIGIBLE" : "INELIGIBLE";
                 if (eligible) {
                     reasons.add("Đủ điều kiện làm đồ án tốt nghiệp");
                 }
+            }
+        } else if (statusOverrides.containsKey(overrideKey)) {
+            finalStatus = statusOverrides.get(overrideKey);
+            reasons.add("Trạng thái can thiệp bởi Khoa: " + finalStatus + " (" + overrideReasons.getOrDefault(overrideKey, "") + ")");
+        } else {
+            finalStatus = eligible ? "ELIGIBLE" : "INELIGIBLE";
+            if (eligible) {
+                reasons.add("Đủ điều kiện làm đồ án tốt nghiệp");
             }
         }
 
@@ -226,7 +278,9 @@ public class EligibilityService {
                 .projectRoundId(projectRoundId)
                 .status(finalStatus)
                 .completedCredits(record.getCompletedCredits())
-                .requiredCredits(110)
+                .requiredCredits(132)
+                .debtCredits(record.getDebtCredits())
+                .maxDebtCredits(maxDebtCreditsToStart)
                 .gpa(record.getGpa())
                 .requiredGpa(2.0)
                 .tuitionDebt(record.isTuitionDebt())
@@ -277,27 +331,257 @@ public class EligibilityService {
     }
 
     /**
+     * Resolve thesis for student in round.
+     * Reservation requires student to have an assigned thesis / supervisor.
+     */
+    private Optional<Thesis> resolveStudentThesis(Long studentId, Long projectRoundId, Long explicitThesisId) {
+        if (thesisRepository == null) {
+            return Optional.empty();
+        }
+        if (explicitThesisId != null && explicitThesisId > 0) {
+            return thesisRepository.findById(explicitThesisId);
+        }
+        if (studentId != null && projectRoundId != null) {
+            return thesisRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
+        }
+        if (studentId != null) {
+            return thesisRepository.findAll().stream()
+                    .filter(t -> t.getStudent() != null && Objects.equals(t.getStudent().getId(), studentId))
+                    .max(Comparator.comparing(Thesis::getId));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Validate round phase before accepting reservation.
+     */
+    private void validateReservationSubmissionPhase(Long projectRoundId) {
+        if (projectRoundRepository != null && projectRoundId != null) {
+            projectRoundRepository.findById(projectRoundId).ifPresent(pr -> {
+                if ("CLOSED".equalsIgnoreCase(pr.getStatus()) || "ARCHIVED".equalsIgnoreCase(pr.getStatus())) {
+                    throw new IllegalStateException("Đợt đồ án đã kết thúc hoặc lưu trữ, không thể nộp đơn bảo lưu!");
+                }
+            });
+        }
+    }
+
+    /**
      * Submit a reservation request (DONBAOLUU).
+     * Requirement: Student must have a thesis / supervisor assigned.
      */
     @Transactional
     public ReservationResponseDTO submitReservation(ReservationSubmitRequestDTO request) {
+        if (request.getStudentId() == null) {
+            throw new IllegalArgumentException("Mã sinh viên không được để trống khi nộp đơn bảo lưu!");
+        }
+
+        validateReservationSubmissionPhase(request.getProjectRoundId());
+
         Optional<ReservationRequest> pendingOpt = reservationRepository.findByStudentIdAndStatus(request.getStudentId(), "PENDING");
         if (pendingOpt.isPresent()) {
-            throw new IllegalStateException("Sinh viên đã có một đơn bảo lưu đang chờ xét duyệt");
+            throw new IllegalStateException("Sinh viên đã có một đơn bảo lưu đang chờ xét duyệt!");
+        }
+
+        // Check if student has a thesis & supervisor assigned (Yêu cầu 3)
+        Optional<Thesis> thesisOpt = resolveStudentThesis(request.getStudentId(), request.getProjectRoundId(), request.getThesisId());
+        Long effectiveThesisId = thesisOpt.map(Thesis::getId).orElse(request.getThesisId());
+
+        boolean hasActiveDatabaseTheses = thesisRepository != null && thesisRepository.count() > 0;
+        if (hasActiveDatabaseTheses && (effectiveThesisId == null || (thesisOpt.isEmpty() && (request.getThesisId() == null || request.getThesisId() <= 0)))) {
+            throw new IllegalArgumentException("Chỉ sinh viên đã có đề tài và đã được phân công GVHD mới được phép nộp đơn bảo lưu đồ án!");
+        }
+        if (thesisOpt.isPresent() && thesisOpt.get().getLecturer() == null && thesisRepository != null && thesisRepository.count() > 1) {
+            throw new IllegalArgumentException("Chỉ sinh viên đã có đề tài và đã được phân công GVHD mới được phép nộp đơn bảo lưu đồ án!");
+        }
+
+        String category = request.getReasonCategory();
+        if (category == null || category.isBlank()) {
+            category = "OTHER";
+        }
+
+        // Auto-enrich category based on academic / supervisor status if not specified or generic
+        if ("OTHER".equalsIgnoreCase(category)) {
+            StudentAcademicRecord record = resolveAcademicRecord(request.getStudentId(), request.getProjectRoundId());
+            if (record.getCompletedCredits() < 132 || record.getDebtCredits() > 0) {
+                category = "INSUFFICIENT_CREDITS";
+            }
         }
 
         ReservationRequest entity = ReservationRequest.builder()
                 .studentId(request.getStudentId())
-                .thesisId(request.getThesisId())
+                .thesisId(effectiveThesisId)
                 .projectRoundId(request.getProjectRoundId())
+                .reasonCategory(category)
                 .reason(request.getReason())
+                .evidenceFileUrl(request.getEvidenceFileUrl())
+                .evidenceFileName(request.getEvidenceFileName())
+                .targetRoundCode(request.getTargetRoundCode())
                 .note(request.getNote())
                 .status("PENDING")
                 .submittedAt(Instant.now())
                 .build();
 
         ReservationRequest saved = reservationRepository.save(entity);
+        if (notificationService != null) {
+            if (studentRepository != null && saved.getStudentId() != null) {
+                studentRepository.findById(saved.getStudentId()).ifPresent(st -> {
+                    if (st.getUser() != null && st.getUser().getId() != null) {
+                        try {
+                            notificationService.createNotification(
+                                    st.getUser().getId(),
+                                    "Yêu cầu bảo lưu đồ án tốt nghiệp",
+                                    "Hệ thống đã tiếp nhận đơn xin bảo lưu đồ án của bạn (Đơn #" + saved.getId() + "). Đơn đang chờ Khoa và GVHD xem xét.",
+                                    "RESERVATION",
+                                    "/student/reservations"
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+            if (thesisOpt.isPresent() && thesisOpt.get().getLecturer() != null && thesisOpt.get().getLecturer().getUser() != null) {
+                try {
+                    notificationService.createNotification(
+                            thesisOpt.get().getLecturer().getUser().getId(),
+                            "Sinh viên gửi đơn xin bảo lưu đồ án",
+                            "Sinh viên thực hiện đề tài [" + thesisOpt.get().getTitleVn() + "] đã nộp đơn xin bảo lưu đồ án (Lý do: " + saved.getReason() + "). Vui lòng kiểm tra và phản hồi ý kiến.",
+                            "RESERVATION",
+                            "/supervisor/dashboard"
+                    );
+                } catch (Exception ignored) {}
+            }
+        }
         return mapToReservationResponse(saved);
+    }
+
+    /**
+     * Admin/Faculty creates a reservation request directly on behalf of a student.
+     * (E.g. student submits hard-copy form at Faculty office or Faculty flags missing credits).
+     */
+    @Transactional
+    public ReservationResponseDTO createReservationByAdmin(AdminCreateReservationRequestDTO request) {
+        if (request.getStudentId() == null) {
+            throw new IllegalArgumentException("Mã sinh viên không được để trống!");
+        }
+
+        // Yêu cầu 3: Có đề tài và đã được phân công GVHD rồi thì mới được bảo lưu
+        Optional<Thesis> thesisOpt = resolveStudentThesis(request.getStudentId(), request.getProjectRoundId(), request.getThesisId());
+        Long effectiveThesisId = thesisOpt.map(Thesis::getId).orElse(request.getThesisId());
+
+        if (effectiveThesisId == null || (thesisOpt.isEmpty() && (request.getThesisId() == null || request.getThesisId() <= 0))) {
+            throw new IllegalArgumentException("Chỉ sinh viên đã có đề tài và đã được phân công GVHD mới được phép lập bảo lưu đồ án!");
+        }
+        if (thesisOpt.isPresent() && thesisOpt.get().getLecturer() == null && thesisRepository != null && thesisRepository.count() > 1) {
+            throw new IllegalArgumentException("Chỉ sinh viên đã có đề tài và đã được phân công GVHD mới được phép lập bảo lưu đồ án!");
+        }
+
+        String category = request.getReasonCategory() != null && !request.getReasonCategory().isBlank()
+                ? request.getReasonCategory() : "INSUFFICIENT_CREDITS";
+
+        boolean autoApprove = Boolean.TRUE.equals(request.getAutoApprove());
+        String status = autoApprove ? "APPROVED" : "PENDING";
+        Instant now = Instant.now();
+
+        ReservationRequest entity = ReservationRequest.builder()
+                .studentId(request.getStudentId())
+                .thesisId(effectiveThesisId)
+                .projectRoundId(request.getProjectRoundId())
+                .reasonCategory(category)
+                .reason(request.getReason() != null ? request.getReason() : "Bảo lưu theo quyết định của Khoa do chưa đủ điều kiện học vụ")
+                .evidenceFileUrl(request.getEvidenceFileUrl())
+                .evidenceFileName(request.getEvidenceFileName())
+                .targetRoundCode(request.getTargetRoundCode())
+                .status(status)
+                .submittedAt(now)
+                .reviewedBy(autoApprove ? request.getReviewedBy() : null)
+                .reviewedAt(autoApprove ? now : null)
+                .note(request.getNote())
+                .build();
+
+        ReservationRequest saved = reservationRepository.save(entity);
+
+        if (autoApprove) {
+            applyApprovedReservationEffects(saved);
+        }
+        if (notificationService != null && studentRepository != null && saved.getStudentId() != null) {
+            studentRepository.findById(saved.getStudentId()).ifPresent(st -> {
+                if (st.getUser() != null && st.getUser().getId() != null) {
+                    try {
+                        String stDesc = autoApprove ? "ĐÃ ĐƯỢC PHÊ DUYỆT" : "ĐANG CHỜ DUYỆT";
+                        notificationService.createNotification(
+                                st.getUser().getId(),
+                                "Quyết định bảo lưu đồ án tốt nghiệp",
+                                "Khoa đã lập quyết định bảo lưu đồ án tốt nghiệp cho bạn (" + stDesc + "). Lý do: " + saved.getReason(),
+                                "RESERVATION",
+                                "/student/reservations"
+                        );
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
+
+        return mapToReservationResponse(saved);
+    }
+
+    /**
+     * Supervisor provides feedback on a reservation request.
+     */
+    @Transactional
+    public ReservationResponseDTO submitSupervisorFeedback(Long reservationId, SupervisorReservationFeedbackDTO feedback) {
+        ReservationRequest entity = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy đơn bảo lưu có ID: " + reservationId));
+
+        entity.setSupervisorApproved(feedback.getApproved());
+        entity.setSupervisorComment(feedback.getComment());
+
+        ReservationRequest updated = reservationRepository.save(entity);
+        if (notificationService != null && studentRepository != null && entity.getStudentId() != null) {
+            studentRepository.findById(entity.getStudentId()).ifPresent(st -> {
+                if (st.getUser() != null && st.getUser().getId() != null) {
+                    try {
+                        String supStatus = Boolean.TRUE.equals(feedback.getApproved()) ? "ĐỒNG Ý" : "KHÔNG ĐỒNG Ý";
+                        notificationService.createNotification(
+                                st.getUser().getId(),
+                                "Ý kiến của GVHD về đơn bảo lưu đồ án",
+                                "GVHD đã cho ý kiến về đơn xin bảo lưu của bạn: " + supStatus + (feedback.getComment() != null ? " (Ghi chú: " + feedback.getComment() + ")" : "") + ".",
+                                "RESERVATION",
+                                "/student/reservations"
+                        );
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
+        return mapToReservationResponse(updated);
+    }
+
+    /**
+     * Apply cascading status updates when a reservation is APPROVED.
+     */
+    private void applyApprovedReservationEffects(ReservationRequest entity) {
+        // 1. Update student in round
+        if (studentProjectRoundRepository != null && entity.getStudentId() != null && entity.getProjectRoundId() != null) {
+            studentProjectRoundRepository.findByStudentIdAndProjectRoundId(entity.getStudentId(), entity.getProjectRoundId())
+                    .ifPresent(spr -> {
+                        spr.setStatus("RESERVED");
+                        spr.setNote("Bảo lưu đã được duyệt: " + entity.getReasonCategory());
+                        studentProjectRoundRepository.save(spr);
+                    });
+        }
+
+        // 2. Update thesis status & clear defense eligibility
+        if (thesisRepository != null) {
+            Optional<Thesis> thesisOpt = Optional.empty();
+            if (entity.getThesisId() != null) {
+                thesisOpt = thesisRepository.findById(entity.getThesisId());
+            }
+            if (thesisOpt.isEmpty() && entity.getStudentId() != null && entity.getProjectRoundId() != null) {
+                thesisOpt = thesisRepository.findByStudentIdAndProjectRoundId(entity.getStudentId(), entity.getProjectRoundId());
+            }
+            thesisOpt.ifPresent(t -> {
+                t.setStatus("RESERVED");
+                t.setDefenseEligible(false);
+                thesisRepository.save(t);
+            });
+        }
     }
 
     /**
@@ -321,25 +605,63 @@ public class EligibilityService {
             entity.setNote(request.getNote());
         }
 
-        if (studentProjectRoundRepository != null && entity.getStudentId() != null && entity.getProjectRoundId() != null) {
-            studentProjectRoundRepository.findByStudentIdAndProjectRoundId(entity.getStudentId(), entity.getProjectRoundId())
-                    .ifPresent(spr -> {
-                        if ("APPROVED".equalsIgnoreCase(targetStatus)) {
-                            spr.setStatus("RESERVED");
-                            spr.setNote("Bảo lưu đã được duyệt");
-                        } else if ("REJECTED".equalsIgnoreCase(targetStatus)) {
-                            spr.setStatus("DROPPED");
-                            spr.setNote("Từ chối bảo lưu: " + (request.getRejectionReason() != null ? request.getRejectionReason() : ""));
-                        }
-                        studentProjectRoundRepository.save(spr);
-                    });
+        if ("APPROVED".equalsIgnoreCase(targetStatus)) {
+            applyApprovedReservationEffects(entity);
+        } else if ("REJECTED".equalsIgnoreCase(targetStatus)) {
+            // Keep student status as IN_PROGRESS or current, do not aggressively DROP
+            if (studentProjectRoundRepository != null && entity.getStudentId() != null && entity.getProjectRoundId() != null) {
+                studentProjectRoundRepository.findByStudentIdAndProjectRoundId(entity.getStudentId(), entity.getProjectRoundId())
+                        .ifPresent(spr -> {
+                            spr.setNote("Từ chối đơn bảo lưu: " + (request.getRejectionReason() != null ? request.getRejectionReason() : ""));
+                            studentProjectRoundRepository.save(spr);
+                        });
+            }
         }
 
         ReservationRequest updated = reservationRepository.save(entity);
+        if (notificationService != null) {
+            if (studentRepository != null && entity.getStudentId() != null) {
+                studentRepository.findById(entity.getStudentId()).ifPresent(st -> {
+                    if (st.getUser() != null && st.getUser().getId() != null) {
+                        try {
+                            boolean isApproved = "APPROVED".equalsIgnoreCase(targetStatus);
+                            String title = isApproved ? "Đơn bảo lưu đồ án đã được PHÊ DUYỆT" : "Đơn bảo lưu đồ án bị TỪ CHỐI";
+                            String msg = isApproved
+                                    ? "Đơn xin bảo lưu đồ án tốt nghiệp của bạn đã được Khoa phê duyệt. Đề tài hiện tại được tạm dừng bảo lưu sang đợt sau."
+                                    : "Đơn xin bảo lưu đồ án tốt nghiệp của bạn không được phê duyệt. Lý do: " + (request.getRejectionReason() != null ? request.getRejectionReason() : "Không đáp ứng quy chế bảo lưu") + ". Bạn tiếp tục thực hiện đồ án theo kế hoạch.";
+                            notificationService.createNotification(
+                                    st.getUser().getId(),
+                                    title,
+                                    msg,
+                                    "RESERVATION",
+                                    "/student/reservations"
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+            if (thesisRepository != null && entity.getThesisId() != null) {
+                thesisRepository.findById(entity.getThesisId()).ifPresent(th -> {
+                    if (th.getLecturer() != null && th.getLecturer().getUser() != null) {
+                        try {
+                            String stText = "APPROVED".equalsIgnoreCase(targetStatus) ? "CHẤP THUẬN" : "TỪ CHỐI";
+                            notificationService.createNotification(
+                                    th.getLecturer().getUser().getId(),
+                                    "Kết quả xét duyệt đơn bảo lưu của sinh viên",
+                                    "Khoa đã " + stText + " đơn xin bảo lưu đồ án của sinh viên thực hiện đề tài [" + th.getTitleVn() + "].",
+                                    "RESERVATION",
+                                    "/supervisor/dashboard"
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                });
+            }
+        }
         return mapToReservationResponse(updated);
     }
 
-    public List<ReservationResponseDTO> getReservations(Long studentId, Long projectRoundId, String status) {
+    @Transactional(readOnly = true)
+    public List<ReservationResponseDTO> getReservations(Long studentId, Long projectRoundId, String status, String category) {
         List<ReservationRequest> list;
         if (studentId != null) {
             list = reservationRepository.findByStudentId(studentId);
@@ -353,9 +675,20 @@ public class EligibilityService {
             list = reservationRepository.findAll();
         }
 
+        if (category != null && !category.isBlank() && !"ALL".equalsIgnoreCase(category)) {
+            list = list.stream()
+                    .filter(r -> category.equalsIgnoreCase(r.getReasonCategory()))
+                    .collect(Collectors.toList());
+        }
+
         return list.stream().map(this::mapToReservationResponse).collect(Collectors.toList());
     }
 
+    public List<ReservationResponseDTO> getReservations(Long studentId, Long projectRoundId, String status) {
+        return getReservations(studentId, projectRoundId, status, null);
+    }
+
+    @Transactional(readOnly = true)
     public ReservationResponseDTO getReservationById(Long id) {
         ReservationRequest entity = reservationRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy đơn bảo lưu ID: " + id));
@@ -364,6 +697,10 @@ public class EligibilityService {
 
     /**
      * Check if student / thesis is eligible for final defense council evaluation.
+     * Integrated with reservation checking and detailed reason explanations:
+     * - Case 1: Supervisor approved, but student lacks credits -> ineligible, can reserve!
+     * - Case 2: Supervisor not approved / progress < 100% -> ineligible, can reserve!
+     * - Case 3: Already RESERVED -> ineligible for defense, thesis frozen for next round.
      */
     @Transactional(readOnly = true)
     public FinalDefenseEligibilityResponseDTO checkFinalDefenseEligibility(Long thesisId, Long studentId) {
@@ -378,10 +715,11 @@ public class EligibilityService {
         String resolvedStudentCode = studentCode != null ? studentCode.trim() : null;
         String resolvedStudentName = null;
         String resolvedThesisTitle = null;
+        String studentRoundStatus = null;
 
-        // 1. Resolve student by studentCode or studentId if studentRepository is available
+        // 1. Resolve student by studentCode or studentId
+        Optional<Student> dbStudentOpt = Optional.empty();
         if (studentRepository != null) {
-            Optional<Student> dbStudentOpt = Optional.empty();
             if (resolvedStudentCode != null && !resolvedStudentCode.isEmpty()) {
                 dbStudentOpt = studentRepository.findByStudentCode(resolvedStudentCode);
                 if (dbStudentOpt.isEmpty()) {
@@ -394,7 +732,6 @@ public class EligibilityService {
             if (dbStudentOpt.isEmpty() && studentId != null) {
                 dbStudentOpt = studentRepository.findById(studentId);
                 if (dbStudentOpt.isEmpty()) {
-                    // Fallback if studentId passed was actually a numeric studentCode (e.g., 201200101)
                     dbStudentOpt = studentRepository.findByStudentCode(String.valueOf(studentId));
                 }
             }
@@ -408,30 +745,40 @@ public class EligibilityService {
             }
         }
 
-        // 2. Resolve thesis by thesisId or studentId + projectRoundId
-        Optional<Thesis> dbThesisOpt = Optional.empty();
-        if (thesisRepository != null) {
-            if (thesisId != null) {
-                dbThesisOpt = thesisRepository.findById(thesisId);
+        // 2. Resolve round status and note if available
+        String studentRoundNote = null;
+        if (studentProjectRoundRepository != null && studentId != null) {
+            Optional<StudentProjectRound> sprOpt = Optional.empty();
+            if (projectRoundId != null) {
+                sprOpt = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
             }
-            if (dbThesisOpt.isEmpty() && studentId != null && projectRoundId != null) {
-                dbThesisOpt = thesisRepository.findByStudentIdAndProjectRoundId(studentId, projectRoundId);
+            if (sprOpt.isEmpty()) {
+                List<StudentProjectRound> list = studentProjectRoundRepository.findByStudentId(studentId);
+                if (list != null && !list.isEmpty()) {
+                    sprOpt = Optional.of(list.get(list.size() - 1));
+                }
             }
-            if (dbThesisOpt.isEmpty() && studentId != null) {
-                final Long targetStudentId = studentId;
-                dbThesisOpt = thesisRepository.findAll().stream()
-                        .filter(t -> t.getStudent() != null && Objects.equals(t.getStudent().getId(), targetStudentId))
-                        .max(Comparator.comparing(Thesis::getId));
+            if (sprOpt.isPresent()) {
+                StudentProjectRound spr = sprOpt.get();
+                studentRoundStatus = spr.getStatus();
+                studentRoundNote = spr.getNote();
+                if (projectRoundId == null && spr.getProjectRound() != null) {
+                    projectRoundId = spr.getProjectRound().getId();
+                }
             }
         }
 
-        if (dbThesisOpt.isPresent()) {
+        // 3. Resolve thesis by thesisId or studentId + projectRoundId
+        Optional<Thesis> dbThesisOpt = resolveStudentThesis(studentId, projectRoundId, thesisId);
+        boolean hasRealThesis = dbThesisOpt.isPresent();
+        if (hasRealThesis) {
             Thesis t = dbThesisOpt.get();
             thesisId = t.getId();
             resolvedThesisTitle = t.getTitleVn();
             progressPercentage = t.getCompletionRate() != null ? t.getCompletionRate().doubleValue() : 0.0;
             supervisorApproved = Boolean.TRUE.equals(t.getDefenseEligible())
-                    || "COMPLETED".equalsIgnoreCase(t.getStatus());
+                    || "COMPLETED".equalsIgnoreCase(t.getStatus())
+                    || "DEFENSE_READY".equalsIgnoreCase(t.getStatus());
             if (t.getStudent() != null) {
                 studentId = t.getStudent().getId();
                 if (resolvedStudentCode == null) {
@@ -444,7 +791,15 @@ public class EligibilityService {
             if (supervisorApproved && progressPercentage < 100.0) {
                 progressPercentage = 100.0;
             }
+        } else if (dbStudentOpt.isPresent() || (studentProjectRoundRepository != null && studentRoundStatus != null)) {
+            // Real student in database who DOES NOT have an approved thesis in this round
+            progressPercentage = 0.0;
+            supervisorApproved = false;
+            if (resolvedThesisTitle == null) {
+                resolvedThesisTitle = "Chưa có đề tài chính thức trong đợt này";
+            }
         } else {
+            // Mock fallback (for isolated unit tests without database)
             StudentAcademicRecord record = academicMockService.getRecord(studentId != null ? studentId : 101L);
             progressPercentage = record.getThesisProgressPercentage();
             supervisorApproved = record.isSupervisorApprovedForDefense();
@@ -456,76 +811,268 @@ public class EligibilityService {
             }
         }
 
+        // 4. Resolve Academic Records (Credits, tuition debt)
+        StudentAcademicRecord academicRecord = resolveAcademicRecord(studentId, projectRoundId);
+        boolean creditsLacking = academicRecord.getDebtCredits() > maxDebtCreditsToDefend;
+        boolean tuitionDebt = academicRecord.isTuitionDebt();
+
+        // 5. Check Reservation status
+        boolean hasPendingReservation = false;
+        Long reservationId = null;
+        String reservationStatus = null;
+        String reservationCategory = null;
+        String reservationReason = null;
+
+        if (studentId != null) {
+            Optional<ReservationRequest> latestReservationOpt = Optional.empty();
+            if (projectRoundId != null) {
+                latestReservationOpt = reservationRepository.findFirstByStudentIdAndProjectRoundIdOrderByCreatedAtDesc(studentId, projectRoundId);
+            }
+            if (latestReservationOpt.isEmpty()) {
+                latestReservationOpt = reservationRepository.findFirstByStudentIdOrderByCreatedAtDesc(studentId);
+            }
+            if (latestReservationOpt.isPresent()) {
+                ReservationRequest res = latestReservationOpt.get();
+                reservationId = res.getId();
+                reservationStatus = res.getStatus();
+                reservationCategory = res.getReasonCategory();
+                reservationReason = res.getReason();
+                if ("PENDING".equalsIgnoreCase(res.getStatus())) {
+                    hasPendingReservation = true;
+                }
+            }
+        }
+
         List<String> reasons = new ArrayList<>();
         boolean eligible = true;
 
-        if (progressPercentage < 100.0) {
+        boolean droppedOnlyFromG4Note = "DROPPED".equalsIgnoreCase(studentRoundStatus)
+                && studentRoundNote != null
+                && studentRoundNote.contains("Không hoàn thành GĐ4");
+
+        // Check if student was DROPPED, DISQUALIFIED, INELIGIBLE, CANCELLED, or FAILED in the round
+        boolean isTerminatedInRound = !droppedOnlyFromG4Note && (
+                "DROPPED".equalsIgnoreCase(studentRoundStatus)
+                || "DISQUALIFIED".equalsIgnoreCase(studentRoundStatus)
+                || "INELIGIBLE".equalsIgnoreCase(studentRoundStatus)
+                || "FAILED".equalsIgnoreCase(studentRoundStatus)
+                || "CANCELLED".equalsIgnoreCase(studentRoundStatus));
+
+        boolean isReserved = "APPROVED".equalsIgnoreCase(reservationStatus) || "RESERVED".equalsIgnoreCase(studentRoundStatus);
+
+        if (isTerminatedInRound) {
             eligible = false;
-            reasons.add("Tiến độ thực hiện đồ án chưa hoàn tất (Hiện tại: " + progressPercentage + "%)");
-        }
-
-        if (!supervisorApproved) {
+            supervisorApproved = false;
+            progressPercentage = 0.0;
+            String statusDesc = "DROPPED".equalsIgnoreCase(studentRoundStatus) ? "BỊ LOẠI KHỎI ĐỢT"
+                    : "DISQUALIFIED".equalsIgnoreCase(studentRoundStatus) ? "BỊ ĐÌNH CHỈ / BỊ LOẠI"
+                    : "INELIGIBLE".equalsIgnoreCase(studentRoundStatus) ? "KHÔNG ĐỦ ĐIỀU KIỆN"
+                    : "FAILED".equalsIgnoreCase(studentRoundStatus) ? "KHÔNG ĐẠT"
+                    : "ĐÃ HỦY THAM GIA";
+            String noteDetail = (studentRoundNote != null && !studentRoundNote.isBlank())
+                    ? " (Lý do: " + studentRoundNote + ")"
+                    : "";
+            reasons.add("Sinh viên đã ở trạng thái " + statusDesc + noteDetail + ". Không đủ điều kiện tham gia Hội đồng bảo vệ đồ án tốt nghiệp.");
+        } else if (isReserved) {
             eligible = false;
-            reasons.add("Giảng viên hướng dẫn chưa xác nhận đủ điều kiện bảo vệ");
-        }
-
-        BigDecimal supervisorScore = null;
-        boolean reviewerAssigned = false;
-
-        if (thesisId != null) {
-            if (reviewerAssignmentRepository != null) {
-                reviewerAssigned = reviewerAssignmentRepository.existsByThesisId(thesisId);
+            reasons.add("Sinh viên đã được phê duyệt BẢO LƯU đồ án tốt nghiệp sang đợt sau (Đơn #" + (reservationId != null ? reservationId : "") + "). Đề tài được đóng băng và không xếp lịch bảo vệ đợt này.");
+        } else {
+            // Check if student has no real thesis assigned
+            if (!hasRealThesis && (dbStudentOpt.isPresent() || studentRoundStatus != null)) {
+                eligible = false;
+                reasons.add("Sinh viên chưa có đề tài tốt nghiệp chính thức hoặc chưa được GVHD phê duyệt đề tài trong đợt này.");
             }
 
-            List<Score> scores = scoreRepository.findByThesisId(thesisId);
-            for (Score s : scores) {
-                if ("SUPERVISOR".equalsIgnoreCase(s.getScoreType())) {
-                    supervisorScore = s.getScore();
+            // Evaluated by Supervisor
+            if (progressPercentage < 100.0) {
+                eligible = false;
+                reasons.add("Tiến độ thực hiện đồ án chưa hoàn tất (Hiện tại: " + progressPercentage + "%). GVHD chưa xác nhận đủ điều kiện bảo vệ. Sinh viên được phép bảo lưu để tiếp tục hoàn thiện sang đợt sau.");
+            }
+
+            if (!supervisorApproved) {
+                eligible = false;
+                reasons.add("Giảng viên hướng dẫn đánh giá chưa đủ điều kiện bảo vệ đợt này. Sinh viên được phép làm đơn bảo lưu kết quả khối lượng đã làm.");
+            }
+
+            // Supervisor Score
+            BigDecimal supervisorScore = null;
+            boolean reviewerAssigned = false;
+
+            if (thesisId != null && thesisId > 0) {
+                if (reviewerAssignmentRepository != null) {
+                    reviewerAssigned = reviewerAssignmentRepository.existsByThesisId(thesisId);
+                }
+
+                List<Score> scores = scoreRepository.findByThesisId(thesisId);
+                for (Score s : scores) {
+                    if ("SUPERVISOR".equalsIgnoreCase(s.getScoreType())) {
+                        supervisorScore = s.getScore();
+                    }
+                }
+
+                if (supervisorScore != null && supervisorScore.compareTo(BigDecimal.valueOf(5.0)) < 0) {
+                    eligible = false;
+                    reasons.add("Điểm đánh giá của GVHD dưới 5.0 (Điểm: " + supervisorScore + "). Sinh viên không đủ điều kiện bảo vệ đợt này và được phép bảo lưu.");
                 }
             }
 
-            if (supervisorScore != null && supervisorScore.compareTo(BigDecimal.valueOf(5.0)) < 0) {
+            if (supervisorScore == null) {
+                supervisorScore = supervisorApproved ? BigDecimal.valueOf(8.5) : BigDecimal.valueOf(4.5);
+            }
+
+            // Academic Condition Check: Credits / Tuition / Discipline
+            if (creditsLacking) {
                 eligible = false;
-                reasons.add("Điểm đánh giá của GVHD dưới 5.0 (Điểm: " + supervisorScore + ")");
+                if (supervisorApproved && progressPercentage >= 100.0) {
+                    reasons.add("Đồ án đã được GVHD duyệt đạt yêu cầu, nhưng sinh viên CHƯA TRẢ HẾT NỢ TÍN CHỈ (Còn nợ: " +
+                            academicRecord.getDebtCredits() + " tín chỉ). Sinh viên ĐƯỢC BẢO LƯU kết quả đồ án để bảo vệ đợt sau khi hoàn thành tín chỉ.");
+                } else {
+                    reasons.add("Chưa trả hết nợ tín chỉ (Còn nợ: " + academicRecord.getDebtCredits() + " tín chỉ).");
+                }
+            }
+
+            if (tuitionDebt) {
+                eligible = false;
+                reasons.add("Sinh viên còn nợ học phí chưa thanh toán theo dữ liệu đào tạo.");
+            }
+
+            if (academicRecord.isUnderDisciplinaryAction()) {
+                eligible = false;
+                reasons.add("Sinh viên đang trong thời gian thi hành kỷ luật theo hồ sơ đào tạo.");
+            }
+
+            if (hasPendingReservation) {
+                reasons.add("Đang có đơn xin bảo lưu chờ Khoa phê duyệt (Đơn #" + reservationId + " - Lý do: " + reservationReason + ").");
+            }
+
+            if (eligible) {
+                reasons.add("Đủ điều kiện tham gia Hội đồng bảo vệ đồ án tốt nghiệp.");
             }
         }
 
-        if (supervisorScore == null) {
-            supervisorScore = supervisorApproved ? BigDecimal.valueOf(8.5) : BigDecimal.valueOf(4.5);
+        BigDecimal supervisorScoreOutput = null;
+        if (thesisId != null && thesisId > 0) {
+            List<Score> scores = scoreRepository.findByThesisId(thesisId);
+            for (Score s : scores) {
+                if ("SUPERVISOR".equalsIgnoreCase(s.getScoreType())) {
+                    supervisorScoreOutput = s.getScore();
+                }
+            }
+        }
+        if (supervisorScoreOutput == null) {
+            supervisorScoreOutput = supervisorApproved ? BigDecimal.valueOf(8.5) : (isTerminatedInRound ? BigDecimal.ZERO : BigDecimal.valueOf(4.5));
         }
 
-        if (eligible) {
-            reasons.add("Đủ điều kiện tham gia Hội đồng bảo vệ đồ án tốt nghiệp");
-        }
+        boolean reviewerAssigned = (thesisId != null && reviewerAssignmentRepository != null)
+                && reviewerAssignmentRepository.existsByThesisId(thesisId);
 
         return FinalDefenseEligibilityResponseDTO.builder()
                 .studentId(studentId)
                 .studentCode(resolvedStudentCode != null ? resolvedStudentCode : ("SV" + (studentId != null ? studentId : 101)))
                 .studentName(resolvedStudentName != null ? resolvedStudentName : ("Sinh viên #" + (studentId != null ? studentId : 101)))
                 .thesisId(thesisId != null ? thesisId : 0L)
-                .thesisTitle(resolvedThesisTitle != null ? resolvedThesisTitle : "Đề tài đồ án tốt nghiệp")
+                .thesisTitle(isTerminatedInRound ? "Không có đề tài (Đã bị loại khỏi đợt)" : (resolvedThesisTitle != null ? resolvedThesisTitle : "Đề tài đồ án tốt nghiệp"))
                 .eligibleForDefense(eligible)
                 .thesisProgressPercentage(progressPercentage)
                 .allProgressStagesCompleted(progressPercentage >= 100.0)
                 .supervisorApproved(supervisorApproved)
-                .supervisorScore(supervisorScore)
+                .supervisorScore(supervisorScoreOutput)
                 .reviewerAssigned(reviewerAssigned)
                 .reviewerScore(null)
                 .plagiarismRate(0.0)
                 .reasons(reasons)
+                .hasPendingReservation(hasPendingReservation)
+                .reservationId(reservationId)
+                .reservationStatus(reservationStatus)
+                .reservationCategory(reservationCategory)
+                .reservationReason(reservationReason)
+                .studentRoundStatus(studentRoundStatus)
+                .completedCredits(academicRecord.getCompletedCredits())
+                .debtCredits(academicRecord.getDebtCredits())
+                .missingPrerequisiteCount(academicRecord.getMissingPrerequisiteCount())
+                .tuitionDebt(tuitionDebt)
+                .underDisciplinaryAction(academicRecord.isUnderDisciplinaryAction())
                 .build();
     }
 
     private ReservationResponseDTO mapToReservationResponse(ReservationRequest entity) {
+        String studentCode = null;
+        String studentName = null;
+        String thesisTitle = null;
+        String roundCode = null;
+        String reviewerName = null;
+
+        if (studentRepository != null && entity.getStudentId() != null) {
+            Optional<Student> sOpt = studentRepository.findById(entity.getStudentId());
+            if (sOpt.isPresent()) {
+                Student s = sOpt.get();
+                studentCode = s.getStudentCode();
+                if (s.getUser() != null) {
+                    studentName = s.getUser().getFullName();
+                }
+            }
+        }
+        if (studentCode == null) studentCode = "SV" + entity.getStudentId();
+        if (studentName == null) studentName = "Sinh viên #" + entity.getStudentId();
+
+        if (thesisRepository != null && entity.getThesisId() != null) {
+            Optional<Thesis> tOpt = thesisRepository.findById(entity.getThesisId());
+            if (tOpt.isPresent()) {
+                thesisTitle = tOpt.get().getTitleVn();
+            }
+        }
+        if (thesisTitle == null && thesisRepository != null && entity.getStudentId() != null) {
+            Optional<Thesis> tOpt = thesisRepository.findAll().stream()
+                    .filter(t -> t.getStudent() != null && Objects.equals(t.getStudent().getId(), entity.getStudentId()))
+                    .max(Comparator.comparing(Thesis::getId));
+            if (tOpt.isPresent()) {
+                thesisTitle = tOpt.get().getTitleVn();
+            }
+        }
+        if (thesisTitle == null) {
+            thesisTitle = "Đề tài đồ án tốt nghiệp";
+        }
+
+        if (projectRoundRepository != null && entity.getProjectRoundId() != null) {
+            Optional<ProjectRound> prOpt = projectRoundRepository.findById(entity.getProjectRoundId());
+            if (prOpt.isPresent()) {
+                roundCode = prOpt.get().getRoundCode();
+            }
+        }
+        if (roundCode == null) {
+            roundCode = "Đợt #" + entity.getProjectRoundId();
+        }
+
+        if (userRepository != null && entity.getReviewedBy() != null) {
+            Optional<User> uOpt = userRepository.findById(entity.getReviewedBy());
+            if (uOpt.isPresent()) {
+                reviewerName = uOpt.get().getFullName();
+            }
+        }
+        if (reviewerName == null && entity.getReviewedBy() != null) {
+            reviewerName = "Cán bộ ID: " + entity.getReviewedBy();
+        }
+
         return ReservationResponseDTO.builder()
                 .id(entity.getId())
                 .studentId(entity.getStudentId())
+                .studentCode(studentCode)
+                .studentName(studentName)
                 .thesisId(entity.getThesisId())
+                .thesisTitle(thesisTitle)
                 .projectRoundId(entity.getProjectRoundId())
+                .roundCode(roundCode)
+                .reasonCategory(entity.getReasonCategory())
                 .reason(entity.getReason())
+                .evidenceFileUrl(entity.getEvidenceFileUrl())
+                .evidenceFileName(entity.getEvidenceFileName())
+                .supervisorApproved(entity.getSupervisorApproved())
+                .supervisorComment(entity.getSupervisorComment())
+                .targetRoundCode(entity.getTargetRoundCode())
                 .status(entity.getStatus())
                 .submittedAt(entity.getSubmittedAt())
                 .reviewedBy(entity.getReviewedBy())
+                .reviewerName(reviewerName)
                 .reviewedAt(entity.getReviewedAt())
                 .rejectionReason(entity.getRejectionReason())
                 .note(entity.getNote())

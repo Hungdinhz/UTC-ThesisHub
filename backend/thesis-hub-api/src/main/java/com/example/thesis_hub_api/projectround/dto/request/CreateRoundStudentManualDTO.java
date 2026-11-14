@@ -30,8 +30,26 @@ public class CreateRoundStudentManualDTO {
 
     private Double gpa;
 
+    private Integer completedCredits;
+
+    private Integer debtCredits;
+
+    private Boolean tuitionDebt;
+
+    private Boolean underDisciplinaryAction;
+
+    private Integer missingPrerequisiteCount;
+
     @Builder.Default
     private String status = "ELIGIBLE";
 
     private String note;
+
+    /**
+     * Tùy chọn cấp mật khẩu mặc định cho tài khoản sinh viên mới:
+     * - PHONE: Số điện thoại (mặc định; nếu thiếu SĐT sẽ tự dùng Mã SV)
+     * - STUDENT_CODE: Mã sinh viên (MSSV)
+     */
+    @Builder.Default
+    private String passwordMode = "PHONE";
 }

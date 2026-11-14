@@ -16,6 +16,7 @@ import UTCFypTimeline from '../components/UTCFypTimeline';
 import UTCEvaluationSheetModal from '../components/UTCEvaluationSheetModal';
 import { UTCSupervisorGraduationView } from '../components/UTCSupervisorGraduationView';
 import { SkeletonProfile, SkeletonEvaluationGrid } from '../components/SkeletonLoader';
+import { toast } from '../components/Toast';
 import './Dashboard.css';
 import '../components/EvaluationForm.css';
 import '../components/DocumentReview.css';
@@ -80,10 +81,10 @@ const SupervisorDashboard: React.FC = () => {
     try {
       await apiService.respondToSupervisorRequest(id, 'accepted');
       await loadSupervisorRequests(); // Reload requests
-      alert('Request accepted successfully!');
+      toast.success('Đã chấp nhận yêu cầu hướng dẫn thành công!');
     } catch (error: any) {
       console.error('Failed to accept request:', error);
-      alert(error.response?.data?.message || 'Failed to accept request');
+      toast.error(error.response?.data?.message || 'Không thể chấp nhận yêu cầu');
     }
   };
 
@@ -91,10 +92,10 @@ const SupervisorDashboard: React.FC = () => {
     try {
       await apiService.respondToSupervisorRequest(id, 'rejected');
       await loadSupervisorRequests(); // Reload requests
-      alert('Request rejected');
+      toast.info('Đã từ chối yêu cầu hướng dẫn.');
     } catch (error: any) {
       console.error('Failed to reject request:', error);
-      alert(error.response?.data?.message || 'Failed to reject request');
+      toast.error(error.response?.data?.message || 'Không thể từ chối yêu cầu');
     }
   };
 
@@ -120,10 +121,10 @@ const SupervisorDashboard: React.FC = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
-      alert('Report exported successfully!');
+      toast.success('Xuất báo cáo thành công!');
     } catch (error: any) {
       console.error('Failed to export report:', error);
-      alert(error.response?.data?.message || 'Failed to export report. Please try again.');
+      toast.error(error.response?.data?.message || 'Lỗi khi xuất báo cáo. Vui lòng thử lại.');
     } finally {
       setExporting(false);
     }
@@ -154,10 +155,10 @@ const SupervisorDashboard: React.FC = () => {
       });
       setProfile(updatedProfile);
       setIsEditingProfile(false);
-      alert('Profile updated successfully!');
+      toast.success('Cập nhật hồ sơ thành công!');
     } catch (error: any) {
       console.error('Failed to update profile:', error);
-      alert(error.response?.data?.message || 'Failed to update profile. Please try again.');
+      toast.error(error.response?.data?.message || 'Không thể cập nhật hồ sơ. Vui lòng thử lại.');
     } finally {
       setSavingProfile(false);
     }

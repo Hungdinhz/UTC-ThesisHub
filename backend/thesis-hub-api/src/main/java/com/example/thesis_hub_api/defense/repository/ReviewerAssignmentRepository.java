@@ -4,6 +4,7 @@ import com.example.thesis_hub_api.defense.entity.ReviewerAssignment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,8 @@ import java.util.Optional;
 public interface ReviewerAssignmentRepository extends JpaRepository<ReviewerAssignment, Long> {
 
     Optional<ReviewerAssignment> findByThesisId(Long thesisId);
+
+    List<ReviewerAssignment> findByThesisIdIn(Collection<Long> thesisIds);
 
     List<ReviewerAssignment> findByReviewerId(Long reviewerId);
 

@@ -72,6 +72,7 @@ export const ChatGroupPage: React.FC = () => {
     fetchMessages(selectedRoom, true);
 
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       fetchMessages(selectedRoom, false);
     }, 4000);
 

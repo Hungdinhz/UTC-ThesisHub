@@ -33,8 +33,9 @@ public class Proposal {
     @JoinColumn(name = "project_round_id", nullable = false)
     private ProjectRound projectRound;
 
+    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id", nullable = false)
+    @JoinColumn(name = "student_id", nullable = true)
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -76,6 +77,18 @@ public class Proposal {
 
     @Column(name = "supervisor_comment", columnDefinition = "TEXT")
     private String supervisorComment;
+
+    @Column(name = "rebuttal_notes", columnDefinition = "TEXT")
+    private String rebuttalNotes;
+
+    @Column(name = "revision_checklist", columnDefinition = "TEXT")
+    private String revisionChecklist;
+
+    @Column(name = "council_comment", columnDefinition = "TEXT")
+    private String councilComment;
+
+    @Column(name = "revision_deadline")
+    private Instant revisionDeadline;
 
     @Column(nullable = false)
     @Builder.Default

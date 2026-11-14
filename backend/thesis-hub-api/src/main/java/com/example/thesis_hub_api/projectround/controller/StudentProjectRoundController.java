@@ -6,6 +6,7 @@ import com.example.thesis_hub_api.assignment.service.AssignmentService;
 import com.example.thesis_hub_api.projectround.dto.request.CreateRoundStudentManualDTO;
 import com.example.thesis_hub_api.projectround.dto.request.StudentImportCommitRequestDTO;
 import com.example.thesis_hub_api.projectround.dto.request.UpdateStudentRoundStatusRequestDTO;
+import com.example.thesis_hub_api.projectround.dto.request.UpdateRoundStudentDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentEligibilityCheckResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreviewResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportResultResponseDTO;
@@ -47,7 +48,7 @@ public class StudentProjectRoundController {
     }
 
     @PostMapping(value = "/{roundId}/students/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(
             summary = "Xem trước (preview) phân tích file Excel import sinh viên",
             description = "Phân tích file Excel, đối soát mã ngành, trùng lặp và tính hợp lệ từng dòng trước khi commit"
@@ -61,7 +62,7 @@ public class StudentProjectRoundController {
     }
 
     @PostMapping("/{roundId}/students/import-commit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(
             summary = "Xác nhận ghi dữ liệu (commit) sinh viên vào đợt đồ án",
             description = "Tự động tạo tài khoản User (ROLE_STUDENT), hồ sơ Student và ghi danh vào đợt với trạng thái ELIGIBLE"
@@ -75,7 +76,7 @@ public class StudentProjectRoundController {
     }
 
     @GetMapping("/{roundId}/students/check-eligibility")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Kiểm tra trùng lặp và tính hợp lệ khi nhập MSSV (real-time check)")
     public ResponseEntity<ApiResponse<StudentEligibilityCheckResponseDTO>> checkStudentEligibility(
             @PathVariable Long roundId,
@@ -86,8 +87,8 @@ public class StudentProjectRoundController {
     }
 
     @PostMapping("/{roundId}/students/manual")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
-    @Operation(summary = "Thêm sinh viên thủ công vào đợt đồ án (Tự động cấp tài khoản MSSV/MSSV)")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
+    @Operation(summary = "Thêm sinh viên thủ công vào đợt đồ án (Tự động cấp tài khoản MSSV, mật khẩu SĐT hoặc MSSV)")
     public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> addStudentManually(
             @PathVariable Long roundId,
             @Valid @RequestBody CreateRoundStudentManualDTO dto) {
@@ -103,17 +104,18 @@ public class StudentProjectRoundController {
     @GetMapping("/{roundId}/students")
     @Operation(
             summary = "Tra cứu danh sách sinh viên trong đợt đồ án (Contract 3)",
-            description = "Hỗ trợ phân trang, lọc theo majorId, status và tìm kiếm theo MSSV/họ tên/lớp/email"
+            description = "Hỗ trợ phân trang, lọc theo majorId, status, onlyEligible và tìm kiếm theo MSSV/họ tên/lớp/email"
     )
     public ResponseEntity<ApiResponse<PageResponse<StudentProjectRoundResponseDTO>>> getStudentsInRound(
             @PathVariable Long roundId,
             @RequestParam(required = false) Long majorId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean onlyEligible,
             @RequestParam(required = false) String search,
             @PageableDefault(page = 0, size = 20, sort = "student.studentCode", direction = Sort.Direction.ASC) Pageable pageable) {
 
         PageResponse<StudentProjectRoundResponseDTO> response = studentProjectRoundService.getStudentsInRound(
-                roundId, majorId, status, search, pageable);
+                roundId, majorId, status, onlyEligible, search, pageable);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -128,8 +130,20 @@ public class StudentProjectRoundController {
         return ResponseEntity.ok(ApiResponse.success(detail));
     }
 
+    @RequestMapping(value = "/{roundId}/students/{studentId}", method = {RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.POST})
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
+    @Operation(summary = "Chỉnh sửa toàn bộ thông tin sinh viên & học vụ trong đợt đồ án (Tự động cập nhật trạng thái đủ/không đủ điều kiện)")
+    public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> updateStudentInRound(
+            @PathVariable Long roundId,
+            @PathVariable Long studentId,
+            @Valid @RequestBody UpdateRoundStudentDTO dto) {
+
+        StudentProjectRoundResponseDTO updated = studentProjectRoundService.updateStudentInRound(roundId, studentId, dto);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin sinh viên thành công", updated));
+    }
+
     @PatchMapping("/{roundId}/students/{studentId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
     @Operation(summary = "Cập nhật trạng thái và ghi chú của sinh viên trong đợt đồ án")
     public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> updateStudentRoundStatus(
             @PathVariable Long roundId,
@@ -143,7 +157,7 @@ public class StudentProjectRoundController {
     }
 
     @DeleteMapping("/{roundId}/students/{studentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Xóa sinh viên khỏi đợt đồ án")
     public ResponseEntity<ApiResponse<Void>> removeStudentFromRound(
             @PathVariable Long roundId,
@@ -154,7 +168,7 @@ public class StudentProjectRoundController {
     }
 
     @DeleteMapping("/{roundId}/lecturers/{lecturerId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Xóa giảng viên khỏi đợt đồ án")
     public ResponseEntity<ApiResponse<Void>> removeLecturerFromRound(
             @PathVariable Long roundId,
@@ -164,7 +178,7 @@ public class StudentProjectRoundController {
     }
 
     @PostMapping("/{roundId}/lecturers/{lecturerId}/delete")
-    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Xóa giảng viên khỏi đợt đồ án (POST fallback)")
     public ResponseEntity<ApiResponse<Void>> removeLecturerFromRoundPost(
             @PathVariable Long roundId,
