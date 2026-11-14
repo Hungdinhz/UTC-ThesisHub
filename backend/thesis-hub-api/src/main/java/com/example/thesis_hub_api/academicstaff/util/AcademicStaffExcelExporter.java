@@ -279,7 +279,14 @@ public class AcademicStaffExcelExporter {
     }
 
     private String safe(String s) {
-        return s == null ? "" : s;
+        if (s == null || s.isEmpty()) {
+            return "";
+        }
+        char first = s.charAt(0);
+        if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+            return "'" + s;
+        }
+        return s;
     }
 
     private Styles createStyles(Workbook wb) {

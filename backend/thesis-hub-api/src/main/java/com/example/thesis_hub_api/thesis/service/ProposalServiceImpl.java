@@ -495,6 +495,13 @@ public class ProposalServiceImpl implements ProposalService {
                 .map(this::mapToResponse);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Long resolveStudentIdForUser(Long userId) {
+        if (userId == null || studentRepository == null) return userId;
+        return studentRepository.findByUserId(userId).map(Student::getId).orElse(userId);
+    }
+
     private Long resolveStudentId(Long studentId) {
         if (studentId == null || studentRepository == null) return studentId;
         if (studentRepository.existsById(studentId)) return studentId;

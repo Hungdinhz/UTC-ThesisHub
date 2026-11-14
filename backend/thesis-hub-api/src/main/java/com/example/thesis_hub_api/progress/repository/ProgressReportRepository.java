@@ -3,16 +3,22 @@ package com.example.thesis_hub_api.progress.repository;
 import com.example.thesis_hub_api.progress.entity.ProgressReport;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface ProgressReportRepository extends JpaRepository<ProgressReport, Long> {
 
+    @EntityGraph(attributePaths = {"feedback"})
     List<ProgressReport> findByThesisIdOrderBySubmittedAtDesc(Long thesisId);
+
+    @EntityGraph(attributePaths = {"feedback"})
+    List<ProgressReport> findByThesisIdInOrderBySubmittedAtDesc(Collection<Long> thesisIds);
 
     List<ProgressReport> findByStudentIdOrderBySubmittedAtDesc(Long studentId);
 

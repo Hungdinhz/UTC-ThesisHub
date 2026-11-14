@@ -63,12 +63,9 @@ public class UserController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id,desc") String sort) {
         
-        String[] sortParts = sort.split(",");
-        String sortField = sortParts[0];
-        Sort.Direction direction = (sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc"))
-                ? Sort.Direction.ASC : Sort.Direction.DESC;
-
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Pageable pageable = com.example.thesis_hub_api.common.util.PaginationUtils.createSafePageable(
+                page, size, sort, "id", Sort.Direction.DESC,
+                java.util.Set.of("id", "username", "email", "fullName", "isActive", "createdAt", "updatedAt"));
         PageResponse<UserProfileResponseDTO> result = userService.getUsers(search, roleId, isActive, pageable);
         return ResponseEntity.ok(ApiResponse.success(result));
     }

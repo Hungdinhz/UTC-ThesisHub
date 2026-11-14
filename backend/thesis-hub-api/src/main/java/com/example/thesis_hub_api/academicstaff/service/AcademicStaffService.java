@@ -118,7 +118,9 @@ public class AcademicStaffService {
         boolean eligible = "ELIGIBLE".equalsIgnoreCase(status) || "FORCE_APPROVED".equalsIgnoreCase(status);
         Integer debt = record != null && record.getDebtCredits() != null ? record.getDebtCredits() : (student.getDebtCredits() != null ? student.getDebtCredits() : 0);
         Integer completed = record != null && record.getCompletedCredits() != null ? record.getCompletedCredits() : Math.max(0, 142 - debt);
-        Double gpaVal = record != null && record.getGpa() != null ? record.getGpa() : (spr.getGpa() != null ? spr.getGpa().doubleValue() : (student.getGpa() != null ? student.getGpa().doubleValue() : null));
+        Double gpaVal = (record != null && record.getGpa() != null)
+                ? record.getGpa()
+                : (spr.getGpa() != null ? spr.getGpa() : student.getGpa());
         String noteVal = (spr.getNote() != null && !spr.getNote().isBlank()) ? spr.getNote() : (record != null ? record.getNote() : "");
 
         return EligibleStudentRowDTO.builder()

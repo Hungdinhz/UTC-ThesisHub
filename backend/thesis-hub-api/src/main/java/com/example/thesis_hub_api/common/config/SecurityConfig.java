@@ -14,11 +14,13 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -54,25 +56,23 @@ public class SecurityConfig {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .referrerPolicy(referrer -> referrer
+                                .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/v1/auth/change-password").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/files/download/**", "/api/v1/files/view/**").permitAll()
-                        .requestMatchers("/api/v1/chat/**").authenticated()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/api/v1/defense/**").permitAll()
-                        .requestMatchers("/api/v1/eligibility/**").permitAll()
-                        .requestMatchers("/api/v1/academic-staff/**").authenticated()
-                        .requestMatchers("/api/v1/users/**").authenticated()
-                        .requestMatchers("/api/v1/lecturers/me/**").authenticated()
-                        .requestMatchers("/api/v1/students/profile/**", "/api/v1/students/profile").authenticated()
-                        .requestMatchers("/api/v1/supervisors/profile/**", "/api/v1/supervisors/profile").authenticated()
-                        .requestMatchers("/api/v1/committee-members/profile/**", "/api/v1/committee-members/profile").authenticated()
-                        .requestMatchers("/api/v1/externals/profile/**", "/api/v1/externals/profile").authenticated()
-                        .anyRequest().permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -89,10 +89,10 @@ public class SecurityConfig {
                 .filter(origin -> !origin.isEmpty())
                 .collect(Collectors.toList());
 
-        // Always ensure key production and development origins are present
+        // Only explicit production, project-scoped preview, and local dev origins (no wildcard https://*.vercel.app)
         List<String> defaultOrigins = List.of(
                 "https://utc-thesishub.vercel.app",
-                "https://*.vercel.app",
+                "https://utc-thesishub-*.vercel.app",
                 "https://utc-thesishub.onrender.com",
                 "https://utc-thesishub-develop.onrender.com",
                 "http://localhost:3000",
@@ -104,11 +104,9 @@ public class SecurityConfig {
             }
         }
 
-        // Use allowedOriginPatterns to support both exact origins and wildcard patterns (e.g., https://*.vercel.app)
-        // while also safely allowing credentials (cookies/authorization headers).
         configuration.setAllowedOriginPatterns(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
         configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition", "Link", "X-Total-Count"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

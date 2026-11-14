@@ -84,9 +84,13 @@ public class AssignmentServiceImpl implements AssignmentService {
         Map<Long, String> deptNames = departmentRepository.findAll().stream()
                 .collect(Collectors.toMap(Department::getId, Department::getName, (a, b) -> a));
 
+        Map<Long, Long> lecturerCountByDirection = lecturerDirectionRepository.findAll().stream()
+                .filter(ld -> ld.getDirectionId() != null)
+                .collect(Collectors.groupingBy(LecturerDirection::getDirectionId, Collectors.counting()));
+
         return list.stream().map(d -> {
             String deptName = d.getDepartmentId() != null ? deptNames.get(d.getDepartmentId()) : null;
-            int count = lecturerDirectionRepository.findByDirectionId(d.getId()).size();
+            int count = lecturerCountByDirection.getOrDefault(d.getId(), 0L).intValue();
             return mapper.toDirectionResponse(d, deptName, count);
         }).collect(Collectors.toList());
     }
@@ -1000,16 +1004,25 @@ public class AssignmentServiceImpl implements AssignmentService {
             list = assignmentRepository.findByProjectRoundId(projectRoundId);
         }
 
-        Map<Long, Student> studentMap = studentRepository.findAll().stream()
-                .collect(Collectors.toMap(Student::getId, s -> s));
+        if (list.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<Long> studentIds = list.stream().map(SupervisorAssignment::getStudentId).filter(Objects::nonNull).collect(Collectors.toSet());
+        List<Student> fetchedStudents = studentIds.isEmpty() ? Collections.emptyList() : studentRepository.findByIdIn(studentIds);
+        if (fetchedStudents == null || fetchedStudents.isEmpty()) {
+            fetchedStudents = studentRepository.findAll();
+        }
+        Map<Long, Student> studentMap = fetchedStudents.stream()
+                .collect(Collectors.toMap(Student::getId, s -> s, (a, b) -> a));
         Map<Long, Lecturer> lecturerMap = lecturerRepository.findAll().stream()
-                .collect(Collectors.toMap(Lecturer::getId, l -> l));
+                .collect(Collectors.toMap(Lecturer::getId, l -> l, (a, b) -> a));
         Map<Long, Department> deptMap = departmentRepository.findAll().stream()
-                .collect(Collectors.toMap(Department::getId, d -> d));
+                .collect(Collectors.toMap(Department::getId, d -> d, (a, b) -> a));
         Map<Long, ProjectDirection> directionMap = directionRepository.findAll().stream()
-                .collect(Collectors.toMap(ProjectDirection::getId, d -> d));
+                .collect(Collectors.toMap(ProjectDirection::getId, d -> d, (a, b) -> a));
         Map<Long, TrainingProgram> tpMap = trainingProgramRepository.findAll().stream()
-                .collect(Collectors.toMap(TrainingProgram::getId, tp -> tp));
+                .collect(Collectors.toMap(TrainingProgram::getId, tp -> tp, (a, b) -> a));
 
         return list.stream().map(sa -> {
             Student s = studentMap.get(sa.getStudentId());

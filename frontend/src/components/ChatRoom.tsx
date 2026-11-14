@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { ChatMessage } from '../types';
+import { toast } from './Toast';
 import './ChatRoom.css';
 
 interface ChatRoomProps {
@@ -70,7 +71,10 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ groupId }) => {
       clearInterval(pollingIntervalRef.current);
     }
     setConnectionStatus('polling');
-    pollingIntervalRef.current = setInterval(pollNewMessages, 3000);
+    pollingIntervalRef.current = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      pollNewMessages();
+    }, 3000);
   }, []);
 
   // Stop polling
@@ -239,7 +243,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ groupId }) => {
       scrollToBottom();
     } catch (error: any) {
       console.error('Failed to send message:', error);
-      alert(error.response?.data?.message || 'Failed to send message. Please try again.');
+      toast.error(error.response?.data?.message || 'Không thể gửi tin nhắn. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }

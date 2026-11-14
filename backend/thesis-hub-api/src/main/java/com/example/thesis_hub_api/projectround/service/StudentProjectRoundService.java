@@ -389,6 +389,9 @@ public class StudentProjectRoundService {
         List<String> messages = new ArrayList<>();
         Set<Long> processedStudentIdsInBatch = new HashSet<>();
 
+        // Pre-compute default BCrypt password hash ONCE outside the row loop to avoid N * 100ms CPU blocking
+        String defaultEncodedPassword = passwordEncoder.encode("Password@123");
+
         for (StudentImportRowDTO row : requestDTO.getRows()) {
             totalProcessed++;
 
@@ -459,7 +462,7 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                             .fullName(fullName)
                             .email(targetEmail)
                             .phone(row.getPhone())
-                            .password(passwordEncoder.encode("Password@123"))
+                            .password(defaultEncodedPassword)
                             .role(studentRole)
                             .isActive(accountActive)
                             .build();
@@ -682,7 +685,9 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                     user.setEmail(email);
                 }
             }
-            user.setPassword(passwordEncoder.encode("Password@123"));
+            if (!StringUtils.hasText(user.getPassword())) {
+                user.setPassword(passwordEncoder.encode("Password@123"));
+            }
             user.setIsActive(false); // Sẽ được cập nhật chính xác theo điều kiện học vụ bên dưới
             user = userRepository.save(user);
         }
@@ -1088,12 +1093,9 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
     public byte[] generateTemplate() {
         try {
             Set<String> existingCodes = studentRepository != null
-                    ? studentRepository.findAll().stream()
-                            .map(Student::getStudentCode)
-                            .filter(Objects::nonNull)
-                            .collect(Collectors.toSet())
+                    ? studentRepository.findAllStudentCodes()
                     : Collections.emptySet();
-            if (existingCodes.isEmpty()) {
+            if (existingCodes == null || existingCodes.isEmpty()) {
                 return studentExcelParser.generateTemplate();
             }
             return studentExcelParser.generateTemplate(existingCodes);

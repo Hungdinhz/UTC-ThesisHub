@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from './Toast';
 import './UTCGraduationViews.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -104,10 +105,10 @@ export const UTCStudentGraduationView: React.FC = () => {
         },
         { headers: getHeaders() }
       );
-      alert('Đã lưu thông tin khảo sát và nguyện vọng thành công!');
+      toast.success('Đã lưu thông tin khảo sát và nguyện vọng thành công!');
       fetchData();
     } catch (err: any) {
-      alert('Lỗi: ' + (err.response?.data?.company_name?.[0] || JSON.stringify(err.response?.data) || err.message));
+      toast.error('Lỗi: ' + (err.response?.data?.company_name?.[0] || JSON.stringify(err.response?.data) || err.message));
     } finally {
       setSurveySaving(false);
     }
@@ -116,7 +117,7 @@ export const UTCStudentGraduationView: React.FC = () => {
   const handleSubmitOutline = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!outlineTitleVi) {
-      alert('Vui lòng nhập tên đề tài tiếng Việt.');
+      toast.warning('Vui lòng nhập tên đề tài tiếng Việt.');
       return;
     }
 
@@ -132,10 +133,10 @@ export const UTCStudentGraduationView: React.FC = () => {
       await axios.post(`${API_BASE}/student/outline/submit/`, fd, {
         headers: { ...getHeaders(), 'Content-Type': 'multipart/form-data' },
       });
-      alert('Nộp đề cương thành công, đang chờ GVHD & Nhóm chuyên môn xét duyệt!');
+      toast.success('Nộp đề cương thành công, đang chờ GVHD & Nhóm chuyên môn xét duyệt!');
       fetchData();
     } catch (err: any) {
-      alert('Lỗi nộp đề cương: ' + (err.response?.data?.outline_file?.[0] || err.message));
+      toast.error('Lỗi nộp đề cương: ' + (err.response?.data?.outline_file?.[0] || err.message));
     } finally {
       setOutlineSubmitting(false);
     }
@@ -144,7 +145,7 @@ export const UTCStudentGraduationView: React.FC = () => {
   const handleSubmitWeeklyReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!weekSummary) {
-      alert('Vui lòng nhập nội dung tóm tắt công việc đã làm trong tuần.');
+      toast.warning('Vui lòng nhập nội dung tóm tắt công việc đã làm trong tuần.');
       return;
     }
 
@@ -162,14 +163,14 @@ export const UTCStudentGraduationView: React.FC = () => {
       await axios.post(`${API_BASE}/student/weekly-reports/`, fd, {
         headers: { ...getHeaders(), 'Content-Type': 'multipart/form-data' },
       });
-      alert(`Đã nộp báo cáo tiến độ Tuần ${selectedWeek} thành công!`);
+      toast.success(`Đã nộp báo cáo tiến độ Tuần ${selectedWeek} thành công!`);
       setWeekSummary('');
       setWeekTasks('');
       setWeekGit('');
       setWeekFile(null);
       fetchData();
     } catch (err: any) {
-      alert('Lỗi nộp báo cáo: ' + JSON.stringify(err.response?.data || err.message));
+      toast.error('Lỗi nộp báo cáo: ' + JSON.stringify(err.response?.data || err.message));
     } finally {
       setReportSubmitting(false);
     }

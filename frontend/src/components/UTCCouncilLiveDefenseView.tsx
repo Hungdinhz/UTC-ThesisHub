@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from './Toast';
 import './UTCGraduationViews.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -78,11 +79,11 @@ export const UTCCouncilLiveDefenseView: React.FC = () => {
         },
         { headers: getHeaders() }
       );
-      alert(res.data.message || 'Đã chấm điểm thành công!');
+      toast.success(res.data.message || 'Đã chấm điểm thành công!');
       setShowScoreModal(false);
       fetchData();
     } catch (err: any) {
-      alert('Lỗi chấm điểm: ' + (err.response?.data?.detail || JSON.stringify(err.response?.data) || err.message));
+      toast.error('Lỗi chấm điểm: ' + (err.response?.data?.detail || JSON.stringify(err.response?.data) || err.message));
     } finally {
       setSubmitting(false);
     }

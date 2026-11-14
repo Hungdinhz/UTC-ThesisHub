@@ -4,6 +4,7 @@ import com.example.thesis_hub_api.defense.entity.GraduationResult;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,8 @@ import java.util.Optional;
 public interface GraduationResultRepository extends JpaRepository<GraduationResult, Long> {
 
     Optional<GraduationResult> findByThesisId(Long thesisId);
+
+    List<GraduationResult> findByThesisIdIn(Collection<Long> thesisIds);
 
     List<GraduationResult> findByFinalResult(String finalResult);
 

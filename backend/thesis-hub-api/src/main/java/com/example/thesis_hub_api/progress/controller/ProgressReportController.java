@@ -20,7 +20,7 @@ public class ProgressReportController {
     private final ProgressReportService progressReportService;
 
     @PostMapping("/by-thesis/{thesisId}")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN') and @accessControl.canAccessThesis(#thesisId)")
     public ApiResponse<ProgressReportResponse> createReport(
             @PathVariable Long thesisId,
             @Valid @RequestBody CreateProgressReportRequest request) {
@@ -29,7 +29,7 @@ public class ProgressReportController {
     }
 
     @PostMapping("/{id}/feedback")
-    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'COMMITTEE', 'ADMIN', 'ACADEMIC_STAFF')")
     public ApiResponse<ProgressReportResponse> feedbackReport(
             @PathVariable Long id,
             @Valid @RequestBody CreateProgressFeedbackRequest request) {
@@ -38,11 +38,13 @@ public class ProgressReportController {
     }
 
     @GetMapping("/by-thesis/{thesisId}")
+    @PreAuthorize("@accessControl.canAccessThesis(#thesisId)")
     public ApiResponse<List<ProgressReportResponse>> getReportsByThesis(@PathVariable Long thesisId) {
         return ApiResponse.success(progressReportService.getReportsByThesis(thesisId));
     }
 
     @GetMapping("/by-thesis/{thesisId}/paged")
+    @PreAuthorize("@accessControl.canAccessThesis(#thesisId)")
     public ApiResponse<Page<ProgressReportResponse>> getReportsByThesisPaged(
             @PathVariable Long thesisId,
             Pageable pageable) {
@@ -50,6 +52,7 @@ public class ProgressReportController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@accessControl.canAccessProgressReport(#id)")
     public ApiResponse<ProgressReportResponse> getReportById(@PathVariable Long id) {
         return ApiResponse.success(progressReportService.getReportById(id));
     }
@@ -59,6 +62,7 @@ public class ProgressReportController {
      * Provides aggregated progress data, task counts, and defense readiness status.
      */
     @GetMapping("/by-thesis/{thesisId}/summary")
+    @PreAuthorize("@accessControl.canAccessThesis(#thesisId)")
     public ApiResponse<ThesisProgressSummaryResponse> getProgressSummaryByThesis(@PathVariable Long thesisId) {
         return ApiResponse.success(progressReportService.getProgressSummaryByThesis(thesisId));
     }

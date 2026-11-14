@@ -31,4 +31,8 @@ public interface ProposalService {
     Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, String status, String search, Pageable pageable);
 
     Page<ProposalResponse> searchProposals(Long roundId, Long lecturerId, Long studentId, String status, String search, Pageable pageable);
+
+    default Long resolveStudentIdForUser(Long userId) {
+        return userId;
+    }
 }

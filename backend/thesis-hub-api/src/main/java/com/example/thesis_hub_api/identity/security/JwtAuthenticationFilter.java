@@ -32,22 +32,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
-                Long userId = jwtTokenProvider.getUserIdFromToken(jwt);
-                UserDetails userDetails;
+                String tokenType = jwtTokenProvider.getTokenTypeFromToken(jwt);
+                if (!JwtTokenProvider.TOKEN_TYPE_REFRESH.equalsIgnoreCase(tokenType)) {
+                    Long userId = jwtTokenProvider.getUserIdFromToken(jwt);
+                    UserDetails userDetails;
 
-                if (userId != null) {
-                    userDetails = customUserDetailsService.loadUserById(userId);
-                } else {
-                    String username = jwtTokenProvider.getUsernameFromToken(jwt);
-                    userDetails = customUserDetailsService.loadUserByUsername(username);
-                }
+                    if (userId != null) {
+                        userDetails = customUserDetailsService.loadUserById(userId);
+                    } else {
+                        String username = jwtTokenProvider.getUsernameFromToken(jwt);
+                        userDetails = customUserDetailsService.loadUserByUsername(username);
+                    }
 
-                if (userDetails != null && userDetails.isEnabled()) {
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    if (userDetails != null && userDetails.isEnabled()) {
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
                 }
             }
         } catch (Exception ex) {

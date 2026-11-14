@@ -135,6 +135,7 @@ class AuthServiceTest {
 
         when(userRepository.findByUsernameOrEmail("student01", "student01"))
                 .thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("password123", "$2a$10$hashedPassword")).thenReturn(true);
 
         AppException ex = assertThrows(AppException.class, () -> authService.login(request));
         assertEquals(ErrorCode.USER_LOCKED, ex.getErrorCode());
@@ -278,6 +279,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByUsernameOrEmail("student01", "student01")).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("password123", "$2a$10$hashedPassword")).thenReturn(true);
 
         AppException ex = assertThrows(AppException.class, () -> authService.adminLogin(request));
         assertEquals(ErrorCode.NOT_AN_ADMIN_ACCOUNT, ex.getErrorCode());

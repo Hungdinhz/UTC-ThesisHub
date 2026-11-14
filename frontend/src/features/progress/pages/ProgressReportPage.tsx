@@ -7,6 +7,7 @@ import type { ProgressReport, ThesisProgressSummary } from '../types';
 import type { Thesis } from '../../thesis/types';
 import FileUploadInput from '../../../components/FileUploadInput';
 import { extractFileName, resolveFileUrl, getFileIcon } from '../../../utils/fileUtils';
+import { toast } from '../../../components/Toast';
 
 export const ProgressReportPage: React.FC = () => {
   const { userType, user } = useAuth();
@@ -195,10 +196,10 @@ export const ProgressReportPage: React.FC = () => {
         fileUrl: fileUrl || `/files/reports/bao_cao_${selectedThesisId}.pdf`
       });
       setReports(prev => [created, ...prev]);
-      alert('🎉 Gửi báo cáo tiến độ và đính kèm tập tin thành công!');
+      toast.success('Gửi báo cáo tiến độ và đính kèm tập tin thành công!');
       loadData(selectedThesisId);
     } catch {
-      alert('🎉 Đã ghi nhận báo cáo tiến độ thành công!');
+      toast.success('Đã ghi nhận báo cáo tiến độ thành công!');
       loadData(selectedThesisId);
     }
     setReportTitle('');
@@ -226,8 +227,9 @@ export const ProgressReportPage: React.FC = () => {
       });
       setReports(prev => prev.map(r => r.id === selectedReport.id ? updated : r));
       loadData(selectedThesisId);
+      toast.success('Đã lưu đánh giá nhận xét tiến độ thành công!');
     } catch {
-      alert('Đã lưu đánh giá nhận xét tiến độ thành công!');
+      toast.success('Đã lưu đánh giá nhận xét tiến độ thành công!');
     }
     setSelectedReport(null);
   };

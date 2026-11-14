@@ -38,7 +38,12 @@ spring:
     open-in-view: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
 
   servlet:
     multipart:
@@ -72,15 +77,17 @@ app:
   backend-url: ${APP_BACKEND_URL:https://utc-thesishub.onrender.com}
 
   jwt:
-    secret: ${JWT_SECRET:CHANGE_THIS_SECRET}
+    secret: ${JWT_SECRET:THESISHUB_SECRET_KEY_FOR_JWT_SIGNING_NEED_TO_BE_AT_LEAST_256_BITS_LONG_UTC_2026!}
     expiration: ${JWT_EXPIRATION:86400000}
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
   file:
     storage-path: ${FILE_STORAGE_PATH:./uploads}
+    max-db-bytes: ${FILE_MAX_DB_BYTES:10485760}
 
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:https://utc-thesishub.vercel.app,https://utc-thesishub.onrender.com,https://utc-thesishub-develop.onrender.com,http://localhost:3000,http://localhost:5173}
 
   admin:
-    registration-key: ${ADMIN_REGISTRATION_KEY:thesishub_admin_secret_key_2026_fit_utc}
+    registration-key: ${ADMIN_REGISTRATION_KEY:}
     require-key-on-login: ${ADMIN_LOGIN_REQUIRE_KEY:false}

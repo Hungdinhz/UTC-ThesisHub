@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 import type { Document, SupervisorOfStudentGroup } from '../types';
 import DocumentViewerModal from './DocumentViewerModal';
+import { toast } from './Toast';
 import './DocumentReview.css';
 
 interface DocumentReviewProps {
@@ -75,11 +76,11 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({ groups }) => {
         setSelectedDocument({ ...selectedDocument, status: newStatus });
       }
       
-      alert(`Document ${newStatus === 'accepted' ? 'approved' : 'rejected'} successfully!`);
+      toast.success(`Đã ${newStatus === 'accepted' ? 'duyệt' : 'từ chối'} tài liệu thành công!`);
     } catch (error: any) {
       console.error('Failed to update document status:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to update document status';
-      alert(errorMessage);
+      const errorMessage = error.response?.data?.message || 'Không thể cập nhật trạng thái tài liệu';
+      toast.error(errorMessage);
     } finally {
       setActionLoading(null);
     }
@@ -87,7 +88,7 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({ groups }) => {
 
   const handleDownload = async (document: Document) => {
     if (!document.uploaded_file) {
-      alert('No file available for download');
+      toast.warning('Tài liệu chưa có file đính kèm để tải xuống');
       return;
     }
 
@@ -97,7 +98,7 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({ groups }) => {
       await apiService.downloadDocument(document.uploaded_file, fileName);
     } catch (error) {
       console.error('Download failed:', error);
-      alert('Failed to download document. Please try again.');
+      toast.error('Lỗi khi tải xuống tài liệu. Vui lòng thử lại!');
     } finally {
       setDownloading(null);
     }
