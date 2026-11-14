@@ -284,7 +284,7 @@ export const ReservationManagementPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Quản lý và Phê duyệt Đơn bảo lưu</h1>
           <p className="feature-page-subtitle">
-            Tiếp nhận và xử lý đơn xin hoãn / bảo lưu đề tài đồ án tốt nghiệp trong giai đoạn Xét điều kiện bảo vệ cuối kỳ (chưa trả đủ tín chỉ, GVHD xét chưa đạt tiến độ, hoặc lý do y tế/công tác).
+            Tiếp nhận và xử lý đơn xin hoãn / bảo lưu đề tài đồ án tốt nghiệp.
           </p>
         </div>
 

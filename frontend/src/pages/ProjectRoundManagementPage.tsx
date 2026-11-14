@@ -697,10 +697,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                     {/* Timeline Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                       <div>
-                        <h3 style={{ margin: 0, color: '#1e293b' }}>Các mốc thời gian / Timeline nghiệp vụ</h3>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-                          Cung cấp API cho hệ thống tự động kiểm tra thời hạn đăng ký, nộp đề cương và bảo vệ
-                        </p>
+                        <h3 style={{ margin: 0, color: '#1e293b' }}>Các mốc thời gian (Timeline)</h3>
                       </div>
                       {selectedRound.status !== 'CLOSED' && selectedRound.status !== 'ARCHIVED' ? (
                         <button

@@ -330,7 +330,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
             ⚠️ Sinh viên chưa thuộc đợt đồ án nào
           </h3>
           <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6 }}>
-            Tài khoản của bạn hiện chưa có trong danh sách sinh viên tham gia đợt đồ án nào. Theo quy định đồng bộ dữ liệu, sinh viên thuộc đợt đồ án nào thì chỉ được phép đăng ký nguyện vọng và thực hiện đồ án tại đợt đó. Vui lòng liên hệ Giáo vụ Khoa để được thêm vào đợt đồ án của bạn.
+            Tài khoản chưa có trong danh sách đợt đồ án nào. Vui lòng liên hệ Giáo vụ Khoa để được hỗ trợ.
           </p>
         </div>
       </div>
@@ -361,7 +361,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
               'Bạn không đăng ký nguyện vọng giảng viên hướng dẫn trước khi Khoa chốt kết quả phân công.'}
           </p>
           <p style={{ margin: 0, fontSize: '0.88rem', color: '#7f1d1d' }}>
-            💡 Nếu bạn thuộc diện được phép đăng ký bổ sung, vui lòng liên hệ Giáo vụ Khoa để mở <strong>Đợt đăng ký bổ sung</strong>. Lưu ý: Sau khi kết thúc đợt đăng ký bổ sung, sinh viên vẫn không đăng ký sẽ bị <strong>xóa hoàn toàn khỏi đợt đồ án</strong>.
+            💡 Vui lòng liên hệ Giáo vụ Khoa nếu bạn thuộc diện đăng ký bổ sung.
           </p>
         </div>
       )}
@@ -382,8 +382,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
             📢 ĐỢT ĐĂNG KÝ BỔ SUNG NGUYỆN VỌNG ĐANG MỞ
           </h4>
           <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: 1.5 }}>
-            Khoa đã mở đợt đăng ký bổ sung nguyện vọng GVHD cho bạn. Vui lòng chọn hướng đồ án và 3 nguyện vọng GVHD bên dưới rồi bấm <strong>Gửi đăng ký</strong>.{' '}
-            <strong>Cảnh báo:</strong> Nếu kết thúc đợt đăng ký bổ sung mà bạn vẫn chưa đăng ký, bạn sẽ bị <strong>xóa vĩnh viễn khỏi danh sách đợt đồ án này</strong>.
+            Đang mở đợt đăng ký bổ sung. Vui lòng chọn hướng và 3 nguyện vọng GVHD bên dưới rồi bấm <strong>Gửi đăng ký</strong>.
           </p>
         </div>
       )}
