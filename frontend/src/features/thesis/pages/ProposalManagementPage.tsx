@@ -874,7 +874,7 @@ export const ProposalManagementPage: React.FC = () => {
             fontWeight: 600,
           }}
         >
-          🔒 Đợt đồ án đã hoàn tất / chốt kết quả tốt nghiệp — bạn đang ở chế độ <strong>Chỉ xem</strong> (không thể tạo mới hoặc chỉnh sửa đề cương).
+          🔒 Đề tài đã hoàn tất — Chế độ chỉ xem.
         </div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>

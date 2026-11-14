@@ -39,9 +39,7 @@ export const TaskBoardPage: React.FC = () => {
   const [supervisorScoreData, setSupervisorScoreData] = useState<{ score: number; feedback: string; graderName?: string } | null>(null);
   const [showDefenseReadyModal, setShowDefenseReadyModal] = useState(false);
   const [supScoreInput, setSupScoreInput] = useState<number>(8.5);
-  const [supFeedbackInput, setSupFeedbackInput] = useState<string>(
-    'Sinh viên chủ động, nắm vững kiến thức chuyên môn, hoàn thành tốt các mục tiêu đồ án đề ra và đủ điều kiện bảo vệ trước Hội đồng.'
-  );
+  const [supFeedbackInput, setSupFeedbackInput] = useState<string>('Đạt yêu cầu bảo vệ đồ án.');
 
 
   // Filter visible theses by user role:
@@ -766,7 +764,7 @@ export const TaskBoardPage: React.FC = () => {
             fontWeight: 600,
           }}
         >
-          🔒 Đợt đồ án đã chốt kết quả / Đề tài đã hoàn thành tốt nghiệp — bạn đang ở chế độ <strong>Chỉ xem</strong> (không thể giao việc mới, chỉnh sửa hoặc nộp bài).
+          🔒 Đề tài đã hoàn tất — Chế độ chỉ xem.
         </div>
       )}
       {/* Top Header & Thesis Switcher */}
@@ -987,17 +985,9 @@ export const TaskBoardPage: React.FC = () => {
               {/* Defense Ready Confirmation Button / Badge */}
               <div>
                 {currentThesis.defenseEligible || currentThesis.status === 'DEFENSE_READY' ? (
-                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '8px', maxWidth: '450px' }}>
+                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '8px 12px', borderRadius: '8px' }}>
                     <div style={{ fontWeight: 700, color: '#15803d', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `| Điểm GVHD: ${supervisorScoreData.score} / 10 đ`}
-                    </div>
-                    {supervisorScoreData && (
-                      <div style={{ fontSize: '12px', color: '#166534', marginTop: '4px' }}>
-                        Nhận xét: "<em>{supervisorScoreData.feedback}</em>"
-                      </div>
-                    )}
-                    <div style={{ fontSize: '11px', color: '#65a30d', marginTop: '3px', fontStyle: 'italic' }}>
-                      (Quy chế: GVHD đã chấm điểm quá trình và không ngồi trong Hội đồng chấm thi)
+                      <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `• Điểm GVHD: ${supervisorScoreData.score}/10`}
                     </div>
                     {canCreateTask && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
