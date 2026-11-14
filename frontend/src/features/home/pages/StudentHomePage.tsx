@@ -482,6 +482,110 @@ export const StudentHomePage: React.FC = () => {
         }
       />
 
+      {gradResult && (
+        <div
+          style={{
+            marginTop: '14px',
+            marginBottom: '16px',
+            padding: '18px 22px',
+            borderRadius: '14px',
+            background:
+              gradResult.finalResult === 'PASSED'
+                ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+                : 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+            border:
+              gradResult.finalResult === 'PASSED'
+                ? '2px solid #10b981'
+                : '2px solid #ef4444',
+            boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: gradResult.finalResult === 'PASSED' ? '#047857' : '#b91c1c',
+                marginBottom: '4px',
+              }}
+            >
+              {gradResult.finalResult === 'PASSED'
+                ? '🎓 ĐÃ TỐT NGHIỆP ĐỒ ÁN TỐT NGHIỆP'
+                : '📋 KẾT QUẢ BẢO VỆ ĐỒ ÁN CHÍNH THỨC'}
+            </div>
+            <h3
+              style={{
+                margin: '0 0 4px 0',
+                fontSize: '1.15rem',
+                fontWeight: 800,
+                color: '#0f172a',
+              }}
+            >
+              {gradResult.finalResult === 'PASSED'
+                ? 'Chúc mừng bạn đã hoàn thành và đạt Đồ án Tốt nghiệp!'
+                : 'Kết quả bảo vệ chưa đạt yêu cầu tốt nghiệp.'}
+            </h3>
+            <div style={{ fontSize: '0.88rem', color: '#334155' }}>
+              Đề tài: <strong>{gradResult.thesisTitle || thesis?.titleVn || 'Đồ án tốt nghiệp'}</strong> •
+              {' '}Các giai đoạn trước đó được lưu ở chế độ chỉ xem.
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              background: 'rgba(255, 255, 255, 0.85)',
+              padding: '10px 18px',
+              borderRadius: '12px',
+              border: '1px solid rgba(15, 23, 42, 0.08)',
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>ĐIỂM TỔNG KẾT</div>
+              <div
+                style={{
+                  fontSize: '1.65rem',
+                  fontWeight: 900,
+                  color: gradResult.finalResult === 'PASSED' ? '#059669' : '#dc2626',
+                  lineHeight: 1.1,
+                }}
+              >
+                {Number(gradResult.finalScore).toFixed(2)}
+              </div>
+            </div>
+            <div style={{ width: '1px', height: '36px', background: '#cbd5e1' }} />
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                Xếp loại: <strong style={{ color: '#0a3273' }}>{gradResult.grade}</strong>
+              </div>
+              <div
+                style={{
+                  marginTop: '3px',
+                  display: 'inline-block',
+                  padding: '2px 10px',
+                  borderRadius: '999px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  background: gradResult.finalResult === 'PASSED' ? '#10b981' : '#ef4444',
+                  color: '#fff',
+                }}
+              >
+                {gradResult.finalResult === 'PASSED' ? 'ĐẠT TỐT NGHIỆP' : 'KHÔNG ĐẠT'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isDropped && (
         <div
           style={{

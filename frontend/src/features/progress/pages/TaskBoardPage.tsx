@@ -744,9 +744,31 @@ export const TaskBoardPage: React.FC = () => {
 
   const completedTasksCount = tasks.filter(t => t.status === 'COMPLETED').length;
   const computedProgressPercent = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : (currentThesis?.completionRate || 0);
+  const currentRoundForBoard = projectRounds.find(r => r.roundId === (currentThesis?.projectRoundId || (selectedRoundId !== 'ALL' ? Number(selectedRoundId) : undefined)));
+  const isBoardReadOnly =
+    currentRoundForBoard?.status === 'CLOSED' ||
+    currentRoundForBoard?.status === 'ARCHIVED' ||
+    currentThesis?.status === 'COMPLETED';
 
   return (
     <div style={{ padding: '24px', maxWidth: '1500px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+      {isBoardReadOnly && (
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            borderLeft: '4px solid #0a3273',
+            color: '#334155',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '13.5px',
+            fontWeight: 600,
+          }}
+        >
+          🔒 Đợt đồ án đã chốt kết quả / Đề tài đã hoàn thành tốt nghiệp — bạn đang ở chế độ <strong>Chỉ xem</strong> (không thể giao việc mới, chỉnh sửa hoặc nộp bài).
+        </div>
+      )}
       {/* Top Header & Thesis Switcher */}
       <div style={{ background: '#fff', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.04)', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
@@ -913,7 +935,7 @@ export const TaskBoardPage: React.FC = () => {
               </div>
             )}
 
-            {canCreateTask && currentThesis && (
+            {canCreateTask && currentThesis && !isBoardReadOnly && (
               <button
                 onClick={() => setShowCreateModal(true)}
                 style={{
@@ -1697,7 +1719,7 @@ export const TaskBoardPage: React.FC = () => {
             {/* Status Selector (Phân quyền theo vai trò) */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>Trạng thái công việc:</span>
-              {isStudent && (selectedTask.status === 'TODO' || selectedTask.status === 'IN_PROGRESS') ? (
+              {!isBoardReadOnly && isStudent && (selectedTask.status === 'TODO' || selectedTask.status === 'IN_PROGRESS') ? (
                 <select
                   value={selectedTask.status}
                   onChange={e => handleStatusChange(selectedTask.id, e.target.value as any)}

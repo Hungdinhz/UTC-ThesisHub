@@ -414,14 +414,18 @@ public class StudentProjectRoundService {
                         ? row.getEmail().trim().toLowerCase()
                         : studentCode.toLowerCase() + "@lms.utc.edu.vn";
 
-                // Đánh giá điều kiện học vụ: Nợ tín khóa cứng theo tín chỉ tích lũy (tối đa 170 tín với Kỹ sư, 132 tín với Cử nhân)
+                // Đánh giá điều kiện học vụ: ưu tiên số tín chỉ nợ từ file Excel (khớp với bước Preview)
+                // để không xảy ra trường hợp Preview báo Hợp lệ nhưng Commit lại tự suy ra nợ > 10 từ tín chỉ tích lũy.
                 int maxRoundCredits = getMaxCreditsForRound(round);
                 int completedCredits = row.getCompletedCredits() != null
-                        ? Math.min(row.getCompletedCredits(), maxRoundCredits)
+                        ? Math.min(Math.max(0, row.getCompletedCredits()), maxRoundCredits)
                         : (row.getDebtCredits() != null ? Math.max(0, maxRoundCredits - row.getDebtCredits()) : maxRoundCredits);
-                int debtCredits = Math.max(0, maxRoundCredits - completedCredits);
+                int debtCredits = row.getDebtCredits() != null
+                        ? Math.max(0, row.getDebtCredits())
+                        : Math.max(0, maxRoundCredits - completedCredits);
                 if (debtCredits > 10) {
                     log.info("Loại sinh viên {} khỏi đợt do nợ {} tín chỉ (> 10)", studentCode, debtCredits);
+                    messages.add("Bỏ qua " + studentCode + ": nợ " + debtCredits + " tín chỉ (> 10 tín chỉ).");
                     skipped++;
                     continue;
                 }
@@ -541,6 +545,7 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 // 3. Ghi danh vào StudentProjectRound nếu đủ điều kiện
                 Optional<String> eligibilityErr = validateStudentRoundEligibility(student, round);
                 if (eligibilityErr.isPresent()) {
+                    messages.add("Bỏ qua " + studentCode + ": " + eligibilityErr.get());
                     skipped++;
                     continue;
                 }
@@ -988,7 +993,9 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         int completedCredits = dto.getCompletedCredits() != null
                 ? dto.getCompletedCredits()
                 : (dto.getDebtCredits() != null ? Math.max(0, maxCredits - dto.getDebtCredits()) : (student.getDebtCredits() != null ? Math.max(0, maxCredits - student.getDebtCredits()) : maxCredits));
-        int debtCredits = Math.max(0, maxCredits - completedCredits);
+        int debtCredits = dto.getDebtCredits() != null
+                ? Math.max(0, dto.getDebtCredits())
+                : Math.max(0, maxCredits - completedCredits);
         student.setDebtCredits(debtCredits);
         student = studentRepository.save(student);
         Double gpa = dto.getGpa() != null ? dto.getGpa() : student.getGpa();
@@ -1092,11 +1099,15 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
      */
     @Transactional
     public void removeStudentFromRound(Long roundId, Long studentId) {
-        ProjectRound round = getAndValidateActiveRound(roundId);
+        getAndValidateActiveRound(roundId);
         StudentProjectRound spr = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
 
         studentProjectRoundRepository.delete(spr);
+        if (academicRecordRepository != null) {
+            academicRecordRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+                    .ifPresent(academicRecordRepository::delete);
+        }
     }
 
     /**
@@ -1184,8 +1195,11 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                         : (student != null && student.getDebtCredits() != null
                                 ? Math.max(0, maxRoundCredits - student.getDebtCredits())
                                 : maxRoundCredits));
-        // Khóa cứng nợ tín theo tín chỉ tích lũy (Cử nhân 132 tín, Kỹ sư 170 tín)
-        Integer debtCredits = Math.max(0, maxRoundCredits - completedCredits);
+        Integer debtCredits = record != null && record.getDebtCredits() != null
+                ? Math.max(0, record.getDebtCredits())
+                : (student != null && student.getDebtCredits() != null
+                        ? Math.max(0, student.getDebtCredits())
+                        : Math.max(0, maxRoundCredits - completedCredits));
         Double gpa = record != null && record.getGpa() != null
                 ? record.getGpa()
                 : (spr.getGpa() != null ? spr.getGpa() : (student != null ? student.getGpa() : null));
@@ -1194,6 +1208,27 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         Integer missingPrerequisiteCount = 0;
         EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, underDisciplinaryAction, missingPrerequisiteCount, gpa);
         String finalStatus = spr.getStatus();
+        String note = StringUtils.hasText(spr.getNote()) ? spr.getNote() : (record != null ? record.getNote() : null);
+
+        if ("DROPPED".equalsIgnoreCase(finalStatus)
+                && note != null && note.contains("Không hoàn thành GĐ4")
+                && thesisRepository != null && student != null && student.getId() != null && spr.getProjectRound() != null) {
+            try {
+                boolean hasApprovedThesis = thesisRepository.findByStudentIdAndProjectRoundId(student.getId(), spr.getProjectRound().getId())
+                        .map(t -> Boolean.TRUE.equals(t.getDefenseEligible())
+                                || "DEFENSE_READY".equalsIgnoreCase(t.getStatus())
+                                || "COMPLETED".equalsIgnoreCase(t.getStatus()))
+                        .orElse(false);
+                if (hasApprovedThesis) {
+                    finalStatus = "DEFENSE_READY";
+                    note = null;
+                } else {
+                    finalStatus = "IN_PROGRESS";
+                    note = null;
+                }
+            } catch (Exception ignored) {}
+        }
+
         if (!eval.isEligible() && !"FORCE_APPROVED".equalsIgnoreCase(finalStatus)) {
             finalStatus = "INELIGIBLE";
         } else if (thesisRepository != null && student != null && student.getId() != null && spr.getProjectRound() != null) {
@@ -1204,7 +1239,6 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 }
             } catch (Exception ignored) {}
         }
-        String note = StringUtils.hasText(spr.getNote()) ? spr.getNote() : (record != null ? record.getNote() : null);
         if (StringUtils.hasText(spr.getNote()) && spr.getNote().toLowerCase().contains("chưa đăng ký")) {
             finalStatus = "DROPPED";
             note = spr.getNote();

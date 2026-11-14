@@ -854,8 +854,29 @@ export const ProposalManagementPage: React.FC = () => {
     }
   };
 
+  const currentRoundObj = rounds.find((r) => r.roundId === selectedRoundId);
+  const isRoundReadOnly =
+    currentRoundObj?.status === 'CLOSED' || currentRoundObj?.status === 'ARCHIVED';
+
   return (
     <div style={{ padding: '16px', maxWidth: '1240px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+      {isRoundReadOnly && (
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            borderLeft: '4px solid #0a3273',
+            color: '#334155',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '13.5px',
+            fontWeight: 600,
+          }}
+        >
+          🔒 Đợt đồ án đã hoàn tất / chốt kết quả tốt nghiệp — bạn đang ở chế độ <strong>Chỉ xem</strong> (không thể tạo mới hoặc chỉnh sửa đề cương).
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 6px 0', color: '#1a202c' }}>
@@ -865,7 +886,7 @@ export const ProposalManagementPage: React.FC = () => {
             Quy trình: GV & SV xác định đề tài (Draft) → GV xác nhận → Khoa/Ban duyệt đề tài → Sinh đề cương PDF → SV ký nộp & Khoa lưu hồ sơ.
           </p>
         </div>
-        {isStudent && (
+        {isStudent && !isRoundReadOnly && (
           <button
             onClick={handleOpenCreateModal}
             disabled={!mySupervisorAssignment || !mySupervisorAssignment.lecturerId}
@@ -1228,8 +1249,8 @@ export const ProposalManagementPage: React.FC = () => {
                   <td style={{ padding: '12px 16px' }}>{getStatusBadge(p.status)}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {/* Chỉ cho phép Sinh viên sửa & nộp lại đề cương khi có yêu cầu sửa đổi (REVISE_REQUIRED) */}
-                      {(isStudent && isCurrentStudentProposal(p)) && p.status === 'REVISE_REQUIRED' && (
+                      {/* Chỉ cho phép Sinh viên sửa & nộp lại đề cương khi có yêu cầu sửa đổi (REVISE_REQUIRED) và đợt chưa đóng */}
+                      {!isRoundReadOnly && (isStudent && isCurrentStudentProposal(p)) && p.status === 'REVISE_REQUIRED' && (
                         <button
                           onClick={() => handleOpenEditModal(p)}
                           style={{
@@ -1249,7 +1270,7 @@ export const ProposalManagementPage: React.FC = () => {
                       )}
 
                       {/* Hỗ trợ nộp với đề cương cũ ở trạng thái DRAFT nếu tồn tại trong CSDL */}
-                      {isStudent && isCurrentStudentProposal(p) && p.status === 'DRAFT' && (
+                      {!isRoundReadOnly && isStudent && isCurrentStudentProposal(p) && p.status === 'DRAFT' && (
                         <button
                           onClick={() => handleSubmitProposalToSupervisor(p)}
                           style={{

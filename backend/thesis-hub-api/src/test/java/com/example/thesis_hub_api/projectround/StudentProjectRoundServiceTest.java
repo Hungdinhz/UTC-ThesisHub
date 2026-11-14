@@ -19,8 +19,10 @@ import com.example.thesis_hub_api.projectround.dto.response.StudentImportPreview
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportResultResponseDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentImportRowDTO;
 import com.example.thesis_hub_api.projectround.dto.response.StudentProjectRoundResponseDTO;
+import com.example.thesis_hub_api.projectround.entity.AcademicRecord;
 import com.example.thesis_hub_api.projectround.entity.ProjectRound;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
+import com.example.thesis_hub_api.projectround.repository.AcademicRecordRepository;
 import com.example.thesis_hub_api.projectround.repository.ProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
 import com.example.thesis_hub_api.projectround.service.StudentProjectRoundService;
@@ -58,6 +60,9 @@ class StudentProjectRoundServiceTest {
 
     @Mock
     private StudentProjectRoundRepository studentProjectRoundRepository;
+
+    @Mock
+    private AcademicRecordRepository academicRecordRepository;
 
     @Mock
     private StudentRepository studentRepository;
@@ -156,6 +161,8 @@ class StudentProjectRoundServiceTest {
                 .errors(new ArrayList<>())
                 .build();
 
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                studentProjectRoundService, "academicRecordRepository", academicRecordRepository);
         when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
         when(studentExcelParser.parseExcel(any())).thenReturn(new ArrayList<>(List.of(validRow, invalidRow)));
         when(majorRepository.findAll()).thenReturn(List.of(sampleMajor));
@@ -196,6 +203,8 @@ class StudentProjectRoundServiceTest {
                 .rows(List.of(validRow))
                 .build();
 
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                studentProjectRoundService, "academicRecordRepository", academicRecordRepository);
         when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
         when(roleRepository.findByName("ROLE_STUDENT")).thenReturn(Optional.of(studentRole));
         when(passwordEncoder.encode(any())).thenReturn("$2a$10$encodedPassword");
@@ -327,6 +336,8 @@ class StudentProjectRoundServiceTest {
                 .note("Đã đăng ký đề tài thành công")
                 .build();
 
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                studentProjectRoundService, "academicRecordRepository", academicRecordRepository);
         when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
         when(studentProjectRoundRepository.findByStudentIdAndProjectRoundId(10L, 100L))
                 .thenReturn(Optional.of(spr));
@@ -362,6 +373,8 @@ class StudentProjectRoundServiceTest {
                 .rowIndex(3).stt(2).studentCode("201200102").fullName("Trần Thị Bình")
                 .majorCode("CNTT").className("CNTT 1").phone("").isValid(true).build();
 
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                studentProjectRoundService, "academicRecordRepository", academicRecordRepository);
         when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
         when(roleRepository.findByName("ROLE_STUDENT")).thenReturn(Optional.of(studentRole));
         when(majorRepository.findAll()).thenReturn(List.of(sampleMajor));
@@ -400,6 +413,8 @@ class StudentProjectRoundServiceTest {
     @Test
     @DisplayName("Thêm sinh viên thủ công - Hỗ trợ 2 tùy chọn mật khẩu: Số điện thoại hoặc Mã SV")
     void addStudentManually_PasswordModes() {
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                studentProjectRoundService, "academicRecordRepository", academicRecordRepository);
         when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
         when(roleRepository.findByName("ROLE_STUDENT")).thenReturn(Optional.of(studentRole));
         when(passwordEncoder.encode(any())).thenAnswer(inv -> "ENC(" + inv.getArgument(0) + ")");
@@ -442,5 +457,81 @@ class StudentProjectRoundServiceTest {
         studentProjectRoundService.addStudentManually(100L, codeDto);
         verify(passwordEncoder).encode("201200202");
         verify(passwordEncoder, never()).encode("Password@123");
+    }
+
+    @Test
+    @DisplayName("Commit import - Tôn trọng số tín chỉ nợ từ file Excel (khớp Preview) kể cả khi TC tích lũy < maxRoundCredits - 10")
+    void commitImportStudents_UsesExcelDebtCreditsConsistentWithPreview() {
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                studentProjectRoundService, "academicRecordRepository", academicRecordRepository);
+        when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
+        when(roleRepository.findByName("ROLE_STUDENT")).thenReturn(Optional.of(studentRole));
+        when(passwordEncoder.encode(any())).thenAnswer(inv -> "ENC(" + inv.getArgument(0) + ")");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.setId(u.getUsername().equals("201200106") ? 206L : 207L);
+            return u;
+        });
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> {
+            Student s = inv.getArgument(0);
+            s.setId(s.getStudentCode().equals("201200106") ? 306L : 307L);
+            return s;
+        });
+        when(studentProjectRoundRepository.save(any(StudentProjectRound.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StudentImportRowDTO row1 = StudentImportRowDTO.builder()
+                .studentCode("201200106")
+                .fullName("Trần Phương Thảo")
+                .majorCode("CNTT")
+                .className("CNTT 2 - K65")
+                .gpa(2.85)
+                .completedCredits(118)
+                .debtCredits(4)
+                .build();
+        StudentImportRowDTO row2 = StudentImportRowDTO.builder()
+                .studentCode("201200107")
+                .fullName("Lê Hoàng Long")
+                .majorCode("KHMT")
+                .className("KHMT 1 - K65")
+                .gpa(2.61)
+                .completedCredits(112)
+                .debtCredits(8)
+                .build();
+
+        var result = studentProjectRoundService.commitImportStudents(100L, StudentImportCommitRequestDTO.builder()
+                .rows(List.of(row1, row2))
+                .passwordMode("STUDENT_CODE")
+                .build());
+
+        assertEquals(2, result.getTotalProcessed());
+        assertEquals(2, result.getEnrolledInRound());
+        assertEquals(0, result.getSkipped());
+        verify(studentProjectRoundRepository, times(2)).save(any(StudentProjectRound.class));
+    }
+
+    @Test
+    @DisplayName("Xóa sinh viên khỏi đợt - Xóa cả StudentProjectRound và AcademicRecord của đợt đó")
+    void removeStudentFromRound_DeletesRoundAndAcademicRecord() {
+        Student student = Student.builder().id(10L).studentCode("201200106").build();
+        StudentProjectRound spr = StudentProjectRound.builder()
+                .id(55L)
+                .student(student)
+                .projectRound(sampleRound)
+                .build();
+        AcademicRecord ar = AcademicRecord.builder()
+                .id(66L)
+                .student(student)
+                .projectRound(sampleRound)
+                .build();
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                studentProjectRoundService, "academicRecordRepository", academicRecordRepository);
+        when(projectRoundRepository.findById(100L)).thenReturn(Optional.of(sampleRound));
+        when(studentProjectRoundRepository.findByStudentIdAndProjectRoundId(10L, 100L)).thenReturn(Optional.of(spr));
+        when(academicRecordRepository.findByStudentIdAndProjectRoundId(10L, 100L)).thenReturn(Optional.of(ar));
+
+        studentProjectRoundService.removeStudentFromRound(100L, 10L);
+
+        verify(studentProjectRoundRepository).delete(spr);
+        verify(academicRecordRepository).delete(ar);
     }
 }

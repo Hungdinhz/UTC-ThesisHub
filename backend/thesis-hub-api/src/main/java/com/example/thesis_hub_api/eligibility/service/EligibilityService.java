@@ -846,12 +846,17 @@ public class EligibilityService {
         List<String> reasons = new ArrayList<>();
         boolean eligible = true;
 
+        boolean droppedOnlyFromG4Note = "DROPPED".equalsIgnoreCase(studentRoundStatus)
+                && studentRoundNote != null
+                && studentRoundNote.contains("Không hoàn thành GĐ4");
+
         // Check if student was DROPPED, DISQUALIFIED, INELIGIBLE, CANCELLED, or FAILED in the round
-        boolean isTerminatedInRound = "DROPPED".equalsIgnoreCase(studentRoundStatus)
+        boolean isTerminatedInRound = !droppedOnlyFromG4Note && (
+                "DROPPED".equalsIgnoreCase(studentRoundStatus)
                 || "DISQUALIFIED".equalsIgnoreCase(studentRoundStatus)
                 || "INELIGIBLE".equalsIgnoreCase(studentRoundStatus)
                 || "FAILED".equalsIgnoreCase(studentRoundStatus)
-                || "CANCELLED".equalsIgnoreCase(studentRoundStatus);
+                || "CANCELLED".equalsIgnoreCase(studentRoundStatus));
 
         boolean isReserved = "APPROVED".equalsIgnoreCase(reservationStatus) || "RESERVED".equalsIgnoreCase(studentRoundStatus);
 

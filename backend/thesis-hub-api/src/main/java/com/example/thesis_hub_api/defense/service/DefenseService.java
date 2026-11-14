@@ -1619,15 +1619,43 @@ public class DefenseService implements RoundDefenseSynthesizer {
             return Collections.emptyList();
         }
         List<Thesis> roundTheses = thesisRepository.findByProjectRoundId(roundId);
+        List<Thesis> eligibleTheses = roundTheses.stream()
+                .filter(this::isThesisDefenseEligible)
+                .toList();
 
-        // 1. Synthesize thesis results (once) for eligible theses that have scores
-        for (Thesis t : roundTheses) {
-            if (!isThesisDefenseEligible(t)) continue;
+        if (eligibleTheses.isEmpty()) {
+            throw new IllegalStateException("Chưa có sinh viên/đề tài nào đủ điều kiện bảo vệ trong đợt để chốt và công bố kết quả.");
+        }
+
+        // 1. Synthesize thesis results (once) for eligible theses that have all required scores
+        for (Thesis t : eligibleTheses) {
+            if (graduationResultRepository != null && graduationResultRepository.findByThesisId(t.getId()).isPresent()) {
+                continue;
+            }
             if (!canSynthesizeResult(t.getId())) continue;
             try {
                 synthesizeResult(t.getId());
             } catch (Exception ignored) {
             }
+        }
+
+        // 1b. Require all eligible students/theses in the round to have a synthesized final result before finalizing
+        List<String> missingTheses = new ArrayList<>();
+        for (Thesis t : eligibleTheses) {
+            boolean hasResult = graduationResultRepository != null
+                    && graduationResultRepository.findByThesisId(t.getId()).isPresent();
+            if (!hasResult) {
+                String studentLabel = t.getStudent() != null && t.getStudent().getStudentCode() != null
+                        ? t.getStudent().getStudentCode()
+                        : (t.getThesisCode() != null ? t.getThesisCode() : ("#" + t.getId()));
+                missingTheses.add(studentLabel);
+            }
+        }
+        if (!missingTheses.isEmpty()) {
+            throw new IllegalStateException(
+                    "Chưa thể chốt và công bố kết quả: còn " + missingTheses.size()
+                            + " sinh viên chưa được chấm đủ điểm hoặc chưa tổng kết điểm cuối kỳ ("
+                            + String.join(", ", missingTheses) + ").");
         }
 
         // 2. Close round and publish notifications/results
