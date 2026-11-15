@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { LecturerCapacity, ProjectDirection } from '../types';
 
 interface Props {
@@ -25,6 +25,17 @@ export const LecturerCapacityManager: React.FC<Props> = ({
   const [noteInput, setNoteInput] = useState<string>('');
   const [selectedDirectionIds, setSelectedDirectionIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editingCapacity) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEditingCapacity(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editingCapacity]);
 
   const filtered = capacities.filter(
     (c) =>
@@ -143,10 +154,10 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                   <tr key={cap.id}>
                     <td>{index + 1}</td>
                     <td className="font-semibold text-primary">{cap.lecturerCode}</td>
-                    <td>
+                    <td style={{ minWidth: '170px' }}>
                       <div className="lecturer-name-block">
-                        <strong>{cap.fullName}</strong>
-                        {cap.email && <span className="text-xs text-muted">{cap.email}</span>}
+                        <strong className="lecturer-name-text">{cap.fullName}</strong>
+                        {cap.email && <span className="lecturer-email">{cap.email}</span>}
                       </div>
                     </td>
                     <td>
@@ -218,14 +229,31 @@ export const LecturerCapacityManager: React.FC<Props> = ({
       {/* Edit Capacity Modal */}
       {editingCapacity && (
         <div className="modal-overlay" onClick={() => setEditingCapacity(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h4>Điều chỉnh năng lực hướng dẫn: {editingCapacity.fullName}</h4>
-              <button className="close-btn" onClick={() => setEditingCapacity(null)}>
+          <div
+            className="modal-dialog"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '580px',
+              maxHeight: 'min(92vh, 720px)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div className="modal-header" style={{ flexShrink: 0 }}>
+              <h4 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 700, color: '#1e293b' }}>
+                ⚙️ Điều chỉnh năng lực hướng dẫn: {editingCapacity.fullName}
+              </h4>
+              <button
+                type="button"
+                className="close-btn"
+                onClick={() => setEditingCapacity(null)}
+                title="Đóng cửa sổ (Esc)"
+                aria-label="Đóng"
+              >
                 ✕
               </button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{ overflowY: 'auto', flex: '1 1 auto', minHeight: 0 }}>
               <div className="modal-desc-box">
                 <p>
                   <strong>Mã CB:</strong> {editingCapacity.lecturerCode} |{' '}
@@ -271,9 +299,9 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                 </strong>
               </div>
 
-              <div className="form-group">
-                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <span>🎯 Hướng đồ án đảm nhận trong đợt ({selectedDirectionIds.length} hướng):</span>
+              <div className="form-group capacity-directions-group">
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: 600 }}>🎯 Hướng đồ án đảm nhận trong đợt ({selectedDirectionIds.length} hướng):</span>
                   {directions.length > 0 && (
                     <button
                       type="button"
@@ -294,11 +322,12 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                   <p className="text-muted text-xs">Chưa có danh mục hướng đồ án</p>
                 ) : (
                   <div
+                    className="capacity-directions-container"
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                      display: 'flex',
+                      flexDirection: 'column',
                       gap: '8px',
-                      maxHeight: '180px',
+                      maxHeight: '140px',
                       overflowY: 'auto',
                       padding: '10px',
                       border: '1px solid #cbd5e1',
@@ -311,23 +340,37 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                       return (
                         <label
                           key={d.id}
+                          className="direction-checkbox-label"
                           style={{
                             display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '8px',
-                            fontSize: '0.82rem',
+                            alignItems: 'center',
+                            gap: '10px',
+                            fontSize: '0.84rem',
                             cursor: 'pointer',
                             background: isChecked ? '#eff6ff' : '#fff',
-                            border: `1px solid ${isChecked ? '#93c5fd' : '#e2e8f0'}`,
-                            padding: '6px 8px',
-                            borderRadius: '6px',
+                            border: `1.5px solid ${isChecked ? '#3b82f6' : '#cbd5e1'}`,
+                            padding: '8px 12px',
+                            borderRadius: '8px',
                             transition: 'all 0.15s ease',
+                            width: '100%',
+                            boxSizing: 'border-box',
                           }}
                         >
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            style={{ marginTop: '2px', cursor: 'pointer' }}
+                            className="direction-checkbox-input"
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              minHeight: '18px',
+                              maxWidth: '18px',
+                              padding: 0,
+                              margin: 0,
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                              accentColor: '#0284c7',
+                            }}
                             onChange={(e) => {
                               if (e.target.checked) {
                                 setSelectedDirectionIds((prev) => [...prev, d.id]);
@@ -337,12 +380,14 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                             }}
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, color: isChecked ? '#1d4ed8' : '#334155' }}>
-                              {d.code}
+                            <div style={{ fontWeight: 700, color: isChecked ? '#1d4ed8' : '#1e293b', fontSize: '0.85rem' }}>
+                              {d.code} — {d.name}
                             </div>
-                            <div style={{ color: '#475569', fontSize: '0.78rem', lineHeight: 1.25 }}>
-                              {d.name}
-                            </div>
+                            {d.description && (
+                              <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px', lineHeight: 1.3 }}>
+                                {d.description}
+                              </div>
+                            )}
                           </div>
                         </label>
                       );
@@ -362,7 +407,7 @@ export const LecturerCapacityManager: React.FC<Props> = ({
                 />
               </div>
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ flexShrink: 0 }}>
               <button
                 className="btn-cancel"
                 onClick={() => setEditingCapacity(null)}

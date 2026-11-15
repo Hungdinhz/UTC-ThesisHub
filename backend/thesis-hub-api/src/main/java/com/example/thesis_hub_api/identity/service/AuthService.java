@@ -151,12 +151,6 @@ public class AuthService {
                                     : "Không đủ điều kiện học vụ";
                             throw new AppException(ErrorCode.USER_LOCKED,
                                     "Sinh viên ở trạng thái Không đủ điều kiện (" + reason + ") nên không được cấp tài khoản đăng nhập vào hệ thống.");
-                        } else {
-                            // Nếu sinh viên có đợt tham gia hợp lệ nhưng tài khoản đang bị vô hiệu hóa, tự động kích hoạt lại
-                            if (!Boolean.TRUE.equals(user.getIsActive())) {
-                                user.setIsActive(true);
-                                userRepository.save(user);
-                            }
                         }
                     }
                 }

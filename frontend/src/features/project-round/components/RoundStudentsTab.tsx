@@ -156,6 +156,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     underDisciplinaryAction: boolean;
     missingPrerequisiteCount: number | string;
     note: string;
+    accountActive: boolean;
   }>({
     fullName: '',
     className: '',
@@ -169,8 +170,25 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     underDisciplinaryAction: false,
     missingPrerequisiteCount: 0,
     note: '',
+    accountActive: true,
   });
   const [editModalError, setEditModalError] = useState<string | null>(null);
+
+  // Helper xác định số tín chỉ yêu cầu tối đa khi bắt đầu làm đồ án của từng sinh viên
+  const getStudentMaxCredits = (st?: StudentProjectRoundItem | null): number => {
+    if (!st) return resolvedProgram.maxCredits;
+    const progCode = st.trainingProgram || (st.trainingProgramId === 2 ? 'KY_SU' : st.trainingProgramId === 1 ? 'CU_NHAN' : undefined);
+    if (progCode === 'KY_SU') return 170;
+    if (progCode === 'CU_NHAN') return 132;
+    if (st.className && (st.className.toLowerCase().includes('kỹ sư') || st.className.toLowerCase().includes('ky su'))) {
+      return 170;
+    }
+    // Nếu sinh viên có completedCredits <= 132 hoặc lớp CNTT thông thường: mặc định Cử nhân (132 tín)
+    if (st.completedCredits !== undefined && st.completedCredits !== null && st.completedCredits <= 132 && !st.className?.toLowerCase().includes('kỹ sư')) {
+      return 132;
+    }
+    return resolvedProgram.maxCredits;
+  };
 
   // Helper tính trạng thái tự động theo quy chế xét duyệt đồ án UTC
   const computeStudentEligibility = (
@@ -752,8 +770,12 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     if (isRoundClosed) return;
     setEditingStudent(st);
     setEditModalError(null);
-    const initialCompleted = st.completedCredits !== undefined && st.completedCredits !== null ? st.completedCredits : resolvedProgram.maxCredits;
-    const initialDebt = Math.max(0, resolvedProgram.maxCredits - initialCompleted);
+    const studentMaxCredits = getStudentMaxCredits(st);
+    const initialCompleted = st.completedCredits !== undefined && st.completedCredits !== null ? st.completedCredits : studentMaxCredits;
+    // Giữ nguyên số tín nợ thực tế của sinh viên nếu có, hoặc tính theo tín chỉ tối đa tương ứng của hệ
+    const initialDebt = st.debtCredits !== undefined && st.debtCredits !== null
+      ? st.debtCredits
+      : Math.max(0, studentMaxCredits - initialCompleted);
     setEditForm({
       fullName: st.fullName || '',
       className: st.className || '',
@@ -767,6 +789,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       underDisciplinaryAction: Boolean(st.underDisciplinaryAction),
       missingPrerequisiteCount: 0,
       note: st.note || '',
+      accountActive: st.accountActive !== false,
     });
   };
 
@@ -783,11 +806,12 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       return;
     }
 
+    const studentMaxCredits = getStudentMaxCredits(editingStudent);
     const editCompletedNum = typeof editForm.completedCredits === 'string' ? parseInt(editForm.completedCredits, 10) : editForm.completedCredits;
-    const editDebtNum = !isNaN(editCompletedNum) ? Math.max(0, resolvedProgram.maxCredits - editCompletedNum) : 0;
+    const editDebtNum = !isNaN(editCompletedNum) ? Math.max(0, studentMaxCredits - editCompletedNum) : 0;
 
-    if (!isNaN(editCompletedNum) && editCompletedNum > resolvedProgram.maxCredits) {
-      setEditModalError(`Tín chỉ tích lũy (${editCompletedNum}) vượt quá số tín chỉ tối đa khi bắt đầu làm đồ án của hệ ${resolvedProgram.name} (${resolvedProgram.maxCredits} tín chỉ). Vui lòng nhập trong khoảng 0 - ${resolvedProgram.maxCredits}.`);
+    if (!isNaN(editCompletedNum) && editCompletedNum > studentMaxCredits) {
+      setEditModalError(`Tín chỉ tích lũy (${editCompletedNum}) vượt quá số tín chỉ tối đa khi bắt đầu làm đồ án của hệ đào tạo (${studentMaxCredits} tín chỉ). Vui lòng nhập trong khoảng 0 - ${studentMaxCredits}.`);
       return;
     }
     if (!isNaN(editCompletedNum) && editCompletedNum < 0) {
@@ -800,7 +824,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       setEditModalError(null);
 
       const gpaNum = typeof editForm.gpa === 'string' ? parseFloat(editForm.gpa) : editForm.gpa;
-      const completedCreditsNum = !isNaN(editCompletedNum) ? editCompletedNum : resolvedProgram.maxCredits;
+      const completedCreditsNum = !isNaN(editCompletedNum) ? editCompletedNum : studentMaxCredits;
       const debtCreditsNum = editDebtNum;
       const missingPrereqNum = typeof editForm.missingPrerequisiteCount === 'string' ? parseInt(editForm.missingPrerequisiteCount, 10) : editForm.missingPrerequisiteCount;
 
@@ -825,6 +849,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         underDisciplinaryAction: editForm.underDisciplinaryAction,
         missingPrerequisiteCount: 0,
         note: editForm.note.trim() || evalResult.autoNote,
+        accountActive: editForm.accountActive,
       };
 
       await apiService.updateStudentInRound(roundId, editingStudent.studentId, payload);
@@ -840,6 +865,34 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       } else {
         setEditModalError(errMsg);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Khóa hoặc mở khóa tài khoản sinh viên
+  const handleToggleAccountLock = async (st: StudentProjectRoundItem) => {
+    if (isRoundClosed) {
+      setError('Đợt đồ án đã đóng. Không thể thay đổi trạng thái tài khoản.');
+      return;
+    }
+    const isCurrentlyLocked = st.accountActive === false;
+    const willLock = !isCurrentlyLocked;
+    const actionText = willLock ? 'khóa tài khoản' : 'mở khóa tài khoản';
+    if (!window.confirm(`Bạn có chắc chắn muốn ${actionText} sinh viên ${st.studentCode} (${st.fullName})?\n${willLock ? '• Sinh viên sẽ bị cấm đăng nhập vào hệ thống.' : '• Sinh viên sẽ có thể đăng nhập bình thường.'}`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await apiService.toggleStudentAccountLock(roundId, st.studentId, willLock);
+      setSuccessMsg(`Đã ${actionText} sinh viên ${st.studentCode} thành công.`);
+      loadStudents();
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : `Lỗi khi ${actionText}`;
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
@@ -1218,7 +1271,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                         {st.phone && <div style={{ fontSize: '0.75rem' }}>📞 {st.phone}</div>}
                       </td>
                       <td style={{ padding: '10px 10px', textAlign: 'center', fontWeight: 600 }}>
-                        {st.completedCredits ?? resolvedProgram.maxCredits}
+                        {st.completedCredits ?? getStudentMaxCredits(st)}
                       </td>
                       <td style={{ padding: '10px 10px', textAlign: 'center' }}>
                         <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
@@ -1254,7 +1307,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                         <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
                           {badge.label}
                         </span>
-                        {isUnregistered ? (
+                        {st.accountActive === false ? (
+                          <div style={{ marginTop: '3px', fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <span>🔒 TK đã khóa</span>
+                          </div>
+                        ) : isUnregistered ? (
                           <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#b45309' }}>
                             🔑 Đã cấp TK
                           </div>
@@ -1263,8 +1320,8 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                             🚫 Không cấp TK
                           </div>
                         ) : (
-                          <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: st.accountActive === false ? '#b45309' : '#15803d' }}>
-                            {st.accountActive === false ? '⏳ Chờ mở đợt cấp TK' : '🔑 Đã cấp TK'}
+                          <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#15803d' }}>
+                            🔑 Đã cấp TK
                           </div>
                         )}
                         {isCleanNote && (
@@ -1282,6 +1339,22 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                               style={{ backgroundColor: '#eff6ff', color: '#0a3273', border: '1px solid #bfdbfe', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
                             >
                               ✏️ Sửa
+                            </button>
+                            <button
+                              onClick={() => handleToggleAccountLock(st)}
+                              title={st.accountActive === false ? "Mở khóa tài khoản đăng nhập" : "Khóa tài khoản đăng nhập"}
+                              style={{
+                                backgroundColor: st.accountActive === false ? '#f0fdf4' : '#fff1f2',
+                                color: st.accountActive === false ? '#16a34a' : '#e11d48',
+                                border: `1px solid ${st.accountActive === false ? '#bbf7d0' : '#fecdd3'}`,
+                                padding: '3px 7px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                fontWeight: 600
+                              }}
+                            >
+                              {st.accountActive === false ? '🔓 Mở TK' : '🔒 Khóa TK'}
                             </button>
                             <button
                               onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
@@ -1605,7 +1678,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                     Sinh viên: <strong>{editingStudent.fullName}</strong> — MSSV: <strong style={{ color: '#0a3273' }}>{editingStudent.studentCode}</strong>
                   </span>
                   <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontSize: '0.75rem', fontWeight: 600 }}>
-                    🎓 Hệ: {resolvedProgram.name} (Tối đa {resolvedProgram.maxCredits} tín)
+                    🎓 Hệ: {getStudentMaxCredits(editingStudent) === 132 ? 'Cử nhân' : 'Kỹ sư'} (Tối đa {getStudentMaxCredits(editingStudent)} tín)
                   </span>
                 </div>
               </div>
@@ -1799,19 +1872,20 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px', color: (Number(editForm.completedCredits) > resolvedProgram.maxCredits) ? '#dc2626' : '#1e293b' }}>
-                      Tín chỉ tích lũy (tối đa {resolvedProgram.maxCredits} tín) *
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px', color: (Number(editForm.completedCredits) > getStudentMaxCredits(editingStudent)) ? '#dc2626' : '#1e293b' }}>
+                      Tín chỉ tích lũy (tối đa {getStudentMaxCredits(editingStudent)} tín) *
                     </label>
                     <input
                       type="number"
                       min="0"
-                      max={resolvedProgram.maxCredits}
+                      max={getStudentMaxCredits(editingStudent)}
                       value={editForm.completedCredits}
                       onChange={(e) => {
                         const val = e.target.value;
                         const num = Number(val);
+                        const curMax = getStudentMaxCredits(editingStudent);
                         const autoDebt = !isNaN(num) && val !== ''
-                          ? Math.max(0, resolvedProgram.maxCredits - num)
+                          ? Math.max(0, curMax - num)
                           : 0;
                         setEditForm({
                           ...editForm,
@@ -1819,19 +1893,19 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                           debtCredits: autoDebt,
                         });
                       }}
-                      placeholder={`VD: ${resolvedProgram.maxCredits - 4} (tối đa ${resolvedProgram.maxCredits})`}
+                      placeholder={`VD: ${getStudentMaxCredits(editingStudent) - 4} (tối đa ${getStudentMaxCredits(editingStudent)})`}
                       required
                       style={{
                         width: '100%',
                         padding: '7px 10px',
                         borderRadius: '6px',
-                        border: (Number(editForm.completedCredits) > resolvedProgram.maxCredits) ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                        backgroundColor: (Number(editForm.completedCredits) > resolvedProgram.maxCredits) ? '#fef2f2' : '#fff',
+                        border: (Number(editForm.completedCredits) > getStudentMaxCredits(editingStudent)) ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                        backgroundColor: (Number(editForm.completedCredits) > getStudentMaxCredits(editingStudent)) ? '#fef2f2' : '#fff',
                       }}
                     />
-                    {Number(editForm.completedCredits) > resolvedProgram.maxCredits && (
+                    {Number(editForm.completedCredits) > getStudentMaxCredits(editingStudent) && (
                       <div style={{ color: '#dc2626', fontSize: '0.72rem', marginTop: '3px', fontWeight: 600 }}>
-                        ⚠️ Vượt quá tối đa {resolvedProgram.maxCredits} tín của hệ {resolvedProgram.name}
+                        ⚠️ Vượt quá tối đa {getStudentMaxCredits(editingStudent)} tín của hệ {getStudentMaxCredits(editingStudent) === 132 ? 'Cử nhân' : 'Kỹ sư'}
                       </div>
                     )}
                   </div>
@@ -1842,7 +1916,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                     <input
                       type="number"
                       min="0"
-                      max={resolvedProgram.maxCredits}
+                      max={getStudentMaxCredits(editingStudent)}
                       value={editForm.debtCredits}
                       readOnly
                       tabIndex={-1}
@@ -1897,7 +1971,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
               </div>
 
               {/* Phần 3: Ghi chú */}
-              <div style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
                   Ghi chú học vụ
                 </label>
@@ -1908,6 +1982,38 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   rows={2}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
                 />
+              </div>
+
+              {/* Phần 4: Trạng thái tài khoản người dùng */}
+              <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '14px', marginBottom: '20px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0a3273', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🔐 Trạng thái tài khoản đăng nhập</span>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontWeight: 600,
+                    backgroundColor: editForm.accountActive ? '#dcfce7' : '#fee2e2',
+                    color: editForm.accountActive ? '#15803d' : '#dc2626'
+                  }}>
+                    {editForm.accountActive ? 'Đang hoạt động' : 'Tài khoản đã bị khóa'}
+                  </span>
+                </div>
+                <div style={{ backgroundColor: editForm.accountActive ? '#f8fafc' : '#fef2f2', border: `1px solid ${editForm.accountActive ? '#e2e8f0' : '#fecaca'}`, borderRadius: '8px', padding: '10px 14px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: editForm.accountActive ? '#1e293b' : '#dc2626' }}>
+                    <input
+                      type="checkbox"
+                      checked={!editForm.accountActive}
+                      onChange={(e) => setEditForm({ ...editForm, accountActive: !e.target.checked })}
+                    />
+                    <span>Khóa tài khoản đăng nhập (Vô hiệu hóa tài khoản sinh viên)</span>
+                  </label>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', marginLeft: '24px' }}>
+                    {editForm.accountActive
+                      ? 'Sinh viên có thể đăng nhập bình thường bằng mã sinh viên và mật khẩu.'
+                      : '⚠️ Sinh viên sẽ bị cấm đăng nhập vào hệ thống ThesisHub cho đến khi được mở khóa.'}
+                  </div>
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

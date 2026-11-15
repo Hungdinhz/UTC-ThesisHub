@@ -306,6 +306,24 @@ public class StudentProjectRoundService {
         return 132;
     }
 
+    public int getMaxCreditsForStudentOrRound(Student student, ProjectRound round) {
+        if (student != null && student.getTrainingProgramId() != null && trainingProgramRepository != null) {
+            TrainingProgram tp = trainingProgramRepository.findById(student.getTrainingProgramId()).orElse(null);
+            if (tp != null) {
+                if ("KY_SU".equalsIgnoreCase(tp.getCode())) return 170;
+                if ("CU_NHAN".equalsIgnoreCase(tp.getCode())) return 132;
+                if (tp.getTotalCredits() != null) return Math.max(0, tp.getTotalCredits() - 10);
+            }
+        }
+        if (student != null && student.getClassName() != null) {
+            String cLower = student.getClassName().toLowerCase();
+            if (cLower.contains("kỹ sư") || cLower.contains("ky su")) {
+                return 170;
+            }
+        }
+        return getMaxCreditsForRound(round);
+    }
+
     public static class EligibilityEvaluation {
         private final boolean eligible;
         private final String status;
@@ -983,7 +1001,7 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         }
 
         // Academic record update: Tín chỉ nợ khóa cứng theo tín chỉ tích lũy (tối đa 170 tín Kỹ sư, 132 tín Cử nhân)
-        int maxCredits = getMaxCreditsForRound(round);
+        int maxCredits = getMaxCreditsForStudentOrRound(student, round);
         if (dto.getCompletedCredits() != null && dto.getCompletedCredits() > maxCredits) {
             throw new AppException(ErrorCode.VALIDATION_FAILED,
                     String.format("Tín chỉ tích lũy (%d) vượt quá số tín chỉ tối đa của hệ đào tạo khi bắt đầu làm đồ án (%d tín chỉ).",
@@ -1021,10 +1039,15 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
         }
         String finalNote = StringUtils.hasText(dto.getNote()) ? dto.getNote().trim() : eval.getNote();
 
-        // Cập nhật trạng thái tài khoản: Nếu không đủ điều kiện thì KHÔNG cấp / hủy kích hoạt tài khoản
+        // Cập nhật trạng thái tài khoản: Nếu chỉ định rõ accountActive thì tôn trọng chỉ định của admin
         boolean isEligibleUpdated = eval.isEligible() || "FORCE_APPROVED".equalsIgnoreCase(spr.getStatus());
         if (user != null) {
-            boolean accountActiveUpdated = isEligibleUpdated && shouldActivateStudentAccount(student, round, isEligibleUpdated);
+            boolean accountActiveUpdated;
+            if (dto.getAccountActive() != null) {
+                accountActiveUpdated = dto.getAccountActive();
+            } else {
+                accountActiveUpdated = isEligibleUpdated && shouldActivateStudentAccount(student, round, isEligibleUpdated);
+            }
             user.setIsActive(accountActiveUpdated);
             user = userRepository.save(user);
         }
@@ -1273,6 +1296,26 @@ EligibilityEvaluation eval = evaluateEligibility(debtCredits, tuitionDebt, under
                 .accountActive(isAccountActive)
                 .enrolledAt(spr.getCreatedAt())
                 .build();
+    }
+
+    @Transactional
+    public StudentProjectRoundResponseDTO toggleAccountLock(Long roundId, Long studentId, boolean locked) {
+        ProjectRound round = getAndValidateActiveRound(roundId);
+        StudentProjectRound spr = studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        Student student = spr.getStudent() != null ? spr.getStudent() : studentRepository.findById(studentId)
+                .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        User user = student.getUser();
+        if (user == null) {
+            throw new AppException(ErrorCode.VALIDATION_FAILED, "Sinh viên chưa có tài khoản người dùng.");
+        }
+
+        user.setIsActive(!locked);
+        userRepository.save(user);
+
+        return getStudentRoundDetail(roundId, studentId);
     }
 
     private String normalizePasswordMode(String passwordMode) {

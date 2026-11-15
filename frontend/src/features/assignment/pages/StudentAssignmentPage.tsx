@@ -425,7 +425,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div className="round-control-right">
           {/* Read-only Round Indicator */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
             <span style={{ color: '#64748b', fontWeight: 500 }}>Đợt đồ án:</span>

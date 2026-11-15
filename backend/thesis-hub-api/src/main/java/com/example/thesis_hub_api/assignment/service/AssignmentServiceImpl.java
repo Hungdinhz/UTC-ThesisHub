@@ -433,6 +433,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         // Xóa nguyện vọng cũ của sinh viên trong đợt này và lưu nguyện vọng mới
         preferenceRepository.deleteByStudentIdAndProjectRoundId(studentId, request.getProjectRoundId());
+        preferenceRepository.flush();
 
         Double effectiveGpa = request.getGpa() != null ? request.getGpa() : student.getGpa();
         List<Preference> savedPreferences = new ArrayList<>();
@@ -446,8 +447,10 @@ public class AssignmentServiceImpl implements AssignmentService {
                     .prioritizationCriteria(request.getPrioritizationCriteria())
                     .status("PENDING")
                     .build();
-            savedPreferences.add(preferenceRepository.save(pref));
+            savedPreferences.add(pref);
         }
+        preferenceRepository.saveAll(savedPreferences);
+        preferenceRepository.flush();
 
         return getStudentPreferences(studentId, request.getProjectRoundId());
     }
@@ -576,14 +579,20 @@ public class AssignmentServiceImpl implements AssignmentService {
         if (request.getDirectionIds() != null) {
             Long lecturerId = capacity.getLecturerId();
             lecturerDirectionRepository.deleteByLecturerId(lecturerId);
+            lecturerDirectionRepository.flush();
+            List<LecturerDirection> newDirections = new ArrayList<>();
             for (Long dirId : request.getDirectionIds()) {
                 if (directionRepository.existsById(dirId)) {
-                    lecturerDirectionRepository.save(LecturerDirection.builder()
+                    newDirections.add(LecturerDirection.builder()
                             .lecturerId(lecturerId)
                             .directionId(dirId)
                             .isPrimary(false)
                             .build());
                 }
+            }
+            if (!newDirections.isEmpty()) {
+                lecturerDirectionRepository.saveAll(newDirections);
+                lecturerDirectionRepository.flush();
             }
         }
 
@@ -841,6 +850,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         // Nếu reassignAll = true, xóa các đề xuất phân công cũ (status = 'PROPOSED')
         if (request.getReassignAll() != null && request.getReassignAll()) {
             assignmentRepository.deleteByProjectRoundIdAndStatus(roundId, "PROPOSED");
+            assignmentRepository.flush();
         }
 
         // Lấy danh sách các phân công đã chốt (FINALIZED) nếu không reassignAll

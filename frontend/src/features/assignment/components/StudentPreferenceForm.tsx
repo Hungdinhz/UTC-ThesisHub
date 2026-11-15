@@ -95,6 +95,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setErrorMessage('');
     setSuccessMessage('');
 

@@ -100,8 +100,10 @@ public class GlobalExceptionHandler {
         String detailMessage = "Dữ liệu bị trùng lặp hoặc vi phạm ràng buộc cơ sở dữ liệu";
         if (ex.getMostSpecificCause() != null && ex.getMostSpecificCause().getMessage() != null) {
             String cause = ex.getMostSpecificCause().getMessage();
-            if (cause.contains("violates unique constraint") || cause.contains("duplicate key")) {
-                detailMessage = "Dữ liệu bị trùng lặp trong hệ thống (đã tồn tại mã số hoặc email này)";
+            if (cause.contains("uq_student_round_priority") || cause.contains("uq_student_round_lecturer")) {
+                detailMessage = "Nguyện vọng của sinh viên bị trùng lặp hoặc xung đột thứ tự ưu tiên trong đợt đồ án";
+            } else if (cause.contains("violates unique constraint") || cause.contains("duplicate key")) {
+                detailMessage = "Dữ liệu bị trùng lặp trong hệ thống (mã số, email hoặc bản ghi đã tồn tại)";
             } else if (cause.contains("violates check constraint")) {
                 detailMessage = "Dữ liệu không hợp lệ hoặc vi phạm điều kiện ràng buộc của hệ thống";
             }

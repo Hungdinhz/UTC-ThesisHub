@@ -5,6 +5,8 @@ import type { ProjectRoundItem, TrainingProgram, CreateProjectRoundPayload, Crea
 import { RoundStudentsTab } from '../features/project-round/components/RoundStudentsTab';
 import { RoundLecturersTab } from '../features/project-round/components/RoundLecturersTab';
 import { UTCAppLayout } from '../components/UTCAppLayout';
+import { getRoundStageNumber, STAGES } from '../utils/phaseTracking';
+import { VnDateTimePicker, parseVnDateTime } from '../components/VnDateTimePicker';
 import './ProjectRoundManagementPage.css';
 
 const ProjectRoundManagementPage: React.FC = () => {
@@ -180,6 +182,22 @@ const ProjectRoundManagementPage: React.FC = () => {
     }
   };
 
+  const handleOpenAddMilestoneModal = () => {
+    const now = new Date();
+    const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0);
+    const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59);
+
+    setNewMilestone({
+      name: 'Đăng ký nguyện vọng & Hướng đề tài',
+      phaseType: 'REGISTRATION',
+      startDate: defaultStart.toISOString(),
+      endDate: defaultEnd.toISOString(),
+      description: '',
+      orderIndex: (selectedRound?.milestones?.length || 0) + 1,
+    });
+    setShowAddMilestoneModal(true);
+  };
+
   const handleAddMilestone = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRound) return;
@@ -187,9 +205,24 @@ const ProjectRoundManagementPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      const parsedStart = parseVnDateTime(newMilestone.startDate) || new Date(newMilestone.startDate);
+      const parsedEnd = parseVnDateTime(newMilestone.endDate) || new Date(newMilestone.endDate);
+
+      if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+        setError('Định dạng ngày không hợp lệ. Vui lòng nhập theo định dạng ngày/tháng/năm (VD: 16/11/2026 08:00)');
+        setLoading(false);
+        return;
+      }
+
+      if (parsedStart > parsedEnd) {
+        setError('Ngày kết thúc phải diễn ra sau ngày bắt đầu!');
+        setLoading(false);
+        return;
+      }
+
       // Convert local date-time strings to ISO Instant format
-      const startIso = new Date(newMilestone.startDate).toISOString();
-      const endIso = new Date(newMilestone.endDate).toISOString();
+      const startIso = parsedStart.toISOString();
+      const endIso = parsedEnd.toISOString();
 
       await apiService.addRoundMilestone(selectedRound.roundId, {
         ...newMilestone,
@@ -224,6 +257,34 @@ const ProjectRoundManagementPage: React.FC = () => {
   };
 
   // Modal Delete Round (Double Click on Finished Round)
+  const [advancingRoundPhase, setAdvancingRoundPhase] = useState(false);
+
+  const handleAdvanceRoundPhase = async (targetPhase?: string) => {
+    if (!selectedRound) return;
+    if (selectedRound.supplementaryOpen) {
+      setError('Đợt đồ án đang mở đăng ký bổ sung. Vui lòng kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn!');
+      return;
+    }
+    try {
+      setAdvancingRoundPhase(true);
+      setError(null);
+      const updated = await apiService.advanceRoundPhase(selectedRound.roundId, targetPhase);
+      setSelectedRound(updated);
+      await loadRounds();
+      setSuccessMsg(`⚡ Demo: Đã chuyển giai đoạn thành công cho đợt "${updated.name}" (${updated.roundCode})!`);
+      window.dispatchEvent(new CustomEvent('utc-phase-change', { detail: { roundId: updated.roundId } }));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Lỗi khi chuyển giai đoạn đợt đồ án');
+    } finally {
+      setAdvancingRoundPhase(false);
+    }
+  };
+
+  const selectedRoundCurrentStage = selectedRound
+    ? getRoundStageNumber(selectedRound.currentMilestone?.phaseType, selectedRound.status)
+    : 1;
+  const selectedRoundCurrentStageDef = STAGES.find((s) => s.stageNumber === selectedRoundCurrentStage);
+
   const [roundToDelete, setRoundToDelete] = useState<ProjectRoundItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -414,6 +475,16 @@ const ProjectRoundManagementPage: React.FC = () => {
                         }}>
                           {badge.label}
                         </span>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff'
+                        }} title={`Đợt này đang ở Giai đoạn ${getRoundStageNumber(r.currentMilestone?.phaseType, r.status)}`}>
+                          GĐ{getRoundStageNumber(r.currentMilestone?.phaseType, r.status)}
+                        </span>
                         {isDeletable && (
                           <button
                             type="button"
@@ -553,42 +624,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                         🔒 Đóng đợt
                       </button>
                     )}
-                    <button
-                      disabled={Boolean(selectedRound.supplementaryOpen)}
-                      onClick={async () => {
-                        if (selectedRound.supplementaryOpen) {
-                          setError('Đợt đồ án đang mở đăng ký bổ sung. Vui lòng kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn!');
-                          return;
-                        }
-                        try {
-                          setLoading(true);
-                          const updated = await apiService.advanceRoundPhase(selectedRound.roundId);
-                          setSelectedRound(updated);
-                          setSuccessMsg('⚡ Demo: Đã kết thúc giai đoạn và chuyển sang giai đoạn tiếp theo thành công!');
-                          window.dispatchEvent(new CustomEvent('utc-phase-change'));
-                        } catch (err: unknown) {
-                          setError(err instanceof Error ? err.message : 'Lỗi khi chuyển giai đoạn');
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
-                      style={{
-                        backgroundColor: selectedRound.supplementaryOpen ? '#cbd5e1' : '#f59e0b',
-                        color: selectedRound.supplementaryOpen ? '#64748b' : '#0f172a',
-                        border: 'none',
-                        padding: '6px 14px',
-                        borderRadius: '6px',
-                        fontWeight: 700,
-                        fontSize: '0.85rem',
-                        cursor: selectedRound.supplementaryOpen ? 'not-allowed' : 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      title={selectedRound.supplementaryOpen ? 'Đang mở đăng ký bổ sung - Không thể chuyển giai đoạn' : 'Demo: Kết thúc giai đoạn hiện tại và chuyển sang giai đoạn tiếp theo'}
-                    >
-                      ⚡ Demo: Kết thúc GĐ & Chuyển tiếp
-                    </button>
+
                     {canDeleteRound(selectedRound.status) && (
                       <button
                         type="button"
@@ -614,6 +650,101 @@ const ProjectRoundManagementPage: React.FC = () => {
                         🗑️ Xóa đợt
                       </button>
                     )}
+                  </div>
+                </div>
+
+                {/* THANH ĐIỀU HÀNH GIAI ĐOẠN DEMO CỦA RIÊNG ĐỢT NÀY */}
+                <div
+                  className="utc-demo-control-bar admin-bar"
+                  style={{
+                    borderRadius: '8px',
+                    margin: '16px 0 20px 0',
+                    boxShadow: '0 2px 8px rgba(7, 25, 51, 0.15)',
+                  }}
+                >
+                  <div className="utc-demo-info">
+                    <span className="utc-demo-tag">⚡ ĐIỀU HÀNH ĐỢT NÀY</span>
+                    <span className="utc-demo-round">
+                      Mã đợt: <strong>{selectedRound.roundCode}</strong>
+                    </span>
+                    <span className="utc-demo-phase">
+                      Giai đoạn hiện tại:{' '}
+                      <strong className="phase-badge">
+                        {selectedRoundCurrentStageDef?.name || `Giai đoạn ${selectedRoundCurrentStage}`}
+                      </strong>
+                    </span>
+                    {selectedRound.supplementaryOpen && (
+                      <span
+                        style={{
+                          background: '#fef3c7',
+                          color: '#92400e',
+                          border: '1px solid #f59e0b',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        ⚠️ Đang mở ĐK bổ sung (Khóa chuyển GĐ)
+                      </span>
+                    )}
+                  </div>
+                  <div className="utc-demo-actions">
+                    <button
+                      className="utc-demo-btn primary"
+                      onClick={() => handleAdvanceRoundPhase()}
+                      disabled={advancingRoundPhase || Boolean(selectedRound.supplementaryOpen)}
+                      title={
+                        selectedRound.supplementaryOpen
+                          ? 'Vui lòng kết thúc đợt đăng ký bổ sung trước khi chuyển giai đoạn'
+                          : 'Demo: Kết thúc giai đoạn hiện tại của đợt này và chuyển sang giai đoạn tiếp theo'
+                      }
+                    >
+                      {advancingRoundPhase ? '⏳ Đang chuyển...' : '⚡ Kết thúc GĐ & Chuyển tiếp theo'}
+                    </button>
+                    <div className="utc-demo-quick-jumps">
+                      <span className="jump-label">Chuyển nhanh:</span>
+                      <button
+                        disabled={Boolean(selectedRound.supplementaryOpen) || advancingRoundPhase}
+                        className={`jump-btn ${selectedRoundCurrentStage === 1 ? 'active' : ''}`}
+                        onClick={() => handleAdvanceRoundPhase('DRAFT')}
+                        title="Chuyển đợt này về GĐ1 (DRAFT)"
+                      >
+                        GĐ1
+                      </button>
+                      <button
+                        disabled={Boolean(selectedRound.supplementaryOpen) || advancingRoundPhase}
+                        className={`jump-btn ${selectedRoundCurrentStage === 2 ? 'active' : ''}`}
+                        onClick={() => handleAdvanceRoundPhase('REGISTRATION')}
+                        title="Chuyển đợt này về GĐ2 (REGISTRATION)"
+                      >
+                        GĐ2
+                      </button>
+                      <button
+                        disabled={Boolean(selectedRound.supplementaryOpen) || advancingRoundPhase}
+                        className={`jump-btn ${selectedRoundCurrentStage === 3 ? 'active' : ''}`}
+                        onClick={() => handleAdvanceRoundPhase('PROPOSAL_SUBMISSION')}
+                        title="Chuyển đợt này về GĐ3 (PROPOSAL_SUBMISSION)"
+                      >
+                        GĐ3
+                      </button>
+                      <button
+                        disabled={Boolean(selectedRound.supplementaryOpen) || advancingRoundPhase}
+                        className={`jump-btn ${selectedRoundCurrentStage === 4 ? 'active' : ''}`}
+                        onClick={() => handleAdvanceRoundPhase('WEEKLY_REPORT')}
+                        title="Chuyển đợt này về GĐ4 (WEEKLY_REPORT)"
+                      >
+                        GĐ4
+                      </button>
+                      <button
+                        disabled={Boolean(selectedRound.supplementaryOpen) || advancingRoundPhase}
+                        className={`jump-btn ${selectedRoundCurrentStage === 5 ? 'active' : ''}`}
+                        onClick={() => handleAdvanceRoundPhase('DEFENSE')}
+                        title="Chuyển đợt này về GĐ5 (DEFENSE)"
+                      >
+                        GĐ5
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -701,7 +832,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                       </div>
                       {selectedRound.status !== 'CLOSED' && selectedRound.status !== 'ARCHIVED' ? (
                         <button
-                          onClick={() => setShowAddMilestoneModal(true)}
+                          onClick={handleOpenAddMilestoneModal}
                           style={{
                             backgroundColor: '#0a3273',
                             color: '#fff',
@@ -977,25 +1108,21 @@ const ProjectRoundManagementPage: React.FC = () => {
                     <option value="DEFENSE">Bảo vệ đồ án tốt nghiệp trước Hội đồng (DEFENSE)</option>
                   </select>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Ngày bắt đầu *</label>
-                    <input
-                      type="datetime-local"
+                    <VnDateTimePicker
                       required
                       value={newMilestone.startDate}
-                      onChange={(e) => setNewMilestone({ ...newMilestone, startDate: e.target.value })}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(val) => setNewMilestone((prev) => ({ ...prev, startDate: val }))}
                     />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Ngày kết thúc *</label>
-                    <input
-                      type="datetime-local"
+                    <VnDateTimePicker
                       required
                       value={newMilestone.endDate}
-                      onChange={(e) => setNewMilestone({ ...newMilestone, endDate: e.target.value })}
-                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      onChange={(val) => setNewMilestone((prev) => ({ ...prev, endDate: val }))}
                     />
                   </div>
                 </div>
