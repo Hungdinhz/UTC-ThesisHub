@@ -107,3 +107,131 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Tab Switcher: Active vs Archived */
+.round-view-switcher {
+  display: flex;
+  gap: 10px;
+  background-color: #f1f5f9;
+  padding: 6px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+
+@media (max-width: 640px) {
+  .round-view-switcher {
+    width: 100%;
+    flex-direction: column;
+  }
+  .round-view-switcher-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.round-view-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: transparent;
+  color: #64748b;
+}
+
+.round-view-switcher-btn.active-tab {
+  background-color: #ffffff;
+  color: #0a3273;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.round-view-switcher-btn .badge-count {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+.round-view-switcher-btn.active-tab .badge-count {
+  background-color: #0a3273;
+  color: #ffffff;
+}
+
+/* Archived Hub Styles */
+.archived-hub-container {
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.archived-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.archived-kpi-card {
+  padding: 16px 20px;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.archived-kpi-card .kpi-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.archived-kpi-card .kpi-val {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #0a3273;
+  margin-top: 6px;
+}
+
+.archived-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.archived-table th {
+  background-color: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.archived-table td {
+  padding: 14px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.88rem;
+  color: #1e293b;
+}
+
+.archived-table tr:last-child td {
+  border-bottom: none;
+}
+
+.archived-table tr:hover {
+  background-color: #f8fafc;
+}
