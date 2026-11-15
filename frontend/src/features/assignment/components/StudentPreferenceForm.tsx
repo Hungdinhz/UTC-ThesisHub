@@ -38,7 +38,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   onSubmit,
   studentProgram = 'CU_NHAN',
   loading,
-  projectRoundName,
+  projectRoundName: _projectRoundName,
   projectRoundCode: _projectRoundCode,
   academicYear: _academicYear,
   semester: _semester,
