@@ -1091,6 +1091,7 @@ export interface UpdateRoundStudentPayload {
   underDisciplinaryAction?: boolean;
   missingPrerequisiteCount?: number;
   note?: string;
+  accountActive?: boolean;
 }
 
 export interface CreateRoundStudentManualPayload {

@@ -231,9 +231,9 @@ export const CouncilManagementPage: React.FC = () => {
     <div className="feature-page-container">
       <div className="feature-page-header">
         <div>
-          <h1 className="feature-page-title">GĐ5: Thành Lập Hội Đồng Bảo Vệ Đồ Án Tốt Nghiệp</h1>
+          <h1 className="feature-page-title">GĐ5: Thành Lập Hội Đồng Bảo Vệ Đồ Án</h1>
           <p className="feature-page-subtitle">
-            Cơ cấu chuẩn: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường. Chốt Hội đồng rồi chuyển sang Xếp lịch bảo vệ.
+            Cơ cấu: 1 Chủ tịch, 1 Thư ký, 2 Phản biện, 1 Ủy viên.
           </p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -337,7 +337,7 @@ export const CouncilManagementPage: React.FC = () => {
               Quy chế GĐ5: 1 Hội đồng (1CT - 1TK - 1PB1 - 1PB2 - 1UV)
             </div>
             <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '2px' }}>
-              Hội đồng sinh tự động ở trạng thái ACTIVE có thể đổi giảng viên thủ công bằng các ô chọn bên dưới trước khi chốt. Sau khi chốt (FINALIZED), thành viên bị khóa và có thể chuyển sang Xếp lịch bảo vệ.
+              Hội đồng sinh tự động ở trạng thái ACTIVE có thể đổi giảng viên thủ công trước khi chốt.
             </div>
           </div>
         </div>
@@ -495,10 +495,10 @@ export const CouncilManagementPage: React.FC = () => {
               <div className="hard-constraint-banner">
                 <span className="constraint-icon">🛡️</span>
                 <div className="constraint-text">
-                  <strong>Ràng buộc cứng bắt buộc:</strong> Giảng viên hướng dẫn (GVHD) tuyệt đối không ngồi trong Hội đồng chấm chính sinh viên của mình.
+                  <strong>Quy chế:</strong> GVHD không ngồi trong Hội đồng chấm sinh viên của mình.
                   {excludedAdvisorIds.length > 0 && (
                     <span className="excluded-list">
-                      (Đã khóa GVHD: {excludedAdvisorIds.map((id) => lecturers.find((l) => l.lecturerId === id)?.fullName || `GV #${id}`).join(', ')})
+                      (Đã loại GVHD: {excludedAdvisorIds.map((id) => lecturers.find((l) => l.lecturerId === id)?.fullName || `GV #${id}`).join(', ')})
                     </span>
                   )}
                 </div>

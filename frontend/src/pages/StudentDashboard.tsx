@@ -427,12 +427,12 @@ const StudentDashboard: React.FC = () => {
                         👨‍🏫 <strong>Giảng viên hướng dẫn:</strong> <span style={{ color: '#fef08a', fontWeight: 600 }}>{mySupervisorAssignment.lecturerName || 'TS. Trần Văn Giảng Viên'}</span> {mySupervisorAssignment.lecturerCode ? `(${mySupervisorAssignment.lecturerCode})` : ''}
                       </p>
                       <p style={{ margin: '4px 0', fontSize: '0.85rem', color: '#a7f3d0' }}>
-                        Hệ thống đã chốt kết quả phân công GVHD. Vui lòng chuyển sang Giai đoạn 3 để biên soạn & nộp đề cương chi tiết.
+                        Đã chốt phân công GVHD. Vui lòng chuyển sang GĐ3 để nộp đề cương.
                       </p>
                     </div>
                   ) : (
                     <p style={{ margin: 0, color: '#e0f2fe', fontSize: '0.9rem', lineHeight: '1.4' }}>
-                      Sinh viên đăng ký hướng nghiên cứu chuyên môn (AI, Phần mềm, Web/Cloud, ATTT, IoT, Big Data) và lựa chọn tối đa 3 nguyện vọng giảng viên hướng dẫn theo quy định Khoa CNTT.
+                      Chọn hướng nghiên cứu và đăng ký tối đa 3 nguyện vọng GVHD.
                     </p>
                   )}
                 </div>

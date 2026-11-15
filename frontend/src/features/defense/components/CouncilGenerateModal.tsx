@@ -57,10 +57,10 @@ export const CouncilGenerateModal: React.FC<CouncilGenerateModalProps> = ({
         <div className="csp-info-box">
           <h4>Quy tắc nghiệp vụ & Giải thuật:</h4>
           <ul>
-            <li><strong>Cơ cấu chuẩn:</strong> Mỗi Hội đồng gồm 5 Giảng viên: 1 Chủ tịch hội đồng, 1 Thư ký hội đồng, 1 Ủy viên Phản biện 1, 1 Ủy viên Phản biện 2, 1 Ủy viên thông thường.</li>
-            <li><strong>Ràng buộc cứng (Hard constraint):</strong> Giảng viên hướng dẫn (GVHD) tuyệt đối KHÔNG được ngồi trong Hội đồng chấm chính sinh viên đó: <code>GVHD ∉ Council</code>.</li>
-            <li><strong>Ràng buộc mềm (Greedy):</strong> Thuật toán ưu tiên chọn GV có tải thấp nhất để cân bằng số lượng chấm.</li>
-            <li>Hội đồng sinh tự động ở trạng thái ACTIVE có thể đổi giảng viên thủ công trước khi chốt. Sau khi chốt (FINALIZED), danh sách thành viên bị khóa.</li>
+            <li><strong>Cơ cấu:</strong> 1 Chủ tịch, 1 Thư ký, 2 Phản biện, 1 Ủy viên.</li>
+            <li><strong>Ràng buộc:</strong> GVHD không ngồi trong Hội đồng chấm sinh viên của mình.</li>
+            <li><strong>Tối ưu:</strong> Tự động cân bằng tải chấm giữa các giảng viên.</li>
+            <li>Có thể đổi giảng viên thủ công trước khi chốt hội đồng.</li>
           </ul>
         </div>
 

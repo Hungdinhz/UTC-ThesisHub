@@ -99,7 +99,7 @@ export const ClassGradeReportPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">In danh sách điểm đồ án theo lớp</h1>
           <p className="feature-page-subtitle">
-            Chỉ hiển thị kết quả đã được hội đồng tổng hợp và công bố. Có thể xuất Excel (mỗi lớp một sheet) hoặc in trực tiếp.
+            Xuất Excel hoặc in trực tiếp bảng điểm đồ án theo từng lớp.
           </p>
         </div>
       </div>

@@ -156,6 +156,19 @@ public class StudentProjectRoundController {
         return ResponseEntity.ok(ApiResponse.success(updated));
     }
 
+    @RequestMapping(value = "/{roundId}/students/{studentId}/account-lock", method = {RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.POST})
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
+    @Operation(summary = "Khóa hoặc Mở khóa tài khoản sinh viên")
+    public ResponseEntity<ApiResponse<StudentProjectRoundResponseDTO>> toggleAccountLock(
+            @PathVariable Long roundId,
+            @PathVariable Long studentId,
+            @RequestParam boolean locked) {
+
+        StudentProjectRoundResponseDTO updated = studentProjectRoundService.toggleAccountLock(roundId, studentId, locked);
+        String msg = locked ? "Đã khóa tài khoản sinh viên thành công" : "Đã mở khóa tài khoản sinh viên thành công";
+        return ResponseEntity.ok(ApiResponse.success(msg, updated));
+    }
+
     @DeleteMapping("/{roundId}/students/{studentId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF') or hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN', 'ROLE_ACADEMIC_STAFF')")
     @Operation(summary = "Xóa sinh viên khỏi đợt đồ án")

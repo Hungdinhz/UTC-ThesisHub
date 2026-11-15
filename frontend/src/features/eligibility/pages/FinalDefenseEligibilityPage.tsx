@@ -283,7 +283,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Xét điều kiện bảo vệ đồ án &amp; Quản lý Bảo lưu</h1>
           <p className="feature-page-subtitle">
-            Giai đoạn 5 (ELIGIBILITY_REVIEW): Kiểm tra tiêu chí xét duyệt bảo vệ đồ án cuối kỳ, tiếp nhận và phê duyệt đơn bảo lưu đề tài (chưa trả đủ tín chỉ, GVHD xét không đủ điều kiện, hoặc lý do chính đáng khác).
+            Kiểm tra tiêu chí xét duyệt bảo vệ cuối kỳ và phê duyệt đơn bảo lưu đề tài.
           </p>
         </div>
       </div>

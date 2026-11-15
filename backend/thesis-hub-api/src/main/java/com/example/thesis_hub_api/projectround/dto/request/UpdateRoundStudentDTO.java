@@ -23,5 +23,6 @@ public class UpdateRoundStudentDTO {
     private Boolean underDisciplinaryAction;
     private Integer missingPrerequisiteCount;
     private String note;
+    private Boolean accountActive;
 }
 

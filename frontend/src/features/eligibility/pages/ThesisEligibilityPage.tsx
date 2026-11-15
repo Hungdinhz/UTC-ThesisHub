@@ -220,7 +220,7 @@ export const ThesisEligibilityPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Xét duyệt điều kiện làm đồ án tốt nghiệp</h1>
           <p className="feature-page-subtitle">
-            Hệ thống xét duyệt điều kiện làm đồ án dựa trên kết quả tích lũy GPA và số tín chỉ nợ (tối đa 10 tín chỉ).
+            Xét duyệt điều kiện làm đồ án dựa trên kết quả GPA và số tín chỉ nợ.
           </p>
         </div>
         <Button variant="primary" onClick={() => loadStudents(selectedRoundId || undefined)} loading={loading}>

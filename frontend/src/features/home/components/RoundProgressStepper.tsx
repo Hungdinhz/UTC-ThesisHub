@@ -144,7 +144,6 @@ export const RoundProgressStepper: React.FC<RoundProgressStepperProps> = ({
                 <span className="utc-step-state-badge">{getStateLabel(step.status)}</span>
               </div>
               <div className="utc-step-name">{step.name.replace(/^GĐ\d:\s*/, '')}</div>
-              <div className="utc-step-desc">{step.description}</div>
               {hasRound && dateRange && <div className="utc-step-dates">📅 {dateRange}</div>}
               {hasRound && step.status === 'IN_PROGRESS' && step.daysLeft !== undefined && (
                 <div

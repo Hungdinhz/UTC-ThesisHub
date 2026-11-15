@@ -38,7 +38,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
   onSubmit,
   studentProgram = 'CU_NHAN',
   loading,
-  projectRoundName,
+  projectRoundName: _projectRoundName,
   projectRoundCode: _projectRoundCode,
   academicYear: _academicYear,
   semester: _semester,
@@ -95,6 +95,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -171,10 +172,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
         <div className="alert-box alert-warning" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderLeft: '4px solid #f59e0b' }}>
           <span style={{ fontSize: '1.3rem' }}>🔒</span>
           <div>
-            <strong>ĐỢT ĐỒ ÁN ĐÃ ĐÓNG (KẾT THÚC):</strong>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.88rem' }}>
-              Cổng đăng ký hướng chuyên môn và nộp nguyện vọng GVHD cho đợt <strong>{projectRoundName || 'này'}</strong> đã kết thúc. Không thể thực hiện thao tác gửi mới hoặc sửa đổi.
-            </p>
+            <strong>Đợt đồ án đã đóng:</strong> Cổng đăng ký nguyện vọng đã kết thúc.
           </div>
         </div>
       )}
@@ -183,10 +181,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
         <div className="alert-box alert-warning" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderLeft: '4px solid #f59e0b', backgroundColor: '#fffbeb', color: '#92400e' }}>
           <span style={{ fontSize: '1.3rem' }}>🔒</span>
           <div>
-            <strong>KẾT QUẢ PHÂN CÔNG ĐÃ ĐƯỢC CHỐT CHÍNH THỨC:</strong>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.88rem' }}>
-              Khoa / Quản trị viên đã chốt danh sách phân công Giảng viên hướng dẫn. Nguyện vọng của bạn hiện đã được khóa và không thể chỉnh sửa.
-            </p>
+            <strong>Kết quả phân công đã chốt:</strong> Danh sách nguyện vọng đã được khóa.
           </div>
         </div>
       )}
@@ -195,10 +190,7 @@ export const StudentPreferenceForm: React.FC<Props> = ({
         <div className="alert-box alert-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderLeft: '4px solid #0284c7' }}>
           <span style={{ fontSize: '1.3rem' }}>✏️</span>
           <div>
-            <strong>BẠN ĐÃ NỘP NGUYỆN VỌNG TRƯỚC ĐÓ:</strong>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.88rem' }}>
-              Khoa chưa chốt kết quả phân công, bạn có thể thoải mái điều chỉnh lại hướng đồ án và các nguyện vọng GVHD bên dưới, sau đó bấm <strong>"Chỉnh sửa & Lưu thay đổi nguyện vọng"</strong> để cập nhật.
-            </p>
+            <strong>Đã nộp nguyện vọng:</strong> Bạn có thể điều chỉnh và bấm <strong>"Chỉnh sửa & Lưu thay đổi nguyện vọng"</strong> trước khi Khoa chốt.
           </div>
         </div>
       )}

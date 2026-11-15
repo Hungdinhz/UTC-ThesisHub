@@ -39,9 +39,7 @@ export const TaskBoardPage: React.FC = () => {
   const [supervisorScoreData, setSupervisorScoreData] = useState<{ score: number; feedback: string; graderName?: string } | null>(null);
   const [showDefenseReadyModal, setShowDefenseReadyModal] = useState(false);
   const [supScoreInput, setSupScoreInput] = useState<number>(8.5);
-  const [supFeedbackInput, setSupFeedbackInput] = useState<string>(
-    'Sinh viên chủ động, nắm vững kiến thức chuyên môn, hoàn thành tốt các mục tiêu đồ án đề ra và đủ điều kiện bảo vệ trước Hội đồng.'
-  );
+  const [supFeedbackInput, setSupFeedbackInput] = useState<string>('Đạt yêu cầu bảo vệ đồ án.');
 
 
   // Filter visible theses by user role:
@@ -766,22 +764,19 @@ export const TaskBoardPage: React.FC = () => {
             fontWeight: 600,
           }}
         >
-          🔒 Đợt đồ án đã chốt kết quả / Đề tài đã hoàn thành tốt nghiệp — bạn đang ở chế độ <strong>Chỉ xem</strong> (không thể giao việc mới, chỉnh sửa hoặc nộp bài).
+          🔒 Đề tài đã hoàn tất — Chế độ chỉ xem.
         </div>
       )}
       {/* Top Header & Thesis Switcher */}
       <div style={{ background: '#fff', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.04)', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '20px' }}>📌</span>
               <h1 style={{ fontSize: '22px', fontWeight: 'bold', margin: 0, color: '#0f172a' }}>
-                Giai đoạn 4: Thực hiện Đồ án & Quản lý Tiến độ (Task Kanban)
+                Giai đoạn 4: Quản lý Tiến độ Đồ án (Task Kanban)
               </h1>
             </div>
-            <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-              Theo dõi giao việc, hạn nộp (Deadline), nộp bài, GVHD đánh giá (Accepted / Revise) và xác nhận đủ điều kiện bảo vệ.
-            </p>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -990,17 +985,9 @@ export const TaskBoardPage: React.FC = () => {
               {/* Defense Ready Confirmation Button / Badge */}
               <div>
                 {currentThesis.defenseEligible || currentThesis.status === 'DEFENSE_READY' ? (
-                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '10px 14px', borderRadius: '8px', maxWidth: '450px' }}>
+                  <div style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '8px 12px', borderRadius: '8px' }}>
                     <div style={{ fontWeight: 700, color: '#15803d', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `| Điểm GVHD: ${supervisorScoreData.score} / 10 đ`}
-                    </div>
-                    {supervisorScoreData && (
-                      <div style={{ fontSize: '12px', color: '#166534', marginTop: '4px' }}>
-                        Nhận xét: "<em>{supervisorScoreData.feedback}</em>"
-                      </div>
-                    )}
-                    <div style={{ fontSize: '11px', color: '#65a30d', marginTop: '3px', fontStyle: 'italic' }}>
-                      (Quy chế: GVHD đã chấm điểm quá trình và không ngồi trong Hội đồng chấm thi)
+                      <span>🎓</span> ĐÃ XÁC NHẬN ĐỦ ĐK BẢO VỆ {supervisorScoreData && `• Điểm GVHD: ${supervisorScoreData.score}/10`}
                     </div>
                     {canCreateTask && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
@@ -1196,14 +1183,8 @@ export const TaskBoardPage: React.FC = () => {
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', marginBottom: '12px' }}>
             Bạn chưa có Đề tài Đồ án Tốt nghiệp chính thức
           </h2>
-          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.7, marginBottom: '24px' }}>
-            Sinh viên mới được import vào đợt đồ án cần thực hiện tuần tự các bước theo đúng quy trình học vụ:
-            <br />
-            1. <strong>Giai đoạn 2:</strong> Chọn hướng đề tài và đăng ký nguyện vọng GVHD (NV1–NV3).
-            <br />
-            2. <strong>Giai đoạn 3:</strong> Xây dựng đề cương và gửi để Khoa phê duyệt đề tài chính thức.
-            <br />
-            Sau khi đề tài được duyệt sang trạng thái <strong>ĐANG THỰC HIỆN</strong>, Giảng viên hướng dẫn sẽ giao các công việc (Task) lên bảng này để bạn làm bài và nộp kết quả.
+          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
+            Cần hoàn thành đăng ký GVHD (GĐ2) và nộp đề cương (GĐ3) trước khi thực hiện nhiệm vụ đồ án.
           </p>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <a

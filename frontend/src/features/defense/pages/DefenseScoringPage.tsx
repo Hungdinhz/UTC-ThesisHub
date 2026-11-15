@@ -290,7 +290,7 @@ export const DefenseScoringPage: React.FC = () => {
         <div>
           <h1 className="feature-page-title">Chấm điểm và Tổng hợp Kết quả Tốt nghiệp</h1>
           <p className="feature-page-subtitle">
-            Cơ cấu điểm chuẩn UTC: GVHD (40%), Hội đồng 5 thành viên (60% - 1CT-1TK-1PB1-1PB2-1UV). Phân quyền nghiêm ngặt theo vai trò được giao.
+            Cơ cấu điểm: GVHD (40%), Hội đồng (60%).
           </p>
         </div>
 
@@ -840,7 +840,7 @@ export const DefenseScoringPage: React.FC = () => {
               📦 Bảng Tổng hợp Dữ liệu Cuối kỳ &amp; Công bố Kết quả Đợt đồ án
             </h3>
             <p style={{ color: '#475569', fontSize: '13.5px', marginBottom: '16px' }}>
-              Khi bấm <strong>"Ký xuất Dữ liệu &amp; Hoàn tất Đợt đồ án"</strong>, hệ thống sẽ chốt kết quả cuối kỳ, công bố kết quả tốt nghiệp chính thức tới từng Sinh viên và đóng đợt đồ án. <strong>Lưu ý:</strong> Chỉ có thể chốt khi toàn bộ sinh viên đủ điều kiện bảo vệ trong đợt đã được chấm đủ và tổng kết điểm.
+              Chốt kết quả cuối kỳ, công bố kết quả tốt nghiệp và hoàn tất đợt đồ án.
             </p>
             {(() => {
               const missingCount = roundExportResults.filter((item) => !item.result).length;

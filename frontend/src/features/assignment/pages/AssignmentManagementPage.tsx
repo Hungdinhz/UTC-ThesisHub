@@ -385,16 +385,13 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       <div className="assignment-header">
         <div className="assignment-header-title">
           <h2>
-            <span>🎓</span> Phân công Giảng viên hướng dẫn (Module Assignment)
+            <span>🎓</span> Phân công Giảng viên hướng dẫn
           </h2>
-          <p>
-            Quy trình ghép nối nguyện vọng, kiểm soát capacity, tối ưu thuật toán và can thiệp thủ công
-            {currentRound && (
-              <span style={{ display: 'block', marginTop: '6px', color: '#0369a1', fontWeight: 600 }}>
-                📌 Đang phân công cho: <strong>{currentRound.name}</strong> ({currentRound.roundCode}) — Năm học {currentRound.academicYear} ({currentRound.semester})
-              </span>
-            )}
-          </p>
+          {currentRound && (
+            <p style={{ margin: '4px 0 0 0', color: '#0369a1', fontWeight: 600, fontSize: '0.9rem' }}>
+              📌 Đợt: <strong>{currentRound.name}</strong> ({currentRound.roundCode})
+            </p>
+          )}
         </div>
 
         <div className="header-action-group">
@@ -560,7 +557,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
         >
           <span style={{ fontSize: '1.4rem' }}>🔒</span>
           <div>
-            <strong>Đợt đồ án đã đóng hoặc đã lưu trữ (Chế độ chỉ xem):</strong> Mọi thao tác ghi danh, phân công thuật toán, chốt kết quả, override và chỉnh sửa chỉ tiêu capacity đã bị khóa đối với đợt này.
+            <strong>Đợt đồ án đã đóng (Chế độ chỉ xem):</strong> Thao tác phân công và chỉnh sửa đã bị khóa.
           </div>
         </div>
       )}
@@ -584,8 +581,8 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
           <div style={{ fontSize: '1.8rem', lineHeight: 1 }}>✅</div>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h4 style={{ margin: 0, color: '#166534', fontSize: '1.05rem', fontWeight: 700 }}>
-                ĐÃ CHỐT PHÂN CÔNG GIẢNG VIÊN HƯỚNG DẪN THÀNH CÔNG (FINALIZED)
+              <h4 style={{ margin: 0, color: '#166534', fontSize: '1rem', fontWeight: 700 }}>
+                Đã chốt phân công GVHD ({proposals.length} sinh viên)
               </h4>
               <span
                 style={{
@@ -594,20 +591,17 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
                   padding: '2px 8px',
                   borderRadius: '12px',
                   fontSize: '0.75rem',
-                  fontWeight: 700,
+                  fontWeight: 600,
                 }}
               >
-                CHÍNH THỨC
+                Chính thức
               </span>
-            </div>
-            <p style={{ margin: '6px 0 0 0', color: '#15803d', fontSize: '0.9rem', lineHeight: 1.5 }}>
-              Kết quả phân công Giảng viên hướng dẫn cho đợt <strong>{currentRound?.name || effectiveRoundId}</strong> đã được chốt và lưu chính thức vào cơ sở dữ liệu. Toàn bộ {proposals.length} sinh viên đã được bàn giao cho các Giảng viên để chuẩn bị bước sang <strong>Giai đoạn 3 (Đề cương & Duyệt đề tài)</strong>. Nút chốt kết quả phân công đã được khóa, tuy nhiên Khoa vẫn có thể bấm nút <strong>"✏️ Sửa phân công"</strong> ở từng sinh viên bên dưới để điều chỉnh thủ công nếu cần.
               {stats?.droppedCount && stats.droppedCount > 0 ? (
-                <span style={{ display: 'block', marginTop: '4px', color: '#b91c1c', fontWeight: 600 }}>
-                  ⚠️ Đã loại {stats.droppedCount} sinh viên không đăng ký nguyện vọng khỏi đợt đồ án theo quy chế.
+                <span style={{ color: '#b91c1c', fontSize: '0.85rem', fontWeight: 600 }}>
+                  • Loại {stats.droppedCount} sinh viên chưa đăng ký
                 </span>
               ) : null}
-            </p>
+            </div>
             {isAdmin && !isRoundClosed && (
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' }}>
                 <button
@@ -816,10 +810,9 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
                   lineHeight: 1.5,
                 }}
               >
-                <strong>⚠️ LƯU Ý QUY ĐỊNH:</strong>
-                <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px' }}>
-                  <li>Những sinh viên chưa đăng ký nguyện vọng đồ án trong đợt này sẽ tự động bị <strong>LOẠI KHỎI ĐỢT (DROPPED)</strong> theo quy định.</li>
-                  <li>Sau khi xác nhận chốt, nút <strong>"Chốt kết quả phân công"</strong> sẽ được khóa lại, nhưng Khoa vẫn có thể bấm <strong>"✏️ Sửa phân công"</strong> ở từng dòng để điều chỉnh giảng viên hướng dẫn khi cần.</li>
+                <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                  <li>Sinh viên chưa đăng ký nguyện vọng sẽ chuyển sang trạng thái <strong>DROPPED</strong>.</li>
+                  <li>Sau khi chốt, vẫn có thể sửa phân công thủ công từng sinh viên nếu cần.</li>
                 </ul>
               </div>
 

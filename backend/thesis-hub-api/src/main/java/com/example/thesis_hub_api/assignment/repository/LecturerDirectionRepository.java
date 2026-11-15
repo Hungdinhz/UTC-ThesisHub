@@ -2,6 +2,9 @@ package com.example.thesis_hub_api.assignment.repository;
 
 import com.example.thesis_hub_api.assignment.entity.LecturerDirection;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -24,5 +27,7 @@ public interface LecturerDirectionRepository extends JpaRepository<LecturerDirec
 
     boolean existsByLecturerIdAndDirectionId(Long lecturerId, Long directionId);
 
-    void deleteByLecturerId(Long lecturerId);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM LecturerDirection ld WHERE ld.lecturerId = :lecturerId")
+    void deleteByLecturerId(@Param("lecturerId") Long lecturerId);
 }

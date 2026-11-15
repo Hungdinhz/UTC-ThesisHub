@@ -298,13 +298,13 @@ const LoginPage: React.FC = () => {
           <div className="utc-info-header">
             <img src={utcLogo} alt="UTC" className="utc-icon-circle blue" style={{ padding: '6px', objectFit: 'contain' }} />
             <div className="utc-info-header-text">
-              <h2>{t('portal.welcomeTitle', 'CHÀO MỪNG ĐẾN VỚI HỆ THỐNG SMART FYP UTC')}</h2>
-              <p>{t('portal.welcomeDesc', 'Trường Đại học Giao thông Vận tải — nơi đào tạo nguồn nhân lực chất lượng cao trong lĩnh vực Giao thông Vận tải, Kinh tế, Kỹ thuật và Công nghệ.')}</p>
+              <h2>{t('portal.welcomeTitle', 'HỆ THỐNG ĐỒ ÁN TỐT NGHIỆP')}</h2>
+              <p>{t('portal.welcomeDesc', 'Trường Đại học Giao thông Vận tải')}</p>
             </div>
           </div>
 
           <p className="utc-info-desc">
-            {t('portal.welcomeNote', 'Đăng nhập để quản lý tiến độ đồ án tốt nghiệp, tra cứu điểm số, theo dõi lịch bảo vệ và sử dụng các tiện ích chuẩn hóa dành cho sinh viên và giảng viên UTC.')}
+            {t('portal.welcomeNote', 'Cổng thông tin quản lý toàn trình đồ án tốt nghiệp UTC.')}
           </p>
 
           <div className="utc-features-grid">

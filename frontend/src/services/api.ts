@@ -1236,6 +1236,19 @@ class ApiService {
     await this.api.delete(PROJECT_ROUNDS.studentDetail(roundId, studentId));
   }
 
+  async toggleStudentAccountLock(
+    roundId: number,
+    studentId: number,
+    locked: boolean
+  ): Promise<StudentProjectRoundItem> {
+    const response = await this.api.put<StudentProjectRoundItem>(
+      `${PROJECT_ROUNDS.studentDetail(roundId, studentId)}/account-lock`,
+      null,
+      { params: { locked } }
+    );
+    return response.data;
+  }
+
   async addStudentToRoundManually(
     roundId: number,
     payload: CreateRoundStudentManualPayload
