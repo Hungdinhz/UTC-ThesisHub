@@ -63,7 +63,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [expandedMenu, setExpandedMenu] = useState<string | null>('academic');
 
   const [_activeRound, setActiveRound] = useState<ProjectRoundItem | null>(null);
   const [roundCurrentStage, setRoundCurrentStage] = useState<number>(2);
@@ -556,33 +555,6 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 <span className="utc-nav-icon">💬</span>
                 <span className="utc-nav-label">Nhóm Chat Hướng Dẫn</span>
               </div>
-
-              <div
-                className={`utc-nav-item ${expandedMenu === 'academic' ? 'expanded' : ''}`}
-                onClick={() => setExpandedMenu(expandedMenu === 'academic' ? null : 'academic')}
-                title="Góc học tập & Tiện ích"
-              >
-                <span className="utc-nav-icon">📚</span>
-                <span className="utc-nav-label">Góc học tập &amp; Tiện ích</span>
-                <span className="utc-arrow">{expandedMenu === 'academic' ? '▾' : '▸'}</span>
-              </div>
-
-              {expandedMenu === 'academic' && (
-                <div className="utc-sub-nav">
-                  <div
-                    className={`utc-sub-item ${activeTab === 'thesis-detail' ? 'active' : ''}`}
-                    onClick={() => handleNavClick('/thesis/detail', true)}
-                  >
-                    Chi tiết Đề tài của tôi
-                  </div>
-                  <div
-                    className={`utc-sub-item ${activeTab === 'reports' ? 'active' : ''}`}
-                    onClick={() => handleNavClick('/progress/reports', true)}
-                  >
-                    Báo cáo Tiến độ Định kỳ
-                  </div>
-                </div>
-              )}
             </>
           )}
 

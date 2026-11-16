@@ -79,7 +79,7 @@ export const CouncilMemberCard: React.FC<CouncilMemberCardProps> = ({
             const isDuplicate = otherMemberLecturerIds.map(Number).includes(Number(lec.lecturerId));
             return (
               <option key={lec.lecturerId} value={lec.lecturerId} disabled={isConflict || isDuplicate}>
-                {lec.fullName} ({lec.degree}) — Tải: {lec.currentLoad} {isConflict ? '[TRÙNG GVHD]' : ''} {isDuplicate ? '[ĐÃ CÓ TRONG HỘI ĐỒNG]' : ''}
+                {lec.fullName} ({lec.degree}) {isConflict ? '[TRÙNG GVHD]' : ''} {isDuplicate ? '[ĐÃ CÓ TRONG HỘI ĐỒNG]' : ''}
               </option>
             );
           })}
