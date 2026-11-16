@@ -74,8 +74,10 @@ export const AdminDashboard: React.FC = () => {
       icon: '🗓️',
       color: '#16a34a',
       actions: [
-        { label: 'Đợt đồ án & Import SV', route: '/admin/project-rounds' },
-        { label: 'Khoa, Bộ môn, GV & SV', route: '/admin/organization' },
+        { label: 'Đợt đồ án & Mốc thời gian', route: '/admin/project-rounds' },
+        { label: 'Khoa, Bộ môn', route: '/admin/organization' },
+        { label: 'Quản lý giảng viên', route: '/admin/lecturers' },
+        { label: 'Quản lý sinh viên', route: '/admin/students' },
       ],
     },
     {

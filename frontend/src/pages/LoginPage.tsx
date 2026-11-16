@@ -307,6 +307,76 @@ const LoginPage: React.FC = () => {
             {t('portal.welcomeNote', 'Cổng thông tin quản lý toàn trình đồ án tốt nghiệp UTC.')}
           </p>
 
+          <div className="utc-milestones-card">
+            <div className="utc-milestones-header">
+              <div className="utc-milestones-title">
+                <span className="utc-milestones-icon">🎯</span>
+                <span>{t('portal.milestonesTitle', 'LỘ TRÌNH 5 MỐC ĐỒ ÁN CHUẨN UTC')}</span>
+              </div>
+              <span className="utc-milestones-badge">{t('portal.milestonesBadge', 'Khóa K60 – K64')}</span>
+            </div>
+
+            <div className="utc-milestones-stepper">
+              <div className="utc-milestone-step completed" title="Giai đoạn 1: Sinh viên đăng ký nguyện vọng và chọn GVHD">
+                <div className="utc-milestone-node-row">
+                  <div className="utc-milestone-circle">1</div>
+                  <div className="utc-milestone-line right line-green" />
+                </div>
+                <div className="utc-milestone-text-group">
+                  <span className="utc-milestone-name">{t('portal.milestone1Title', 'Đăng ký đề tài')}</span>
+                  <span className="utc-milestone-time">{t('portal.milestone1Time', 'Tuần 1-2')}</span>
+                </div>
+              </div>
+
+              <div className="utc-milestone-step completed" title="Giai đoạn 2: Xây dựng và nộp đề cương chi tiết, thẩm định đề tài">
+                <div className="utc-milestone-node-row">
+                  <div className="utc-milestone-line left line-green" />
+                  <div className="utc-milestone-circle">2</div>
+                  <div className="utc-milestone-line right line-green-to-blue" />
+                </div>
+                <div className="utc-milestone-text-group">
+                  <span className="utc-milestone-name">{t('portal.milestone2Title', 'Đề cương chi tiết')}</span>
+                  <span className="utc-milestone-time">{t('portal.milestone2Time', 'Tuần 3-4')}</span>
+                </div>
+              </div>
+
+              <div className="utc-milestone-step active" title="Giai đoạn 3: Báo cáo tiến độ đồ án giữa kỳ, GVHD đánh giá và duyệt tiếp tục">
+                <div className="utc-milestone-node-row">
+                  <div className="utc-milestone-line left line-blue" />
+                  <div className="utc-milestone-circle">3</div>
+                  <div className="utc-milestone-line right line-muted" />
+                </div>
+                <div className="utc-milestone-text-group">
+                  <span className="utc-milestone-name">{t('portal.milestone3Title', 'Đánh giá giữa kỳ')}</span>
+                  <span className="utc-milestone-time">{t('portal.milestone3Time', 'Tuần 8-10')}</span>
+                </div>
+              </div>
+
+              <div className="utc-milestone-step upcoming" title="Giai đoạn 4: Hoàn thiện báo cáo toàn văn, nộp khóa luận và xét điều kiện bảo vệ">
+                <div className="utc-milestone-node-row">
+                  <div className="utc-milestone-line left line-muted" />
+                  <div className="utc-milestone-circle">4</div>
+                  <div className="utc-milestone-line right line-muted" />
+                </div>
+                <div className="utc-milestone-text-group">
+                  <span className="utc-milestone-name">{t('portal.milestone4Title', 'Nộp khóa luận')}</span>
+                  <span className="utc-milestone-time">{t('portal.milestone4Time', 'Tuần 14')}</span>
+                </div>
+              </div>
+
+              <div className="utc-milestone-step upcoming" title="Giai đoạn 5: Thuyết trình trước Hội đồng chấm điểm UTC & tổng kết điểm số">
+                <div className="utc-milestone-node-row">
+                  <div className="utc-milestone-line left line-muted" />
+                  <div className="utc-milestone-circle">5</div>
+                </div>
+                <div className="utc-milestone-text-group">
+                  <span className="utc-milestone-name">{t('portal.milestone5Title', 'Bảo vệ Hội đồng')}</span>
+                  <span className="utc-milestone-time">{t('portal.milestone5Time', 'Tuần 16')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="utc-features-grid">
             <div className="utc-feature-box">
               <div className="utc-feature-icon icon-blue">📊</div>
@@ -339,6 +409,17 @@ const LoginPage: React.FC = () => {
                 <p>{t('portal.feat4Desc', 'Trao đổi trực tiếp & chia sẻ tài liệu cùng GVHD')}</p>
               </div>
             </div>
+          </div>
+
+          <div className="utc-grading-rule-note">
+            <span className="utc-grading-icon">⚖️</span>
+            <span>
+              <strong>{t('portal.gradingNotePrefix', 'Quy chuẩn đánh giá ĐATN UTC:')}</strong>{' '}
+              {t(
+                'portal.gradingStandardNote',
+                'Điểm GVHD (40%) • Điểm Phản biện (20%) • Điểm Hội đồng (40%) — Chuẩn hóa thang GPA 4.0 & quy chế học vụ'
+              )}
+            </span>
           </div>
         </section>
 

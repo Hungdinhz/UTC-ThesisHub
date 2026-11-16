@@ -64,6 +64,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [securityMenuOpen, setSecurityMenuOpen] = useState(true);
+  const [organizationMenuOpen, setOrganizationMenuOpen] = useState(true);
 
   const [_activeRound, setActiveRound] = useState<ProjectRoundItem | null>(null);
   const [roundCurrentStage, setRoundCurrentStage] = useState<number>(2);
@@ -379,20 +380,55 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
                 <span className="utc-nav-icon">🏠</span>
                 <span className="utc-nav-label">Trang chủ</span>
               </div>
+
+              {/* TÀI KHOẢN & NHÂN SỰ */}
+              <div className="utc-security-section-box">
+                <div
+                  className="utc-security-section-header"
+                  onClick={() => setOrganizationMenuOpen(!organizationMenuOpen)}
+                >
+                  <span>TÀI KHOẢN &amp; NHÂN SỰ</span>
+                  <span className="utc-arrow">{organizationMenuOpen ? '▾' : '▸'}</span>
+                </div>
+
+                {organizationMenuOpen && (
+                  <div className="utc-security-section-items">
+                    <div
+                      className={`utc-nav-item ${activeTab === 'organization' ? 'active' : ''}`}
+                      onClick={() => handleNavClick('/admin/organization', true)}
+                      title="Khoa, Bộ môn"
+                    >
+                      <span className="utc-nav-icon">🏛️</span>
+                      <span className="utc-nav-label">Khoa, Bộ môn</span>
+                    </div>
+
+                    <div
+                      className={`utc-nav-item ${activeTab === 'lecturers' ? 'active' : ''}`}
+                      onClick={() => handleNavClick('/admin/lecturers', true)}
+                      title="Quản lý giảng viên"
+                    >
+                      <span className="utc-nav-icon">👨‍🏫</span>
+                      <span className="utc-nav-label">Quản lý giảng viên</span>
+                    </div>
+
+                    <div
+                      className={`utc-nav-item ${activeTab === 'students' ? 'active' : ''}`}
+                      onClick={() => handleNavClick('/admin/students', true)}
+                      title="Quản lý sinh viên"
+                    >
+                      <span className="utc-nav-icon">👨‍🎓</span>
+                      <span className="utc-nav-label">Quản lý sinh viên</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div
                 className={`utc-nav-item ${activeTab === 'project-rounds' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/admin/project-rounds', true)}
               >
                 <span className="utc-nav-icon">🗓️</span>
                 <span className="utc-nav-label">GĐ1: Quản trị Đợt đồ án &amp; Mốc thời gian</span>
-              </div>
-
-              <div
-                className={`utc-nav-item ${activeTab === 'organization' ? 'active' : ''}`}
-                onClick={() => handleNavClick('/admin/organization', true)}
-              >
-                <span className="utc-nav-icon">🏛️</span>
-                <span className="utc-nav-label">GĐ1: Khoa, Bộ môn, GV &amp; SV</span>
               </div>
 
               <div

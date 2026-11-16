@@ -264,7 +264,8 @@
 
 /* Security & Audit Logs Sidebar Section Box */
 .utc-security-section-box {
-  margin-top: 12px;
+  margin-top: 10px;
+  margin-bottom: 10px;
   padding: 10px 8px 6px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.035);

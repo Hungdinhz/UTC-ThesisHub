@@ -13,6 +13,8 @@ const AdminRegisterPage = lazy(() => import('./pages/AdminRegisterPage'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const ExternalDashboard = lazy(() => import('./pages/ExternalDashboard'));
 const OrganizationManagementPage = lazy(() => import('./pages/OrganizationManagementPage'));
+const LecturerManagementPage = lazy(() => import('./pages/LecturerManagementPage'));
+const StudentManagementPage = lazy(() => import('./pages/StudentManagementPage'));
 const ProjectRoundManagementPage = lazy(() => import('./pages/ProjectRoundManagementPage'));
 const AssignmentManagementPage = lazy(() =>
   import('./features/assignment/pages/AssignmentManagementPage').then((m) => ({ default: m.AssignmentManagementPage }))
@@ -227,6 +229,22 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute allowedTypes={['admin']}>
             <OrganizationManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/lecturers"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <LecturerManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/students"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <StudentManagementPage />
           </ProtectedRoute>
         }
       />
