@@ -352,6 +352,91 @@ public class DefenseService implements RoundDefenseSynthesizer {
     }
 
     @Transactional
+    public java.util.Map<String, Object> notifyCouncilMembers(Long id, CouncilNotifyRequestDTO request) {
+        DefenseCouncil council = councilRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
+
+        String title = (request != null && request.getTitle() != null && !request.getTitle().isBlank())
+                ? request.getTitle()
+                : "Thông báo thành lập Hội đồng bảo vệ đồ án: " + council.getName();
+
+        String message = (request != null && request.getMessage() != null && !request.getMessage().isBlank())
+                ? request.getMessage()
+                : "Hội đồng bảo vệ " + council.getName() + " (" + council.getCode() + ") đã được chốt danh sách thành viên chính thức.";
+
+        boolean notifyLecturers = request == null || request.getNotifyLecturers() == null || request.getNotifyLecturers();
+        boolean notifyStudents = request == null || request.getNotifyStudents() == null || request.getNotifyStudents();
+
+        int lecturerCount = 0;
+        int studentCount = 0;
+
+        if (notificationService != null) {
+            if (notifyLecturers && lecturerRepository != null) {
+                List<CouncilMember> members = memberRepository.findByCouncilId(id);
+                for (CouncilMember m : members) {
+                    if (m.getLecturerId() != null) {
+                        try {
+                            lecturerRepository.findById(m.getLecturerId()).ifPresent(lec -> {
+                                if (lec.getUser() != null && lec.getUser().getId() != null) {
+                                    String roleVn = switch (m.getRole() != null ? m.getRole().toUpperCase() : "") {
+                                        case "PRESIDENT" -> "Chủ tịch Hội đồng";
+                                        case "SECRETARY" -> "Thư ký Hội đồng";
+                                        case "REVIEWER_1" -> "Ủy viên Phản biện 1";
+                                        case "REVIEWER_2" -> "Ủy viên Phản biện 2";
+                                        case "MEMBER" -> "Ủy viên Hội đồng";
+                                        default -> "Thành viên Hội đồng";
+                                    };
+                                    notificationService.createNotification(
+                                            lec.getUser().getId(),
+                                            title,
+                                            message + " [Vai trò của Thầy/Cô: " + roleVn + "]",
+                                            "DEFENSE",
+                                            "/defense-councils"
+                                    );
+                                }
+                            });
+                            lecturerCount++;
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            if (notifyStudents && studentRepository != null) {
+                CouncilResponseDTO councilDto = mapToCouncilResponse(council);
+                if (councilDto.getAssignedStudents() != null) {
+                    for (CouncilStudentDetailDTO cs : councilDto.getAssignedStudents()) {
+                        if (cs.getStudentId() != null) {
+                            try {
+                                studentRepository.findById(cs.getStudentId()).ifPresent(st -> {
+                                    if (st.getUser() != null && st.getUser().getId() != null) {
+                                        notificationService.createNotification(
+                                                st.getUser().getId(),
+                                                title,
+                                                message,
+                                                "DEFENSE",
+                                                "/student/defense"
+                                        );
+                                    }
+                                });
+                                studentCount++;
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            }
+        }
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("councilId", id);
+        result.put("councilCode", council.getCode());
+        result.put("lecturerCount", lecturerCount);
+        result.put("studentCount", studentCount);
+        result.put("totalNotified", lecturerCount + studentCount);
+        result.put("sentAt", java.time.Instant.now().toString());
+        return result;
+    }
+
+    @Transactional
     public CouncilResponseDTO reopenCouncil(Long id) {
         DefenseCouncil council = councilRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));

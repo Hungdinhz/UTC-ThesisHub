@@ -271,6 +271,15 @@ public class AssignmentController {
         return ResponseEntity.ok(ApiResponse.success("Chốt kết quả phân công thành công", stats));
     }
 
+    @PostMapping("/notify")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_FACULTY_ADMIN') or hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    @Operation(summary = "Gửi thông báo kết quả phân công GVHD đến giảng viên và sinh viên sau khi chốt")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> notifyAssignmentMembers(
+            @RequestBody(required = false) AssignmentNotifyRequestDTO request) {
+        java.util.Map<String, Object> result = assignmentService.notifyAssignmentMembers(request);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi thông báo kết quả phân công thành công", result));
+    }
+
     @GetMapping("/stats")
     @Operation(summary = "Thống kê kết quả phân công và tải giảng viên")
     public ResponseEntity<ApiResponse<AssignmentStatsResponseDTO>> getStats(

@@ -41,6 +41,7 @@ public interface AssignmentService {
     List<SupervisorAssignmentResponseDTO> getProposalsByRound(Long projectRoundId, String status);
     SupervisorAssignmentResponseDTO overrideAssignment(Long assignmentId, AssignmentOverrideRequestDTO request, Long currentUserId);
     AssignmentStatsResponseDTO finalizeAssignments(AssignmentFinalizeRequestDTO request, Long currentUserId);
+    java.util.Map<String, Object> notifyAssignmentMembers(AssignmentNotifyRequestDTO request);
     AssignmentStatsResponseDTO getAssignmentStats(Long projectRoundId);
     AssignmentStatsResponseDTO openSupplementaryRegistration(Long projectRoundId);
     AssignmentStatsResponseDTO finalizeSupplementaryRegistration(Long projectRoundId, Long currentUserId);

@@ -87,6 +87,18 @@ public class DefenseController {
     }
 
     /**
+     * Gửi thông báo đến các thành viên và sinh viên bảo vệ của Hội đồng sau khi chốt
+     */
+    @PostMapping("/councils/{id}/notify")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> notifyCouncilMembers(
+            @PathVariable Long id,
+            @RequestBody(required = false) CouncilNotifyRequestDTO request) {
+        java.util.Map<String, Object> result = defenseService.notifyCouncilMembers(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi thông báo đến các thành viên Hội đồng thành công", result));
+    }
+
+    /**
      * Mở khóa Hội đồng bảo vệ (Chuyển trạng thái từ FINALIZED về ACTIVE để chỉnh sửa thủ công)
      */
     @PostMapping("/councils/{id}/reopen")

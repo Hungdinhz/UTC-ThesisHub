@@ -1257,6 +1257,93 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     @Transactional
+    public java.util.Map<String, Object> notifyAssignmentMembers(AssignmentNotifyRequestDTO request) {
+        if (request == null || request.getProjectRoundId() == null) {
+            throw new IllegalArgumentException("Vui lòng cung cấp projectRoundId để gửi thông báo.");
+        }
+        Long roundId = request.getProjectRoundId();
+        ProjectRound round = projectRoundRepository.findById(roundId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đợt đồ án với ID: " + roundId));
+
+        List<SupervisorAssignment> assignments = assignmentRepository.findByProjectRoundId(roundId);
+
+        String roundName = (round.getName() != null && !round.getName().isBlank()) ? round.getName() : ("Đợt đồ án #" + roundId);
+        String title = (request.getTitle() != null && !request.getTitle().isBlank())
+                ? request.getTitle()
+                : "[UTC] Thông báo chính thức kết quả phân công Giảng viên hướng dẫn - " + roundName;
+
+        String message = (request.getMessage() != null && !request.getMessage().isBlank())
+                ? request.getMessage()
+                : "Khoa đã chốt kết quả phân công Giảng viên hướng dẫn đồ án tốt nghiệp cho đợt " + roundName + ". Vui lòng đăng nhập hệ thống để xem chi tiết.";
+
+        boolean notifyLecturers = request.getNotifyLecturers() == null || request.getNotifyLecturers();
+        boolean notifyStudents = request.getNotifyStudents() == null || request.getNotifyStudents();
+
+        int lecturerCount = 0;
+        int studentCount = 0;
+
+        if (notificationService != null) {
+            if (notifyLecturers && lecturerRepository != null) {
+                Set<Long> lecturerIds = assignments.stream()
+                        .map(SupervisorAssignment::getLecturerId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+
+                for (Long lecId : lecturerIds) {
+                    try {
+                        lecturerRepository.findById(lecId).ifPresent(lec -> {
+                            if (lec.getUser() != null && lec.getUser().getId() != null) {
+                                notificationService.createNotification(
+                                        lec.getUser().getId(),
+                                        title,
+                                        message,
+                                        "ASSIGNMENT",
+                                        "/lecturer/topics"
+                                );
+                            }
+                        });
+                        lecturerCount++;
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            if (notifyStudents && studentRepository != null) {
+                Set<Long> studentIds = assignments.stream()
+                        .map(SupervisorAssignment::getStudentId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+
+                for (Long sId : studentIds) {
+                    try {
+                        studentRepository.findById(sId).ifPresent(st -> {
+                            if (st.getUser() != null && st.getUser().getId() != null) {
+                                notificationService.createNotification(
+                                        st.getUser().getId(),
+                                        title,
+                                        message,
+                                        "ASSIGNMENT",
+                                        "/student/assignment"
+                                );
+                            }
+                        });
+                        studentCount++;
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("projectRoundId", roundId);
+        result.put("roundName", roundName);
+        result.put("lecturerCount", lecturerCount);
+        result.put("studentCount", studentCount);
+        result.put("totalNotified", lecturerCount + studentCount);
+        result.put("sentAt", java.time.Instant.now().toString());
+        return result;
+    }
+
+    @Override
+    @Transactional
     public AssignmentStatsResponseDTO openSupplementaryRegistration(Long projectRoundId) {
         ProjectRound round = getAndValidateActiveRound(projectRoundId);
         if (studentProjectRoundRepository == null) {

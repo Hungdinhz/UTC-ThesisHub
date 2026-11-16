@@ -223,3 +223,21 @@ export const isLecturerAssignedToDirection = (
 
   return false;
 };
+
+export interface AssignmentNotifyRequest {
+  projectRoundId: number;
+  title?: string;
+  message?: string;
+  notifyLecturers?: boolean;
+  notifyStudents?: boolean;
+  sendEmail?: boolean;
+}
+
+export interface AssignmentNotifyResponse {
+  projectRoundId: number;
+  roundName?: string;
+  lecturerCount: number;
+  studentCount: number;
+  totalNotified: number;
+  sentAt: string;
+}
