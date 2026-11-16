@@ -1748,6 +1748,58 @@ public class DefenseService implements RoundDefenseSynthesizer {
         return enrichGraduationResultDTO(saved);
     }
 
+    /**
+     * Tổng hợp điểm tốt nghiệp cho toàn bộ sinh viên trong đợt đồ án
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = {IllegalArgumentException.class})
+    public List<GraduationResultResponseDTO> synthesizeRoundResults(Long roundId, SynthesizeResultRequestDTO request) {
+        if (roundId == null || thesisRepository == null) {
+            return Collections.emptyList();
+        }
+        List<Thesis> roundTheses = thesisRepository.findByProjectRoundId(roundId);
+        List<Thesis> eligibleTheses = roundTheses.stream()
+                .filter(this::isThesisDefenseEligible)
+                .toList();
+
+        if (eligibleTheses.isEmpty()) {
+            throw new IllegalStateException("Chưa có sinh viên/đề tài nào đủ điều kiện bảo vệ trong đợt để tổng hợp điểm.");
+        }
+
+        double wSup = (request != null && request.getSupervisorWeight() != null) ? request.getSupervisorWeight() : 0.4;
+        double wRev = (request != null && request.getReviewerWeight() != null) ? request.getReviewerWeight() : 0.0;
+        double wCou = (request != null && request.getCouncilWeight() != null) ? request.getCouncilWeight() : 0.6;
+        String notes = (request != null && request.getNotes() != null && !request.getNotes().isBlank())
+                ? request.getNotes() : "Tổng hợp kết quả tốt nghiệp toàn đợt đồ án";
+
+        List<String> failedLabels = new ArrayList<>();
+        int synthesizedCount = 0;
+
+        for (Thesis t : eligibleTheses) {
+            try {
+                SynthesizeResultRequestDTO tReq = SynthesizeResultRequestDTO.builder()
+                        .thesisId(t.getId())
+                        .supervisorWeight(wSup)
+                        .reviewerWeight(wRev)
+                        .councilWeight(wCou)
+                        .notes(notes)
+                        .build();
+                synthesizeResult(tReq);
+                synthesizedCount++;
+            } catch (Exception ex) {
+                String label = (t.getStudent() != null && t.getStudent().getStudentCode() != null)
+                        ? t.getStudent().getStudentCode()
+                        : (t.getThesisCode() != null ? t.getThesisCode() : ("#" + t.getId()));
+                failedLabels.add(label);
+            }
+        }
+
+        if (synthesizedCount == 0 && !failedLabels.isEmpty()) {
+            throw new IllegalStateException("Không có đề tài nào đủ điều kiện điểm (GVHD + Hội đồng) để tổng hợp kết quả: " + String.join(", ", failedLabels));
+        }
+
+        return getGraduationResultsByRound(roundId);
+    }
+
     @Transactional(readOnly = true)
     public GraduationResultResponseDTO getGraduationResultByThesis(Long thesisId) {
         GraduationResult entity = graduationResultRepository.findByThesisId(thesisId).orElse(null);

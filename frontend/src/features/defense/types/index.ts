@@ -234,7 +234,8 @@ export interface GraduationResult {
 }
 
 export interface SynthesizeResultRequest {
-  thesisId: number;
+  thesisId?: number;
+  projectRoundId?: number;
   supervisorWeight?: number;
   reviewerWeight?: number;
   councilWeight?: number;

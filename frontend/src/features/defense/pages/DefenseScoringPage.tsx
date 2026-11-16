@@ -39,7 +39,8 @@ export const DefenseScoringPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isSynthModalOpen, setIsSynthModalOpen] = useState(false);
   const [showMinutesModal, setShowMinutesModal] = useState(false);
-  const [showFinalExportModal, setShowFinalExportModal] = useState(false);
+  const [showExportDataModal, setShowExportDataModal] = useState(false);
+  const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
@@ -135,13 +136,36 @@ export const DefenseScoringPage: React.FC = () => {
 
   const handleSynthesize = async (data: SynthesizeResultRequest) => {
     try {
-      const res = await defenseService.synthesizeResult(data);
-      setGraduationResult(res);
-      setNotification({
-        type: 'success',
-        message: `Tổng hợp điểm thành công! Điểm tổng kết: ${res.finalScore.toFixed(2)} — Xếp loại: ${res.grade}`,
-      });
-      await loadThesisScoringDetails(selectedThesisId);
+      if (selectedRoundId) {
+        const results = await defenseService.synthesizeRoundResults(selectedRoundId, data);
+        const resultMap = new Map(results.map((r) => [r.thesisId, r]));
+        setRoundExportResults(
+          scoringTheses.map((t) => ({
+            thesis: t,
+            result: resultMap.get(t.thesisId) || null,
+          }))
+        );
+        if (selectedThesisId) {
+          const currentRes = resultMap.get(selectedThesisId);
+          if (currentRes) {
+            setGraduationResult(currentRes);
+          } else {
+            await loadThesisScoringDetails(selectedThesisId);
+          }
+        }
+        setNotification({
+          type: 'success',
+          message: `🎯 Đã tổng hợp điểm tốt nghiệp thành công cho toàn bộ đợt đồ án (${results.length} sinh viên)!`,
+        });
+      } else if (data.thesisId) {
+        const res = await defenseService.synthesizeResult(data);
+        setGraduationResult(res);
+        setNotification({
+          type: 'success',
+          message: `Tổng hợp điểm thành công! Điểm tổng kết: ${res.finalScore.toFixed(2)} — Xếp loại: ${res.grade}`,
+        });
+        await loadThesisScoringDetails(data.thesisId);
+      }
     } catch (err: any) {
       setNotification({ type: 'error', message: err?.message || 'Thất bại khi tổng hợp điểm' });
       throw err;
@@ -165,8 +189,7 @@ export const DefenseScoringPage: React.FC = () => {
     }
   };
 
-  const handleOpenFinalExportModal = async () => {
-    setShowFinalExportModal(true);
+  const loadRoundExportData = async () => {
     try {
       const results = selectedRoundId
         ? await defenseService.getResultsByRound(selectedRoundId).catch(() => [])
@@ -182,18 +205,71 @@ export const DefenseScoringPage: React.FC = () => {
     }
   };
 
+  const handleOpenExportDataModal = async () => {
+    setShowExportDataModal(true);
+    await loadRoundExportData();
+  };
+
+  const handleOpenFinalizeModal = async () => {
+    setShowFinalizeModal(true);
+    await loadRoundExportData();
+  };
+
+  const handleExportCsv = () => {
+    if (roundExportResults.length === 0) return;
+    const headers = [
+      'STT',
+      'MSSV',
+      'Họ và tên SV',
+      'Lớp',
+      'Tên đề tài tốt nghiệp',
+      'GVHD',
+      'Điểm GVHD (40%)',
+      'Điểm Hội đồng (60%)',
+      'Điểm tổng kết',
+      'Xếp loại',
+      'Kết quả tốt nghiệp',
+    ];
+    const rows = roundExportResults.map((item, idx) => {
+      const t = item.thesis;
+      const r = item.result;
+      return [
+        idx + 1,
+        `"${t.studentCode || ''}"`,
+        `"${t.studentName || ''}"`,
+        `"${t.studentClass || ''}"`,
+        `"${(t.titleVn || '').replace(/"/g, '""')}"`,
+        `"${t.advisorName || ''}"`,
+        r?.supervisorScore != null ? Number(r.supervisorScore).toFixed(2) : '',
+        r?.councilScore != null ? Number(r.councilScore).toFixed(2) : '',
+        r?.finalScore != null ? Number(r.finalScore).toFixed(2) : 'Chưa tổng hợp',
+        `"${r?.grade || '—'}"`,
+        `"${r?.finalResult === 'PASSED' ? 'ĐẠT' : (r?.finalResult === 'FAILED' ? 'KHÔNG ĐẠT' : 'Chưa xét')}"`,
+      ].join(',');
+    });
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Bang_diem_tot_nghiep_dot_${selectedRoundId || 'dot'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleFinalizeAndPublishRound = async () => {
     if (!selectedRoundId) {
       setNotification({ type: 'error', message: 'Vui lòng chọn Đợt đồ án cần công bố kết quả và hoàn tất!' });
       return;
     }
-    if (!window.confirm('Xác nhận Ký xuất Dữ liệu cuối kỳ, công bố kết quả chính thức về tài khoản của tất cả Sinh viên và Đóng hoàn tất Đợt đồ án này?')) {
+    if (!window.confirm('Xác nhận hoàn tất và đóng Đợt đồ án này, đồng thời công bố kết quả chính thức về tài khoản của toàn bộ Sinh viên?')) {
       return;
     }
     try {
       setPublishingRound(true);
       await defenseService.finalizeAndPublishRound(selectedRoundId);
-      setShowFinalExportModal(false);
+      setShowFinalizeModal(false);
       setNotification({
         type: 'success',
         message: '🎓 Đã công bố kết quả bảo vệ chính thức tới toàn bộ Sinh viên và hoàn tất đóng Đợt đồ án!',
@@ -320,7 +396,7 @@ export const DefenseScoringPage: React.FC = () => {
             </select>
           )}
 
-          {isAdmin && selectedThesis && (
+          {isAdmin && selectedRoundId && (
             <Button variant="success" onClick={() => setIsSynthModalOpen(true)}>
               🎯 Tổng hợp kết quả tốt nghiệp
             </Button>
@@ -334,9 +410,14 @@ export const DefenseScoringPage: React.FC = () => {
           )}
 
           {isAdmin && (
-            <Button variant="outline" onClick={handleOpenFinalExportModal}>
-              📦 Xuất Dữ liệu Cuối kỳ &amp; Hoàn tất Đợt
-            </Button>
+            <>
+              <Button variant="outline" onClick={handleOpenExportDataModal}>
+                📥 Xuất dữ liệu cuối kỳ
+              </Button>
+              <Button variant="primary" onClick={handleOpenFinalizeModal}>
+                🏁 Hoàn tất đợt
+              </Button>
+            </>
           )}
 
           <Button
@@ -580,11 +661,14 @@ export const DefenseScoringPage: React.FC = () => {
       )}
 
       {/* Synthesis Modal */}
-      {isAdmin && selectedThesisId > 0 && (
+      {isAdmin && (
         <ResultSynthesisModal
           isOpen={isSynthModalOpen}
           onClose={() => setIsSynthModalOpen(false)}
-          thesisId={selectedThesisId}
+          thesisId={selectedThesisId || undefined}
+          roundId={selectedRoundId}
+          roundName={rounds.find((r) => (r.roundId || r.id) === selectedRoundId)?.name}
+          totalThesesCount={scoringTheses.length}
           onSynthesize={handleSynthesize}
         />
       )}
@@ -821,8 +905,8 @@ export const DefenseScoringPage: React.FC = () => {
         </div>
       )}
 
-      {/* Final Term Data Export & Round Completion Modal (#25, #27 — No Reservation Mock Row!) */}
-      {showFinalExportModal && isAdmin && (
+      {/* 1. Modal Xuất Dữ liệu Cuối kỳ (Data Export & Report) */}
+      {showExportDataModal && isAdmin && (
         <div
           style={{
             position: 'fixed',
@@ -835,67 +919,78 @@ export const DefenseScoringPage: React.FC = () => {
             padding: '16px',
           }}
         >
-          <div style={{ background: '#fff', borderRadius: '10px', width: '100%', maxWidth: '780px', maxHeight: '90vh', overflowY: 'auto', padding: '28px' }}>
-            <h3 style={{ margin: '0 0 8px 0', color: '#0a3273' }}>
-              📦 Bảng Tổng hợp Dữ liệu Cuối kỳ &amp; Công bố Kết quả Đợt đồ án
-            </h3>
-            <p style={{ color: '#475569', fontSize: '13.5px', marginBottom: '16px' }}>
-              Chốt kết quả cuối kỳ, công bố kết quả tốt nghiệp và hoàn tất đợt đồ án.
-            </p>
-            {(() => {
-              const missingCount = roundExportResults.filter((item) => !item.result).length;
-              if (roundExportResults.length === 0) {
-                return (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
-                    ⚠️ Chưa có sinh viên nào đủ điều kiện bảo vệ trong đợt để chốt kết quả.
-                  </div>
-                );
-              }
-              if (missingCount > 0) {
-                return (
-                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
-                    ⚠️ Còn {missingCount}/{roundExportResults.length} sinh viên chưa tổng kết điểm cuối kỳ. Vui lòng chấm và tổng hợp điểm cho toàn bộ sinh viên trước khi chốt đợt!
-                  </div>
-                );
-              }
-              return (
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
-                  ✅ Đã tổng kết đủ điểm cho toàn bộ {roundExportResults.length} sinh viên. Sẵn sàng chốt và công bố kết quả tốt nghiệp!
-                </div>
-              );
-            })()}
-            <div style={{ width: '100%', overflowX: 'auto' }}>
-              <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '20px' }}>
-                <thead>
-                  <tr style={{ background: '#f1f5f9' }}>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>MSSV</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Họ và tên SV</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Đề tài</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Điểm tổng kết</th>
-                    <th style={{ padding: '8px', border: '1px solid #cbd5e1' }}>Xếp loại / Kết quả</th>
+          <div style={{ background: '#fff', borderRadius: '10px', width: '100%', maxWidth: '840px', maxHeight: '90vh', overflowY: 'auto', padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', color: '#0a3273' }}>
+                  📥 Bảng Tổng hợp Dữ liệu Điểm Cuối kỳ
+                </h3>
+                <p style={{ color: '#475569', fontSize: '13.5px', margin: 0 }}>
+                  Đợt: <strong>{rounds.find((r) => (r.roundId || r.id) === selectedRoundId)?.name || `#${selectedRoundId}`}</strong> — Xem chi tiết và xuất bảng điểm tốt nghiệp toàn đợt.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowExportDataModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', margin: '14px 0', flexWrap: 'wrap' }}>
+              <div style={{ padding: '8px 14px', background: '#f1f5f9', borderRadius: '6px', fontSize: '13px' }}>
+                Tổng số sinh viên: <strong>{roundExportResults.length}</strong>
+              </div>
+              <div style={{ padding: '8px 14px', background: '#ecfdf5', color: '#065f46', borderRadius: '6px', fontSize: '13px' }}>
+                Đã tổng kết điểm: <strong>{roundExportResults.filter((x) => x.result).length}</strong>
+              </div>
+              <div style={{ padding: '8px 14px', background: '#fff7ed', color: '#9a3412', borderRadius: '6px', fontSize: '13px' }}>
+                Chờ tổng hợp: <strong>{roundExportResults.filter((x) => !x.result).length}</strong>
+              </div>
+            </div>
+
+            <div style={{ width: '100%', overflowX: 'auto', maxHeight: '50vh', border: '1px solid #cbd5e1', borderRadius: '6px', marginBottom: '20px' }}>
+              <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>
+                  <tr>
+                    <th style={{ padding: '8px', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>MSSV</th>
+                    <th style={{ padding: '8px', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>Họ và tên SV</th>
+                    <th style={{ padding: '8px', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>Đề tài</th>
+                    <th style={{ padding: '8px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Điểm GVHD</th>
+                    <th style={{ padding: '8px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Điểm HĐ</th>
+                    <th style={{ padding: '8px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Điểm tổng kết</th>
+                    <th style={{ padding: '8px', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>Xếp loại / Kết quả</th>
                   </tr>
                 </thead>
                 <tbody>
                   {roundExportResults.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: '14px', textAlign: 'center', border: '1px solid #cbd5e1', color: '#64748b' }}>
+                      <td colSpan={7} style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>
                         Chưa có sinh viên nào đủ điều kiện bảo vệ trong đợt này.
                       </td>
                     </tr>
                   ) : (
                     roundExportResults.map(({ thesis, result }) => (
-                      <tr key={thesis.thesisId}>
-                        <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 700, color: '#0a3273' }}>
+                      <tr key={thesis.thesisId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px', fontWeight: 700, color: '#0a3273' }}>
                           {thesis.studentCode}
                         </td>
-                        <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 600 }}>
+                        <td style={{ padding: '8px', fontWeight: 600 }}>
                           {thesis.studentName}
                         </td>
-                        <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>{thesis.titleVn}</td>
-                        <td style={{ padding: '8px', border: '1px solid #cbd5e1', fontWeight: 700, textAlign: 'center' }}>
-                          {result ? Number(result.finalScore).toFixed(2) : 'Chờ tổng hợp'}
+                        <td style={{ padding: '8px', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={thesis.titleVn}>
+                          {thesis.titleVn}
                         </td>
-                        <td style={{ padding: '8px', border: '1px solid #cbd5e1' }}>
+                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                          {result?.supervisorScore != null ? Number(result.supervisorScore).toFixed(2) : '—'}
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                          {result?.councilScore != null ? Number(result.councilScore).toFixed(2) : '—'}
+                        </td>
+                        <td style={{ padding: '8px', fontWeight: 700, textAlign: 'center', color: '#0a3273' }}>
+                          {result ? Number(result.finalScore).toFixed(2) : <span style={{ color: '#94a3b8' }}>Chờ TH</span>}
+                        </td>
+                        <td style={{ padding: '8px' }}>
                           {result ? (
                             <span style={{ color: result.finalResult === 'PASSED' ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
                               {result.grade} ({result.finalResult === 'PASSED' ? 'ĐẠT' : 'KHÔNG ĐẠT'})
@@ -913,17 +1008,131 @@ export const DefenseScoringPage: React.FC = () => {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
               <button
-                onClick={() => setShowFinalExportModal(false)}
+                onClick={() => setShowExportDataModal(false)}
                 style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
               >
                 Đóng
               </button>
               <button
+                onClick={handleExportCsv}
+                disabled={roundExportResults.length === 0}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: roundExportResults.length === 0 ? '#94a3b8' : '#16a34a',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: roundExportResults.length === 0 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                📥 Xuất file Excel (.csv)
+              </button>
+              <button
                 onClick={() => window.print()}
                 style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#0284c7', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
               >
-                🖨️ In Bảng tổng hợp Cuối kỳ (PDF)
+                🖨️ In Bảng tổng hợp (PDF)
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Modal Hoàn tất Đợt Đồ án (Round Completion & Finalization) */}
+      {showFinalizeModal && isAdmin && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: '10px', width: '100%', maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto', padding: '28px' }}>
+            <h3 style={{ margin: '0 0 8px 0', color: '#0a3273' }}>
+              🏁 Hoàn tất Đợt Đồ án &amp; Công bố Kết quả Chính thức
+            </h3>
+            <p style={{ color: '#475569', fontSize: '13.5px', marginBottom: '16px' }}>
+              Đợt: <strong>{rounds.find((r) => (r.roundId || r.id) === selectedRoundId)?.name || `#${selectedRoundId}`}</strong>
+            </p>
+
+            {(() => {
+              const missingCount = roundExportResults.filter((item) => !item.result).length;
+              if (roundExportResults.length === 0) {
+                return (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '12px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
+                    ⚠️ Chưa có sinh viên nào đủ điều kiện bảo vệ trong đợt này để hoàn tất.
+                  </div>
+                );
+              }
+              if (missingCount > 0) {
+                return (
+                  <div>
+                    <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '12px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
+                      ⚠️ Còn <strong>{missingCount}/{roundExportResults.length} sinh viên</strong> chưa tổng kết điểm cuối kỳ. Vui lòng chấm điểm và bấm "🎯 Tổng hợp kết quả tốt nghiệp" trước khi hoàn tất đợt!
+                    </div>
+                    <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '8px 12px', marginBottom: '16px', background: '#f8fafc', fontSize: '12.5px' }}>
+                      <div style={{ fontWeight: 600, color: '#64748b', marginBottom: '6px' }}>Danh sách sinh viên chưa tổng kết điểm:</div>
+                      {roundExportResults.filter((item) => !item.result).map((item) => (
+                        <div key={item.thesis.thesisId} style={{ padding: '3px 0', color: '#b45309' }}>
+                          • <strong>{item.thesis.studentCode}</strong> — {item.thesis.studentName} ({item.thesis.titleVn})
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div>
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '12px 14px', borderRadius: '8px', fontSize: '13.5px', fontWeight: 600, marginBottom: '14px' }}>
+                    ✅ Toàn bộ <strong>{roundExportResults.length}/{roundExportResults.length} sinh viên</strong> đã có điểm tổng kết đầy đủ. Sẵn sàng chốt kết quả và đóng đợt đồ án!
+                  </div>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '8px', fontSize: '13px', color: '#334155', marginBottom: '16px' }}>
+                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>Xác nhận đóng đợt đồ án sẽ thực hiện:</div>
+                    <ul style={{ margin: 0, paddingLeft: '18px', lineHeight: '1.6' }}>
+                      <li>Khóa vĩnh viễn quyền chấm điểm và sửa điểm của Đợt đồ án.</li>
+                      <li>Công bố điểm bảo vệ chính thức và xếp loại tốt nghiệp về tài khoản của tất cả sinh viên.</li>
+                      <li>Chuyển trạng thái Đợt đồ án sang <strong>HOÀN TẤT (CLOSED)</strong>.</li>
+                    </ul>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowFinalizeModal(false)}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}
+              >
+                Hủy
+              </button>
+              {roundExportResults.filter((item) => !item.result).length > 0 && (
+                <button
+                  onClick={() => {
+                    setShowFinalizeModal(false);
+                    setIsSynthModalOpen(true);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: '#0284c7',
+                    color: '#fff',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  🎯 Đi tới Tổng hợp Điểm ngay
+                </button>
+              )}
               <button
                 onClick={handleFinalizeAndPublishRound}
                 disabled={
@@ -932,7 +1141,7 @@ export const DefenseScoringPage: React.FC = () => {
                   roundExportResults.some((item) => !item.result)
                 }
                 style={{
-                  padding: '8px 16px',
+                  padding: '8px 18px',
                   borderRadius: '6px',
                   border: 'none',
                   background:
@@ -940,7 +1149,7 @@ export const DefenseScoringPage: React.FC = () => {
                     roundExportResults.length === 0 ||
                     roundExportResults.some((item) => !item.result)
                       ? '#94a3b8'
-                      : '#16a34a',
+                      : '#dc2626',
                   color: '#fff',
                   fontWeight: 700,
                   cursor:
@@ -951,7 +1160,7 @@ export const DefenseScoringPage: React.FC = () => {
                       : 'pointer',
                 }}
               >
-                {publishingRound ? 'Đang công bố & đóng đợt...' : '✅ Ký xuất Dữ liệu & Hoàn tất Đợt đồ án'}
+                {publishingRound ? 'Đang hoàn tất & công bố...' : '🎓 Xác nhận Hoàn tất & Công bố Đợt đồ án'}
               </button>
             </div>
           </div>

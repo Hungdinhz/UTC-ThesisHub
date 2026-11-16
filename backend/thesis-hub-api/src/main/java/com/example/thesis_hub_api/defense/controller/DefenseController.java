@@ -296,10 +296,26 @@ public class DefenseController {
      */
     @PostMapping("/results/synthesize")
     @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
-    public ResponseEntity<ApiResponse<GraduationResultResponseDTO>> synthesizeResult(
+    public ResponseEntity<ApiResponse<Object>> synthesizeResult(
             @RequestBody SynthesizeResultRequestDTO request) {
+        if (request != null && request.getProjectRoundId() != null && (request.getThesisId() == null || request.getThesisId() == 0)) {
+            List<GraduationResultResponseDTO> roundResults = defenseService.synthesizeRoundResults(request.getProjectRoundId(), request);
+            return ResponseEntity.ok(ApiResponse.success("Tổng hợp kết quả tốt nghiệp toàn đợt thành công", roundResults));
+        }
         GraduationResultResponseDTO result = defenseService.synthesizeResult(request);
         return ResponseEntity.ok(ApiResponse.success("Tổng hợp kết quả tốt nghiệp thành công", result));
+    }
+
+    /**
+     * Tổng hợp điểm tốt nghiệp cho toàn bộ sinh viên trong đợt đồ án
+     */
+    @PostMapping("/rounds/{roundId}/synthesize")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
+    public ResponseEntity<ApiResponse<List<GraduationResultResponseDTO>>> synthesizeRoundResults(
+            @PathVariable Long roundId,
+            @RequestBody(required = false) SynthesizeResultRequestDTO request) {
+        List<GraduationResultResponseDTO> result = defenseService.synthesizeRoundResults(roundId, request);
+        return ResponseEntity.ok(ApiResponse.success("Tổng hợp kết quả tốt nghiệp toàn đợt thành công", result));
     }
 
     /**

@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SynthesizeResultRequestDTO {
     private Long thesisId;
+    private Long projectRoundId;
     @Builder.Default
     private Double supervisorWeight = 0.4;
     @Builder.Default

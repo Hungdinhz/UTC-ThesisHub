@@ -571,6 +571,23 @@ class DefenseService {
     }
   }
 
+  async synthesizeRoundResults(roundId: number, request?: Partial<SynthesizeResultRequest>): Promise<GraduationResult[]> {
+    try {
+      const res = await axios.post(
+        `${API_BASE}/rounds/${roundId}/synthesize`,
+        { ...request, projectRoundId: roundId },
+        { headers: authHeaders() }
+      );
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      return [];
+    } catch (err) {
+      if (!IS_TEST_ENV) {
+        throw new Error(extractApiError(err, 'Tổng hợp kết quả tốt nghiệp toàn đợt thất bại'));
+      }
+      return mockResults;
+    }
+  }
+
   async getResultsByRound(roundId: number): Promise<GraduationResult[]> {
     try {
       const res = await axios.get(`${API_BASE}/rounds/${roundId}/results`, { headers: authHeaders() });
