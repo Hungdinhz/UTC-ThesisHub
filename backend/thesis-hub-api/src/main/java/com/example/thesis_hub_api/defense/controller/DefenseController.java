@@ -198,6 +198,39 @@ public class DefenseController {
     }
 
     /**
+     * Chốt toàn bộ lịch bảo vệ của đợt đồ án (Khóa lịch bảo vệ chính thức)
+     */
+    @PostMapping("/schedules/finalize")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<List<DefenseScheduleResponseDTO>>> finalizeSchedules(
+            @RequestParam Long projectRoundId) {
+        List<DefenseScheduleResponseDTO> result = defenseService.finalizeSchedules(projectRoundId);
+        return ResponseEntity.ok(ApiResponse.success("Chốt toàn bộ lịch bảo vệ thành công", result));
+    }
+
+    /**
+     * Mở khóa lịch bảo vệ của đợt đồ án để chỉnh sửa ca và sinh viên
+     */
+    @PostMapping("/schedules/reopen")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<List<DefenseScheduleResponseDTO>>> reopenSchedules(
+            @RequestParam Long projectRoundId) {
+        List<DefenseScheduleResponseDTO> result = defenseService.reopenSchedules(projectRoundId);
+        return ResponseEntity.ok(ApiResponse.success("Mở khóa lịch bảo vệ để chỉnh sửa thành công", result));
+    }
+
+    /**
+     * Gửi thông báo lịch bảo vệ chính thức đến các thành viên Hội đồng, GVHD và Sinh viên
+     */
+    @PostMapping("/schedules/notify")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> notifyDefenseSchedules(
+            @RequestBody(required = false) ScheduleNotifyRequestDTO request) {
+        java.util.Map<String, Object> result = defenseService.notifyDefenseSchedules(request);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi thông báo lịch bảo vệ thành công đến mọi người", result));
+    }
+
+    /**
      * Danh sách đề tài được phép xem / chấm điểm ở GĐ5 theo đúng vai trò người đăng nhập (#17)
      */
     @GetMapping("/my-scoring-theses")

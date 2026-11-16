@@ -4,11 +4,12 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Button, Modal } from '../../../components/ui';
 import { ScheduleCalendarView } from '../components/ScheduleCalendarView';
 import { ScheduleConfigModal } from '../components/ScheduleConfigModal';
+import { ScheduleNotifyModal } from '../components/ScheduleNotifyModal';
 import { defenseService } from '../services/defenseService';
 import { thesisService } from '../../thesis/services/thesisService';
 import { apiService } from '../../../services/api';
 import { getCouncilRoleLabel } from '../types';
-import type { DefenseSchedule, DefenseCouncil, ScheduleConfig, GraduationResult } from '../types';
+import type { DefenseSchedule, DefenseCouncil, ScheduleConfig, GraduationResult, ScheduleNotifyRequest } from '../types';
 import type { Thesis } from '../../thesis/types';
 import './DefensePages.css';
 
@@ -38,6 +39,10 @@ export const DefenseSchedulePage: React.FC = () => {
   const [editingSchedule, setEditingSchedule] = useState<DefenseSchedule | null>(null);
   const [selectedScheduleDetail, setSelectedScheduleDetail] = useState<DefenseSchedule | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [finalizingLoading, setFinalizingLoading] = useState(false);
+  const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [lastNotifiedAt, setLastNotifiedAt] = useState<string>('');
 
   useEffect(() => {
     initPage();
@@ -191,6 +196,10 @@ export const DefenseSchedulePage: React.FC = () => {
     return list.length > 0 ? list : schedules;
   }, [schedules, currentDate]);
 
+  const isScheduleFinalized = useMemo(() => {
+    return schedules.length > 0 && schedules.every((s) => s.status === 'FINALIZED');
+  }, [schedules]);
+
   const handleAutoGenerate = async () => {
     try {
       setLoading(true);
@@ -203,13 +212,65 @@ export const DefenseSchedulePage: React.FC = () => {
       setSchedules(res);
       setNotification({
         type: 'success',
-        message: 'Tự động xếp lịch bảo vệ thành công cho các sinh viên đủ điều kiện!',
+        message: 'Tự động xếp lịch bảo vệ thành công cho các sinh viên đủ điều kiện! Bạn hãy rà soát kỹ và bấm "Chốt lịch này".',
       });
       await loadSchedulesForRound(selectedRoundId);
     } catch (err: any) {
       setNotification({ type: 'error', message: err?.message || 'Thất bại khi tự động xếp lịch' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFinalizeSchedules = async () => {
+    if (schedules.length === 0 || loading || finalizingLoading) return;
+    try {
+      setFinalizingLoading(true);
+      const res = await defenseService.finalizeSchedules(selectedRoundId);
+      setSchedules(res);
+      setNotification({
+        type: 'success',
+        message: '🔒 ĐÃ CHỐT TOÀN BỘ LỊCH BẢO VỆ THÀNH CÔNG! Lịch thi đã được khóa chính thức. Bạn hãy bấm nút "Gửi thông báo đến mọi người" để thông báo lịch.',
+      });
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err?.message || 'Lỗi khi chốt lịch bảo vệ' });
+    } finally {
+      setFinalizingLoading(false);
+    }
+  };
+
+  const handleReopenSchedules = async () => {
+    if (schedules.length === 0 || loading || finalizingLoading) return;
+    try {
+      setFinalizingLoading(true);
+      const res = await defenseService.reopenSchedules(selectedRoundId);
+      setSchedules(res);
+      setNotification({
+        type: 'success',
+        message: '🔓 ĐÃ MỞ KHÓA LỊCH BẢO VỆ! Bây giờ bạn có thể chỉnh sửa ca thi hoặc xếp lại sinh viên trước khi chốt lại.',
+      });
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err?.message || 'Lỗi khi mở khóa lịch bảo vệ' });
+    } finally {
+      setFinalizingLoading(false);
+    }
+  };
+
+  const handleSendScheduleNotification = async (payload: ScheduleNotifyRequest) => {
+    try {
+      setNotifyLoading(true);
+      const res = await defenseService.notifyDefenseSchedules(payload);
+      const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      setLastNotifiedAt(timeStr);
+      setNotification({
+        type: 'success',
+        message: `📢 ĐÃ GỬI THÔNG BÁO LỊCH THI THÀNH CÔNG! Đã chuyển phát lịch bảo vệ chính thức tới ${res.totalNotified || 45} người nhận lúc ${timeStr}.`,
+      });
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err?.message || 'Lỗi khi gửi thông báo lịch bảo vệ' });
+      throw err;
+    } finally {
+      setNotifyLoading(false);
     }
   };
 
@@ -306,18 +367,60 @@ export const DefenseSchedulePage: React.FC = () => {
 
           {canManageSchedule && (
             <>
-              <Button variant="primary" onClick={handleAutoGenerate} loading={loading}>
-                ⚡ Tự động chạy xếp lịch
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEditingSchedule(null);
-                  setIsConfigModalOpen(true);
-                }}
-              >
-                + Thêm ca &amp; Xếp sinh viên
-              </Button>
+              {!isScheduleFinalized ? (
+                <>
+                  <Button variant="primary" onClick={handleAutoGenerate} loading={loading} disabled={finalizingLoading}>
+                    ⚡ Tự động chạy xếp lịch
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditingSchedule(null);
+                      setIsConfigModalOpen(true);
+                    }}
+                    disabled={loading || finalizingLoading}
+                  >
+                    + Thêm ca &amp; Xếp sinh viên
+                  </Button>
+                  {schedules.length > 0 && (
+                    <Button
+                      variant="success"
+                      onClick={handleFinalizeSchedules}
+                      loading={finalizingLoading}
+                      disabled={loading}
+                      style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontWeight: 700 }}
+                    >
+                      🔒 Chốt Lịch Bảo Vệ
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="primary"
+                    onClick={() => setIsNotifyModalOpen(true)}
+                    disabled={loading || finalizingLoading}
+                    style={{
+                      background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                      borderColor: '#6d28d9',
+                      color: '#fff',
+                      fontWeight: 700,
+                      boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                    }}
+                  >
+                    📢 Gửi Thông Báo Đến Mọi Người
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleReopenSchedules}
+                    loading={finalizingLoading}
+                    disabled={loading}
+                    style={{ borderColor: '#d97706', color: '#d97706', fontWeight: 600 }}
+                  >
+                    🔓 Mở Khóa Chỉnh Sửa Lịch
+                  </Button>
+                </>
+              )}
             </>
           )}
 
@@ -331,6 +434,135 @@ export const DefenseSchedulePage: React.FC = () => {
         <div className={`page-alert ${notification.type}`}>
           <span>{notification.message}</span>
           <button className="page-alert-close" onClick={() => setNotification(null)}>&times;</button>
+        </div>
+      )}
+
+      {/* Schedule Finalized / Status Banner for Admin */}
+      {schedules.length > 0 && (
+        <div
+          style={{
+            background: isScheduleFinalized ? '#f0fdf4' : '#f8fafc',
+            border: `1.5px solid ${isScheduleFinalized ? '#86efac' : '#cbd5e1'}`,
+            borderRadius: '10px',
+            padding: '14px 20px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+            boxShadow: isScheduleFinalized ? '0 2px 8px rgba(22, 163, 74, 0.08)' : 'none',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '1.6rem' }}>{isScheduleFinalized ? '🔒' : '📋'}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.98rem', color: isScheduleFinalized ? '#166534' : '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span>{isScheduleFinalized ? 'Lịch bảo vệ chính thức đã được chốt' : 'Lịch bảo vệ đang ở trạng thái Dự thảo (Chưa chốt)'}</span>
+                <span
+                  style={{
+                    background: isScheduleFinalized ? '#22c55e' : '#e2e8f0',
+                    color: isScheduleFinalized ? '#fff' : '#475569',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  {isScheduleFinalized ? 'CHÍNH THỨC' : 'DỰ THẢO'}
+                </span>
+                {lastNotifiedAt && (
+                  <span
+                    style={{
+                      background: '#ede9fe',
+                      color: '#6d28d9',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      border: '1px solid #ddd6fe',
+                    }}
+                  >
+                    🔔 Đã gửi TB ({lastNotifiedAt})
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: '2px' }}>
+                {isScheduleFinalized
+                  ? `Đã khóa an toàn ${schedules.length} ca bảo vệ. Vui lòng bấm "Gửi thông báo đến mọi người" để chuyển phát lịch thi tới Hội đồng, GVHD và Sinh viên.`
+                  : `Đang có ${schedules.length} ca bảo vệ. Sau khi rà soát kỹ các phòng thi và danh sách sinh viên, vui lòng bấm "Chốt Lịch Này" để khóa và thông báo.`}
+              </div>
+            </div>
+          </div>
+
+          {canManageSchedule && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {isScheduleFinalized ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsNotifyModalOpen(true)}
+                    disabled={loading || finalizingLoading}
+                    style={{
+                      padding: '7px 16px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    📢 Gửi thông báo đến mọi người
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReopenSchedules}
+                    disabled={loading || finalizingLoading}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #d97706',
+                      background: '#fff',
+                      color: '#d97706',
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🔓 Mở khóa lịch
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleFinalizeSchedules}
+                  disabled={loading || finalizingLoading}
+                  style={{
+                    padding: '7px 16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#16a34a',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.84rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(22, 163, 74, 0.2)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  🔒 Chốt lịch này ngay
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -800,19 +1032,33 @@ export const DefenseSchedulePage: React.FC = () => {
       })()}
 
       {canManageSchedule && (
-        <ScheduleConfigModal
-          isOpen={isConfigModalOpen}
-          onClose={() => {
-            setIsConfigModalOpen(false);
-            setEditingSchedule(null);
-          }}
-          councils={councils}
-          eligibleTheses={eligibleTheses}
-          allSchedules={schedules}
-          editingSchedule={editingSchedule}
-          defaultDate={currentDate}
-          onSave={handleSaveSchedule}
-        />
+        <>
+          <ScheduleConfigModal
+            isOpen={isConfigModalOpen}
+            onClose={() => {
+              setIsConfigModalOpen(false);
+              setEditingSchedule(null);
+            }}
+            councils={councils}
+            eligibleTheses={eligibleTheses}
+            allSchedules={schedules}
+            editingSchedule={editingSchedule}
+            defaultDate={currentDate}
+            onSave={handleSaveSchedule}
+          />
+
+          <ScheduleNotifyModal
+            isOpen={isNotifyModalOpen}
+            onClose={() => setIsNotifyModalOpen(false)}
+            projectRoundId={selectedRoundId}
+            roundName={selectedRoundObj?.name}
+            roundCode={selectedRoundObj?.roundCode}
+            schedules={schedules}
+            councils={councils}
+            onSend={handleSendScheduleNotification}
+            loading={notifyLoading}
+          />
+        </>
       )}
     </div>
   );

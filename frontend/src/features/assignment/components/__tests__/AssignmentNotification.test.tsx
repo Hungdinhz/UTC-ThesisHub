@@ -34,9 +34,10 @@ describe('Assignment Notification Feature (GĐ2)', () => {
         lecturerCode: 'GV001',
         lecturerName: 'PGS. TS. Trần Văn Minh',
         academicDegree: 'PGS',
+        projectRoundId: 1,
         status: 'FINALIZED',
-        priorityMatched: 1,
-        assignmentMethod: 'ALGORITHM_MATCH',
+        matchedPriority: 1,
+        assignmentMethod: 'ALGORITHM',
         isOverridden: false,
       },
     ]);

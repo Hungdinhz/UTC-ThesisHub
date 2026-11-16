@@ -257,3 +257,22 @@ export interface CouncilNotifyResponse {
   totalNotified: number;
   sentAt: string;
 }
+
+export interface ScheduleNotifyRequest {
+  projectRoundId: number;
+  title?: string;
+  message?: string;
+  notifyLecturers?: boolean;
+  notifyStudents?: boolean;
+  sendEmail?: boolean;
+}
+
+export interface ScheduleNotifyResponse {
+  projectRoundId: number;
+  roundName?: string;
+  scheduleCount: number;
+  lecturerCount: number;
+  studentCount: number;
+  totalNotified: number;
+  sentAt: string;
+}
