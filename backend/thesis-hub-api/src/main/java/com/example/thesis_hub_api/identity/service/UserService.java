@@ -9,16 +9,23 @@ import com.example.thesis_hub_api.identity.entity.Role;
 import com.example.thesis_hub_api.identity.entity.User;
 import com.example.thesis_hub_api.identity.repository.RoleRepository;
 import com.example.thesis_hub_api.identity.repository.UserRepository;
+import com.example.thesis_hub_api.identity.security.UserPrincipal;
 import com.example.thesis_hub_api.organization.entity.Lecturer;
 import com.example.thesis_hub_api.organization.entity.Student;
 import com.example.thesis_hub_api.organization.entity.TrainingProgram;
 import com.example.thesis_hub_api.organization.repository.LecturerRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.organization.repository.TrainingProgramRepository;
+import com.example.thesis_hub_api.security.interceptor.AuditHttpInterceptor;
+import com.example.thesis_hub_api.security.service.AuditLogService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +47,12 @@ public class UserService {
     private final LecturerRepository lecturerRepository;
     private final TrainingProgramRepository trainingProgramRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    private AuditLogService auditLogService;
+
+    @Autowired(required = false)
+    private HttpServletRequest httpServletRequest;
 
     @Transactional(readOnly = true)
     public UserProfileResponseDTO getCurrentUserProfile(Long userId) {
@@ -180,8 +193,19 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        Boolean oldActive = user.getIsActive();
         user.setIsActive(dto.getIsActive());
+        if (Boolean.TRUE.equals(dto.getIsActive())) {
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
+        }
         user = userRepository.save(user);
+
+        recordUserAudit("UPDATE_USER_STATUS", user,
+                "Cập nhật trạng thái tài khoản " + user.getUsername() + " (" + (Boolean.TRUE.equals(dto.getIsActive()) ? "Mở khóa" : "Khóa") + ")",
+                Map.of("isActive", Boolean.TRUE.equals(oldActive)),
+                Map.of("isActive", Boolean.TRUE.equals(user.getIsActive())),
+                "PATCH", "/api/v1/users/" + id + "/status");
 
         return toUserProfileResponse(user);
     }
@@ -191,6 +215,7 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        String oldRole = user.getRole() != null ? user.getRole().getName() : null;
         Role role;
         if (dto.getRoleId() != null) {
             role = roleRepository.findById(dto.getRoleId())
@@ -205,6 +230,12 @@ public class UserService {
         user.setRole(role);
         user = userRepository.save(user);
 
+        recordUserAudit("UPDATE_USER_ROLE", user,
+                "Thay đổi vai trò tài khoản " + user.getUsername() + " từ " + oldRole + " sang " + role.getName(),
+                Map.of("role", oldRole != null ? oldRole : "NONE"),
+                Map.of("role", role.getName()),
+                "PUT", "/api/v1/users/" + id + "/role");
+
         return toUserProfileResponse(user);
     }
 
@@ -214,8 +245,44 @@ public class UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+        user.setPasswordChangedAt(java.time.Instant.now());
         userRepository.save(user);
         log.info("Admin reset password for user ID: {}", id);
+
+        recordUserAudit("RESET_USER_PASSWORD", user,
+                "Admin đặt lại mật khẩu cho tài khoản " + user.getUsername(),
+                Map.of("passwordReset", false),
+                Map.of("passwordReset", true, "passwordChangedAt", user.getPasswordChangedAt().toString()),
+                "POST", "/api/v1/users/" + id + "/reset-password");
+    }
+
+    private void recordUserAudit(String actionType, User targetUser, String summary, Object oldValues, Object newValues, String method, String uri) {
+        if (auditLogService == null) return;
+        try {
+            if (httpServletRequest != null) {
+                httpServletRequest.setAttribute(AuditHttpInterceptor.ATTR_LOGGED_EXPLICITLY, Boolean.TRUE);
+            }
+            Long actorId = null;
+            String actorUsername = "admin";
+            String actorFullName = null;
+            String actorRole = "ROLE_ADMIN";
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
+                actorId = principal.getId();
+                actorUsername = principal.getUsername();
+                actorFullName = principal.getFullName();
+                actorRole = principal.getRole();
+            }
+            String ip = httpServletRequest != null ? AuditHttpInterceptor.extractClientIp(httpServletRequest) : "127.0.0.1";
+            String ua = httpServletRequest != null ? httpServletRequest.getHeader("User-Agent") : null;
+            auditLogService.recordLog(
+                    actorId, actorUsername, actorFullName, actorRole,
+                    actionType, "USER_ORG", "User", String.valueOf(targetUser.getId()),
+                    summary, oldValues, newValues, method, uri, ip, ua,
+                    "HIGH", "SUCCESS", null, null
+            );
+        } catch (Exception ignored) {
+        }
     }
 
     @Transactional(readOnly = true)

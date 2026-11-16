@@ -68,6 +68,12 @@ const LecturerHomePage = lazy(() =>
 const AcademicStaffHomePage = lazy(() =>
   import('./features/home/pages/AcademicStaffHomePage').then((m) => ({ default: m.AcademicStaffHomePage }))
 );
+const SecurityCenterPage = lazy(() =>
+  import('./features/security/pages/SecurityCenterPage').then((m) => ({ default: m.SecurityCenterPage }))
+);
+const AuditLogsPage = lazy(() =>
+  import('./features/security/pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage }))
+);
 
 const getDefaultRouteForRole = (role?: string | null): string => {
   switch (role) {
@@ -403,6 +409,28 @@ const AppRoutes: React.FC = () => {
           <ProtectedRoute allowedTypes={['academic_staff', 'admin']}>
             <LayoutPageWrapper activeTab="staff-grades" pageTitle="Giáo vụ: In danh sách điểm đồ án theo lớp">
               <ClassGradeReportPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* System & Security Center / Audit Logs (Admin only) */}
+      <Route
+        path="/admin/security-center"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <LayoutPageWrapper activeTab="security-center" pageTitle="Hệ thống & Bảo mật: Trung Tâm Bảo Mật">
+              <SecurityCenterPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/audit-logs"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <LayoutPageWrapper activeTab="audit-logs" pageTitle="Hệ thống & Bảo mật: Nhật Ký Hệ Thống (Audit Logs)">
+              <AuditLogsPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
         }

@@ -63,6 +63,7 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [securityMenuOpen, setSecurityMenuOpen] = useState(true);
 
   const [_activeRound, setActiveRound] = useState<ProjectRoundItem | null>(null);
   const [roundCurrentStage, setRoundCurrentStage] = useState<number>(2);
@@ -448,6 +449,39 @@ const UTCAppLayout: React.FC<UTCAppLayoutProps> = ({
               >
                 <span className="utc-nav-icon">🏆</span>
                 <span className="utc-nav-label">GĐ5: Chấm điểm &amp; Tổng hợp</span>
+              </div>
+
+              {/* HỆ THỐNG & BẢO MẬT (DƯỚI GĐ5) */}
+              <div className="utc-security-section-box">
+                <div
+                  className="utc-security-section-header"
+                  onClick={() => setSecurityMenuOpen(!securityMenuOpen)}
+                >
+                  <span>HỆ THỐNG &amp; BẢO MẬT</span>
+                  <span className="utc-arrow">{securityMenuOpen ? '▾' : '▸'}</span>
+                </div>
+
+                {securityMenuOpen && (
+                  <div className="utc-security-section-items">
+                    <div
+                      className={`utc-nav-item ${activeTab === 'security-center' ? 'active' : ''}`}
+                      onClick={() => handleNavClick('/admin/security-center', true)}
+                      title="Trung Tâm Bảo Mật"
+                    >
+                      <span className="utc-nav-icon">🛡️</span>
+                      <span className="utc-nav-label">Trung Tâm Bảo Mật</span>
+                    </div>
+
+                    <div
+                      className={`utc-nav-item ${activeTab === 'audit-logs' ? 'active' : ''}`}
+                      onClick={() => handleNavClick('/admin/audit-logs', true)}
+                      title="Nhật Ký Hệ Thống"
+                    >
+                      <span className="utc-nav-icon">📜</span>
+                      <span className="utc-nav-label">Nhật Ký Hệ Thống</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}

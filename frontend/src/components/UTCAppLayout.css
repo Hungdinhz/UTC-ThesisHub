@@ -262,6 +262,49 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Security & Audit Logs Sidebar Section Box */
+.utc-security-section-box {
+  margin-top: 12px;
+  padding: 10px 8px 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.utc-security-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+}
+
+.utc-security-section-header:hover {
+  color: #e2e8f0;
+}
+
+.utc-security-section-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.utc-dashboard-wrapper.sidebar-collapsed .utc-security-section-box {
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+}
+
+.utc-dashboard-wrapper.sidebar-collapsed .utc-security-section-header {
+  display: none !important;
+}
+
 .utc-sidebar-footer {
   padding: 14px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);

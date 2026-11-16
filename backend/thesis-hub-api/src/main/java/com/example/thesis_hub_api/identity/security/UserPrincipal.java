@@ -25,6 +25,7 @@ public class UserPrincipal implements UserDetails {
     private final String fullName;
     private final String role;
     private final boolean active;
+    private final java.time.Instant lockedUntil;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public static UserPrincipal create(User user) {
@@ -35,6 +36,8 @@ public class UserPrincipal implements UserDetails {
             authorities.add(new SimpleGrantedAuthority("ROLE_LECTURER"));
         }
 
+        boolean isActive = Boolean.TRUE.equals(user.getIsActive());
+
         return UserPrincipal.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -42,7 +45,8 @@ public class UserPrincipal implements UserDetails {
                 .password(user.getPassword())
                 .fullName(user.getFullName())
                 .role(roleName)
-                .active(Boolean.TRUE.equals(user.getIsActive()))
+                .active(isActive)
+                .lockedUntil(user.getLockedUntil())
                 .authorities(authorities)
                 .build();
     }
@@ -69,7 +73,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return active;
+        return active && (lockedUntil == null || lockedUntil.isBefore(java.time.Instant.now()));
     }
 
     @Override
