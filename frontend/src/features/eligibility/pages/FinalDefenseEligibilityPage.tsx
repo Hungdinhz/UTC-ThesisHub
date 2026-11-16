@@ -443,14 +443,50 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
             <form onSubmit={handleCheck} className="query-form-row">
               <div className="query-input-group" style={{ flex: 1 }}>
                 <label htmlFor="stdCode">Mã sinh viên (MSSV):</label>
-                <input
-                  id="stdCode"
-                  type="text"
-                  className="form-control"
-                  placeholder="Nhập mã sinh viên (VD: 201200101)..."
-                  value={studentCodeInput}
-                  onChange={(e) => setStudentCodeInput(e.target.value)}
-                />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    id="stdCode"
+                    type="text"
+                    className="form-control"
+                    placeholder="Nhập mã sinh viên (VD: 201200101)..."
+                    value={studentCodeInput}
+                    onChange={(e) => setStudentCodeInput(e.target.value)}
+                    list="student-code-datalist"
+                    autoComplete="off"
+                    style={{ paddingRight: studentCodeInput ? '36px' : '14px' }}
+                  />
+                  {studentCodeInput && (
+                    <button
+                      type="button"
+                      onClick={() => setStudentCodeInput('')}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title="Xóa mã sinh viên"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <datalist id="student-code-datalist">
+                  {roundStudents.map((s) => (
+                    <option key={s.studentId} value={s.studentCode}>
+                      {s.fullName} — {s.className || 'Sinh viên'}
+                    </option>
+                  ))}
+                </datalist>
               </div>
 
               <div className="query-btn-group">
@@ -459,6 +495,54 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                 </Button>
               </div>
             </form>
+
+            {/* Quick Select from Round Students */}
+            {roundStudents.length > 0 && (
+              <div
+                style={{
+                  marginTop: '14px',
+                  paddingTop: '12px',
+                  borderTop: '1px dashed #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+                  ⚡ Chọn nhanh sinh viên trong đợt ({roundStudents.length}):
+                </span>
+                <select
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    color: '#003366',
+                    backgroundColor: '#f8fafc',
+                    fontWeight: 600,
+                    maxWidth: '420px',
+                    cursor: 'pointer',
+                  }}
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const st = roundStudents.find((s) => s.studentCode === e.target.value);
+                      if (st) {
+                        handleQuickCheckStudent(st);
+                      }
+                    }
+                  }}
+                >
+                  <option value="">-- Click để chọn sinh viên cần kiểm tra --</option>
+                  {roundStudents.map((s) => (
+                    <option key={s.studentId} value={s.studentCode}>
+                      {s.studentCode} — {s.fullName} ({s.className || 'Sinh viên'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {error && <div className="query-error-msg">{error}</div>}
           </div>
