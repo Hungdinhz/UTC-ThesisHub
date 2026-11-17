@@ -337,7 +337,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/chat"
         element={
-          <ProtectedRoute allowedTypes={['student', 'supervisor', 'committee_member']}>
+          <ProtectedRoute allowedTypes={['student', 'supervisor', 'lecturer', 'committee_member', 'admin']}>
             <LayoutPageWrapper activeTab="chat" pageTitle="Nhóm Chat Hướng Dẫn Đồ Án Tốt Nghiệp">
               <ChatGroupPage />
             </LayoutPageWrapper>

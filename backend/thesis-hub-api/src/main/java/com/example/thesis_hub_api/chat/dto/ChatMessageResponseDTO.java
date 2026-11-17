@@ -18,6 +18,8 @@ public class ChatMessageResponseDTO {
     private Long senderUserId;
     private String senderName;
     private String senderRole;
+    private String senderCode;
+    private String senderSubtitle;
     private String content;
     private String attachmentUrl;
     private String attachmentName;

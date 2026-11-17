@@ -31,14 +31,14 @@ public class ChatController {
     }
 
     @GetMapping("/rooms")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<ChatRoomResponseDTO>>> getMyRooms() {
         List<ChatRoomResponseDTO> rooms = chatService.getMyRooms(currentUserId());
         return ResponseEntity.ok(ApiResponse.success(rooms));
     }
 
     @GetMapping("/rooms/{roundId}/{lecturerId}/messages")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<ChatMessageResponseDTO>>> getRoomMessages(
             @PathVariable Long roundId,
             @PathVariable Long lecturerId) {
@@ -47,12 +47,22 @@ public class ChatController {
     }
 
     @PostMapping("/rooms/{roundId}/{lecturerId}/messages")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
     public ResponseEntity<ApiResponse<ChatMessageResponseDTO>> sendMessage(
             @PathVariable Long roundId,
             @PathVariable Long lecturerId,
             @RequestBody SendChatMessageRequestDTO request) {
         ChatMessageResponseDTO sent = chatService.sendMessage(roundId, lecturerId, currentUserId(), request);
         return ResponseEntity.ok(ApiResponse.success("Đã gửi tin nhắn", sent));
+    }
+
+    @DeleteMapping("/rooms/{roundId}/{lecturerId}/messages/{messageId}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteMessage(
+            @PathVariable Long roundId,
+            @PathVariable Long lecturerId,
+            @PathVariable Long messageId) {
+        chatService.deleteMessage(roundId, lecturerId, messageId, currentUserId());
+        return ResponseEntity.ok(ApiResponse.success("Đã thu hồi tin nhắn", null));
     }
 }

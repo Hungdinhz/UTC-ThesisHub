@@ -21,6 +21,10 @@ public class ChatRoomResponseDTO {
     private Long lecturerId;
     private String lecturerName;
     private String lecturerDegree;
+    private String lecturerCode;
+    private String lecturerEmail;
+    private String lecturerPhone;
+    private String departmentName;
     private Integer studentCount;
     private List<ChatRoomMemberDTO> members;
     private String lastMessagePreview;
