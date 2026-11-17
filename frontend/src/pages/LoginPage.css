@@ -247,6 +247,236 @@
   line-height: 1.4;
 }
 
+/* UTC 5 Milestones Roadmap Card (White Theme) */
+.utc-milestones-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 20px 18px;
+  box-shadow: 0 4px 16px rgba(0, 51, 102, 0.06);
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.utc-milestones-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #10b981 0%, #0284c7 50%, #f59e0b 100%);
+}
+
+.utc-milestones-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.utc-milestones-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #003366;
+  text-transform: uppercase;
+}
+
+.utc-milestones-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.utc-milestones-badge {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+/* Stepper Track */
+.utc-milestones-stepper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+}
+
+.utc-milestone-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  text-align: center;
+  cursor: default;
+}
+
+.utc-milestone-node-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  position: relative;
+  height: 32px;
+}
+
+.utc-milestone-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  z-index: 2;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+/* Connecting Lines */
+.utc-milestone-line {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.utc-milestone-line.left {
+  left: 0;
+  width: 50%;
+}
+
+.utc-milestone-line.right {
+  right: 0;
+  width: 50%;
+}
+
+/* Line colors */
+.line-green {
+  background: #10b981;
+}
+
+.line-green-to-blue {
+  background: linear-gradient(90deg, #10b981 0%, #2563eb 100%);
+}
+
+.line-blue {
+  background: #2563eb;
+}
+
+.line-muted {
+  background: #e2e8f0;
+}
+
+/* Circle Statuses */
+.utc-milestone-step.completed .utc-milestone-circle {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+}
+
+.utc-milestone-step.active .utc-milestone-circle {
+  background: #1d4ed8;
+  color: #ffffff;
+  border: 2.5px solid #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 0 10px rgba(245, 158, 11, 0.45);
+  animation: pulse-milestone-glow 2.5s infinite ease-in-out;
+}
+
+@keyframes pulse-milestone-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 0 10px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.35), 0 0 14px rgba(245, 158, 11, 0.6);
+  }
+}
+
+.utc-milestone-step.upcoming .utc-milestone-circle {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1.5px solid #cbd5e1;
+}
+
+/* Text Group */
+.utc-milestone-text-group {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 2px;
+}
+
+.utc-milestone-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.25;
+  transition: color 0.2s ease;
+}
+
+.utc-milestone-step.active .utc-milestone-name {
+  color: #003366;
+  font-weight: 800;
+}
+
+.utc-milestone-time {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+.utc-milestone-step:hover .utc-milestone-circle {
+  transform: scale(1.1);
+}
+
+.utc-milestone-step:hover .utc-milestone-name {
+  color: #0284c7;
+}
+
+/* UTC Grading Rule note */
+.utc-grading-rule-note {
+  margin-top: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #0284c7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.utc-grading-rule-note strong {
+  color: #003366;
+}
+
+.utc-grading-icon {
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
 /* Right Card: Login Form */
 .utc-login-card {
   background: #ffffff;
@@ -603,6 +833,24 @@
   }
   .utc-role-tabs {
     flex-wrap: wrap;
+  }
+  .utc-milestones-stepper {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .utc-milestones-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .utc-milestone-step {
+    min-width: 18%;
+  }
+  .utc-milestone-name {
+    font-size: 0.72rem;
+  }
+  .utc-milestone-time {
+    font-size: 0.68rem;
   }
 }
 

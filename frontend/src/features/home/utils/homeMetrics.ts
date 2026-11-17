@@ -92,7 +92,7 @@ export function getRouteForStage(stageNumber: number, role: string): string {
       case 4:
         return '/academic-staff/eligible-students';
       case 5:
-        return '/academic-staff/class-grades';
+        return '/admin/final-eligibility';
       default:
         return '/academic-staff/home';
     }

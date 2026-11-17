@@ -234,9 +234,46 @@ export interface GraduationResult {
 }
 
 export interface SynthesizeResultRequest {
-  thesisId: number;
+  thesisId?: number;
+  projectRoundId?: number;
   supervisorWeight?: number;
   reviewerWeight?: number;
   councilWeight?: number;
   notes?: string;
+}
+
+export interface CouncilNotifyRequest {
+  title?: string;
+  message?: string;
+  notifyLecturers?: boolean;
+  notifyStudents?: boolean;
+  sendEmail?: boolean;
+}
+
+export interface CouncilNotifyResponse {
+  councilId: number;
+  councilCode: string;
+  lecturerCount: number;
+  studentCount: number;
+  totalNotified: number;
+  sentAt: string;
+}
+
+export interface ScheduleNotifyRequest {
+  projectRoundId: number;
+  title?: string;
+  message?: string;
+  notifyLecturers?: boolean;
+  notifyStudents?: boolean;
+  sendEmail?: boolean;
+}
+
+export interface ScheduleNotifyResponse {
+  projectRoundId: number;
+  roundName?: string;
+  scheduleCount: number;
+  lecturerCount: number;
+  studentCount: number;
+  totalNotified: number;
+  sentAt: string;
 }

@@ -28,6 +28,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -105,10 +106,15 @@ public class AcademicStaffService {
 
         // Sinh viên chưa có dữ liệu học vụ của đợt thì KHÔNG được coi là đủ điều kiện
         // (tránh việc EligibilityService rơi về dữ liệu mock mặc định).
-        if (record != null || hasSpecialRoundStatus(spr)) {
+        if (record != null || hasSpecialRoundStatus(spr) || hasEmbeddedAcademicData(spr, student)) {
             EligibilityCheckResponseDTO check = eligibilityService.checkThesisEligibility(student.getId(), roundId);
-            status = check.getStatus();
-            reasons = check.getReasons() != null ? check.getReasons() : List.of();
+            if (check != null) {
+                status = check.getStatus();
+                reasons = check.getReasons() != null ? check.getReasons() : List.of();
+            } else {
+                status = STATUS_NO_DATA;
+                reasons = List.of("Chưa có dữ liệu học vụ của sinh viên trong đợt này (cần import file Excel học vụ)");
+            }
         } else {
             status = STATUS_NO_DATA;
             reasons = List.of("Chưa có dữ liệu học vụ của sinh viên trong đợt này (cần import file Excel học vụ)");
@@ -150,6 +156,24 @@ public class AcademicStaffService {
             return true;
         }
         return spr.getNote() != null && spr.getNote().toLowerCase().contains("force approve");
+    }
+
+    private boolean hasEmbeddedAcademicData(StudentProjectRound spr, Student student) {
+        if (spr.getGpa() != null || student.getGpa() != null) {
+            return true;
+        }
+        String s = spr.getStatus();
+        if (s == null) {
+            return false;
+        }
+        return "REGISTERED".equalsIgnoreCase(s)
+                || "ASSIGNED".equalsIgnoreCase(s)
+                || "IN_PROGRESS".equalsIgnoreCase(s)
+                || "TOPIC_APPROVED".equalsIgnoreCase(s)
+                || "DEFENSE_READY".equalsIgnoreCase(s)
+                || "COMPLETED".equalsIgnoreCase(s)
+                || "DEFENDED".equalsIgnoreCase(s)
+                || "PASSED".equalsIgnoreCase(s);
     }
 
     @Transactional(readOnly = true)
@@ -252,22 +276,49 @@ public class AcademicStaffService {
     @Transactional
     public void updateStudentDebt(Long roundId, Long studentId, Integer newDebtCredits) {
         int debt = newDebtCredits != null ? Math.max(0, newDebtCredits) : 0;
+        Student student = studentRepository != null ? studentRepository.findById(studentId).orElse(null) : null;
+        if (student != null) {
+            student.setDebtCredits(debt);
+            student = studentRepository.save(student);
+        }
+
         AcademicRecord record = academicRecordRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
                 .orElse(null);
+        if (record == null && student != null) {
+            ProjectRound round = projectRoundRepository.findById(roundId).orElse(null);
+            if (round != null) {
+                record = AcademicRecord.builder()
+                        .student(student)
+                        .projectRound(round)
+                        .gpa(student.getGpa())
+                        .completedCredits(Math.max(0, 132 - debt))
+                        .tuitionDebt(false)
+                        .underDisciplinaryAction(false)
+                        .build();
+            }
+        }
         if (record != null) {
             record.setDebtCredits(debt);
             if (debt == 0) {
                 record.setMissingPrerequisiteCount(0);
+                if (record.getCompletedCredits() == null || record.getCompletedCredits() < 132) {
+                    record.setCompletedCredits(132);
+                }
                 record.setNote("Giáo vụ xác nhận đã hoàn thành trả nợ tín chỉ trước khi bảo vệ đồ án");
             }
+            record.setImportedAt(Instant.now());
             academicRecordRepository.save(record);
         }
 
-        if (studentRepository != null) {
-            studentRepository.findById(studentId).ifPresent(st -> {
-                st.setDebtCredits(debt);
-                studentRepository.save(st);
-            });
+        if (debt == 0) {
+            studentProjectRoundRepository.findByStudentIdAndProjectRoundId(studentId, roundId)
+                    .ifPresent(spr -> {
+                        if ("INELIGIBLE".equalsIgnoreCase(spr.getStatus())) {
+                            spr.setStatus("ELIGIBLE");
+                        }
+                        spr.setNote("Giáo vụ xác nhận đã hoàn thành trả nợ tín chỉ trước khi bảo vệ đồ án");
+                        studentProjectRoundRepository.save(spr);
+                    });
         }
     }
 }

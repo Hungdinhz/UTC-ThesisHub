@@ -1,11 +1,13 @@
 package com.example.thesis_hub_api.identity.security;
 
+import com.example.thesis_hub_api.security.service.SecurityCenterService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,6 +26,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService customUserDetailsService;
 
+    @Autowired(required = false)
+    private SecurityCenterService securityCenterService;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -33,7 +38,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
                 String tokenType = jwtTokenProvider.getTokenTypeFromToken(jwt);
-                if (!JwtTokenProvider.TOKEN_TYPE_REFRESH.equalsIgnoreCase(tokenType)) {
+                boolean isRevoked = securityCenterService != null && securityCenterService.isTokenRevoked(jwt);
+
+                if (!JwtTokenProvider.TOKEN_TYPE_REFRESH.equalsIgnoreCase(tokenType) && !isRevoked) {
                     Long userId = jwtTokenProvider.getUserIdFromToken(jwt);
                     UserDetails userDetails;
 
@@ -44,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         userDetails = customUserDetailsService.loadUserByUsername(username);
                     }
 
-                    if (userDetails != null && userDetails.isEnabled()) {
+                    if (userDetails != null && userDetails.isEnabled() && userDetails.isAccountNonLocked()) {
                         UsernamePasswordAuthenticationToken authentication =
                                 new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

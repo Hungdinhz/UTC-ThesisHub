@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import type {
@@ -19,6 +20,11 @@ import './OrganizationManagementPage.css';
 
 type TabType = 'faculties' | 'majors' | 'lecturers' | 'students';
 
+export interface OrganizationManagementPageProps {
+  mode?: 'organization' | 'lecturers' | 'students' | 'all';
+  defaultTab?: TabType;
+}
+
 const FACULTY_RESEARCH_DIRECTIONS = [
   { code: 'HD_PM_APP', name: 'Phát triển phần mềm và ứng dụng (webApp, MobileApp)' },
   { code: 'HD_DATA_AI', name: 'Dữ liệu và trí tuệ nhân tạo' },
@@ -29,9 +35,52 @@ const FACULTY_RESEARCH_DIRECTIONS = [
   { code: 'HD_ALGO', name: 'Nghiên cứu và ứng dụng thuật toán' },
 ];
 
-const OrganizationManagementPage: React.FC = () => {
+const OrganizationManagementPage: React.FC<OrganizationManagementPageProps> = ({
+  mode: propMode,
+  defaultTab: propDefaultTab,
+}) => {
   const { logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('faculties');
+  const location = useLocation();
+
+  const resolvedMode = propMode || (
+    location.pathname.includes('/admin/lecturers')
+      ? 'lecturers'
+      : location.pathname.includes('/admin/students')
+        ? 'students'
+        : 'organization'
+  );
+
+  const initialTab: TabType = propDefaultTab || (
+    resolvedMode === 'lecturers'
+      ? 'lecturers'
+      : resolvedMode === 'students'
+        ? 'students'
+        : 'faculties'
+  );
+
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+
+  useEffect(() => {
+    if (resolvedMode === 'lecturers') {
+      setActiveTab('lecturers');
+    } else if (resolvedMode === 'students') {
+      setActiveTab('students');
+    } else if (resolvedMode === 'organization' && (activeTab === 'lecturers' || activeTab === 'students')) {
+      setActiveTab('faculties');
+    }
+  }, [resolvedMode, location.pathname]);
+
+  const getLayoutActiveTab = () => {
+    if (resolvedMode === 'lecturers') return 'lecturers';
+    if (resolvedMode === 'students') return 'students';
+    return 'organization';
+  };
+
+  const getPageTitle = () => {
+    if (resolvedMode === 'lecturers') return 'Quản lý Giảng viên';
+    if (resolvedMode === 'students') return 'Quản lý Sinh viên';
+    return 'Quản trị Khoa, Bộ môn & Ngành đào tạo';
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -653,55 +702,61 @@ const OrganizationManagementPage: React.FC = () => {
   };
 
   return (
-    <UTCAppLayout activeTab="organization" hideHeroBanner pageTitle="Quản lý Dữ liệu Tổ chức & Đào tạo" onLogout={logout}>
+    <UTCAppLayout activeTab={getLayoutActiveTab()} hideHeroBanner pageTitle={getPageTitle()} onLogout={logout}>
       <div className="org-page-container">
-        {/* Navigation Tabs */}
-        <div className="org-tabs-container">
-          <button
-            onClick={() => setActiveTab('faculties')}
-            className="org-tab-button"
-            style={{
-              borderBottom: activeTab === 'faculties' ? '3px solid #0a3273' : '3px solid transparent',
-              color: activeTab === 'faculties' ? '#0a3273' : '#64748b',
-              fontWeight: activeTab === 'faculties' ? 700 : 500,
-            }}
-          >
-            🏛️ Khoa & Bộ môn
-          </button>
-          <button
-            onClick={() => setActiveTab('majors')}
-            className="org-tab-button"
-            style={{
-              borderBottom: activeTab === 'majors' ? '3px solid #0a3273' : '3px solid transparent',
-              color: activeTab === 'majors' ? '#0a3273' : '#64748b',
-              fontWeight: activeTab === 'majors' ? 700 : 500,
-            }}
-          >
-            🎓 Ngành & CTĐT
-          </button>
-          <button
-            onClick={() => setActiveTab('lecturers')}
-            className="org-tab-button"
-            style={{
-              borderBottom: activeTab === 'lecturers' ? '3px solid #0a3273' : '3px solid transparent',
-              color: activeTab === 'lecturers' ? '#0a3273' : '#64748b',
-              fontWeight: activeTab === 'lecturers' ? 700 : 500,
-            }}
-          >
-            👨‍🏫 Danh sách Giảng viên (Contract 1)
-          </button>
-          <button
-            onClick={() => setActiveTab('students')}
-            className="org-tab-button"
-            style={{
-              borderBottom: activeTab === 'students' ? '3px solid #0a3273' : '3px solid transparent',
-              color: activeTab === 'students' ? '#0a3273' : '#64748b',
-              fontWeight: activeTab === 'students' ? 700 : 500,
-            }}
-          >
-            👨‍🎓 Danh sách Sinh viên
-          </button>
-        </div>
+        {/* Navigation Tabs - Only show when in organization or all mode */}
+        {(resolvedMode === 'organization' || resolvedMode === 'all') && (
+          <div className="org-tabs-container">
+            <button
+              onClick={() => setActiveTab('faculties')}
+              className="org-tab-button"
+              style={{
+                borderBottom: activeTab === 'faculties' ? '3px solid #0a3273' : '3px solid transparent',
+                color: activeTab === 'faculties' ? '#0a3273' : '#64748b',
+                fontWeight: activeTab === 'faculties' ? 700 : 500,
+              }}
+            >
+              🏛️ Khoa &amp; Bộ môn
+            </button>
+            <button
+              onClick={() => setActiveTab('majors')}
+              className="org-tab-button"
+              style={{
+                borderBottom: activeTab === 'majors' ? '3px solid #0a3273' : '3px solid transparent',
+                color: activeTab === 'majors' ? '#0a3273' : '#64748b',
+                fontWeight: activeTab === 'majors' ? 700 : 500,
+              }}
+            >
+              🎓 Ngành &amp; CTĐT
+            </button>
+            {resolvedMode === 'all' && (
+              <>
+                <button
+                  onClick={() => setActiveTab('lecturers')}
+                  className="org-tab-button"
+                  style={{
+                    borderBottom: activeTab === 'lecturers' ? '3px solid #0a3273' : '3px solid transparent',
+                    color: activeTab === 'lecturers' ? '#0a3273' : '#64748b',
+                    fontWeight: activeTab === 'lecturers' ? 700 : 500,
+                  }}
+                >
+                  👨‍🏫 Danh sách Giảng viên (Contract 1)
+                </button>
+                <button
+                  onClick={() => setActiveTab('students')}
+                  className="org-tab-button"
+                  style={{
+                    borderBottom: activeTab === 'students' ? '3px solid #0a3273' : '3px solid transparent',
+                    color: activeTab === 'students' ? '#0a3273' : '#64748b',
+                    fontWeight: activeTab === 'students' ? 700 : 500,
+                  }}
+                >
+                  👨‍🎓 Danh sách Sinh viên
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {loading && (
           <div

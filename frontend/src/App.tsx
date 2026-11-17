@@ -13,6 +13,8 @@ const AdminRegisterPage = lazy(() => import('./pages/AdminRegisterPage'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const ExternalDashboard = lazy(() => import('./pages/ExternalDashboard'));
 const OrganizationManagementPage = lazy(() => import('./pages/OrganizationManagementPage'));
+const LecturerManagementPage = lazy(() => import('./pages/LecturerManagementPage'));
+const StudentManagementPage = lazy(() => import('./pages/StudentManagementPage'));
 const ProjectRoundManagementPage = lazy(() => import('./pages/ProjectRoundManagementPage'));
 const AssignmentManagementPage = lazy(() =>
   import('./features/assignment/pages/AssignmentManagementPage').then((m) => ({ default: m.AssignmentManagementPage }))
@@ -67,6 +69,12 @@ const LecturerHomePage = lazy(() =>
 );
 const AcademicStaffHomePage = lazy(() =>
   import('./features/home/pages/AcademicStaffHomePage').then((m) => ({ default: m.AcademicStaffHomePage }))
+);
+const SecurityCenterPage = lazy(() =>
+  import('./features/security/pages/SecurityCenterPage').then((m) => ({ default: m.SecurityCenterPage }))
+);
+const AuditLogsPage = lazy(() =>
+  import('./features/security/pages/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage }))
 );
 
 const getDefaultRouteForRole = (role?: string | null): string => {
@@ -225,6 +233,22 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route
+        path="/admin/lecturers"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <LecturerManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/students"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <StudentManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/project-rounds"
         element={
           <ProtectedRoute allowedTypes={['admin']}>
@@ -313,7 +337,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/chat"
         element={
-          <ProtectedRoute allowedTypes={['student', 'supervisor', 'committee_member']}>
+          <ProtectedRoute allowedTypes={['student', 'supervisor', 'lecturer', 'committee_member', 'admin']}>
             <LayoutPageWrapper activeTab="chat" pageTitle="Nhóm Chat Hướng Dẫn Đồ Án Tốt Nghiệp">
               <ChatGroupPage />
             </LayoutPageWrapper>
@@ -403,6 +427,28 @@ const AppRoutes: React.FC = () => {
           <ProtectedRoute allowedTypes={['academic_staff', 'admin']}>
             <LayoutPageWrapper activeTab="staff-grades" pageTitle="Giáo vụ: In danh sách điểm đồ án theo lớp">
               <ClassGradeReportPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* System & Security Center / Audit Logs (Admin only) */}
+      <Route
+        path="/admin/security-center"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <LayoutPageWrapper activeTab="security-center" pageTitle="Hệ thống & Bảo mật: Trung Tâm Bảo Mật">
+              <SecurityCenterPage />
+            </LayoutPageWrapper>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/audit-logs"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <LayoutPageWrapper activeTab="audit-logs" pageTitle="Hệ thống & Bảo mật: Nhật Ký Hệ Thống (Audit Logs)">
+              <AuditLogsPage />
             </LayoutPageWrapper>
           </ProtectedRoute>
         }

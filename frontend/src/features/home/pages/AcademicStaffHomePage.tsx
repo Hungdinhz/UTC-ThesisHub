@@ -63,6 +63,20 @@ export const AcademicStaffHomePage: React.FC = () => {
 
   const activeRoundId = selectedRoundId || round?.roundId;
 
+  const withRoundQuery = (path: string, extraParams?: Record<string, string>) => {
+    const params = new URLSearchParams();
+    if (activeRoundId) {
+      params.set('roundId', String(activeRoundId));
+    }
+    if (extraParams) {
+      Object.entries(extraParams).forEach(([k, v]) => {
+        if (v) params.set(k, v);
+      });
+    }
+    const qs = params.toString();
+    return qs ? `${path}?${qs}` : path;
+  };
+
   useEffect(() => {
     let mounted = true;
     const loadStaffData = async () => {
@@ -210,7 +224,7 @@ export const AcademicStaffHomePage: React.FC = () => {
       tag: 'Thiếu dữ liệu',
       tagColor: 'danger',
       actionLabel: 'Rà soát DS',
-      actionRoute: '/academic-staff/eligible-students',
+      actionRoute: withRoundQuery('/academic-staff/eligible-students'),
     });
   }
 
@@ -223,7 +237,7 @@ export const AcademicStaffHomePage: React.FC = () => {
       tag: 'Nợ tín chỉ',
       tagColor: 'warning',
       actionLabel: 'Xem danh sách',
-      actionRoute: '/academic-staff/eligible-students',
+      actionRoute: withRoundQuery('/academic-staff/eligible-students', { status: 'INELIGIBLE' }),
     });
   }
 
@@ -236,7 +250,7 @@ export const AcademicStaffHomePage: React.FC = () => {
       tag: 'Đơn bảo lưu',
       tagColor: 'primary',
       actionLabel: 'Phê duyệt',
-      actionRoute: '/admin/reservations',
+      actionRoute: withRoundQuery('/admin/reservations'),
     });
   }
 
@@ -249,7 +263,7 @@ export const AcademicStaffHomePage: React.FC = () => {
       tag: 'GĐ5 • In điểm',
       tagColor: 'success',
       actionLabel: 'In bảng điểm',
-      actionRoute: '/academic-staff/class-grades',
+      actionRoute: withRoundQuery('/academic-staff/class-grades'),
     });
   }
 
@@ -258,6 +272,15 @@ export const AcademicStaffHomePage: React.FC = () => {
   // Upcoming Milestones
   const milestoneTodos: TodoItem[] = milestones.map((m) => {
     const d = daysUntil(m.endDate);
+    const pt = (m.phaseType || '').toUpperCase();
+    const targetRoute =
+      pt === 'DEFENSE'
+        ? (round?.status === 'CLOSED' || round?.status === 'ARCHIVED'
+            ? withRoundQuery('/academic-staff/class-grades')
+            : withRoundQuery('/admin/final-eligibility'))
+        : pt === 'ELIGIBILITY_REVIEW' || pt === 'COMMITTEE_ASSIGNMENT'
+        ? withRoundQuery('/admin/final-eligibility')
+        : withRoundQuery('/academic-staff/eligible-students');
     return {
       id: `ms-${m.milestoneId}`,
       title: m.name,
@@ -267,10 +290,7 @@ export const AcademicStaffHomePage: React.FC = () => {
       tag: m.isActive ? 'Đang diễn ra' : m.phaseType,
       tagColor: m.isActive ? 'primary' : 'info',
       actionLabel: 'Kiểm tra',
-      actionRoute:
-        m.phaseType === 'DEFENSE'
-          ? '/academic-staff/class-grades'
-          : '/academic-staff/eligible-students',
+      actionRoute: targetRoute,
     };
   });
 
@@ -297,7 +317,9 @@ export const AcademicStaffHomePage: React.FC = () => {
       icon: '📋',
       label: 'GĐ1: Lập DS SV đủ ĐK nhận đồ án',
       subtitle: 'Kiểm tra nợ tín chỉ & xuất danh sách',
-      route: '/academic-staff/eligible-students',
+      route: withRoundQuery('/academic-staff/eligible-students'),
+      disabled: !activeRoundId,
+      disabledReason: 'Chưa chọn đợt đồ án',
     },
     {
       id: 'as-export-eligible',
@@ -312,27 +334,27 @@ export const AcademicStaffHomePage: React.FC = () => {
       icon: '🔍',
       label: 'GĐ5: Rà soát ĐK Bảo vệ cuối',
       subtitle: 'Kiểm tra trả nợ tín chỉ & điều kiện bảo vệ',
-      route: '/admin/final-eligibility',
-      disabled: !activeRoundId || roundStage < 5,
-      disabledReason: !activeRoundId ? 'Chưa chọn đợt đồ án' : 'Đợt đồ án chưa mở Giai đoạn 5 (Bảo vệ)',
+      route: withRoundQuery('/admin/final-eligibility'),
+      disabled: !activeRoundId,
+      disabledReason: 'Chưa chọn đợt đồ án',
     },
     {
       id: 'as-reservations',
       icon: '⏸️',
       label: 'GĐ5: Quản lý Đơn bảo lưu',
       subtitle: `${pendingReservationsCount} đơn chờ xử lý`,
-      route: '/admin/reservations',
-      disabled: !activeRoundId || roundStage < 5,
-      disabledReason: !activeRoundId ? 'Chưa chọn đợt đồ án' : 'Đợt đồ án chưa mở Giai đoạn 5',
+      route: withRoundQuery('/admin/reservations'),
+      disabled: !activeRoundId,
+      disabledReason: 'Chưa chọn đợt đồ án',
     },
     {
       id: 'as-class-grades',
       icon: '🖨️',
       label: 'GĐ5: In điểm đồ án theo lớp',
       subtitle: 'Xem & in bảng điểm tổng hợp theo lớp',
-      route: '/academic-staff/class-grades',
-      disabled: !activeRoundId || (roundStage < 5 && round?.status !== 'CLOSED'),
-      disabledReason: !activeRoundId ? 'Chưa chọn đợt đồ án' : 'Giai đoạn 5 chưa mở hoặc chưa công bố điểm',
+      route: withRoundQuery('/academic-staff/class-grades'),
+      disabled: !activeRoundId,
+      disabledReason: 'Chưa chọn đợt đồ án',
     },
     {
       id: 'as-export-grades',
@@ -346,7 +368,7 @@ export const AcademicStaffHomePage: React.FC = () => {
   ];
 
   const handleStepClick = (step: StageStepInfo) => {
-    navigate(step.route);
+    navigate(withRoundQuery(step.route));
   };
 
   return (
@@ -404,7 +426,7 @@ export const AcademicStaffHomePage: React.FC = () => {
             <button
               type="button"
               className="utc-home-btn utc-home-btn-primary"
-              onClick={() => navigate('/academic-staff/eligible-students')}
+              onClick={() => navigate(withRoundQuery('/academic-staff/eligible-students'))}
             >
               📋 Quản lý DS Sinh viên
             </button>
@@ -432,7 +454,7 @@ export const AcademicStaffHomePage: React.FC = () => {
           subtitle={`Đợt ${round?.roundCode || 'hiện hành'}`}
           icon="👥"
           accentColor="#0a3273"
-          onClick={() => navigate('/academic-staff/eligible-students')}
+          onClick={() => navigate(withRoundQuery('/academic-staff/eligible-students'))}
         />
         <StatCard
           label="Đủ điều kiện nhận ĐA"
@@ -444,7 +466,7 @@ export const AcademicStaffHomePage: React.FC = () => {
           }
           icon="✅"
           accentColor="#16a34a"
-          onClick={() => navigate('/academic-staff/eligible-students')}
+          onClick={() => navigate(withRoundQuery('/academic-staff/eligible-students', { status: 'ELIGIBLE' }))}
         />
         <StatCard
           label="Không đủ ĐK (Nợ TC)"
@@ -452,7 +474,7 @@ export const AcademicStaffHomePage: React.FC = () => {
           subtitle={`Nợ vượt ngưỡng ${eligibleStats?.maxDebtCredits ?? 10} TC`}
           icon="❌"
           accentColor="#dc2626"
-          onClick={() => navigate('/academic-staff/eligible-students')}
+          onClick={() => navigate(withRoundQuery('/academic-staff/eligible-students', { status: 'INELIGIBLE' }))}
         />
         <StatCard
           label="Thiếu dữ liệu học vụ"
@@ -460,15 +482,21 @@ export const AcademicStaffHomePage: React.FC = () => {
           subtitle="Cần bổ sung bảng điểm học vụ"
           icon="⚠️"
           accentColor="#d97706"
-          onClick={() => navigate('/academic-staff/eligible-students')}
+          onClick={() => navigate(withRoundQuery('/academic-staff/eligible-students'))}
         />
         <StatCard
           label="Đơn bảo lưu chờ duyệt"
           value={pendingReservationsCount}
-          subtitle={roundStage < 5 ? '🔒 GĐ5 chưa mở' : 'Giai đoạn 5 • Rà soát bảo lưu'}
+          subtitle={
+            !activeRoundId
+              ? 'Chưa chọn đợt đồ án'
+              : roundStage < 5
+              ? 'GĐ5 chưa mở • Vẫn có thể xem trước'
+              : 'Giai đoạn 5 • Rà soát bảo lưu'
+          }
           icon="⏸️"
           accentColor="#7c3aed"
-          onClick={activeRoundId && roundStage >= 5 ? () => navigate('/admin/reservations') : undefined}
+          onClick={activeRoundId ? () => navigate(withRoundQuery('/admin/reservations')) : undefined}
         />
       </div>
 

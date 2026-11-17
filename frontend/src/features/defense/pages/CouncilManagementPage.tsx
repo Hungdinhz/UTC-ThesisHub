@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../../components/ui';
 import { CouncilMemberCard } from '../components/CouncilMemberCard';
 import { CouncilGenerateModal } from '../components/CouncilGenerateModal';
+import { CouncilNotifyModal } from '../components/CouncilNotifyModal';
 import { defenseService } from '../services/defenseService';
 import { apiService } from '../../../services/api';
-import type { DefenseCouncil, LecturerOption, CouncilGenerationRequest } from '../types';
+import type { DefenseCouncil, LecturerOption, CouncilGenerationRequest, CouncilNotifyRequest } from '../types';
 import './DefensePages.css';
 
 export const CouncilManagementPage: React.FC = () => {
@@ -25,6 +26,9 @@ export const CouncilManagementPage: React.FC = () => {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [selectedCouncilId, setSelectedCouncilId] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isNotifyModalOpen, setIsNotifyModalOpen] = useState(false);
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [notifiedCouncils, setNotifiedCouncils] = useState<Record<number, string>>({});
 
 
   useEffect(() => {
@@ -148,6 +152,27 @@ export const CouncilManagementPage: React.FC = () => {
     } finally {
       mutationInFlight.current = false;
       setLoading(false);
+    }
+  };
+
+  const handleSendCouncilNotification = async (payload: CouncilNotifyRequest) => {
+    if (!selectedCouncil || busy || mutationInFlight.current) return;
+    mutationInFlight.current = true;
+    setNotifyLoading(true);
+    try {
+      const res = await defenseService.notifyCouncilMembers(selectedCouncil.id, payload);
+      const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      setNotifiedCouncils((prev) => ({ ...prev, [selectedCouncil.id]: timeStr }));
+      setNotification({
+        type: 'success',
+        message: `📢 ĐÃ GỬI THÔNG BÁO THÀNH CÔNG! Đã chuyển phát thông báo tới ${res.totalNotified || 7} người nhận (Hội đồng ${selectedCouncil.code}) lúc ${timeStr}.`,
+      });
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err?.message || 'Lỗi khi gửi thông báo đến các thành viên' });
+      throw err;
+    } finally {
+      mutationInFlight.current = false;
+      setNotifyLoading(false);
     }
   };
 
@@ -286,6 +311,20 @@ export const CouncilManagementPage: React.FC = () => {
 
           {isFinalized && (
             <>
+              <Button
+                variant="primary"
+                onClick={() => setIsNotifyModalOpen(true)}
+                disabled={busy}
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  borderColor: '#6d28d9',
+                  color: '#fff',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                }}
+              >
+                📢 Gửi Thông Báo Thành Viên
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleReopen}
@@ -438,6 +477,42 @@ export const CouncilManagementPage: React.FC = () => {
                   <span className="structure-pill">Cơ cấu chuẩn: 1CT - 1TK - 1PB1 - 1PB2 - 1UV</span>
                   {isFinalized ? (
                     <>
+                      {notifiedCouncils[selectedCouncil.id] && (
+                        <span style={{
+                          background: '#ede9fe',
+                          color: '#6d28d9',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          border: '1px solid #ddd6fe',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}>
+                          🔔 Đã gửi TB ({notifiedCouncils[selectedCouncil.id]})
+                        </span>
+                      )}
+                      <button
+                        onClick={() => setIsNotifyModalOpen(true)}
+                        disabled={busy}
+                        style={{
+                          background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        📢 Gửi thông báo
+                      </button>
                       <button
                         onClick={handleReopen}
                         disabled={busy}
@@ -577,6 +652,15 @@ export const CouncilManagementPage: React.FC = () => {
         onGenerate={handleGenerate}
         rounds={rounds}
         currentRoundId={selectedRoundId}
+      />
+
+      {/* Council Notify Modal */}
+      <CouncilNotifyModal
+        isOpen={isNotifyModalOpen}
+        onClose={() => setIsNotifyModalOpen(false)}
+        council={selectedCouncil || null}
+        onSend={handleSendCouncilNotification}
+        loading={notifyLoading}
       />
     </div>
   );

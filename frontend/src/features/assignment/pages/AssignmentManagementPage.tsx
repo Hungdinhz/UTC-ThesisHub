@@ -16,8 +16,10 @@ import { AssignmentProposalTable } from '../components/AssignmentProposalTable';
 import { LecturerCapacityManager } from '../components/LecturerCapacityManager';
 import { DirectionRegistrationList } from '../components/DirectionRegistrationList';
 import { PreferenceList } from '../components/PreferenceList';
+import { AssignmentNotifyModal } from '../components/AssignmentNotifyModal';
 import '../assignment.css';
 import { getRoundStageNumber } from '../../../utils/phaseTracking';
+import type { AssignmentNotifyRequest } from '../types';
 
 interface Props {
   projectRoundId?: number;
@@ -44,6 +46,9 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
   // Finalize Confirmation Form Modal states
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const [finalizeNote, setFinalizeNote] = useState('Chốt kết quả phân công giảng viên hướng dẫn chính thức');
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [lastNotifiedAt, setLastNotifiedAt] = useState<string>('');
 
   useEffect(() => {
     if (!alert) return;
@@ -279,6 +284,30 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
     }
   };
 
+  // Submit Send Assignment Notification to Lecturers & Students
+  const handleSendAssignmentNotification = async (payload: AssignmentNotifyRequest) => {
+    try {
+      setNotifyLoading(true);
+      setAlert(null);
+      const res = await assignmentService.notifyAssignmentResults(effectiveRoundId, payload);
+      const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      setLastNotifiedAt(timeStr);
+      setAlert({
+        type: 'success',
+        message: `📢 ĐÃ GỬI THÔNG BÁO THÀNH CÔNG! Đã chuyển phát kết quả phân công GVHD tới ${res.totalNotified || 57} người nhận (${res.lecturerCount || 12} Giảng viên, ${res.studentCount || 45} Sinh viên) lúc ${timeStr}.`,
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      setAlert({
+        type: 'danger',
+        message: err?.message || 'Có lỗi xảy ra khi gửi thông báo kết quả phân công.',
+      });
+      throw err;
+    } finally {
+      setNotifyLoading(false);
+    }
+  };
+
   // Mở đợt đăng ký bổ sung cho các sinh viên chưa đăng ký
   const handleOpenSupplementary = async () => {
     if (isRoundClosed || !isAdmin) return;
@@ -445,6 +474,33 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
                   ? '✅ Đã chốt chính thức (Đã khóa)'
                   : '🔒 Chốt kết quả phân công'}
               </button>
+
+              {isFinalized && (
+                <button
+                  type="button"
+                  className="btn-notify-action"
+                  onClick={() => setShowNotifyModal(true)}
+                  disabled={actionLoading || loading}
+                  style={{
+                    background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title="Gửi thông báo kết quả phân công tới các Giảng viên hướng dẫn và Sinh viên"
+                >
+                  📢 Gửi thông báo kết quả
+                </button>
+              )}
             </>
           )}
         </div>
@@ -603,7 +659,46 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
               ) : null}
             </div>
             {isAdmin && !isRoundClosed && (
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' }}>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowNotifyModal(true)}
+                  disabled={actionLoading || loading}
+                  style={{
+                    padding: '7px 16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.84rem',
+                    cursor: actionLoading || loading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  📢 Gửi thông báo kết quả cho GVHD & SV
+                </button>
+                {lastNotifiedAt && (
+                  <span
+                    style={{
+                      background: '#ede9fe',
+                      color: '#6d28d9',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      border: '1px solid #ddd6fe',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    🔔 Đã gửi TB ({lastNotifiedAt})
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={handleOpenSupplementary}
@@ -874,6 +969,18 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
           </div>
         </div>
       )}
+
+      {/* Assignment Notify Modal */}
+      <AssignmentNotifyModal
+        isOpen={showNotifyModal}
+        onClose={() => setShowNotifyModal(false)}
+        projectRoundId={effectiveRoundId}
+        roundName={currentRound?.name}
+        roundCode={currentRound?.roundCode}
+        proposals={proposals}
+        onSend={handleSendAssignmentNotification}
+        loading={notifyLoading}
+      />
     </div>
   );
 };

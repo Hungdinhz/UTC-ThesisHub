@@ -352,6 +352,91 @@ public class DefenseService implements RoundDefenseSynthesizer {
     }
 
     @Transactional
+    public java.util.Map<String, Object> notifyCouncilMembers(Long id, CouncilNotifyRequestDTO request) {
+        DefenseCouncil council = councilRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
+
+        String title = (request != null && request.getTitle() != null && !request.getTitle().isBlank())
+                ? request.getTitle()
+                : "Thông báo thành lập Hội đồng bảo vệ đồ án: " + council.getName();
+
+        String message = (request != null && request.getMessage() != null && !request.getMessage().isBlank())
+                ? request.getMessage()
+                : "Hội đồng bảo vệ " + council.getName() + " (" + council.getCode() + ") đã được chốt danh sách thành viên chính thức.";
+
+        boolean notifyLecturers = request == null || request.getNotifyLecturers() == null || request.getNotifyLecturers();
+        boolean notifyStudents = request == null || request.getNotifyStudents() == null || request.getNotifyStudents();
+
+        int lecturerCount = 0;
+        int studentCount = 0;
+
+        if (notificationService != null) {
+            if (notifyLecturers && lecturerRepository != null) {
+                List<CouncilMember> members = memberRepository.findByCouncilId(id);
+                for (CouncilMember m : members) {
+                    if (m.getLecturerId() != null) {
+                        try {
+                            lecturerRepository.findById(m.getLecturerId()).ifPresent(lec -> {
+                                if (lec.getUser() != null && lec.getUser().getId() != null) {
+                                    String roleVn = switch (m.getRole() != null ? m.getRole().toUpperCase() : "") {
+                                        case "PRESIDENT" -> "Chủ tịch Hội đồng";
+                                        case "SECRETARY" -> "Thư ký Hội đồng";
+                                        case "REVIEWER_1" -> "Ủy viên Phản biện 1";
+                                        case "REVIEWER_2" -> "Ủy viên Phản biện 2";
+                                        case "MEMBER" -> "Ủy viên Hội đồng";
+                                        default -> "Thành viên Hội đồng";
+                                    };
+                                    notificationService.createNotification(
+                                            lec.getUser().getId(),
+                                            title,
+                                            message + " [Vai trò của Thầy/Cô: " + roleVn + "]",
+                                            "DEFENSE",
+                                            "/defense-councils"
+                                    );
+                                }
+                            });
+                            lecturerCount++;
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            if (notifyStudents && studentRepository != null) {
+                CouncilResponseDTO councilDto = mapToCouncilResponse(council);
+                if (councilDto.getAssignedStudents() != null) {
+                    for (CouncilStudentDetailDTO cs : councilDto.getAssignedStudents()) {
+                        if (cs.getStudentId() != null) {
+                            try {
+                                studentRepository.findById(cs.getStudentId()).ifPresent(st -> {
+                                    if (st.getUser() != null && st.getUser().getId() != null) {
+                                        notificationService.createNotification(
+                                                st.getUser().getId(),
+                                                title,
+                                                message,
+                                                "DEFENSE",
+                                                "/student/defense"
+                                        );
+                                    }
+                                });
+                                studentCount++;
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            }
+        }
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("councilId", id);
+        result.put("councilCode", council.getCode());
+        result.put("lecturerCount", lecturerCount);
+        result.put("studentCount", studentCount);
+        result.put("totalNotified", lecturerCount + studentCount);
+        result.put("sentAt", java.time.Instant.now().toString());
+        return result;
+    }
+
+    @Transactional
     public CouncilResponseDTO reopenCouncil(Long id) {
         DefenseCouncil council = councilRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Không tìm thấy hội đồng ID: " + id));
@@ -934,6 +1019,129 @@ public class DefenseService implements RoundDefenseSynthesizer {
             list = scheduleRepository.findAll();
         }
         return list.stream().map(this::mapToScheduleResponse).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public List<DefenseScheduleResponseDTO> finalizeSchedules(Long projectRoundId) {
+        List<Long> councilIds = councilRepository.findByProjectRoundId(projectRoundId)
+                .stream().map(DefenseCouncil::getId).collect(Collectors.toList());
+        if (councilIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<DefenseSchedule> schedules = scheduleRepository.findByCouncilIdIn(councilIds);
+        for (DefenseSchedule s : schedules) {
+            s.setStatus("FINALIZED");
+        }
+        List<DefenseSchedule> saved = scheduleRepository.saveAll(schedules);
+        return saved.stream().map(this::mapToScheduleResponse).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public List<DefenseScheduleResponseDTO> reopenSchedules(Long projectRoundId) {
+        List<Long> councilIds = councilRepository.findByProjectRoundId(projectRoundId)
+                .stream().map(DefenseCouncil::getId).collect(Collectors.toList());
+        if (councilIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<DefenseSchedule> schedules = scheduleRepository.findByCouncilIdIn(councilIds);
+        for (DefenseSchedule s : schedules) {
+            s.setStatus("SCHEDULED");
+        }
+        List<DefenseSchedule> saved = scheduleRepository.saveAll(schedules);
+        return saved.stream().map(this::mapToScheduleResponse).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Map<String, Object> notifyDefenseSchedules(ScheduleNotifyRequestDTO request) {
+        if (request == null || request.getProjectRoundId() == null) {
+            throw new IllegalArgumentException("Vui lòng cung cấp projectRoundId để gửi thông báo lịch bảo vệ.");
+        }
+        Long roundId = request.getProjectRoundId();
+        ProjectRound round = projectRoundRepository != null ? projectRoundRepository.findById(roundId).orElse(null) : null;
+        String roundName = (round != null && round.getName() != null) ? round.getName() : ("Đợt đồ án #" + roundId);
+
+        List<Long> councilIds = councilRepository.findByProjectRoundId(roundId)
+                .stream().map(DefenseCouncil::getId).collect(Collectors.toList());
+        List<DefenseSchedule> schedules = councilIds.isEmpty() ? Collections.emptyList() : scheduleRepository.findByCouncilIdIn(councilIds);
+
+        String title = (request.getTitle() != null && !request.getTitle().isBlank())
+                ? request.getTitle()
+                : "[UTC] Thông báo lịch bảo vệ đồ án tốt nghiệp chính thức - " + roundName;
+
+        String message = (request.getMessage() != null && !request.getMessage().isBlank())
+                ? request.getMessage()
+                : "Khoa đã chốt Lịch bảo vệ đồ án tốt nghiệp chính thức cho đợt " + roundName + ". Vui lòng đăng nhập hệ thống để xem chi tiết phòng thi và ca bảo vệ.";
+
+        boolean notifyLecturers = request.getNotifyLecturers() == null || request.getNotifyLecturers();
+        boolean notifyStudents = request.getNotifyStudents() == null || request.getNotifyStudents();
+
+        int lecturerCount = 0;
+        int studentCount = 0;
+
+        if (notificationService != null) {
+            if (notifyLecturers && lecturerRepository != null) {
+                Set<Long> lecturerIds = new HashSet<>();
+                for (Long cId : councilIds) {
+                    memberRepository.findByCouncilId(cId).forEach(m -> {
+                        if (m.getLecturerId() != null) lecturerIds.add(m.getLecturerId());
+                    });
+                }
+                for (Long lId : lecturerIds) {
+                    try {
+                        lecturerRepository.findById(lId).ifPresent(lec -> {
+                            if (lec.getUser() != null && lec.getUser().getId() != null) {
+                                notificationService.createNotification(
+                                        lec.getUser().getId(),
+                                        title,
+                                        message,
+                                        "DEFENSE",
+                                        "/defense-schedules"
+                                );
+                            }
+                        });
+                        lecturerCount++;
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            if (notifyStudents && studentRepository != null) {
+                Set<Long> studentIds = new HashSet<>();
+                for (DefenseSchedule s : schedules) {
+                    DefenseScheduleResponseDTO sDto = mapToScheduleResponse(s);
+                    if (sDto.getAssignedStudents() != null) {
+                        for (CouncilStudentDetailDTO cs : sDto.getAssignedStudents()) {
+                            if (cs.getStudentId() != null) studentIds.add(cs.getStudentId());
+                        }
+                    }
+                }
+                for (Long sId : studentIds) {
+                    try {
+                        studentRepository.findById(sId).ifPresent(st -> {
+                            if (st.getUser() != null && st.getUser().getId() != null) {
+                                notificationService.createNotification(
+                                        st.getUser().getId(),
+                                        title,
+                                        message,
+                                        "DEFENSE",
+                                        "/student/defense"
+                                );
+                            }
+                        });
+                        studentCount++;
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("projectRoundId", roundId);
+        result.put("roundName", roundName);
+        result.put("scheduleCount", schedules.size());
+        result.put("lecturerCount", lecturerCount);
+        result.put("studentCount", studentCount);
+        result.put("totalNotified", lecturerCount + studentCount);
+        result.put("sentAt", Instant.now().toString());
+        return result;
     }
 
     private DefenseScheduleResponseDTO mapToScheduleResponse(DefenseSchedule s) {
@@ -1538,6 +1746,58 @@ public class DefenseService implements RoundDefenseSynthesizer {
             });
         }
         return enrichGraduationResultDTO(saved);
+    }
+
+    /**
+     * Tổng hợp điểm tốt nghiệp cho toàn bộ sinh viên trong đợt đồ án
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = {IllegalArgumentException.class})
+    public List<GraduationResultResponseDTO> synthesizeRoundResults(Long roundId, SynthesizeResultRequestDTO request) {
+        if (roundId == null || thesisRepository == null) {
+            return Collections.emptyList();
+        }
+        List<Thesis> roundTheses = thesisRepository.findByProjectRoundId(roundId);
+        List<Thesis> eligibleTheses = roundTheses.stream()
+                .filter(this::isThesisDefenseEligible)
+                .toList();
+
+        if (eligibleTheses.isEmpty()) {
+            throw new IllegalStateException("Chưa có sinh viên/đề tài nào đủ điều kiện bảo vệ trong đợt để tổng hợp điểm.");
+        }
+
+        double wSup = (request != null && request.getSupervisorWeight() != null) ? request.getSupervisorWeight() : 0.4;
+        double wRev = (request != null && request.getReviewerWeight() != null) ? request.getReviewerWeight() : 0.0;
+        double wCou = (request != null && request.getCouncilWeight() != null) ? request.getCouncilWeight() : 0.6;
+        String notes = (request != null && request.getNotes() != null && !request.getNotes().isBlank())
+                ? request.getNotes() : "Tổng hợp kết quả tốt nghiệp toàn đợt đồ án";
+
+        List<String> failedLabels = new ArrayList<>();
+        int synthesizedCount = 0;
+
+        for (Thesis t : eligibleTheses) {
+            try {
+                SynthesizeResultRequestDTO tReq = SynthesizeResultRequestDTO.builder()
+                        .thesisId(t.getId())
+                        .supervisorWeight(wSup)
+                        .reviewerWeight(wRev)
+                        .councilWeight(wCou)
+                        .notes(notes)
+                        .build();
+                synthesizeResult(tReq);
+                synthesizedCount++;
+            } catch (Exception ex) {
+                String label = (t.getStudent() != null && t.getStudent().getStudentCode() != null)
+                        ? t.getStudent().getStudentCode()
+                        : (t.getThesisCode() != null ? t.getThesisCode() : ("#" + t.getId()));
+                failedLabels.add(label);
+            }
+        }
+
+        if (synthesizedCount == 0 && !failedLabels.isEmpty()) {
+            throw new IllegalStateException("Không có đề tài nào đủ điều kiện điểm (GVHD + Hội đồng) để tổng hợp kết quả: " + String.join(", ", failedLabels));
+        }
+
+        return getGraduationResultsByRound(roundId);
     }
 
     @Transactional(readOnly = true)

@@ -16,4 +16,9 @@ public class ChatRoomMemberDTO {
     private String code;
     private String className;
     private String role; // SUPERVISOR, STUDENT
+    private String email;
+    private String phone;
+    private String directionName;
+    private String thesisTitle;
+    private String assignmentStatus;
 }

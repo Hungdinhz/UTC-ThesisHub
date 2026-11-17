@@ -5,8 +5,13 @@ import com.example.thesis_hub_api.assignment.entity.SupervisorAssignment;
 import com.example.thesis_hub_api.assignment.repository.LecturerCapacityRepository;
 import com.example.thesis_hub_api.assignment.repository.LecturerDirectionRepository;
 import com.example.thesis_hub_api.assignment.repository.SupervisorAssignmentRepository;
+import com.example.thesis_hub_api.organization.entity.Lecturer;
+import com.example.thesis_hub_api.organization.repository.LecturerRepository;
+import com.example.thesis_hub_api.thesis.repository.ProposalRepository;
+import com.example.thesis_hub_api.thesis.repository.ThesisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +33,15 @@ public class AssignmentOverrideManager {
     private final LecturerCapacityRepository capacityRepository;
     private final LecturerDirectionRepository lecturerDirectionRepository;
     private final CapacityCalculator capacityCalculator;
+
+    @Autowired(required = false)
+    private LecturerRepository lecturerRepository;
+
+    @Autowired(required = false)
+    private ProposalRepository proposalRepository;
+
+    @Autowired(required = false)
+    private ThesisRepository thesisRepository;
 
     @Transactional
     public SupervisorAssignment executeOverride(Long assignmentId, Long newLecturerId, String reason, Long overriddenBy) {
@@ -80,7 +94,30 @@ public class AssignmentOverrideManager {
         assignment.setOverriddenBy(overriddenBy);
         assignment.setOverriddenAt(Instant.now());
 
-        return assignmentRepository.save(assignment);
+        SupervisorAssignment saved = assignmentRepository.save(assignment);
+
+        // Sync existing proposal & thesis lecturer if student already started Stage 3/4
+        if (assignment.getStudentId() != null && roundId != null && newLecturerId != null && lecturerRepository != null) {
+            Lecturer newLecturer = lecturerRepository.findById(newLecturerId).orElse(null);
+            if (newLecturer != null) {
+                if (proposalRepository != null) {
+                    proposalRepository.findByStudentIdAndProjectRoundId(assignment.getStudentId(), roundId)
+                            .ifPresent(p -> {
+                                p.setLecturer(newLecturer);
+                                proposalRepository.save(p);
+                            });
+                }
+                if (thesisRepository != null) {
+                    thesisRepository.findByStudentIdAndProjectRoundId(assignment.getStudentId(), roundId)
+                            .ifPresent(t -> {
+                                t.setLecturer(newLecturer);
+                                thesisRepository.save(t);
+                            });
+                }
+            }
+        }
+
+        return saved;
     }
 
     @Transactional

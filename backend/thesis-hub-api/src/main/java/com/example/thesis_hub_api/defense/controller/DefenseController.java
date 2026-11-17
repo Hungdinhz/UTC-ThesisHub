@@ -87,6 +87,18 @@ public class DefenseController {
     }
 
     /**
+     * Gửi thông báo đến các thành viên và sinh viên bảo vệ của Hội đồng sau khi chốt
+     */
+    @PostMapping("/councils/{id}/notify")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> notifyCouncilMembers(
+            @PathVariable Long id,
+            @RequestBody(required = false) CouncilNotifyRequestDTO request) {
+        java.util.Map<String, Object> result = defenseService.notifyCouncilMembers(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi thông báo đến các thành viên Hội đồng thành công", result));
+    }
+
+    /**
      * Mở khóa Hội đồng bảo vệ (Chuyển trạng thái từ FINALIZED về ACTIVE để chỉnh sửa thủ công)
      */
     @PostMapping("/councils/{id}/reopen")
@@ -186,6 +198,39 @@ public class DefenseController {
     }
 
     /**
+     * Chốt toàn bộ lịch bảo vệ của đợt đồ án (Khóa lịch bảo vệ chính thức)
+     */
+    @PostMapping("/schedules/finalize")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<List<DefenseScheduleResponseDTO>>> finalizeSchedules(
+            @RequestParam Long projectRoundId) {
+        List<DefenseScheduleResponseDTO> result = defenseService.finalizeSchedules(projectRoundId);
+        return ResponseEntity.ok(ApiResponse.success("Chốt toàn bộ lịch bảo vệ thành công", result));
+    }
+
+    /**
+     * Mở khóa lịch bảo vệ của đợt đồ án để chỉnh sửa ca và sinh viên
+     */
+    @PostMapping("/schedules/reopen")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<List<DefenseScheduleResponseDTO>>> reopenSchedules(
+            @RequestParam Long projectRoundId) {
+        List<DefenseScheduleResponseDTO> result = defenseService.reopenSchedules(projectRoundId);
+        return ResponseEntity.ok(ApiResponse.success("Mở khóa lịch bảo vệ để chỉnh sửa thành công", result));
+    }
+
+    /**
+     * Gửi thông báo lịch bảo vệ chính thức đến các thành viên Hội đồng, GVHD và Sinh viên
+     */
+    @PostMapping("/schedules/notify")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> notifyDefenseSchedules(
+            @RequestBody(required = false) ScheduleNotifyRequestDTO request) {
+        java.util.Map<String, Object> result = defenseService.notifyDefenseSchedules(request);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi thông báo lịch bảo vệ thành công đến mọi người", result));
+    }
+
+    /**
      * Danh sách đề tài được phép xem / chấm điểm ở GĐ5 theo đúng vai trò người đăng nhập (#17)
      */
     @GetMapping("/my-scoring-theses")
@@ -251,10 +296,26 @@ public class DefenseController {
      */
     @PostMapping("/results/synthesize")
     @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
-    public ResponseEntity<ApiResponse<GraduationResultResponseDTO>> synthesizeResult(
+    public ResponseEntity<ApiResponse<Object>> synthesizeResult(
             @RequestBody SynthesizeResultRequestDTO request) {
+        if (request != null && request.getProjectRoundId() != null && (request.getThesisId() == null || request.getThesisId() == 0)) {
+            List<GraduationResultResponseDTO> roundResults = defenseService.synthesizeRoundResults(request.getProjectRoundId(), request);
+            return ResponseEntity.ok(ApiResponse.success("Tổng hợp kết quả tốt nghiệp toàn đợt thành công", roundResults));
+        }
         GraduationResultResponseDTO result = defenseService.synthesizeResult(request);
         return ResponseEntity.ok(ApiResponse.success("Tổng hợp kết quả tốt nghiệp thành công", result));
+    }
+
+    /**
+     * Tổng hợp điểm tốt nghiệp cho toàn bộ sinh viên trong đợt đồ án
+     */
+    @PostMapping("/rounds/{roundId}/synthesize")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN', 'ACADEMIC_STAFF')")
+    public ResponseEntity<ApiResponse<List<GraduationResultResponseDTO>>> synthesizeRoundResults(
+            @PathVariable Long roundId,
+            @RequestBody(required = false) SynthesizeResultRequestDTO request) {
+        List<GraduationResultResponseDTO> result = defenseService.synthesizeRoundResults(roundId, request);
+        return ResponseEntity.ok(ApiResponse.success("Tổng hợp kết quả tốt nghiệp toàn đợt thành công", result));
     }
 
     /**

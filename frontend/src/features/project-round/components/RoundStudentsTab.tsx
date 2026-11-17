@@ -10,6 +10,8 @@ import type {
   UpdateRoundStudentPayload,
 } from '../../../types';
 import { downloadBlob, extractErrorMessage } from '../../academic-staff/utils/download';
+import '../../eligibility/pages/EligibilityPages.css';
+import '../../academic-staff/pages/AcademicStaffPages.css';
 
 interface RoundStudentsTabProps {
   roundId: number;
@@ -21,6 +23,7 @@ interface RoundStudentsTabProps {
   isAdminView?: boolean;
   onlyEligible?: boolean;
   hideImportActions?: boolean;
+  initialStatusFilter?: string;
 }
 
 export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
@@ -33,6 +36,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   isAdminView: _isAdminView = false,
   onlyEligible,
   hideImportActions,
+  initialStatusFilter,
 }) => {
   const effectiveOnlyEligible = onlyEligible ?? false;
   const effectiveHideImportActions = hideImportActions ?? false;
@@ -48,8 +52,9 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     total: number;
     eligible: number;
     ineligible: number;
+    noData: number;
     hasDebt: number;
-  }>({ total: 0, eligible: 0, ineligible: 0, hasDebt: 0 });
+  }>({ total: 0, eligible: 0, ineligible: 0, noData: 0, hasDebt: 0 });
 
   // Xác định hệ đào tạo và giới hạn tín chỉ theo hệ của đợt (khi bắt đầu làm đồ án: Cử nhân 132 tín, Kỹ sư 170 tín; tổng CTĐT: Cử nhân 142, Kỹ sư 180)
   const [resolvedProgram, setResolvedProgram] = useState<{
@@ -101,7 +106,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
   // Filter & Pagination states
   const [selectedMajorId, setSelectedMajorId] = useState<number | undefined>(undefined);
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>(initialStatusFilter || '');
   const [filterTuition, setFilterTuition] = useState<string>('');
   const [filterDiscipline, setFilterDiscipline] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -492,6 +497,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
           total: res.totalStudents,
           eligible: res.eligibleCount,
           ineligible: res.ineligibleCount,
+          noData: res.noDataCount || 0,
           hasDebt: debtCount,
         });
       }
@@ -929,7 +935,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     }
     switch (status) {
       case 'ELIGIBLE':
-        return { label: 'Đủ điều kiện', bg: '#dcfce7', color: '#15803d' };
+        return { label: 'Đủ ĐK nhận ĐA', bg: '#dcfce7', color: '#15803d' };
       case 'FORCE_APPROVED':
         return { label: 'Duyệt đặc cách', bg: '#e0f2fe', color: '#0369a1' };
       case 'REGISTERED':
@@ -938,7 +944,16 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         return { label: 'Đã gán GVHD', bg: '#fef3c7', color: '#b45309' };
       case 'IN_PROGRESS':
       case 'TOPIC_APPROVED':
-        return { label: 'Đã duyệt đề tài', bg: '#e0f2fe', color: '#0369a1' };
+        return { label: 'Đang làm ĐA', bg: '#e0f2fe', color: '#0369a1' };
+      case 'DEFENSE_READY':
+        return { label: 'Đủ ĐK bảo vệ', bg: '#d1fae5', color: '#065f46' };
+      case 'DEFENSE_NOT_ELIGIBLE':
+        return { label: 'Chưa đủ ĐK bảo vệ', bg: '#ffedd5', color: '#c2410c' };
+      case 'COMPLETED':
+      case 'PASSED':
+        return { label: 'Hoàn thành ĐA', bg: '#dcfce7', color: '#166534' };
+      case 'FAILED':
+        return { label: 'Không đạt', bg: '#fee2e2', color: '#b91c1c' };
       case 'DISQUALIFIED':
       case 'INELIGIBLE':
         return { label: 'Không đủ ĐK', bg: '#fee2e2', color: '#b91c1c' };
@@ -947,7 +962,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       case 'RESERVED':
         return { label: 'Bảo lưu', bg: '#ffedd5', color: '#c2410c' };
       case 'NO_DATA':
-        return { label: 'Chưa có HV', bg: '#f1f5f9', color: '#64748b' };
+        return { label: 'Chưa có DL học vụ', bg: '#f1f5f9', color: '#64748b' };
       default:
         return { label: status, bg: '#f1f5f9', color: '#475569' };
     }
@@ -956,7 +971,13 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   // Client-side filtering for tuition, disciplinary and onlyEligible
   const filteredStudents = students.filter((s) => {
     if (effectiveOnlyEligible) {
-      const isEligible = s.status === 'ELIGIBLE' || s.status === 'FORCE_APPROVED';
+      const isEligible =
+        s.status === 'ELIGIBLE' ||
+        s.status === 'FORCE_APPROVED' ||
+        s.status === 'REGISTERED' ||
+        s.status === 'ASSIGNED' ||
+        s.status === 'IN_PROGRESS' ||
+        s.status === 'DEFENSE_READY';
       if (!isEligible) return false;
     }
     if (filterTuition === 'debt' && !s.tuitionDebt) return false;
@@ -970,65 +991,106 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
     <div>
       {/* Closed Round Notice Banner */}
       {isRoundClosed && (
-        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '1.2rem' }}>🔒</span>
+        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', padding: '12px 16px', borderRadius: '10px', marginBottom: '16px', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '1.15rem' }}>🔒</span>
           <span><strong>Đợt đồ án đã đóng:</strong> Danh sách sinh viên đang ở chế độ chỉ xem. Không thể nạp file Excel, cập nhật trạng thái hay xóa sinh viên khỏi đợt này.</span>
         </div>
       )}
 
       {/* Alert Messages */}
       {error ? (
-        <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+        <div className="page-alert error">
           <span>⚠️ {error}</span>
-          <button type="button" onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer' }}>✕</button>
+          <button type="button" className="page-alert-close" onClick={() => setError(null)}>✕</button>
         </div>
       ) : successMsg ? (
-        <div style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+        <div className="page-alert success">
           <span>✅ {successMsg}</span>
-          <button type="button" onClick={() => setSuccessMsg(null)} style={{ background: 'none', border: 'none', color: '#16a34a', fontWeight: 700, cursor: 'pointer' }}>✕</button>
+          <button type="button" className="page-alert-close" onClick={() => setSuccessMsg(null)}>✕</button>
         </div>
       ) : null}
 
       {/* KPI Summary Cards */}
       {effectiveOnlyEligible ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '18px' }}>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '14px 18px' }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#15803d' }}>{kpi.eligible || totalElements}</div>
-            <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Sinh viên đủ điều kiện nhận đồ án</div>
+        <div className="utc-kpi-strip">
+          <div className="utc-kpi-box accent-green">
+            <div className="utc-kpi-top">
+              <span className="utc-kpi-icon">✅</span>
+              <span className="utc-kpi-label">SV đủ điều kiện nhận đồ án</span>
+            </div>
+            <div className="utc-kpi-num ok">{kpi.eligible || totalElements}</div>
+            <div className="utc-kpi-sub">Phục vụ phân công GVHD &amp; Hội đồng</div>
           </div>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '14px 18px' }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{kpi.hasDebt}</div>
-            <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Có nợ tín chỉ (cần trả nợ GĐ5)</div>
+          <div className="utc-kpi-box accent-amber">
+            <div className="utc-kpi-top">
+              <span className="utc-kpi-icon">⏳</span>
+              <span className="utc-kpi-label">Có nợ tín chỉ (cần trả GĐ5)</span>
+            </div>
+            <div className="utc-kpi-num warn">{kpi.hasDebt}</div>
+            <div className="utc-kpi-sub">Phải hoàn thành về 0 TC trước khi bảo vệ</div>
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '18px' }}>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '14px 18px' }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#003366' }}>{kpi.total || totalElements}</div>
-            <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Tổng sinh viên trong đợt</div>
+        <div className="utc-kpi-strip">
+          <div
+            className={`utc-kpi-box accent-navy ${selectedStatus === '' ? 'is-active' : ''}`}
+            onClick={() => { setSelectedStatus(''); setCurrentPage(0); }}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="utc-kpi-top">
+              <span className="utc-kpi-icon">👥</span>
+              <span className="utc-kpi-label">Tổng sinh viên trong đợt</span>
+            </div>
+            <div className="utc-kpi-num">{kpi.total || totalElements}</div>
+            <div className="utc-kpi-sub">Bấm để xem toàn bộ danh sách</div>
           </div>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '14px 18px' }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#15803d' }}>{kpi.eligible}</div>
-            <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Đủ điều kiện nhận đồ án</div>
+          <div
+            className={`utc-kpi-box accent-green ${selectedStatus === 'ELIGIBLE' ? 'is-active' : ''}`}
+            onClick={() => { setSelectedStatus('ELIGIBLE'); setCurrentPage(0); }}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="utc-kpi-top">
+              <span className="utc-kpi-icon">✅</span>
+              <span className="utc-kpi-label">Đủ điều kiện nhận đồ án</span>
+            </div>
+            <div className="utc-kpi-num ok">{kpi.eligible}</div>
+            <div className="utc-kpi-sub">Đạt GPA ≥ 2.0, nợ ≤ 10 TC, đủ học phí</div>
           </div>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '14px 18px' }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#dc2626' }}>{kpi.ineligible}</div>
-            <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Không đủ điều kiện</div>
+          <div
+            className={`utc-kpi-box accent-red ${selectedStatus === 'INELIGIBLE' ? 'is-active' : ''}`}
+            onClick={() => { setSelectedStatus('INELIGIBLE'); setCurrentPage(0); }}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="utc-kpi-top">
+              <span className="utc-kpi-icon">⛔</span>
+              <span className="utc-kpi-label">Không đủ điều kiện</span>
+            </div>
+            <div className="utc-kpi-num bad">{kpi.ineligible}</div>
+            <div className="utc-kpi-sub">
+              {kpi.noData > 0 ? `Vượt ngưỡng nợ/HP/KL (+${kpi.noData} thiếu DL)` : 'Nợ > 10 TC, GPA < 2.0 hoặc nợ HP'}
+            </div>
           </div>
-          <div style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '14px 18px' }}>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{kpi.hasDebt}</div>
-            <div style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Có nợ tín chỉ (cần trả nợ GĐ5)</div>
+          <div className="utc-kpi-box accent-amber">
+            <div className="utc-kpi-top">
+              <span className="utc-kpi-icon">📌</span>
+              <span className="utc-kpi-label">Có nợ tín chỉ (cần trả GĐ5)</span>
+            </div>
+            <div className="utc-kpi-num warn">{kpi.hasDebt}</div>
+            <div className="utc-kpi-sub">Cần xác nhận trả nợ về 0 trước bảo vệ</div>
           </div>
         </div>
       )}
 
-      {/* Action Toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+      {/* Action Toolbar + Filter Bar + Table Shell */}
+      <div className="utc-rs-action-bar">
         <div>
-          <h3 style={{ margin: 0, color: '#1e293b' }}>
-            {effectiveOnlyEligible ? `Sinh viên đủ điều kiện nhận đồ án (${totalElements})` : `Sinh viên trong đợt (${totalElements})`}
+          <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.05rem', fontWeight: 800 }}>
+            {effectiveOnlyEligible ? `Sinh viên đủ điều kiện nhận đồ án (${totalElements})` : `Danh sách sinh viên trong đợt (${totalElements})`}
           </h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+          <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
             {effectiveOnlyEligible
               ? 'Danh sách sinh viên đủ điều kiện nhận đề tài tốt nghiệp, phục vụ phân công GVHD & Hội đồng bảo vệ'
               : 'Dữ liệu tích hợp thông tin sinh viên và kết quả học vụ xét điều kiện nhận đồ án (GĐ1 & GĐ5)'}
@@ -1038,26 +1100,11 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {!effectiveHideImportActions && (
             <>
-              <button
-                type="button"
-                onClick={handleDownloadTemplate}
-                style={{
-                  backgroundColor: '#f8fafc',
-                  color: '#0a3273',
-                  border: '1px solid #cbd5e1',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
+              <button type="button" onClick={handleDownloadTemplate} className="utc-rs-btn template">
                 📥 Tải file mẫu Excel UTC
               </button>
               <button
+                type="button"
                 disabled={isRoundClosed}
                 onClick={() => {
                   if (isRoundClosed) return;
@@ -1066,24 +1113,13 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   setPreviewData(null);
                   setImportFile(null);
                 }}
-                style={{
-                  backgroundColor: isRoundClosed ? '#94a3b8' : '#16a34a',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '8px 14px',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  cursor: isRoundClosed ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
+                className="utc-rs-btn import"
                 title={isRoundClosed ? 'Đợt đồ án đã đóng - Không thể import sinh viên' : undefined}
               >
                 📤 Import SV từ Excel
               </button>
               <button
+                type="button"
                 disabled={isRoundClosed}
                 onClick={() => {
                   if (isRoundClosed) return;
@@ -1092,19 +1128,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
                   setCheckingEligibility(false);
                   setShowManualModal(true);
                 }}
-                style={{
-                  backgroundColor: isRoundClosed ? '#94a3b8' : '#0284c7',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '8px 14px',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  cursor: isRoundClosed ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
+                className="utc-rs-btn add"
                 title={isRoundClosed ? 'Đợt đồ án đã đóng' : 'Thêm từng sinh viên thủ công vào đợt'}
               >
                 ➕ Thêm thủ công SV
@@ -1115,19 +1139,7 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
             type="button"
             disabled={exporting || totalElements === 0}
             onClick={handleExport}
-            style={{
-              backgroundColor: '#fff',
-              color: '#15803d',
-              border: '1px solid #16a34a',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: exporting || totalElements === 0 ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
+            className="utc-rs-btn export"
           >
             {exporting ? 'Đang xuất...' : '📊 Xuất Excel'}
           </button>
@@ -1135,30 +1147,33 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       </div>
 
       {/* Filter Bar */}
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flex: '1 1 220px' }}>
+      <div className="utc-rs-filter-bar">
+        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flex: '1 1 240px' }}>
           <input
             type="text"
+            className="utc-toolbar-input"
             placeholder="Tìm MSSV, họ tên, email, lớp..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ flex: 1, minWidth: '150px', padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+            style={{ flex: 1, minWidth: '160px' }}
           />
           <button
             type="submit"
-            style={{ backgroundColor: '#0a3273', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            className="utc-rs-btn"
+            style={{ backgroundColor: '#0a3273', color: '#fff', padding: '0 16px', height: '36px' }}
           >
             Tìm
           </button>
         </form>
 
         <select
+          className="utc-toolbar-select"
           value={selectedMajorId || ''}
           onChange={(e) => {
             setSelectedMajorId(e.target.value ? Number(e.target.value) : undefined);
             setCurrentPage(0);
           }}
-          style={{ flex: '1 1 150px', minWidth: '130px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+          style={{ flex: '1 1 150px', minWidth: '130px' }}
         >
           <option value="">Tất cả ngành</option>
           {majors.map((m) => (
@@ -1170,12 +1185,13 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
 
         {effectiveOnlyEligible ? (
           <select
+            className="utc-toolbar-select"
             value={selectedStatus}
             onChange={(e) => {
               setSelectedStatus(e.target.value);
               setCurrentPage(0);
             }}
-            style={{ flex: '1 1 160px', minWidth: '140px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+            style={{ flex: '1 1 160px', minWidth: '140px' }}
           >
             <option value="">Tất cả SV đủ điều kiện</option>
             <option value="ELIGIBLE">Đủ điều kiện tiêu chuẩn</option>
@@ -1183,18 +1199,22 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
           </select>
         ) : (
           <select
+            className="utc-toolbar-select"
             value={selectedStatus}
             onChange={(e) => {
               setSelectedStatus(e.target.value);
               setCurrentPage(0);
             }}
-            style={{ flex: '1 1 160px', minWidth: '140px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+            style={{ flex: '1 1 170px', minWidth: '150px' }}
           >
             <option value="">Tất cả trạng thái</option>
-            <option value="ELIGIBLE">Đủ điều kiện</option>
+            <option value="ELIGIBLE">Đủ ĐK nhận ĐA</option>
             <option value="FORCE_APPROVED">Duyệt đặc cách</option>
             <option value="ASSIGNED">Đã gán GVHD</option>
-            <option value="IN_PROGRESS">Đã duyệt đề tài</option>
+            <option value="IN_PROGRESS">Đang làm ĐA</option>
+            <option value="DEFENSE_READY">Đủ ĐK bảo vệ</option>
+            <option value="DEFENDED">Đã bảo vệ</option>
+            <option value="COMPLETED">Hoàn thành ĐA</option>
             <option value="INELIGIBLE">Không đủ điều kiện</option>
             <option value="RESERVED">Đã bảo lưu</option>
             <option value="DROPPED">Chưa ĐK hướng / Bị loại</option>
@@ -1202,9 +1222,10 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         )}
 
         <select
+          className="utc-toolbar-select"
           value={filterTuition}
           onChange={(e) => setFilterTuition(e.target.value)}
-          style={{ flex: '1 1 140px', minWidth: '130px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+          style={{ flex: '0 1 145px', minWidth: '130px' }}
         >
           <option value="">Tất cả học phí</option>
           <option value="clean">Đã đóng học phí</option>
@@ -1212,9 +1233,10 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
         </select>
 
         <select
+          className="utc-toolbar-select"
           value={filterDiscipline}
           onChange={(e) => setFilterDiscipline(e.target.value)}
-          style={{ flex: '1 1 140px', minWidth: '130px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#fff' }}
+          style={{ flex: '0 1 145px', minWidth: '130px' }}
         >
           <option value="">Tất cả kỷ luật</option>
           <option value="normal">Bình thường</option>
@@ -1223,192 +1245,186 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
       </div>
 
       {/* Students Table */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>Đang tải danh sách sinh viên...</div>
-      ) : filteredStudents.length > 0 ? (
-        <div style={{ width: '100%', minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' }}>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>💡 Vuốt hoặc cuộn ngang để xem đầy đủ cột thông tin học vụ</span>
-          </div>
-          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', WebkitOverflowScrolling: 'touch', width: '100%' }}>
-            <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569', whiteSpace: 'nowrap' }}>
-                  <th style={{ padding: '10px 10px', width: '45px' }}>STT</th>
-                  <th style={{ padding: '10px 10px', width: '100px' }}>MSSV</th>
-                  <th style={{ padding: '10px 10px', minWidth: '150px' }}>Họ và tên</th>
-                  <th style={{ padding: '10px 10px', width: '120px' }}>Lớp &amp; Ngành</th>
-                  <th style={{ padding: '10px 10px', minWidth: '160px' }}>Email &amp; SĐT</th>
-                  <th style={{ padding: '10px 10px', textAlign: 'center', width: '80px' }}>TC tích lũy</th>
-                  <th style={{ padding: '10px 10px', textAlign: 'center', width: '65px' }}>GPA</th>
-                  <th style={{ padding: '10px 10px', textAlign: 'center', width: '85px' }}>Học phí</th>
-                  <th style={{ padding: '10px 10px', textAlign: 'center', width: '85px' }}>Kỷ luật</th>
-                  <th style={{ padding: '10px 10px', textAlign: 'center', width: '75px' }}>Nợ tín</th>
-                  <th style={{ padding: '10px 10px', width: '140px' }}>Trạng thái</th>
-                  <th style={{ padding: '10px 10px', width: '150px', textAlign: 'center' }}>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.map((st, idx) => {
-                  const badge = getStatusBadge(st.status, st.note);
-                  const isUnregistered = Boolean(st.note && (st.note.toLowerCase().includes('chưa đăng ký hướng') || st.note.toLowerCase().includes('chưa đăng ký')));
-                  const isCleanNote = Boolean(st.note && !st.note.toLowerCase().includes('đủ đk nhận đồ án') && !st.note.toLowerCase().includes('chưa đăng ký hướng'));
-                  return (
-                    <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '10px 10px' }}>{currentPage * 15 + idx + 1}</td>
-                      <td style={{ padding: '10px 10px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
-                      <td style={{ padding: '10px 10px', fontWeight: 600, color: '#1e293b' }}>{st.fullName}</td>
-                      <td style={{ padding: '10px 10px' }}>
-                        <div>{st.className || '—'}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                          <span style={{ padding: '1px 5px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontWeight: 600 }}>
+      <div className="utc-rs-table-shell">
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>⏳ Đang tải danh sách sinh viên...</div>
+        ) : filteredStudents.length > 0 ? (
+          <>
+            <div className="utc-rs-table-scroll">
+              <table className="utc-rs-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '44px', textAlign: 'center' }}>STT</th>
+                    <th style={{ width: '105px' }}>MSSV</th>
+                    <th style={{ minWidth: '150px' }}>Họ và tên</th>
+                    <th style={{ width: '125px' }}>Lớp &amp; Ngành</th>
+                    <th style={{ minWidth: '170px' }}>Liên hệ</th>
+                    <th style={{ textAlign: 'center', width: '82px' }}>TC tích lũy</th>
+                    <th style={{ textAlign: 'center', width: '64px' }}>GPA</th>
+                    <th style={{ textAlign: 'center', width: '86px' }}>Học phí</th>
+                    <th style={{ textAlign: 'center', width: '86px' }}>Kỷ luật</th>
+                    <th style={{ textAlign: 'center', width: '68px' }}>Nợ tín</th>
+                    <th style={{ width: '165px' }}>Trạng thái &amp; Tài khoản</th>
+                    <th style={{ width: '160px', textAlign: 'center' }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((st, idx) => {
+                    const badge = getStatusBadge(st.status, st.note);
+                    const isUnregistered = Boolean(st.note && (st.note.toLowerCase().includes('chưa đăng ký hướng') || st.note.toLowerCase().includes('chưa đăng ký')));
+                    const isCleanNote = Boolean(st.note && !st.note.toLowerCase().includes('đủ đk nhận đồ án') && !st.note.toLowerCase().includes('chưa đăng ký hướng'));
+                    return (
+                      <tr key={st.studentRoundId}>
+                        <td style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>{currentPage * 15 + idx + 1}</td>
+                        <td style={{ fontWeight: 800, color: '#0a3273' }}>{st.studentCode}</td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{st.fullName}</div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#1e293b' }}>{st.className || '—'}</div>
+                          <span style={{ display: 'inline-block', marginTop: '2px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', color: '#334155', fontSize: '0.7rem', fontWeight: 700 }}>
                             {st.majorCode || 'N/A'}
                           </span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '10px 10px', color: '#64748b' }}>
-                        <div style={{ fontSize: '0.8rem' }}>{st.email}</div>
-                        {st.phone && <div style={{ fontSize: '0.75rem' }}>📞 {st.phone}</div>}
-                      </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'center', fontWeight: 600 }}>
-                        {st.completedCredits ?? getStudentMaxCredits(st)}
-                      </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'center' }}>
-                        <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
-                          {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '—'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'center' }}>
-                        {st.tuitionDebt ? (
-                          <span style={{ padding: '2px 6px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#fee2e2', color: '#dc2626' }}>
-                            Nợ HP
+                        </td>
+                        <td style={{ color: '#64748b' }}>
+                          <div style={{ fontSize: '0.78rem', color: '#334155' }}>{st.email}</div>
+                          {st.phone && <div style={{ fontSize: '0.74rem', marginTop: '1px' }}>📞 {st.phone}</div>}
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
+                          {st.completedCredits ?? getStudentMaxCredits(st)}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 800 }}>
+                            {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '—'}
                           </span>
-                        ) : (
-                          <span style={{ padding: '2px 6px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d' }}>
-                            Đã đóng
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {st.tuitionDebt ? (
+                            <span className="utc-badge utc-badge-danger">Nợ HP</span>
+                          ) : (
+                            <span className="utc-badge utc-badge-success">Đã đóng</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {st.underDisciplinaryAction ? (
+                            <span className="utc-badge utc-badge-danger">Kỷ luật</span>
+                          ) : (
+                            <span style={{ color: '#475569', fontSize: '0.78rem', fontWeight: 600 }}>Bình thường</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{
+                            color: (st.debtCredits !== undefined && st.debtCredits > 10) ? '#dc2626' : (st.debtCredits && st.debtCredits > 0 ? '#d97706' : '#15803d'),
+                            fontWeight: 800
+                          }}>
+                            {st.debtCredits ?? 0}
                           </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'center' }}>
-                        {st.underDisciplinaryAction ? (
-                          <span style={{ padding: '2px 6px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#fee2e2', color: '#dc2626' }}>
-                            Kỷ luật
+                        </td>
+                        <td>
+                          <span style={{ display: 'inline-block', padding: '3px 9px', borderRadius: '999px', fontSize: '0.73rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
+                            {badge.label}
                           </span>
-                        ) : (
-                          <span style={{ color: '#475569', fontSize: '0.78rem' }}>Bình thường</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'center' }}>
-                        <span style={{ color: (st.debtCredits !== undefined && st.debtCredits > 10) ? '#dc2626' : '#15803d', fontWeight: 700 }}>
-                          {st.debtCredits ?? 0}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 10px' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: badge.bg, color: badge.color }}>
-                          {badge.label}
-                        </span>
-                        {st.accountActive === false ? (
-                          <div style={{ marginTop: '3px', fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <span>🔒 TK đã khóa</span>
-                          </div>
-                        ) : isUnregistered ? (
-                          <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#b45309' }}>
-                            🔑 Đã cấp TK
-                          </div>
-                        ) : (st.status === 'INELIGIBLE' || st.status === 'DROPPED' || st.status === 'DISQUALIFIED') ? (
-                          <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#dc2626' }}>
-                            🚫 Không cấp TK
-                          </div>
-                        ) : (
-                          <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#15803d' }}>
-                            🔑 Đã cấp TK
-                          </div>
-                        )}
-                        {isCleanNote && (
-                          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={st.note}>
-                            {st.note}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'center' }}>
-                        {!isRoundClosed ? (
-                          <div style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                            <button
-                              onClick={() => handleOpenEditModal(st)}
-                              title="Chỉnh sửa thông tin sinh viên & dữ liệu học vụ"
-                              style={{ backgroundColor: '#eff6ff', color: '#0a3273', border: '1px solid #bfdbfe', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                            >
-                              ✏️ Sửa
-                            </button>
-                            <button
-                              onClick={() => handleToggleAccountLock(st)}
-                              title={st.accountActive === false ? "Mở khóa tài khoản đăng nhập" : "Khóa tài khoản đăng nhập"}
-                              style={{
-                                backgroundColor: st.accountActive === false ? '#f0fdf4' : '#fff1f2',
-                                color: st.accountActive === false ? '#16a34a' : '#e11d48',
-                                border: `1px solid ${st.accountActive === false ? '#bbf7d0' : '#fecdd3'}`,
-                                padding: '3px 7px',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                fontWeight: 600
-                              }}
-                            >
-                              {st.accountActive === false ? '🔓 Mở TK' : '🔒 Khóa TK'}
-                            </button>
-                            <button
-                              onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
-                              title="Xóa khỏi đợt"
-                              style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '3px 7px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Đã khóa</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          {st.accountActive === false ? (
+                            <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 700, color: '#dc2626' }}>
+                              🔒 TK đã khóa
+                            </div>
+                          ) : isUnregistered ? (
+                            <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#b45309' }}>
+                              🔑 Đã cấp TK
+                            </div>
+                          ) : (st.status === 'INELIGIBLE' || st.status === 'DROPPED' || st.status === 'DISQUALIFIED') ? (
+                            <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#dc2626' }}>
+                              🚫 Không cấp TK
+                            </div>
+                          ) : (
+                            <div style={{ marginTop: '3px', fontSize: '0.7rem', fontWeight: 600, color: '#15803d' }}>
+                              🔑 Đã cấp TK
+                            </div>
+                          )}
+                          {isCleanNote && (
+                            <div style={{ fontSize: '0.69rem', color: '#64748b', marginTop: '2px', maxWidth: '175px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={st.note}>
+                              {st.note}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {!isRoundClosed ? (
+                            <div style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              <button
+                                type="button"
+                                className="utc-btn-xs info"
+                                onClick={() => handleOpenEditModal(st)}
+                                title="Chỉnh sửa thông tin sinh viên & dữ liệu học vụ"
+                              >
+                                ✏️ Sửa
+                              </button>
+                              <button
+                                type="button"
+                                className={`utc-btn-xs ${st.accountActive === false ? 'success' : 'warning'}`}
+                                onClick={() => handleToggleAccountLock(st)}
+                                title={st.accountActive === false ? 'Mở khóa tài khoản đăng nhập' : 'Khóa tài khoản đăng nhập'}
+                              >
+                                {st.accountActive === false ? '🔓 Mở' : '🔒 Khóa'}
+                              </button>
+                              <button
+                                type="button"
+                                className="utc-btn-xs danger"
+                                onClick={() => handleRemoveStudent(st.studentId, st.studentCode)}
+                                title="Xóa khỏi đợt"
+                              >
+                                Xóa
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Đã khóa</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-          {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', padding: '12px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
-            <div>
-              Trang <strong>{currentPage + 1}</strong> / {totalPages || 1} (Tổng {totalElements} sinh viên)
+            {/* Pagination */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', padding: '12px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: '0.84rem' }}>
+              <div style={{ color: '#475569' }}>
+                Trang <strong style={{ color: '#0f172a' }}>{currentPage + 1}</strong> / {totalPages || 1} &nbsp;•&nbsp; Tổng <strong style={{ color: '#0a3273' }}>{totalElements}</strong> sinh viên
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  disabled={currentPage === 0}
+                  onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                  className="utc-btn-xs muted"
+                  style={{ padding: '5px 12px' }}
+                >
+                  ← Trước
+                </button>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages - 1}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  className="utc-btn-xs muted"
+                  style={{ padding: '5px 12px' }}
+                >
+                  Sau →
+                </button>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button
-                disabled={currentPage === 0}
-                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: currentPage === 0 ? '#f1f5f9' : '#fff', cursor: currentPage === 0 ? 'not-allowed' : 'pointer' }}
-              >
-                Trước
-              </button>
-              <button
-                disabled={currentPage >= totalPages - 1}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: currentPage >= totalPages - 1 ? '#f1f5f9' : '#fff', cursor: currentPage >= totalPages - 1 ? 'not-allowed' : 'pointer' }}
-              >
-                Sau
-              </button>
-            </div>
+          </>
+        ) : (
+          <div style={{ padding: '44px 20px', textAlign: 'center', color: '#475569', fontWeight: 500 }}>
+            {effectiveOnlyEligible ? (
+              'Đợt đồ án này chưa có sinh viên nào đủ điều kiện nhận đồ án (hoặc Giáo vụ Khoa chưa nạp và xét duyệt dữ liệu học vụ).'
+            ) : (
+              <>
+                Không có sinh viên nào khớp với bộ lọc hiện tại. Bấm <strong style={{ color: '#0a3273' }}>"Import SV từ Excel"</strong> hoặc điều chỉnh lại bộ lọc.
+              </>
+            )}
           </div>
-        </div>
-      ) : (
-        <div style={{ padding: '36px', textAlign: 'center', color: '#475569', fontWeight: 500, border: '1px dashed #94a3b8', borderRadius: '8px' }}>
-          {effectiveOnlyEligible ? (
-            'Đợt đồ án này chưa có sinh viên nào đủ điều kiện nhận đồ án (hoặc Giáo vụ Khoa chưa nạp và xét duyệt dữ liệu học vụ).'
-          ) : (
-            <>
-              Đợt đồ án này chưa có sinh viên nào. Hãy bấm nút <strong style={{ color: '#0f172a' }}>"Import SV từ Excel"</strong> để nạp danh sách kèm thông tin học vụ.
-            </>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Modal Import Excel */}
       {showImportModal && (

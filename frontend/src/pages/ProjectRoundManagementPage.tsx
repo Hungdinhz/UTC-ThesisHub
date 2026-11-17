@@ -806,9 +806,7 @@ const ProjectRoundManagementPage: React.FC = () => {
                 <div
                   className="utc-demo-control-bar admin-bar"
                   style={{
-                    borderRadius: '8px',
                     margin: '16px 0 20px 0',
-                    boxShadow: '0 2px 8px rgba(7, 25, 51, 0.15)',
                   }}
                 >
                   <div className="utc-demo-info">

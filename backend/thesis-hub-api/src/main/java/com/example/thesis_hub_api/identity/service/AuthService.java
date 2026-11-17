@@ -20,9 +20,15 @@ import com.example.thesis_hub_api.organization.repository.LecturerRepository;
 import com.example.thesis_hub_api.organization.repository.StudentRepository;
 import com.example.thesis_hub_api.projectround.entity.StudentProjectRound;
 import com.example.thesis_hub_api.projectround.repository.StudentProjectRoundRepository;
+import com.example.thesis_hub_api.security.interceptor.AuditHttpInterceptor;
+import com.example.thesis_hub_api.security.service.AuditLogService;
+import com.example.thesis_hub_api.security.service.SecurityCenterService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -47,8 +53,18 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final StudentProjectRoundRepository studentProjectRoundRepository;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+
+    @Autowired(required = false)
     private LoginRateLimiter loginRateLimiter;
+
+    @Autowired(required = false)
+    private SecurityCenterService securityCenterService;
+
+    @Autowired(required = false)
+    private AuditLogService auditLogService;
+
+    @Autowired(required = false)
+    private HttpServletRequest httpServletRequest;
 
     @Value("${app.admin.registration-key:}")
     private String adminRegistrationKey;
@@ -74,6 +90,22 @@ public class AuthService {
         }
     }
 
+    private String resolveClientIp() {
+        try {
+            return AuditHttpInterceptor.extractClientIp(httpServletRequest);
+        } catch (Exception e) {
+            return "127.0.0.1";
+        }
+    }
+
+    private String resolveUserAgent() {
+        try {
+            return httpServletRequest != null ? httpServletRequest.getHeader("User-Agent") : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     @Transactional
     public LoginResponseDTO login(LoginRequestDTO request) {
         String identifier = request.getLoginIdentifier();
@@ -82,6 +114,8 @@ public class AuthService {
         }
 
         checkRateLimit(identifier);
+        String ip = resolveClientIp();
+        String userAgent = resolveUserAgent();
 
         // Try locating user by username or email
         Optional<User> userOpt = userRepository.findByUsernameOrEmail(identifier, identifier);
@@ -98,14 +132,46 @@ public class AuthService {
 
         if (userOpt.isEmpty()) {
             recordLoginFailure(identifier);
+            if (auditLogService != null) {
+                auditLogService.recordLog(
+                        null, identifier, null, null,
+                        "LOGIN_FAILED", "AUTH_SECURITY", "User", identifier,
+                        "Đăng nhập thất bại với định danh không tồn tại: " + identifier,
+                        null, null, "POST", "/api/v1/auth/login", ip, userAgent,
+                        "WARNING", "FAILED", "Người dùng không tồn tại", null
+                );
+            }
             throw new AppException(ErrorCode.USER_NOT_EXISTED);
         }
 
         User user = userOpt.get();
 
+        // Check temporary brute-force lockout before validating credentials
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
+            if (auditLogService != null) {
+                auditLogService.recordLog(
+                        user.getId(), user.getUsername(), user.getFullName(),
+                        user.getRole() != null ? user.getRole().getName() : null,
+                        "LOGIN_FAILED", "AUTH_SECURITY", "User", String.valueOf(user.getId()),
+                        "Từ chối đăng nhập do tài khoản " + user.getUsername() + " đang trong thời gian khóa bảo mật",
+                        null, Map.of("lockedUntil", user.getLockedUntil().toString()),
+                        "POST", "/api/v1/auth/login", ip, userAgent,
+                        "HIGH", "BLOCKED", "Tài khoản đang bị tạm khóa bảo mật", null
+                );
+            }
+            throw new AppException(ErrorCode.USER_LOCKED,
+                    "Tài khoản đang bị tạm khóa bảo mật do nhập sai mật khẩu nhiều lần. Vui lòng thử lại sau ít phút hoặc liên hệ Quản trị viên.");
+        }
+
         // Verify password BEFORE checking eligibility or lock status to prevent pre-auth user enumeration & academic info leak
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             recordLoginFailure(identifier);
+            boolean lockedNow = securityCenterService != null
+                    && securityCenterService.recordFailedPasswordAttempt(user.getId(), ip);
+            if (lockedNow) {
+                throw new AppException(ErrorCode.USER_LOCKED,
+                        "Tài khoản đã bị tạm khóa bảo mật do nhập sai mật khẩu quá số lần quy định.");
+            }
             throw new AppException(ErrorCode.INVALID_PASSWORD);
         }
 
@@ -146,7 +212,7 @@ public class AuthService {
                                     .reduce((first, second) -> second)
                                     .orElse(sprList.get(sprList.size() - 1));
 
-                            String reason = org.springframework.util.StringUtils.hasText(ineligibleSpr.getNote())
+                            String reason = StringUtils.hasText(ineligibleSpr.getNote())
                                     ? ineligibleSpr.getNote()
                                     : "Không đủ điều kiện học vụ";
                             throw new AppException(ErrorCode.USER_LOCKED,
@@ -161,7 +227,13 @@ public class AuthService {
             throw new AppException(ErrorCode.USER_LOCKED, "Tài khoản của bạn đã bị khóa hoặc chưa được cấp phép.");
         }
 
-        return buildLoginResponse(user);
+        if (securityCenterService != null) {
+            securityCenterService.resetFailedPasswordAttemptsOnSuccess(user.getId(), ip);
+        }
+
+        LoginResponseDTO response = buildLoginResponse(user);
+        recordSuccessLoginSecurity(user, response.getToken(), ip, userAgent, "/api/v1/auth/login");
+        return response;
     }
 
     @Transactional
@@ -213,11 +285,12 @@ public class AuthService {
         user = userRepository.save(user);
         log.info("Registered new Admin account successfully: {} ({})", user.getUsername(), user.getEmail());
 
-        // 6. Return LoginResponseDTO
-        return buildLoginResponse(user);
+        LoginResponseDTO response = buildLoginResponse(user);
+        recordSuccessLoginSecurity(user, response.getToken(), resolveClientIp(), resolveUserAgent(), "/api/v1/auth/admin/register");
+        return response;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponseDTO adminLogin(AdminLoginRequestDTO request) {
         String identifier = request.getLoginIdentifier();
         if (!StringUtils.hasText(identifier) || !StringUtils.hasText(request.getPassword())) {
@@ -225,6 +298,8 @@ public class AuthService {
         }
 
         checkRateLimit("admin:" + identifier);
+        String ip = resolveClientIp();
+        String userAgent = resolveUserAgent();
 
         // 1. If requireKeyOnLogin is enabled, verify admin secret key
         if (requireKeyOnLogin) {
@@ -242,19 +317,49 @@ public class AuthService {
         Optional<User> userOpt = userRepository.findByUsernameOrEmail(identifier, identifier);
         if (userOpt.isEmpty()) {
             recordLoginFailure("admin:" + identifier);
+            if (auditLogService != null) {
+                auditLogService.recordLog(
+                        null, identifier, null, "ROLE_ADMIN",
+                        "LOGIN_FAILED", "AUTH_SECURITY", "User", identifier,
+                        "Đăng nhập Admin thất bại với tài khoản không tồn tại: " + identifier,
+                        null, null, "POST", "/api/v1/auth/admin/login", ip, userAgent,
+                        "HIGH", "FAILED", "Tài khoản không tồn tại", null
+                );
+            }
             throw new AppException(ErrorCode.USER_NOT_EXISTED);
         }
         User user = userOpt.get();
 
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
+            throw new AppException(ErrorCode.USER_LOCKED,
+                    "Tài khoản Quản trị viên đang bị tạm khóa bảo mật do nhập sai mật khẩu nhiều lần.");
+        }
+
         // 3. Verify password first before revealing role or lock status
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             recordLoginFailure("admin:" + identifier);
+            boolean lockedNow = securityCenterService != null
+                    && securityCenterService.recordFailedPasswordAttempt(user.getId(), ip);
+            if (lockedNow) {
+                throw new AppException(ErrorCode.USER_LOCKED,
+                        "Tài khoản Quản trị viên đã bị tạm khóa bảo mật do nhập sai mật khẩu quá số lần quy định.");
+            }
             throw new AppException(ErrorCode.INVALID_PASSWORD);
         }
 
         // 4. Verify role must be ROLE_ADMIN
         if (user.getRole() == null || !"ROLE_ADMIN".equalsIgnoreCase(user.getRole().getName())) {
             recordLoginFailure("admin:" + identifier);
+            if (auditLogService != null) {
+                auditLogService.recordLog(
+                        user.getId(), user.getUsername(), user.getFullName(),
+                        user.getRole() != null ? user.getRole().getName() : null,
+                        "LOGIN_FAILED", "AUTH_SECURITY", "User", String.valueOf(user.getId()),
+                        "Tài khoản không có quyền Admin cố gắng đăng nhập cổng Quản trị",
+                        null, null, "POST", "/api/v1/auth/admin/login", ip, userAgent,
+                        "HIGH", "BLOCKED", "Không có quyền Quản trị viên", null
+                );
+            }
             throw new AppException(ErrorCode.NOT_AN_ADMIN_ACCOUNT);
         }
 
@@ -263,9 +368,14 @@ public class AuthService {
         }
 
         resetRateLimit("admin:" + identifier);
+        if (securityCenterService != null) {
+            securityCenterService.resetFailedPasswordAttemptsOnSuccess(user.getId(), ip);
+        }
 
         // 5. Generate token
-        return buildLoginResponse(user);
+        LoginResponseDTO response = buildLoginResponse(user);
+        recordSuccessLoginSecurity(user, response.getToken(), ip, userAgent, "/api/v1/auth/admin/login");
+        return response;
     }
 
     @Transactional
@@ -294,6 +404,7 @@ public class AuthService {
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangedAt(Instant.now());
         userRepository.save(user);
         log.info("Password changed successfully for user ID: {}", userId);
     }
@@ -307,6 +418,10 @@ public class AuthService {
 
         if (!StringUtils.hasText(token) || !jwtTokenProvider.validateToken(token)) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        if (securityCenterService != null && securityCenterService.isTokenRevoked(token)) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED, "Phiên đăng nhập đã bị thu hồi");
         }
 
         Long userId = jwtTokenProvider.getUserIdFromToken(token);
@@ -325,6 +440,35 @@ public class AuthService {
         }
 
         return buildLoginResponse(user);
+    }
+
+    private void recordSuccessLoginSecurity(User user, String accessToken, String ip, String userAgent, String uri) {
+        if (securityCenterService != null) {
+            securityCenterService.registerLoginSession(user, accessToken, jwtTokenProvider.getExpirationMs(), ip, userAgent);
+        }
+        if (auditLogService != null) {
+            auditLogService.recordLog(
+                    user.getId(),
+                    user.getUsername(),
+                    user.getFullName(),
+                    user.getRole() != null ? user.getRole().getName() : "ROLE_STUDENT",
+                    "LOGIN_SUCCESS",
+                    "AUTH_SECURITY",
+                    "User",
+                    String.valueOf(user.getId()),
+                    "Đăng nhập hệ thống thành công: " + user.getUsername(),
+                    null,
+                    Map.of("username", user.getUsername(), "role", user.getRole() != null ? user.getRole().getName() : "ROLE_STUDENT"),
+                    "POST",
+                    uri,
+                    ip,
+                    userAgent,
+                    "INFO",
+                    "SUCCESS",
+                    null,
+                    null
+            );
+        }
     }
 
     private LoginResponseDTO buildLoginResponse(User user) {
