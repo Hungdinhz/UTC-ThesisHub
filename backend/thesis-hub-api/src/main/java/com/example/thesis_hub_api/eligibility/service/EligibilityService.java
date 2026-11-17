@@ -94,32 +94,54 @@ public class EligibilityService {
             }
             if (dbRecordOpt.isPresent()) {
                 AcademicRecord ar = dbRecordOpt.get();
-                String code = ar.getStudent() != null ? ar.getStudent().getStudentCode() : null;
-                String name = (ar.getStudent() != null && ar.getStudent().getUser() != null)
-                        ? ar.getStudent().getUser().getFullName()
-                        : null;
-                if (code == null && studentRepository != null) {
-                    Optional<Student> sOpt = studentRepository.findById(studentId);
-                    if (sOpt.isPresent()) {
-                        code = sOpt.get().getStudentCode();
-                        if (name == null && sOpt.get().getUser() != null) {
-                            name = sOpt.get().getUser().getFullName();
-                        }
-                    }
+                Student arStudent = ar.getStudent();
+                if (arStudent == null && studentRepository != null) {
+                    arStudent = studentRepository.findById(studentId).orElse(null);
                 }
+                String code = arStudent != null ? arStudent.getStudentCode() : null;
+                String name = (arStudent != null && arStudent.getUser() != null)
+                        ? arStudent.getUser().getFullName()
+                        : null;
                 if (code == null) code = "SV" + studentId;
                 if (name == null) name = "Sinh viên #" + studentId;
+
+                Integer resolvedDebt = ar.getDebtCredits();
+                if (resolvedDebt == null && arStudent != null) {
+                    resolvedDebt = arStudent.getDebtCredits();
+                }
+                if (resolvedDebt == null) {
+                    resolvedDebt = 0;
+                }
+
+                Integer resolvedCompleted = ar.getCompletedCredits();
+                if (resolvedCompleted == null) {
+                    resolvedCompleted = Math.max(0, 132 - resolvedDebt);
+                }
+
+                Double resolvedGpa = ar.getGpa();
+                if (resolvedGpa == null && studentProjectRoundRepository != null && projectRoundId != null) {
+                    resolvedGpa = studentProjectRoundRepository
+                            .findByStudentIdAndProjectRoundId(studentId, projectRoundId)
+                            .map(StudentProjectRound::getGpa)
+                            .orElse(null);
+                }
+                if (resolvedGpa == null && arStudent != null) {
+                    resolvedGpa = arStudent.getGpa();
+                }
+                if (resolvedGpa == null) {
+                    resolvedGpa = 0.0;
+                }
 
                 return StudentAcademicRecord.builder()
                         .studentId(studentId)
                         .studentCode(code)
                         .fullName(name)
-                        .completedCredits(ar.getCompletedCredits() != null ? ar.getCompletedCredits() : 0)
-                        .gpa(ar.getGpa() != null ? ar.getGpa() : 0.0)
+                        .completedCredits(resolvedCompleted)
+                        .gpa(resolvedGpa)
                         .tuitionDebt(Boolean.TRUE.equals(ar.getTuitionDebt()))
                         .underDisciplinaryAction(Boolean.TRUE.equals(ar.getUnderDisciplinaryAction()))
                         .missingPrerequisiteCount(ar.getMissingPrerequisiteCount() != null ? ar.getMissingPrerequisiteCount() : 0)
-                        .debtCredits(ar.getDebtCredits() != null ? ar.getDebtCredits() : 0)
+                        .debtCredits(resolvedDebt)
                         .thesisProgressPercentage(100.0)
                         .supervisorApprovedForDefense(true)
                         .build();
@@ -245,10 +267,14 @@ public class EligibilityService {
             statusOverrides.remove(overrideKey);
             overrideReasons.remove(overrideKey);
             StudentProjectRound spr = sprOpt.get();
+            boolean droppedOnlyFromG4Note = "DROPPED".equalsIgnoreCase(spr.getStatus())
+                    && spr.getNote() != null
+                    && spr.getNote().contains("Không hoàn thành GĐ4");
             if ("RESERVED".equalsIgnoreCase(spr.getStatus())) {
                 finalStatus = "RESERVED";
                 reasons.add("Sinh viên đã được bảo lưu kết quả đồ án");
-            } else if ("DROPPED".equalsIgnoreCase(spr.getStatus()) || "DISQUALIFIED".equalsIgnoreCase(spr.getStatus())) {
+            } else if (!droppedOnlyFromG4Note
+                    && ("DROPPED".equalsIgnoreCase(spr.getStatus()) || "DISQUALIFIED".equalsIgnoreCase(spr.getStatus()))) {
                 finalStatus = "DISQUALIFIED";
                 reasons.add("Sinh viên đã bị loại khỏi đợt đồ án" + (spr.getNote() != null ? ": " + spr.getNote() : ""));
             } else if ("FORCE_APPROVED".equalsIgnoreCase(spr.getStatus())

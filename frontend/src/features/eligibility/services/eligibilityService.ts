@@ -299,8 +299,12 @@ class EligibilityService {
         headers: authHeaders(),
       });
       if (res.data && res.data.data) return res.data.data;
-    } catch {
-      // Fallback
+    } catch (err: any) {
+      if (!IS_TEST_ENV && axios.isAxiosError(err) && err.response) {
+        const msg = err.response.data?.message || err.response.data?.error || 'Không thể gửi đơn xin bảo lưu';
+        throw new Error(msg);
+      }
+      // Fallback for offline unit tests
     }
     const newReq: ReservationRequestItem = {
       id: mockReservations.length + 1,
@@ -329,8 +333,12 @@ class EligibilityService {
         headers: authHeaders(),
       });
       if (res.data && res.data.data) return res.data.data;
-    } catch {
-      // Fallback
+    } catch (err: any) {
+      if (!IS_TEST_ENV && axios.isAxiosError(err) && err.response) {
+        const msg = err.response.data?.message || err.response.data?.error || 'Không thể lập quyết định bảo lưu';
+        throw new Error(msg);
+      }
+      // Fallback for offline unit tests
     }
     const status = request.autoApprove ? 'APPROVED' : 'PENDING';
     const newReq: ReservationRequestItem = {
@@ -387,8 +395,12 @@ class EligibilityService {
         { headers: authHeaders() }
       );
       if (res.data && res.data.data) return res.data.data;
-    } catch {
-      // Fallback
+    } catch (err: any) {
+      if (!IS_TEST_ENV && axios.isAxiosError(err) && err.response) {
+        const msg = err.response.data?.message || err.response.data?.error || 'Không thể xử lý đơn bảo lưu';
+        throw new Error(msg);
+      }
+      // Fallback for offline unit tests
     }
     const item = mockReservations.find((r) => r.id === id);
     if (item) {

@@ -65,44 +65,179 @@
   margin-left: auto;
 }
 
+/* Round Students Toolbar & Table Enhancements */
+.utc-rs-action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px 12px 0 0;
+  border-bottom: none;
+}
+
+.utc-rs-filter-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: #f8fafc;
+  padding: 12px 18px;
+  border: 1px solid #e2e8f0;
+  border-bottom: none;
+}
+
+.utc-rs-table-shell {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 0 0 12px 12px;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.utc-rs-table-scroll {
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.utc-rs-table {
+  width: 100%;
+  min-width: 1040px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.84rem;
+}
+
+.utc-rs-table thead tr {
+  background: #f1f5f9;
+  border-bottom: 1.5px solid #dbe4f0;
+}
+
+.utc-rs-table th {
+  padding: 11px 10px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.utc-rs-table td {
+  padding: 10px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.utc-rs-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.utc-rs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.83rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: filter 0.14s ease, transform 0.12s ease;
+  white-space: nowrap;
+}
+
+.utc-rs-btn:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.utc-rs-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.utc-rs-btn.template {
+  background: #f8fafc;
+  color: #0a3273;
+  border-color: #cbd5e1;
+}
+
+.utc-rs-btn.import {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.utc-rs-btn.add {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.utc-rs-btn.export {
+  background: #ffffff;
+  color: #15803d;
+  border-color: #16a34a;
+}
+
 /* Bảng điểm theo lớp */
 .class-grade-block {
   background: var(--bg-secondary, #fff);
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 8px;
-  padding: 16px 20px;
-  margin-bottom: 24px;
+  border: 1px solid #cbd5e1;
+  border-top: 3px solid #0a3273;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+}
+
+.class-grade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .class-grade-title {
-  margin: 0 0 4px 0;
-  font-size: 1.1rem;
+  margin: 0 0 2px 0;
+  font-size: 1.12rem;
   font-weight: 800;
   color: #003366;
 }
 
 .class-grade-meta {
-  margin: 0 0 12px 0;
-  font-size: 0.8125rem;
+  margin: 0;
+  font-size: 0.82rem;
   color: var(--text-secondary, #475569);
 }
 
 .grade-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
 .grade-table th,
 .grade-table td {
   border: 1px solid #cbd5e1;
-  padding: 6px 8px;
+  padding: 8px 10px;
 }
 
 .grade-table th {
-  background: #003366;
+  background: #0a3273;
   color: #fff;
   text-align: center;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.grade-table tbody tr:nth-child(even) {
+  background: #f8fafc;
 }
 
 .grade-table td.center { text-align: center; }

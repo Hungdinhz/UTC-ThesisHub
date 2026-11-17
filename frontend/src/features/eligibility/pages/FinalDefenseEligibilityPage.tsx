@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button, StatusBadge } from '../../../components/ui';
 import { eligibilityService } from '../services/eligibilityService';
 import { thesisService } from '../../thesis/services/thesisService';
 import type { Thesis } from '../../thesis/types';
 import { apiService } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import type { FinalDefenseEligibilityResponse, ReservationRequestItem, AdminCreateReservationRequest } from '../types';
+import type {
+  FinalDefenseEligibilityResponse,
+  ReservationRequestItem,
+  AdminCreateReservationRequest,
+} from '../types';
 import type { ProjectRoundItem, StudentProjectRoundItem } from '../../../types';
 import { ReservationReviewModal } from '../components/ReservationReviewModal';
 import { AdminCreateReservationModal } from '../components/AdminCreateReservationModal';
@@ -13,11 +17,22 @@ import { EditAcademicRecordModal } from '../components/EditAcademicRecordModal';
 import { toast } from '../../../components/Toast';
 import './EligibilityPages.css';
 
+const readUrlQueryParam = (key: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get(key);
+};
+
+type StudentStage5Filter = 'ALL' | 'HAS_DEBT' | 'ELIGIBLE_DEFENSE' | 'NOT_ELIGIBLE' | 'RESERVED';
+
 export const FinalDefenseEligibilityPage: React.FC = () => {
   const { userType } = useAuth();
   const isAdmin = userType === 'admin' || userType === 'academic_staff';
+
   // Navigation sub-tabs: 'check' | 'students' | 'reservations'
-  const [activeTab, setActiveTab] = useState<'check' | 'students' | 'reservations'>('check');
+  const [activeTab, setActiveTab] = useState<'check' | 'students' | 'reservations'>(() => {
+    const t = readUrlQueryParam('tab');
+    return t === 'students' || t === 'reservations' ? t : 'check';
+  });
 
   // Project Rounds state
   const [rounds, setRounds] = useState<ProjectRoundItem[]>([]);
@@ -29,11 +44,15 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
   const [roundTheses, setRoundTheses] = useState<Thesis[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
+  const [studentFilter, setStudentFilter] = useState<StudentStage5Filter>('ALL');
+  const [clearingStudentId, setClearingStudentId] = useState<number | null>(null);
 
   // Reservations in round state
   const [reservationsInRound, setReservationsInRound] = useState<ReservationRequestItem[]>([]);
   const [loadingReservations, setLoadingReservations] = useState(false);
-  const [selectedReservationForReview, setSelectedReservationForReview] = useState<ReservationRequestItem | null>(null);
+  const [reservationStatusFilter, setReservationStatusFilter] = useState<string>('ALL');
+  const [selectedReservationForReview, setSelectedReservationForReview] =
+    useState<ReservationRequestItem | null>(null);
   const [selectedStudentForAdminReserve, setSelectedStudentForAdminReserve] = useState<{
     studentId: number;
     studentCode?: string;
@@ -62,7 +81,11 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         const data = await apiService.getProjectRounds();
         setRounds(data || []);
         if (data && data.length > 0) {
+          const urlRoundRaw = readUrlQueryParam('roundId');
+          const urlRoundNum = urlRoundRaw ? Number(urlRoundRaw) : NaN;
+          const fromUrl = !isNaN(urlRoundNum) && data.find((r) => r.roundId === urlRoundNum);
           const active =
+            fromUrl ||
             data.find((r) => r.status === 'IN_PROGRESS') ||
             data.find((r) => r.status === 'OPEN') ||
             data[0];
@@ -86,7 +109,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
       setLoadingReservations(true);
       const [res, thesesList, resList] = await Promise.all([
         apiService.getStudentsInRound(roundId, {
-          size: 100,
+          size: 200,
           search: studentSearch || undefined,
         }),
         thesisService.searchTheses({ roundId }).catch(() => [] as Thesis[]),
@@ -130,6 +153,96 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         (studentCode && r.studentCode && r.studentCode.toLowerCase() === studentCode.toLowerCase())
     );
   };
+
+  // Evaluate Stage 5 readiness for each student row
+  const evaluatedRows = useMemo(() => {
+    return roundStudents.map((st) => {
+      const thesis = findStudentThesis(st);
+      const reservation = findStudentReservation(st.studentId, st.studentCode);
+      const isReserved =
+        st.status === 'RESERVED' ||
+        thesis?.status === 'RESERVED' ||
+        reservation?.status === 'APPROVED';
+      const hasPendingRes = reservation?.status === 'PENDING';
+      const isDropped =
+        st.status === 'DROPPED' || st.status === 'DISQUALIFIED' || st.status === 'INELIGIBLE';
+
+      const isAcademicEligible =
+        (!st.debtCredits || st.debtCredits === 0) &&
+        !st.tuitionDebt &&
+        !st.underDisciplinaryAction;
+
+      const hasSupervisorApproved = Boolean(
+        thesis &&
+          (thesis.defenseEligible ||
+            thesis.status === 'COMPLETED' ||
+            thesis.status === 'DEFENSE_READY')
+      );
+
+      const isThesisProgressComplete = Boolean(
+        thesis && (thesis.completionRate === 100 || hasSupervisorApproved)
+      );
+
+      const hasAssignedThesisAndSupervisor = Boolean(
+        thesis && thesis.id && (thesis.lecturerId || thesis.lecturerFullName)
+      );
+
+      const isEligibleForDefense = Boolean(
+        !isReserved &&
+          !isDropped &&
+          hasAssignedThesisAndSupervisor &&
+          hasSupervisorApproved &&
+          isThesisProgressComplete &&
+          isAcademicEligible
+      );
+
+      const progressRate = thesis?.completionRate ?? (hasSupervisorApproved ? 100 : 0);
+
+      return {
+        st,
+        thesis,
+        reservation,
+        isReserved,
+        hasPendingRes,
+        isDropped,
+        isAcademicEligible,
+        hasSupervisorApproved,
+        isThesisProgressComplete,
+        hasAssignedThesisAndSupervisor,
+        isEligibleForDefense,
+        progressRate,
+      };
+    });
+  }, [roundStudents, roundTheses, reservationsInRound]);
+
+  const kpiStats = useMemo(() => {
+    const total = evaluatedRows.length;
+    const eligibleDefense = evaluatedRows.filter((r) => r.isEligibleForDefense).length;
+    const hasDebt = evaluatedRows.filter((r) => (r.st.debtCredits ?? 0) > 0).length;
+    const pendingRes = reservationsInRound.filter((r) => r.status === 'PENDING').length;
+    const reserved = evaluatedRows.filter((r) => r.isReserved).length;
+    return { total, eligibleDefense, hasDebt, pendingRes, reserved };
+  }, [evaluatedRows, reservationsInRound]);
+
+  const filteredStudentRows = useMemo(() => {
+    const kw = studentSearch.trim().toLowerCase();
+    return evaluatedRows.filter((row) => {
+      if (kw) {
+        const hay = `${row.st.studentCode} ${row.st.fullName} ${row.st.className || ''} ${row.thesis?.titleVn || ''}`.toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      if (studentFilter === 'HAS_DEBT') return (row.st.debtCredits ?? 0) > 0;
+      if (studentFilter === 'ELIGIBLE_DEFENSE') return row.isEligibleForDefense;
+      if (studentFilter === 'RESERVED') return row.isReserved;
+      if (studentFilter === 'NOT_ELIGIBLE') return !row.isEligibleForDefense && !row.isReserved;
+      return true;
+    });
+  }, [evaluatedRows, studentSearch, studentFilter]);
+
+  const filteredReservations = useMemo(() => {
+    if (reservationStatusFilter === 'ALL') return reservationsInRound;
+    return reservationsInRound.filter((r) => r.status === reservationStatusFilter);
+  }, [reservationsInRound, reservationStatusFilter]);
 
   // 3. Handle check single student criteria by Student Code (MSSV)
   const handleCheck = async (
@@ -189,8 +302,39 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
     handleCheck(undefined, student.studentId, thesis?.id, student.studentCode);
   };
 
+  // 4. Quick 1-click clear debt for Stage 5 Academic Staff workflow
+  const handleClearDebt = async (studentId: number, studentCode?: string, studentName?: string) => {
+    if (!selectedRoundId) return;
+    const ok = window.confirm(
+      `Xác nhận sinh viên ${studentCode || studentId}${studentName ? ` (${studentName})` : ''} đã hoàn thành trả hết nợ tín chỉ (về 0 TC) trước khi bảo vệ đồ án?`
+    );
+    if (!ok) return;
+
+    try {
+      setClearingStudentId(studentId);
+      await apiService.clearStudentDebt(selectedRoundId, studentId);
+      const msg = `Đã xác nhận sinh viên ${studentCode || studentId} hoàn thành trả hết nợ tín chỉ (0 TC).`;
+      setNotification({ type: 'success', message: msg });
+      toast.success(msg);
+      await loadRoundData(selectedRoundId);
+      if (result && result.studentId === studentId) {
+        await handleCheck(undefined, result.studentId, result.thesisId, result.studentCode);
+      }
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Không thể xác nhận trả nợ tín chỉ';
+      setNotification({ type: 'error', message: errMsg });
+      toast.error(errMsg);
+    } finally {
+      setClearingStudentId(null);
+    }
+  };
+
   // Handle Review reservation (Approve/Reject)
-  const handleReviewReservation = async (status: 'APPROVED' | 'REJECTED', reviewNotes: string, reviewedBy: string) => {
+  const handleReviewReservation = async (
+    status: 'APPROVED' | 'REJECTED',
+    reviewNotes: string,
+    reviewedBy: string
+  ) => {
     if (!selectedReservationForReview) return;
     try {
       await eligibilityService.reviewReservation(selectedReservationForReview.id, {
@@ -234,43 +378,36 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
     }
   };
 
+  const renderCategoryBadge = (cat?: string) => {
+    switch (cat) {
+      case 'INSUFFICIENT_CREDITS':
+        return <span className="utc-badge utc-badge-danger">Chưa trả đủ tín chỉ</span>;
+      case 'SUPERVISOR_NOT_ELIGIBLE':
+        return <span className="utc-badge utc-badge-warning">GVHD xét chưa đạt</span>;
+      case 'RESEARCH_PROGRESS':
+        return <span className="utc-badge utc-badge-indigo">Tiến độ đề tài</span>;
+      case 'HEALTH_REASONS':
+        return <span className="utc-badge utc-badge-success">Lý do sức khỏe</span>;
+      case 'INTERNSHIP_WORK':
+        return <span className="utc-badge utc-badge-info">Thực tập / Công tác</span>;
+      case 'FAMILY_CIRCUMSTANCES':
+        return <span className="utc-badge utc-badge-purple">Hoàn cảnh gia đình</span>;
+      default:
+        return <span className="utc-badge utc-badge-muted">{cat || 'Khác'}</span>;
+    }
+  };
+
   return (
     <div className="feature-page-container">
       {/* Notifications */}
       {notification && (
-        <div
-          style={{
-            padding: '14px 20px',
-            marginBottom: '18px',
-            borderRadius: '12px',
-            background: notification.type === 'success' ? 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)' : 'linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%)',
-            color: notification.type === 'success' ? '#065f46' : '#991b1b',
-            border: `1px solid ${notification.type === 'success' ? '#a7f3d0' : '#fecaca'}`,
-            boxShadow: notification.type === 'success' ? '0 4px 12px rgba(16, 185, 129, 0.12)' : '0 4px 12px rgba(239, 68, 68, 0.12)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '0.95rem',
-            fontWeight: 500,
-            animation: 'utcFadeSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.2rem' }}>{notification.type === 'success' ? '✅' : '⚠️'}</span>
-            <span>{notification.message}</span>
-          </div>
+        <div className={`page-alert ${notification.type}`}>
+          <span>
+            {notification.type === 'success' ? '✅' : '⚠️'} {notification.message}
+          </span>
           <button
+            className="page-alert-close"
             onClick={() => setNotification(null)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 700,
-              fontSize: '1rem',
-              color: notification.type === 'success' ? '#059669' : '#dc2626',
-              padding: '4px 8px',
-              borderRadius: '6px'
-            }}
             title="Đóng thông báo"
           >
             ✕
@@ -278,160 +415,169 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="feature-page-header">
-        <div>
-          <h1 className="feature-page-title">Xét điều kiện bảo vệ đồ án &amp; Quản lý Bảo lưu</h1>
-          <p className="feature-page-subtitle">
-            Kiểm tra tiêu chí xét duyệt bảo vệ cuối kỳ và phê duyệt đơn bảo lưu đề tài.
-          </p>
+      {/* Unified UTC Hero Header & Round Selector */}
+      <div className="utc-stage-hero">
+        <div className="utc-stage-hero-main">
+          <div>
+            <div className="utc-stage-eyebrow">
+              <span>🎓</span> GIAI ĐOẠN 5 • RÀ SOÁT ĐIỀU KIỆN BẢO VỆ &amp; HỒ SƠ BẢO LƯU
+            </div>
+            <h1 className="utc-stage-title">Xét điều kiện bảo vệ đồ án &amp; Quản lý Bảo lưu</h1>
+            <p className="utc-stage-subtitle">
+              Kiểm tra điều kiện bảo vệ cuối kỳ (nợ tín chỉ = 0 TC, hoàn thành học phí, tiến độ GVHD 100%) và phê duyệt đơn bảo lưu trước khi chốt Hội đồng.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Project Round Context & Selector Bar */}
-      <div
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: '10px',
-          border: '1px solid #e2e8f0',
-          padding: '16px 20px',
-          marginBottom: '20px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <label style={{ fontWeight: 700, color: '#0a3273', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>🗓️</span> Chọn Đợt đồ án:
-          </label>
-          <select
-            value={selectedRoundId || ''}
-            onChange={(e) => setSelectedRoundId(Number(e.target.value))}
-            disabled={loadingRounds}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '6px',
-              border: '1.5px solid #0a3273',
-              fontWeight: 600,
-              color: '#0a3273',
-              backgroundColor: '#f8fafc',
-              fontSize: '0.9rem',
-              minWidth: '280px',
-            }}
-          >
-            {(isAdmin ? rounds : rounds.filter((r) => r.status === 'OPEN' || r.status === 'IN_PROGRESS')).map((r) => (
-              <option key={r.roundId} value={r.roundId}>
-                {r.name} ({r.roundCode}) — {r.semester} {r.academicYear}
-              </option>
-            ))}
-          </select>
+        <div className="utc-round-control-bar">
+          <div className="utc-round-select-group">
+            <label htmlFor="finalEligRound">🗓️ Chọn Đợt đồ án:</label>
+            <select
+              id="finalEligRound"
+              className="utc-round-select"
+              value={selectedRoundId || ''}
+              onChange={(e) => setSelectedRoundId(Number(e.target.value))}
+              disabled={loadingRounds}
+            >
+              {(isAdmin ? rounds : rounds.filter((r) => r.status === 'OPEN' || r.status === 'IN_PROGRESS')).map((r) => (
+                <option key={r.roundId} value={r.roundId}>
+                  {r.name} ({r.roundCode}) — {r.semester} {r.academicYear}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {selectedRound && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  backgroundColor: selectedRound.status === 'OPEN' ? '#dcfce7' : '#f1f5f9',
-                  color: selectedRound.status === 'OPEN' ? '#16a34a' : '#475569',
-                }}
-              >
-                {selectedRound.status === 'OPEN' ? 'Đang mở (OPEN)' : selectedRound.status}
+            <div className="utc-round-meta-pills">
+              <span className={`utc-round-status-badge status-${(selectedRound.status || '').toLowerCase()}`}>
+                {selectedRound.status === 'OPEN'
+                  ? '● Đang mở'
+                  : selectedRound.status === 'IN_PROGRESS'
+                  ? '● Đang thực hiện'
+                  : selectedRound.status}
               </span>
-              <span
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  backgroundColor: '#eff6ff',
-                  color: '#1d4ed8',
-                }}
-              >
+              <span className="utc-round-program-pill">
                 🎓 {selectedRound.trainingProgramName || selectedRound.trainingProgram || 'Chương trình đào tạo'}
               </span>
             </div>
           )}
         </div>
+      </div>
 
-        <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-          Đang xem: <strong>{selectedRound?.name || 'Chưa chọn đợt'}</strong>
+      {/* 5 KPI Cards Overview */}
+      <div className="utc-kpi-strip">
+        <div
+          className={`utc-kpi-box accent-navy ${activeTab === 'students' && studentFilter === 'ALL' ? 'is-active' : ''}`}
+          onClick={() => {
+            setActiveTab('students');
+            setStudentFilter('ALL');
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="utc-kpi-top">
+            <span className="utc-kpi-icon">👥</span>
+            <span className="utc-kpi-label">Tổng SV trong đợt</span>
+          </div>
+          <div className="utc-kpi-num">{kpiStats.total}</div>
+          <div className="utc-kpi-sub">Bấm để rà soát danh sách</div>
+        </div>
+
+        <div
+          className={`utc-kpi-box accent-green ${activeTab === 'students' && studentFilter === 'ELIGIBLE_DEFENSE' ? 'is-active' : ''}`}
+          onClick={() => {
+            setActiveTab('students');
+            setStudentFilter('ELIGIBLE_DEFENSE');
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="utc-kpi-top">
+            <span className="utc-kpi-icon">✅</span>
+            <span className="utc-kpi-label">Đủ ĐK bảo vệ cuối</span>
+          </div>
+          <div className="utc-kpi-num ok">{kpiStats.eligibleDefense}</div>
+          <div className="utc-kpi-sub">0 nợ TC • GVHD xác nhận 100%</div>
+        </div>
+
+        <div
+          className={`utc-kpi-box accent-amber ${activeTab === 'students' && studentFilter === 'HAS_DEBT' ? 'is-active' : ''}`}
+          onClick={() => {
+            setActiveTab('students');
+            setStudentFilter('HAS_DEBT');
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="utc-kpi-top">
+            <span className="utc-kpi-icon">📌</span>
+            <span className="utc-kpi-label">Còn nợ tín chỉ (GĐ5)</span>
+          </div>
+          <div className="utc-kpi-num warn">{kpiStats.hasDebt}</div>
+          <div className="utc-kpi-sub">Cần xác nhận trả hết nợ về 0</div>
+        </div>
+
+        <div
+          className={`utc-kpi-box accent-red ${activeTab === 'reservations' ? 'is-active' : ''}`}
+          onClick={() => {
+            setActiveTab('reservations');
+            setReservationStatusFilter('PENDING');
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="utc-kpi-top">
+            <span className="utc-kpi-icon">⏳</span>
+            <span className="utc-kpi-label">Đơn bảo lưu chờ duyệt</span>
+          </div>
+          <div className="utc-kpi-num bad">{kpiStats.pendingRes}</div>
+          <div className="utc-kpi-sub">Tổng {reservationsInRound.length} đơn trong đợt</div>
+        </div>
+
+        <div
+          className={`utc-kpi-box accent-purple ${activeTab === 'students' && studentFilter === 'RESERVED' ? 'is-active' : ''}`}
+          onClick={() => {
+            setActiveTab('students');
+            setStudentFilter('RESERVED');
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="utc-kpi-top">
+            <span className="utc-kpi-icon">🟣</span>
+            <span className="utc-kpi-label">Đã bảo lưu (RESERVED)</span>
+          </div>
+          <div className="utc-kpi-num purple">{kpiStats.reserved}</div>
+          <div className="utc-kpi-sub">Đóng băng kết quả sang đợt sau</div>
         </div>
       </div>
 
-      {/* Sub-Navigation Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          borderBottom: '2px solid #e2e8f0',
-          marginBottom: '20px',
-          gap: '8px',
-          backgroundColor: '#fff',
-          borderRadius: '8px 8px 0 0',
-          padding: '6px 12px 0 12px',
-        }}
-      >
+      {/* Sub-Navigation Pill Tabs */}
+      <div className="utc-stage-tabs">
         <button
+          type="button"
+          className={`utc-stage-tab ${activeTab === 'check' ? 'active' : ''}`}
           onClick={() => setActiveTab('check')}
-          style={{
-            padding: '10px 18px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'check' ? '3px solid #0a3273' : '3px solid transparent',
-            color: activeTab === 'check' ? '#0a3273' : '#64748b',
-            fontWeight: 700,
-            fontSize: '0.95rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
         >
           🔍 Xét điều kiện bảo vệ cuối kỳ
         </button>
 
         <button
+          type="button"
+          className={`utc-stage-tab ${activeTab === 'students' ? 'active' : ''}`}
           onClick={() => setActiveTab('students')}
-          style={{
-            padding: '10px 18px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'students' ? '3px solid #0a3273' : '3px solid transparent',
-            color: activeTab === 'students' ? '#0a3273' : '#64748b',
-            fontWeight: 700,
-            fontSize: '0.95rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
         >
-          👨‍🎓 Sinh viên trong đợt ({roundStudents.length})
+          👨‍🎓 Sinh viên trong đợt
+          <span className="utc-stage-tab-count">{roundStudents.length}</span>
         </button>
 
         <button
+          type="button"
+          className={`utc-stage-tab ${activeTab === 'reservations' ? 'active' : ''}`}
           onClick={() => setActiveTab('reservations')}
-          style={{
-            padding: '10px 18px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'reservations' ? '3px solid #0a3273' : '3px solid transparent',
-            color: activeTab === 'reservations' ? '#0a3273' : '#64748b',
-            fontWeight: 700,
-            fontSize: '0.95rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
         >
-          📋 Đơn bảo lưu đồ án ({reservationsInRound.length})
+          📋 Đơn bảo lưu đồ án
+          <span className="utc-stage-tab-count">{reservationsInRound.length}</span>
         </button>
       </div>
 
@@ -513,17 +659,8 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   ⚡ Chọn nhanh sinh viên trong đợt ({roundStudents.length}):
                 </span>
                 <select
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.85rem',
-                    color: '#003366',
-                    backgroundColor: '#f8fafc',
-                    fontWeight: 600,
-                    maxWidth: '420px',
-                    cursor: 'pointer',
-                  }}
+                  className="utc-toolbar-select"
+                  style={{ minWidth: '280px', maxWidth: '460px', fontWeight: 600 }}
                   value=""
                   onChange={(e) => {
                     if (e.target.value) {
@@ -538,6 +675,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   {roundStudents.map((s) => (
                     <option key={s.studentId} value={s.studentCode}>
                       {s.studentCode} — {s.fullName} ({s.className || 'Sinh viên'})
+                      {s.debtCredits && s.debtCredits > 0 ? ` [Nợ ${s.debtCredits} TC]` : ''}
                     </option>
                   ))}
                 </select>
@@ -565,8 +703,12 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   <h2 className="result-main-title">
                     {result.reservationStatus === 'APPROVED'
                       ? '🟣 ĐÃ BẢO LƯU ĐỒ ÁN SANG ĐỢT SAU (RESERVED)'
-                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
-                      ? (result.studentRoundStatus === 'INELIGIBLE' ? '🚫 KHÔNG ĐỦ ĐIỀU KIỆN THAM GIA ĐỢT ĐỒ ÁN' : '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN')
+                      : result.studentRoundStatus === 'DROPPED' ||
+                        result.studentRoundStatus === 'DISQUALIFIED' ||
+                        result.studentRoundStatus === 'INELIGIBLE'
+                      ? result.studentRoundStatus === 'INELIGIBLE'
+                        ? '🚫 KHÔNG ĐỦ ĐIỀU KIỆN THAM GIA ĐỢT ĐỒ ÁN'
+                        : '🚫 ĐÃ BỊ LOẠI KHỎI ĐỢT ĐỒ ÁN'
                       : result.eligibleForDefense
                       ? 'ĐỦ ĐIỀU KIỆN BẢO VỆ CUỐI KỲ'
                       : 'CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ'}
@@ -576,8 +718,12 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                   <span className="result-badge">
                     {result.reservationStatus === 'APPROVED'
                       ? 'BẢO LƯU'
-                      : result.studentRoundStatus === 'DROPPED' || result.studentRoundStatus === 'DISQUALIFIED' || result.studentRoundStatus === 'INELIGIBLE'
-                      ? (result.studentRoundStatus === 'INELIGIBLE' ? 'KHÔNG ĐỦ ĐK' : 'BỊ LOẠI')
+                      : result.studentRoundStatus === 'DROPPED' ||
+                        result.studentRoundStatus === 'DISQUALIFIED' ||
+                        result.studentRoundStatus === 'INELIGIBLE'
+                      ? result.studentRoundStatus === 'INELIGIBLE'
+                        ? 'KHÔNG ĐỦ ĐK'
+                        : 'BỊ LOẠI'
                       : result.eligibleForDefense
                       ? 'ĐỦ ĐIỀU KIỆN'
                       : 'KHÔNG ĐỦ ĐIỀU KIỆN'}
@@ -585,9 +731,56 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Reservation Action Banner if Pending or Recommended */}
+              {/* Quick 1-click Clear Debt Banner for Academic Staff */}
+              {isAdmin && result.debtCredits !== undefined && result.debtCredits !== null && result.debtCredits > 0 && result.reservationStatus !== 'APPROVED' && (
+                <div
+                  style={{
+                    background: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    padding: '14px 18px',
+                    borderRadius: '10px',
+                    margin: '16px 20px 0 20px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div>
+                    <strong style={{ color: '#92400e' }}>
+                      📌 Sinh viên hiện còn nợ {result.debtCredits} tín chỉ trước bảo vệ:
+                    </strong>
+                    <div style={{ fontSize: '0.84rem', color: '#b45309', marginTop: '3px' }}>
+                      Nếu sinh viên đã hoàn tất trả nợ môn theo dữ liệu Phòng Đào tạo, Giáo vụ có thể xác nhận ngay để mở điều kiện bảo vệ.
+                    </div>
+                  </div>
+                  <Button
+                    variant="success"
+                    loading={clearingStudentId === result.studentId}
+                    onClick={() => handleClearDebt(result.studentId, result.studentCode, result.studentName)}
+                  >
+                    ✅ Xác nhận đã trả hết nợ TC
+                  </Button>
+                </div>
+              )}
+
+              {/* Reservation Action Banner if Pending */}
               {result.hasPendingReservation && (
-                <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', padding: '14px', borderRadius: '8px', margin: '16px 20px 0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{
+                    background: '#fffbeb',
+                    border: '1px solid #fcd34d',
+                    padding: '14px 18px',
+                    borderRadius: '10px',
+                    margin: '16px 20px 0 20px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px',
+                    flexWrap: 'wrap',
+                  }}
+                >
                   <div>
                     <strong style={{ color: '#92400e' }}>⚠️ Sinh viên đang có đơn xin bảo lưu chờ phê duyệt:</strong>
                     <div style={{ fontSize: '13px', color: '#b45309', marginTop: '4px' }}>
@@ -609,9 +802,27 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
               )}
 
               {/* Recommendation for Reservation if not eligible */}
-              {!result.eligibleForDefense && result.reservationStatus !== 'APPROVED' && result.studentRoundStatus !== 'DROPPED' && result.studentRoundStatus !== 'DISQUALIFIED' && !result.hasPendingReservation && isAdmin && (
-                result.thesisId && result.thesisId > 0 && result.thesisTitle && !result.thesisTitle.includes('Chưa có đề tài') ? (
-                  <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', padding: '14px', borderRadius: '8px', margin: '16px 20px 0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {!result.eligibleForDefense &&
+                result.reservationStatus !== 'APPROVED' &&
+                result.studentRoundStatus !== 'DROPPED' &&
+                result.studentRoundStatus !== 'DISQUALIFIED' &&
+                !result.hasPendingReservation &&
+                isAdmin &&
+                (result.thesisId && result.thesisId > 0 && result.thesisTitle && !result.thesisTitle.includes('Chưa có đề tài') ? (
+                  <div
+                    style={{
+                      background: '#f5f3ff',
+                      border: '1px solid #ddd6fe',
+                      padding: '14px 18px',
+                      borderRadius: '10px',
+                      margin: '16px 20px 0 20px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
                     <div>
                       <strong style={{ color: '#5b21b6' }}>💡 Hỗ trợ bảo lưu đồ án tốt nghiệp:</strong>
                       <div style={{ fontSize: '13px', color: '#6d28d9', marginTop: '4px' }}>
@@ -627,10 +838,14 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                           studentName: result.studentName,
                           thesisId: result.thesisId,
                           thesisTitle: result.thesisTitle,
-                          defaultCategory: (result.debtCredits && result.debtCredits > 0) ? 'INSUFFICIENT_CREDITS' : 'SUPERVISOR_NOT_ELIGIBLE',
-                          defaultReason: (result.debtCredits && result.debtCredits > 0)
-                            ? `Bảo lưu kết quả đồ án do chưa hoàn thành đủ số tín chỉ quy định (Còn nợ: ${result.debtCredits} tín chỉ)`
-                            : 'Bảo lưu kết quả đồ án theo đề nghị của Khoa / GVHD',
+                          defaultCategory:
+                            result.debtCredits && result.debtCredits > 0
+                              ? 'INSUFFICIENT_CREDITS'
+                              : 'SUPERVISOR_NOT_ELIGIBLE',
+                          defaultReason:
+                            result.debtCredits && result.debtCredits > 0
+                              ? `Bảo lưu kết quả đồ án do chưa hoàn thành đủ số tín chỉ quy định (Còn nợ: ${result.debtCredits} tín chỉ)`
+                              : 'Bảo lưu kết quả đồ án theo đề nghị của Khoa / GVHD',
                         });
                       }}
                     >
@@ -638,31 +853,41 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     </Button>
                   </div>
                 ) : (
-                  <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '14px', borderRadius: '8px', margin: '16px 20px 0 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px dashed #cbd5e1',
+                      padding: '14px',
+                      borderRadius: '10px',
+                      margin: '16px 20px 0 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                    }}
+                  >
                     <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
                     <div style={{ fontSize: '13px', color: '#64748b' }}>
                       <strong>Lưu ý bảo lưu:</strong> Sinh viên chưa có đề tài chính thức hoặc chưa được phân công GVHD trong đợt này. Theo quy định, sinh viên chỉ được lập bảo lưu khi đã có đề tài và đã được phân công GVHD.
                     </div>
                   </div>
-                )
-              )}
+                ))}
 
               {/* Student and Thesis Meta Box */}
               <div className="result-meta-grid">
                 <div className="meta-item">
-                  <span className="meta-label">Mã sinh viên:</span>
+                  <span className="meta-label">Mã sinh viên</span>
                   <span className="meta-val font-bold">{result.studentCode}</span>
                 </div>
                 <div className="meta-item">
-                  <span className="meta-label">Họ và tên:</span>
+                  <span className="meta-label">Họ và tên</span>
                   <span className="meta-val font-bold">{result.studentName}</span>
                 </div>
                 <div className="meta-item">
-                  <span className="meta-label">Mã đề tài:</span>
-                  <span className="meta-val">#{result.thesisId}</span>
+                  <span className="meta-label">Mã đề tài</span>
+                  <span className="meta-val">{result.thesisId ? `#${result.thesisId}` : '—'}</span>
                 </div>
                 <div className="meta-item">
-                  <span className="meta-label">Tên đề tài:</span>
+                  <span className="meta-label">Tên đề tài</span>
                   <span className="meta-val text-primary font-semibold">{result.thesisTitle}</span>
                 </div>
               </div>
@@ -672,29 +897,25 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                 <h3 className="criteria-title">Các tiêu chí kiểm tra điều kiện bảo vệ:</h3>
 
                 <div className="criteria-grid">
-                  {/* Criteria 1: Tiến độ thực hiện */}
+                  {/* Criteria 1 */}
                   <div className={`criteria-card ${result.allProgressStagesCompleted ? 'card-ok' : 'card-fail'}`}>
                     <div className="card-top">
                       <span className="card-icon">{result.allProgressStagesCompleted ? '✅' : '❌'}</span>
                       <span className="card-heading">1. Tiến độ thực hiện đồ án</span>
                     </div>
-                    <div className="card-desc">
-                      Yêu cầu hoàn thành 100% tiến độ và báo cáo tuần.
-                    </div>
+                    <div className="card-desc">Yêu cầu hoàn thành 100% tiến độ và báo cáo tuần.</div>
                     <div className="card-metric">
                       Tiến độ: <strong>{result.thesisProgressPercentage ?? (result.allProgressStagesCompleted ? 100 : 0)}%</strong>
                     </div>
                   </div>
 
-                  {/* Criteria 2: Đánh giá GVHD */}
+                  {/* Criteria 2 */}
                   <div className={`criteria-card ${result.supervisorApproved ? 'card-ok' : 'card-fail'}`}>
                     <div className="card-top">
                       <span className="card-icon">{result.supervisorApproved ? '✅' : '❌'}</span>
                       <span className="card-heading">2. Giảng viên Hướng dẫn (GVHD)</span>
                     </div>
-                    <div className="card-desc">
-                      GVHD xác nhận đồng ý cho bảo vệ &amp; điểm GVHD ≥ 5.0.
-                    </div>
+                    <div className="card-desc">GVHD xác nhận đồng ý cho bảo vệ &amp; điểm GVHD ≥ 5.0.</div>
                     <div className="card-metric">
                       Trạng thái: <strong>{result.supervisorApproved ? 'Đã duyệt cho bảo vệ' : 'Chưa duyệt / Điểm < 5.0'}</strong>
                       {result.supervisorScore !== undefined && result.supervisorScore !== null && (
@@ -703,34 +924,62 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Criteria 3: Điều kiện Học vụ / Tín chỉ */}
-                  <div className={`criteria-card ${result.completedCredits !== undefined && result.completedCredits !== null && (!result.debtCredits || result.debtCredits === 0) ? 'card-ok' : 'card-fail'}`}>
+                  {/* Criteria 3 */}
+                  <div
+                    className={`criteria-card ${
+                      result.completedCredits !== undefined &&
+                      result.completedCredits !== null &&
+                      (!result.debtCredits || result.debtCredits === 0)
+                        ? 'card-ok'
+                        : 'card-fail'
+                    }`}
+                  >
                     <div className="card-top">
-                      <span className="card-icon">{result.completedCredits !== undefined && result.completedCredits !== null && (!result.debtCredits || result.debtCredits === 0) ? '✅' : '❌'}</span>
+                      <span className="card-icon">
+                        {result.completedCredits !== undefined &&
+                        result.completedCredits !== null &&
+                        (!result.debtCredits || result.debtCredits === 0)
+                          ? '✅'
+                          : '❌'}
+                      </span>
                       <span className="card-heading">3. Tín chỉ tích lũy &amp; Nợ tín chỉ</span>
                     </div>
                     <div className="card-desc">
                       Hoàn thành toàn bộ nợ tín chỉ (= 0) theo chương trình đào tạo (Cử nhân: 142 TC, Kỹ sư: 180 TC).
                     </div>
                     <div className="card-metric">
-                      Tín chỉ tích lũy: <strong>{result.completedCredits !== undefined && result.completedCredits !== null ? `${result.completedCredits} TC` : 'Chưa có dữ liệu'}</strong>
+                      Tín chỉ tích lũy:{' '}
+                      <strong>
+                        {result.completedCredits !== undefined && result.completedCredits !== null
+                          ? `${result.completedCredits} TC`
+                          : 'Chưa có dữ liệu'}
+                      </strong>
                       {result.debtCredits !== undefined && result.debtCredits !== null && result.debtCredits > 0 ? (
                         <span style={{ color: '#dc2626', fontWeight: 600 }}> (Còn nợ: {result.debtCredits} tín chỉ)</span>
                       ) : null}
                     </div>
                   </div>
 
-                  {/* Criteria 4: Học phí & Kỷ luật */}
-                  <div className={`criteria-card ${!result.tuitionDebt && !result.underDisciplinaryAction ? 'card-ok' : 'card-fail'}`}>
+                  {/* Criteria 4 */}
+                  <div
+                    className={`criteria-card ${!result.tuitionDebt && !result.underDisciplinaryAction ? 'card-ok' : 'card-fail'}`}
+                  >
                     <div className="card-top">
                       <span className="card-icon">{!result.tuitionDebt && !result.underDisciplinaryAction ? '✅' : '❌'}</span>
                       <span className="card-heading">4. Nghĩa vụ học phí &amp; Kỷ luật</span>
                     </div>
-                    <div className="card-desc">
-                      Đã hoàn thành toàn bộ học phí và không bị kỷ luật.
-                    </div>
+                    <div className="card-desc">Đã hoàn thành toàn bộ học phí và không bị kỷ luật.</div>
                     <div className="card-metric">
-                      Trạng thái: <strong>{!result.tuitionDebt && !result.underDisciplinaryAction ? 'Đã hoàn thành' : result.tuitionDebt && result.underDisciplinaryAction ? 'Nợ học phí & Bị kỷ luật' : result.tuitionDebt ? 'Còn nợ học phí' : 'Đang bị kỷ luật'}</strong>
+                      Trạng thái:{' '}
+                      <strong>
+                        {!result.tuitionDebt && !result.underDisciplinaryAction
+                          ? 'Đã hoàn thành'
+                          : result.tuitionDebt && result.underDisciplinaryAction
+                          ? 'Nợ học phí & Bị kỷ luật'
+                          : result.tuitionDebt
+                          ? 'Còn nợ học phí'
+                          : 'Đang bị kỷ luật'}
+                      </strong>
                     </div>
                   </div>
                 </div>
@@ -752,23 +1001,24 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: Danh sách Sinh viên trong Đợt & Trạng thái */}
+      {/* TAB 2: Danh sách Sinh viên trong Đợt & Học vụ GĐ5 */}
       {activeTab === 'students' && (
-        <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '20px', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div className="utc-card-panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h3 style={{ margin: 0, color: '#1e293b' }}>
-                Danh sách Sinh viên trong đợt — {selectedRound?.name} ({roundStudents.length} SV)
+              <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.08rem', fontWeight: 800 }}>
+                Danh sách Sinh viên &amp; Điều kiện Bảo vệ GĐ5 — {selectedRound?.name} ({filteredStudentRows.length} / {roundStudents.length} SV)
               </h3>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-                Theo dõi dữ liệu học vụ, điều kiện bảo vệ và thực hiện lập quyết định bảo lưu trực tiếp cho sinh viên đã có đề tài / GVHD nhưng chưa đủ điều kiện bảo vệ.
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.83rem', color: '#64748b' }}>
+                Xác nhận sinh viên hoàn thành trả nợ tín chỉ về 0 TC, chỉnh sửa dữ liệu học vụ hoặc lập quyết định bảo lưu sang đợt sau.
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <input
                 type="text"
-                placeholder="Tìm theo MSSV, họ tên..."
+                className="utc-toolbar-input"
+                placeholder="Tìm theo MSSV, họ tên, đề tài..."
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -776,92 +1026,89 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                     loadRoundData(selectedRoundId);
                   }
                 }}
-                style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', minWidth: '220px' }}
+                style={{ minWidth: '220px' }}
               />
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => selectedRoundId && loadRoundData(selectedRoundId)}
-                style={{ backgroundColor: '#0a3273', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: '6px', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
               >
                 Tìm
-              </button>
+              </Button>
+            </div>
+          </div>
+
+          {/* Quick filter bar */}
+          <div className="filter-toolbar" style={{ marginBottom: '14px', padding: '10px 14px' }}>
+            <div className="btn-group-toggle">
+              {(
+                [
+                  { id: 'ALL', label: `Tất cả (${evaluatedRows.length})` },
+                  { id: 'HAS_DEBT', label: `Còn nợ TC (${kpiStats.hasDebt})` },
+                  { id: 'ELIGIBLE_DEFENSE', label: `Đủ ĐK bảo vệ (${kpiStats.eligibleDefense})` },
+                  { id: 'NOT_ELIGIBLE', label: 'Chưa đủ ĐK khác' },
+                  { id: 'RESERVED', label: `Đã bảo lưu (${kpiStats.reserved})` },
+                ] as { id: StudentStage5Filter; label: string }[]
+              ).map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`toggle-btn ${studentFilter === f.id ? 'active' : ''}`}
+                  onClick={() => setStudentFilter(f.id)}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
           </div>
 
           {loadingStudents ? (
-            <div style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>Đang tải danh sách sinh viên...</div>
-          ) : roundStudents.length > 0 ? (
-            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+            <div style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>⏳ Đang tải danh sách sinh viên...</div>
+          ) : filteredStudentRows.length > 0 ? (
+            <div className="utc-table-container">
+              <table className="utc-clean-table">
                 <thead>
-                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                    <th style={{ padding: '10px 12px' }}>STT</th>
-                    <th style={{ padding: '10px 12px' }}>MSSV</th>
-                    <th style={{ padding: '10px 12px' }}>Họ và tên</th>
-                    <th style={{ padding: '10px 12px' }}>Đề tài &amp; Tiến độ</th>
-                    <th style={{ padding: '10px 12px' }}>Thông tin học vụ</th>
-                    <th style={{ padding: '10px 12px' }}>Điểm GPA</th>
-                    <th style={{ padding: '10px 12px' }}>Điều kiện Bảo vệ &amp; Bảo lưu</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
+                  <tr>
+                    <th style={{ width: '44px', textAlign: 'center' }}>STT</th>
+                    <th style={{ width: '110px' }}>MSSV</th>
+                    <th style={{ minWidth: '160px' }}>Họ và tên</th>
+                    <th style={{ minWidth: '240px' }}>Đề tài &amp; Tiến độ</th>
+                    <th style={{ minWidth: '190px' }}>Hồ sơ học vụ GĐ5</th>
+                    <th style={{ width: '70px', textAlign: 'center' }}>GPA</th>
+                    <th style={{ minWidth: '185px' }}>Kết luận Bảo vệ &amp; Bảo lưu</th>
+                    <th style={{ minWidth: '220px', textAlign: 'center' }}>Thao tác Giáo vụ</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {roundStudents.map((st, idx) => {
-                    const thesis = findStudentThesis(st);
-                    const reservation = findStudentReservation(st.studentId, st.studentCode);
-                    const isReserved = st.status === 'RESERVED' || thesis?.status === 'RESERVED' || reservation?.status === 'APPROVED';
-                    const hasPendingRes = reservation?.status === 'PENDING';
-                    const isDropped = st.status === 'DROPPED' || st.status === 'DISQUALIFIED' || st.status === 'INELIGIBLE';
-
-                    // Academic condition check: debtCredits == 0, no tuition debt, no discipline
-                    const isAcademicEligible =
-                      (!st.debtCredits || st.debtCredits === 0) &&
-                      !st.tuitionDebt &&
-                      !st.underDisciplinaryAction;
-
-                    const hasSupervisorApproved = Boolean(
-                      thesis && (
-                        thesis.defenseEligible ||
-                        thesis.status === 'COMPLETED' ||
-                        thesis.status === 'DEFENSE_READY'
-                      )
-                    );
-
-                    const isThesisProgressComplete = Boolean(
-                      thesis && (thesis.completionRate === 100 || hasSupervisorApproved)
-                    );
-
-                    // Requirement 3: Student must have a thesis and supervisor assigned
-                    const hasAssignedThesisAndSupervisor = Boolean(
-                      thesis && thesis.id && (thesis.lecturerId || thesis.lecturerFullName)
-                    );
-
-                    // Requirement 2: Student is eligible for defense ONLY IF thesis approved AND academic conditions satisfied
-                    const isEligibleForDefense = Boolean(
-                      !isReserved &&
-                      !isDropped &&
-                      hasAssignedThesisAndSupervisor &&
-                      hasSupervisorApproved &&
-                      isThesisProgressComplete &&
-                      isAcademicEligible
-                    );
-                    const progressRate = thesis?.completionRate ?? (hasSupervisorApproved ? 100 : 0);
+                  {filteredStudentRows.map((row, idx) => {
+                    const {
+                      st,
+                      thesis,
+                      reservation,
+                      isReserved,
+                      hasPendingRes,
+                      isDropped,
+                      hasSupervisorApproved,
+                      isThesisProgressComplete,
+                      hasAssignedThesisAndSupervisor,
+                      isEligibleForDefense,
+                      progressRate,
+                    } = row;
 
                     return (
-                      <tr key={st.studentRoundId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px 12px' }}>{idx + 1}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0a3273' }}>{st.studentCode}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
-                          <div>{st.fullName}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>
+                      <tr key={st.studentRoundId}>
+                        <td style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>{idx + 1}</td>
+                        <td style={{ fontWeight: 800, color: '#0a3273' }}>{st.studentCode}</td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{st.fullName}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                             {st.className || st.majorCode || ''}
                           </div>
                         </td>
-                        <td style={{ padding: '10px 12px', maxWidth: '280px' }}>
+                        <td style={{ maxWidth: '280px' }}>
                           {thesis ? (
                             <div>
-                              <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: '2px' }}>
-                                {thesis.titleVn}
-                              </div>
+                              <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: '2px' }}>{thesis.titleVn}</div>
                               <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 600 }}>
                                 Tiến độ: {progressRate}% {thesis.lecturerFullName ? `• GVHD: ${thesis.lecturerFullName}` : ''}
                               </span>
@@ -870,156 +1117,51 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                             <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa có đề tài chính thức</span>
                           )}
                         </td>
-                        {/* Cột Học vụ (Yêu cầu 1) */}
-                        <td style={{ padding: '10px 12px', minWidth: '190px' }}>
-                          <div style={{ fontSize: '0.82rem' }}>
+                        <td>
+                          <div style={{ fontSize: '0.8rem' }}>
                             <div style={{ marginBottom: '3px' }}>
-                              <strong>Tích lũy:</strong> {st.completedCredits ?? 0} TC
-                            </div>
-                            <div style={{ marginBottom: '4px' }}>
-                              <strong>Nợ tín:</strong>{' '}
-                              <span
-                                style={{
-                                  fontWeight: 700,
-                                  color: (st.debtCredits !== undefined && st.debtCredits > 0) ? '#dc2626' : '#16a34a',
-                                }}
-                              >
-                                {st.debtCredits !== undefined && st.debtCredits > 0 ? `${st.debtCredits} TC (Nợ)` : '0 TC'}
+                              <strong>Tích lũy:</strong> {st.completedCredits ?? 0} TC &nbsp;•&nbsp;{' '}
+                              <strong>Nợ:</strong>{' '}
+                              <span style={{ fontWeight: 800, color: st.debtCredits && st.debtCredits > 0 ? '#dc2626' : '#15803d' }}>
+                                {st.debtCredits && st.debtCredits > 0 ? `${st.debtCredits} TC` : '0 TC'}
                               </span>
                             </div>
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                              <span
-                                style={{
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 600,
-                                  backgroundColor: st.tuitionDebt ? '#fee2e2' : '#dcfce7',
-                                  color: st.tuitionDebt ? '#991b1b' : '#166534',
-                                }}
-                              >
+                              <span className={`utc-badge ${st.tuitionDebt ? 'utc-badge-danger' : 'utc-badge-success'}`}>
                                 {st.tuitionDebt ? 'Nợ HP' : 'Đã đóng HP'}
                               </span>
                               {st.underDisciplinaryAction ? (
-                                <span
-                                  style={{
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600,
-                                    backgroundColor: '#fee2e2',
-                                    color: '#991b1b',
-                                  }}
-                                >
-                                  Kỷ luật
-                                </span>
+                                <span className="utc-badge utc-badge-danger">Kỷ luật</span>
                               ) : (
-                                <span
-                                  style={{
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600,
-                                    backgroundColor: '#f1f5f9',
-                                    color: '#475569',
-                                  }}
-                                >
-                                  Không KL
-                                </span>
+                                <span className="utc-badge utc-badge-muted">Không KL</span>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ color: (st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0) ? '#dc2626' : '#0a3273', fontWeight: 700 }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{ color: st.gpa !== undefined && st.gpa !== null && st.gpa < 2.0 ? '#dc2626' : '#0a3273', fontWeight: 800 }}>
                             {st.gpa !== undefined && st.gpa !== null ? Number(st.gpa).toFixed(2) : '—'}
                           </span>
                         </td>
-                        {/* Cột Điều kiện Bảo vệ & Bảo lưu (Yêu cầu 2) */}
-                        <td style={{ padding: '10px 12px' }}>
+                        <td>
                           {isReserved ? (
-                            <span
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                backgroundColor: '#f3e8ff',
-                                color: '#7e22ce',
-                                border: '1px solid #d8b4fe',
-                                display: 'inline-block',
-                              }}
-                            >
-                              🟣 Đã bảo lưu (RESERVED)
-                            </span>
-                          ) : hasPendingRes ? (
-                            <span
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                backgroundColor: '#fffbeb',
-                                color: '#b45309',
-                                border: '1px solid #fde68a',
-                                display: 'inline-block',
-                              }}
-                            >
-                              🟠 Chờ duyệt bảo lưu (#{reservation.id})
-                            </span>
+                            <span className="utc-badge utc-badge-purple">🟣 Đã bảo lưu (RESERVED)</span>
+                          ) : hasPendingRes && reservation ? (
+                            <span className="utc-badge utc-badge-warning">🟠 Chờ duyệt bảo lưu (#{reservation.id})</span>
                           ) : isDropped ? (
-                            <span
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                backgroundColor: '#fef2f2',
-                                color: '#dc2626',
-                                border: '1px solid #fecaca',
-                                display: 'inline-block',
-                              }}
-                            >
-                              🚫 Đã bị loại khỏi đợt
-                            </span>
+                            <span className="utc-badge utc-badge-danger">🚫 Đã bị loại khỏi đợt</span>
                           ) : isEligibleForDefense ? (
-                            <span
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                backgroundColor: '#dcfce7',
-                                color: '#15803d',
-                                border: '1px solid #86efac',
-                                display: 'inline-block',
-                              }}
-                            >
-                              ✅ Đủ điều kiện bảo vệ
-                            </span>
+                            <span className="utc-badge utc-badge-success">✅ Đủ điều kiện bảo vệ</span>
                           ) : (
                             <div>
-                              <span
-                                style={{
-                                  padding: '4px 10px',
-                                  borderRadius: '12px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  backgroundColor: '#fff1f2',
-                                  color: '#be123c',
-                                  border: '1px solid #fecdd3',
-                                  display: 'inline-block',
-                                }}
-                              >
-                                ❌ Chưa đủ điều kiện bảo vệ
-                              </span>
+                              <span className="utc-badge utc-badge-danger">❌ Chưa đủ ĐK bảo vệ</span>
                               <div style={{ fontSize: '0.72rem', color: '#b91c1c', marginTop: '3px', fontWeight: 600 }}>
                                 {!thesis
                                   ? 'Chưa có đề tài'
                                   : !hasAssignedThesisAndSupervisor
                                   ? 'Chưa phân công GVHD'
-                                  : (st.debtCredits !== undefined && st.debtCredits > 0)
-                                  ? `Nợ ${st.debtCredits} tín chỉ`
+                                  : st.debtCredits !== undefined && st.debtCredits > 0
+                                  ? `Còn nợ ${st.debtCredits} tín chỉ`
                                   : st.tuitionDebt
                                   ? 'Còn nợ học phí'
                                   : st.underDisciplinaryAction
@@ -1033,66 +1175,53 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                             </div>
                           )}
                         </td>
-                        {/* Cột Thao tác (Yêu cầu 1 & 3) */}
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', flexWrap: 'wrap' }}>
                             <button
+                              type="button"
+                              className="utc-btn-xs primary"
                               onClick={() => handleQuickCheckStudent(st)}
-                              style={{
-                                backgroundColor: '#0a3273',
-                                color: '#fff',
-                                border: 'none',
-                                padding: '5px 10px',
-                                borderRadius: '4px',
-                                fontWeight: 600,
-                                fontSize: '0.75rem',
-                                cursor: 'pointer',
-                              }}
                             >
                               🔍 Kiểm tra
                             </button>
 
-                            {/* Thao tác thay đổi học vụ (Yêu cầu 1) */}
                             {isAdmin && (
                               <button
+                                type="button"
+                                className="utc-btn-xs info"
                                 onClick={() => setEditingAcademicStudent(st)}
                                 title="Chỉnh sửa thông tin học vụ (tín chỉ tích lũy, nợ tín, học phí, kỷ luật)"
-                                style={{
-                                  backgroundColor: '#eff6ff',
-                                  color: '#0a3273',
-                                  border: '1px solid #bfdbfe',
-                                  padding: '5px 10px',
-                                  borderRadius: '4px',
-                                  fontWeight: 600,
-                                  fontSize: '0.75rem',
-                                  cursor: 'pointer',
-                                }}
                               >
                                 ✏️ Sửa học vụ
                               </button>
                             )}
 
-                            {hasPendingRes && reservation && (
+                            {isAdmin && !isReserved && st.debtCredits !== undefined && st.debtCredits !== null && st.debtCredits > 0 && (
                               <button
+                                type="button"
+                                className="utc-btn-xs success"
+                                disabled={clearingStudentId === st.studentId}
+                                onClick={() => handleClearDebt(st.studentId, st.studentCode, st.fullName)}
+                                title="Xác nhận sinh viên đã trả hết nợ tín chỉ về 0 TC"
+                              >
+                                {clearingStudentId === st.studentId ? 'Đang lưu...' : '✅ Trả hết nợ TC'}
+                              </button>
+                            )}
+
+                            {hasPendingRes && reservation && isAdmin && (
+                              <button
+                                type="button"
+                                className="utc-btn-xs warning"
                                 onClick={() => setSelectedReservationForReview(reservation)}
-                                style={{
-                                  backgroundColor: '#f59e0b',
-                                  color: '#fff',
-                                  border: 'none',
-                                  padding: '5px 10px',
-                                  borderRadius: '4px',
-                                  fontWeight: 600,
-                                  fontSize: '0.75rem',
-                                  cursor: 'pointer',
-                                }}
                               >
                                 ✍️ Duyệt bảo lưu
                               </button>
                             )}
 
-                            {/* Yêu cầu 3: Có đề tài và đã được phân GVHD rồi thì mới được bảo lưu */}
                             {!isReserved && !isEligibleForDefense && !hasPendingRes && isAdmin && hasAssignedThesisAndSupervisor && (
                               <button
+                                type="button"
+                                className="utc-btn-xs purple"
                                 onClick={() => {
                                   setSelectedStudentForAdminReserve({
                                     studentId: st.studentId,
@@ -1100,21 +1229,15 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
                                     studentName: st.fullName,
                                     thesisId: thesis?.id,
                                     thesisTitle: thesis?.titleVn,
-                                    defaultCategory: (st.debtCredits && st.debtCredits > 0) ? 'INSUFFICIENT_CREDITS' : 'SUPERVISOR_NOT_ELIGIBLE',
-                                    defaultReason: (st.debtCredits && st.debtCredits > 0)
-                                      ? `Bảo lưu kết quả đồ án do chưa hoàn thành nợ tín chỉ (Còn nợ: ${st.debtCredits} tín chỉ)`
-                                      : 'Bảo lưu kết quả đồ án theo đề nghị của Khoa / GVHD',
+                                    defaultCategory:
+                                      st.debtCredits && st.debtCredits > 0
+                                        ? 'INSUFFICIENT_CREDITS'
+                                        : 'SUPERVISOR_NOT_ELIGIBLE',
+                                    defaultReason:
+                                      st.debtCredits && st.debtCredits > 0
+                                        ? `Bảo lưu kết quả đồ án do chưa hoàn thành nợ tín chỉ (Còn nợ: ${st.debtCredits} tín chỉ)`
+                                        : 'Bảo lưu kết quả đồ án theo đề nghị của Khoa / GVHD',
                                   });
-                                }}
-                                style={{
-                                  backgroundColor: '#7c3aed',
-                                  color: '#fff',
-                                  border: 'none',
-                                  padding: '5px 10px',
-                                  borderRadius: '4px',
-                                  fontWeight: 600,
-                                  fontSize: '0.75rem',
-                                  cursor: 'pointer',
                                 }}
                               >
                                 ⚡ Lập bảo lưu
@@ -1130,7 +1253,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-              Chưa có sinh viên nào trong đợt đồ án này hoặc không tìm thấy kết quả.
+              Chưa có sinh viên nào phù hợp với bộ lọc trong đợt đồ án này.
             </div>
           )}
         </div>
@@ -1138,109 +1261,97 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
 
       {/* TAB 3: Danh sách Đơn bảo lưu trong đợt */}
       {activeTab === 'reservations' && (
-        <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '20px', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div className="utc-card-panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h3 style={{ margin: 0, color: '#1e293b' }}>
-                Danh sách Đơn xin bảo lưu đồ án — {selectedRound?.name} ({reservationsInRound.length} đơn)
+              <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.08rem', fontWeight: 800 }}>
+                Danh sách Đơn xin bảo lưu đồ án — {selectedRound?.name} ({filteredReservations.length} / {reservationsInRound.length} đơn)
               </h3>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.83rem', color: '#64748b' }}>
                 Khoa phê duyệt hoặc từ chối các đơn xin bảo lưu của sinh viên trước khi thành lập Hội đồng và xếp lịch bảo vệ.
               </p>
+            </div>
+
+            <div className="btn-group-toggle">
+              {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  className={`toggle-btn ${reservationStatusFilter === st ? 'active' : ''}`}
+                  onClick={() => setReservationStatusFilter(st)}
+                >
+                  {st === 'ALL' && 'Tất cả'}
+                  {st === 'PENDING' && `Chờ duyệt (${kpiStats.pendingRes})`}
+                  {st === 'APPROVED' && 'Đã duyệt'}
+                  {st === 'REJECTED' && 'Từ chối'}
+                </button>
+              ))}
             </div>
           </div>
 
           {loadingReservations ? (
-            <div style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>Đang tải danh sách đơn bảo lưu...</div>
-          ) : reservationsInRound.length > 0 ? (
-            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+            <div style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>⏳ Đang tải danh sách đơn bảo lưu...</div>
+          ) : filteredReservations.length > 0 ? (
+            <div className="utc-table-container">
+              <table className="utc-clean-table">
                 <thead>
-                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                    <th style={{ padding: '10px 12px' }}>Mã đơn</th>
-                    <th style={{ padding: '10px 12px' }}>Sinh viên</th>
-                    <th style={{ padding: '10px 12px' }}>Phân loại lý do</th>
-                    <th style={{ padding: '10px 12px' }}>Nội dung &amp; Minh chứng</th>
-                    <th style={{ padding: '10px 12px' }}>Ý kiến GVHD</th>
-                    <th style={{ padding: '10px 12px' }}>Trạng thái</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao tác</th>
+                  <tr>
+                    <th style={{ width: '80px' }}>Mã đơn</th>
+                    <th style={{ minWidth: '180px' }}>Sinh viên</th>
+                    <th style={{ width: '150px' }}>Phân loại lý do</th>
+                    <th style={{ minWidth: '240px' }}>Nội dung &amp; Minh chứng</th>
+                    <th style={{ minWidth: '170px' }}>Ý kiến GVHD</th>
+                    <th style={{ width: '120px', textAlign: 'center' }}>Trạng thái</th>
+                    <th style={{ width: '130px', textAlign: 'center' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reservationsInRound.map((res) => (
-                    <tr key={res.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 700 }}>#{res.id}</td>
-                      <td style={{ padding: '10px 12px' }}>
+                  {filteredReservations.map((res) => (
+                    <tr key={res.id}>
+                      <td style={{ fontWeight: 800, color: '#0a3273' }}>#{res.id}</td>
+                      <td>
                         <div style={{ fontWeight: 700, color: '#0a3273' }}>{res.studentCode || `SV${res.studentId}`}</div>
-                        <div style={{ color: '#1e293b', fontSize: '0.8rem' }}>{res.studentName || 'Sinh viên'}</div>
+                        <div style={{ color: '#1e293b', fontWeight: 600, fontSize: '0.82rem' }}>{res.studentName || 'Sinh viên'}</div>
                       </td>
-                      <td style={{ padding: '10px 12px' }}>
-                        {res.reasonCategory === 'INSUFFICIENT_CREDITS' && (
-                          <span style={{ background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Chưa trả đủ tín chỉ</span>
-                        )}
-                        {res.reasonCategory === 'SUPERVISOR_NOT_ELIGIBLE' && (
-                          <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>GVHD xét chưa đạt</span>
-                        )}
-                        {res.reasonCategory === 'HEALTH_REASONS' && (
-                          <span style={{ background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Lý do sức khỏe</span>
-                        )}
-                        {!['INSUFFICIENT_CREDITS', 'SUPERVISOR_NOT_ELIGIBLE', 'HEALTH_REASONS'].includes(res.reasonCategory || '') && (
-                          <span style={{ background: '#f3f4f6', color: '#374151', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>{res.reasonCategory || 'Khác'}</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '10px 12px', maxWidth: '300px' }}>
-                        <div>{res.reason}</div>
+                      <td>{renderCategoryBadge(res.reasonCategory)}</td>
+                      <td style={{ maxWidth: '320px' }}>
+                        <div className="text-reason">{res.reason}</div>
                         {res.evidenceFileUrl && (
-                          <a href={res.evidenceFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600, display: 'inline-block', marginTop: '4px' }}>
-                            📎 Minh chứng đính kèm
+                          <a href={res.evidenceFileUrl} target="_blank" rel="noreferrer" className="evidence-attachment-tag">
+                            📎 {res.evidenceFileName || 'Minh chứng đính kèm'}
                           </a>
                         )}
                       </td>
-                      <td style={{ padding: '10px 12px' }}>
+                      <td>
                         {res.supervisorComment ? (
-                          <div style={{ fontSize: '0.75rem' }}>
-                            <span>{res.supervisorApproved ? '✅ Đồng ý' : '⚠️ Ý kiến'}: </span>
+                          <div style={{ fontSize: '0.78rem' }}>
+                            <span>{res.supervisorApproved ? '✅ Đồng ý: ' : '⚠️ Ý kiến: '}</span>
                             <em>{res.supervisorComment}</em>
                           </div>
                         ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Chưa có ý kiến</span>
+                          <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>Chưa có ý kiến</span>
                         )}
                       </td>
-                      <td style={{ padding: '10px 12px' }}>
+                      <td style={{ textAlign: 'center' }}>
                         <StatusBadge
                           status={res.status}
                           label={res.status === 'APPROVED' ? 'Đã duyệt' : res.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
                         />
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <td style={{ textAlign: 'center' }}>
                         {res.status === 'PENDING' && isAdmin ? (
                           <button
+                            type="button"
+                            className="utc-btn-xs primary"
                             onClick={() => setSelectedReservationForReview(res)}
-                            style={{
-                              backgroundColor: '#0a3273',
-                              color: '#fff',
-                              border: 'none',
-                              padding: '5px 12px',
-                              borderRadius: '4px',
-                              fontWeight: 600,
-                              fontSize: '0.75rem',
-                              cursor: 'pointer',
-                            }}
                           >
                             ✍️ Phê duyệt
                           </button>
                         ) : (
                           <button
+                            type="button"
+                            className="utc-btn-xs muted"
                             onClick={() => setSelectedReservationForReview(res)}
-                            style={{
-                              backgroundColor: '#f1f5f9',
-                              color: '#475569',
-                              border: '1px solid #cbd5e1',
-                              padding: '5px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
-                              cursor: 'pointer',
-                            }}
                           >
                             Xem chi tiết
                           </button>
@@ -1253,7 +1364,7 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-              Chưa có đơn xin bảo lưu nào trong đợt đồ án này.
+              Chưa có đơn xin bảo lưu nào phù hợp trong đợt đồ án này.
             </div>
           )}
         </div>
@@ -1267,21 +1378,21 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
         onConfirm={handleReviewReservation}
       />
 
-      {/* Modal: Admin lập quyết định bảo lưu */}
+      {/* Modal: Admin / Giáo vụ lập quyết định bảo lưu */}
       <AdminCreateReservationModal
         isOpen={Boolean(selectedStudentForAdminReserve)}
         onClose={() => setSelectedStudentForAdminReserve(null)}
         student={selectedStudentForAdminReserve}
-        projectRoundId={selectedRoundId || 10}
+        projectRoundId={selectedRoundId || undefined}
         onConfirm={handleAdminCreateReservation}
       />
 
-      {/* Modal: Chỉnh sửa thông tin học vụ (Yêu cầu 1) */}
+      {/* Modal: Chỉnh sửa thông tin học vụ */}
       <EditAcademicRecordModal
         isOpen={Boolean(editingAcademicStudent)}
         onClose={() => setEditingAcademicStudent(null)}
         student={editingAcademicStudent}
-        projectRoundId={selectedRoundId || 10}
+        projectRoundId={selectedRoundId ?? selectedRound?.roundId ?? 0}
         onSuccess={async () => {
           const msg = `Cập nhật thông tin học vụ cho sinh viên ${editingAcademicStudent?.studentCode} thành công`;
           setNotification({
