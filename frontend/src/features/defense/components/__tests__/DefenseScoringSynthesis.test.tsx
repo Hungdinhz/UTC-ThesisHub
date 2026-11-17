@@ -99,7 +99,14 @@ describe('Defense Scoring & Round Synthesis Feature (GĐ5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiService.getProjectRounds).mockResolvedValue([
-      { roundId: 10, name: 'Đợt 1 Năm học 2026-2027', roundCode: 'D1_2627', status: 'IN_PROGRESS' },
+      {
+        roundId: 10,
+        name: 'Đợt 1 Năm học 2026-2027',
+        roundCode: 'D1_2627',
+        academicYear: '2026-2027',
+        semester: 'HK1',
+        status: 'IN_PROGRESS',
+      },
     ]);
     vi.mocked(defenseService.getMyScoringTheses).mockResolvedValue(mockTheses);
     vi.mocked(defenseService.getScores).mockResolvedValue([]);
