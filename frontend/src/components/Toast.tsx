@@ -18,6 +18,16 @@ export interface ModalAlertState {
   onClose?: () => void;
 }
 
+export interface ConfirmAlertState {
+  title?: string;
+  message: string;
+  type?: ToastType;
+  confirmText?: string;
+  cancelText?: string;
+  onConfirm: () => void;
+  onCancel?: () => void;
+}
+
 export interface ToastContextType {
   showToast: (message: string, type?: ToastType, duration?: number, title?: string) => void;
   success: (message: string, duration?: number, title?: string) => void;
@@ -25,6 +35,15 @@ export interface ToastContextType {
   warning: (message: string, duration?: number, title?: string) => void;
   info: (message: string, duration?: number, title?: string) => void;
   modal: (message: string, title?: string, type?: ToastType) => void;
+  confirm: (options: {
+    message: string;
+    title?: string;
+    type?: ToastType;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }) => void;
 }
 
 const ToastContext = createContext<ToastContextType | null>(null);
@@ -32,9 +51,11 @@ const ToastContext = createContext<ToastContextType | null>(null);
 // ─── GLOBAL SINGLETON LISTENERS ──────────────────────────────────────
 type ToastListener = (toast: Toast) => void;
 type ModalListener = (modalState: ModalAlertState | null) => void;
+type ConfirmListener = (confirmState: ConfirmAlertState | null) => void;
 
 let globalToastListener: ToastListener | null = null;
 let globalModalListener: ModalListener | null = null;
+let globalConfirmListener: ConfirmListener | null = null;
 
 /**
  * Global toast helper that can be called anywhere (inside or outside React components).
@@ -76,6 +97,23 @@ export const toast = {
       console.log(`[Modal ${type.toUpperCase()}]:`, message);
     }
   },
+  confirm: (options: {
+    message: string;
+    title?: string;
+    type?: ToastType;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }) => {
+    if (globalConfirmListener) {
+      globalConfirmListener(options);
+    } else {
+      const ok = window.confirm(options.message);
+      if (ok) options.onConfirm();
+      else options.onCancel?.();
+    }
+  },
 };
 
 /**
@@ -99,6 +137,7 @@ interface ToastProviderProps {
 export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [modalAlert, setModalAlert] = useState<ModalAlertState | null>(null);
+  const [confirmAlert, setConfirmAlert] = useState<ConfirmAlertState | null>(null);
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -149,6 +188,21 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     });
   }, []);
 
+  const confirm = useCallback(
+    (options: {
+      message: string;
+      title?: string;
+      type?: ToastType;
+      confirmText?: string;
+      cancelText?: string;
+      onConfirm: () => void;
+      onCancel?: () => void;
+    }) => {
+      setConfirmAlert(options);
+    },
+    []
+  );
+
   // Connect global listeners and intercept window.alert
   useEffect(() => {
     globalToastListener = (newToast) => {
@@ -156,6 +210,9 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     };
     globalModalListener = (modalState) => {
       setModalAlert(modalState);
+    };
+    globalConfirmListener = (confirmState) => {
+      setConfirmAlert(confirmState);
     };
 
     // Intercept default browser alert()
@@ -215,6 +272,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     return () => {
       globalToastListener = null;
       globalModalListener = null;
+      globalConfirmListener = null;
       window.alert = originalAlert;
     };
   }, []);
@@ -226,6 +284,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     warning,
     info,
     modal,
+    confirm,
   };
 
   return (
@@ -233,6 +292,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       {children}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       {modalAlert && <ModalAlertDialog alert={modalAlert} onClose={() => setModalAlert(null)} />}
+      {confirmAlert && (
+        <ModalConfirmDialog
+          alert={confirmAlert}
+          onClose={() => setConfirmAlert(null)}
+        />
+      )}
     </ToastContext.Provider>
   );
 };
@@ -379,6 +444,79 @@ const ModalAlertDialog: React.FC<ModalAlertDialogProps> = ({ alert: modalData, o
         <div className="utc-modal-alert-footer">
           <button className="utc-modal-alert-btn" onClick={onClose} autoFocus>
             Đã hiểu
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── MODAL CONFIRM DIALOG COMPONENT ──────────────────────────────────
+interface ModalConfirmDialogProps {
+  alert: ConfirmAlertState;
+  onClose: () => void;
+}
+
+const ModalConfirmDialog: React.FC<ModalConfirmDialogProps> = ({ alert: confirmData, onClose }) => {
+  const type = confirmData.type || 'warning';
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        confirmData.onCancel?.();
+        onClose();
+      } else if (e.key === 'Enter') {
+        confirmData.onConfirm();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [confirmData, onClose]);
+
+  const getIcon = () => {
+    switch (type) {
+      case 'error':
+        return '🗑️';
+      case 'warning':
+        return '⚠️';
+      case 'info':
+        return '❓';
+      case 'success':
+      default:
+        return '✨';
+    }
+  };
+
+  const handleConfirm = () => {
+    confirmData.onConfirm();
+    onClose();
+  };
+
+  const handleCancel = () => {
+    confirmData.onCancel?.();
+    onClose();
+  };
+
+  return (
+    <div className="utc-modal-alert-overlay" onClick={handleCancel} role="dialog" aria-modal="true">
+      <div className="utc-modal-alert-card" onClick={(e) => e.stopPropagation()}>
+        <div className={`utc-modal-alert-stripe stripe-${type}`} />
+        <div className="utc-modal-alert-header">
+          <div className={`utc-modal-alert-icon-ring ring-${type}`}>{getIcon()}</div>
+          <h3 className="utc-modal-alert-title">{confirmData.title || 'Xác nhận thao tác'}</h3>
+        </div>
+        <div className="utc-modal-alert-body">{confirmData.message}</div>
+        <div className="utc-modal-alert-footer" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+          <button className="utc-modal-btn-cancel" onClick={handleCancel}>
+            {confirmData.cancelText || 'Hủy bỏ'}
+          </button>
+          <button
+            className={`utc-modal-btn-confirm ${type === 'error' ? 'confirm-danger' : ''}`}
+            onClick={handleConfirm}
+            autoFocus
+          >
+            {confirmData.confirmText || 'Xác nhận'}
           </button>
         </div>
       </div>

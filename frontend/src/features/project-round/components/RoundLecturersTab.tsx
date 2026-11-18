@@ -182,24 +182,30 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
       toast.warning(`Không thể xóa: Giảng viên ${c.fullName} (${c.lecturerCode}) đã được phân công hướng dẫn ${c.currentAssigned} sinh viên trong đợt này. Cần hủy phân công trước khi xóa khỏi đợt.`);
       return;
     }
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa giảng viên ${c.fullName} (${c.lecturerCode}) khỏi đợt đồ án này?`)) {
-      return;
-    }
-    try {
-      setLoading(true);
-      await assignmentService.deleteCapacity(c.id, roundId, c.lecturerId);
-      setSuccessMsg(`Đã xóa giảng viên ${c.fullName} khỏi đợt đồ án thành công.`);
-      toast.success(`Đã xóa giảng viên ${c.fullName} khỏi đợt đồ án thành công.`);
-      await loadData();
-      onRefresh?.();
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Lỗi khi xóa giảng viên khỏi đợt';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
+    toast.confirm({
+      title: 'Xác nhận xóa giảng viên',
+      message: `Bạn có chắc chắn muốn xóa giảng viên ${c.fullName} (${c.lecturerCode}) khỏi đợt đồ án này?`,
+      type: 'error',
+      confirmText: 'Xóa giảng viên',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await assignmentService.deleteCapacity(c.id, roundId, c.lecturerId);
+          setSuccessMsg(`Đã xóa giảng viên ${c.fullName} khỏi đợt đồ án thành công.`);
+          toast.success(`Đã xóa giảng viên ${c.fullName} khỏi đợt đồ án thành công.`);
+          await loadData();
+          onRefresh?.();
+          setTimeout(() => setSuccessMsg(null), 3000);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Lỗi khi xóa giảng viên khỏi đợt';
+          setError(msg);
+          toast.error(msg);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   const getDegreeBadge = (degree?: string) => {

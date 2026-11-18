@@ -1008,6 +1008,13 @@
   color: #92400e;
 }
 
+.alert-info {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #bae6fd;
+  border-left: 4px solid #0284c7;
+  color: #0369a1;
+}
+
 /* =============================================================================
    Project Round Context & Switcher Bar (GD2 Assignment Module)
    ============================================================================= */

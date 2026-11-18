@@ -11,6 +11,7 @@ import { apiService } from '../../../services/api';
 import { getCouncilRoleLabel } from '../types';
 import type { DefenseSchedule, DefenseCouncil, ScheduleConfig, GraduationResult, ScheduleNotifyRequest } from '../types';
 import type { Thesis } from '../../thesis/types';
+import { toast } from '../../../components/Toast';
 import './DefensePages.css';
 
 export const DefenseSchedulePage: React.FC = () => {
@@ -288,20 +289,30 @@ export const DefenseSchedulePage: React.FC = () => {
   };
 
   const handleDeleteSchedule = async (schedule: DefenseSchedule) => {
-    if (!window.confirm(`Xác nhận xóa ca bảo vệ tại ${schedule.room} (${schedule.defenseDate})?`)) {
-      return;
-    }
-    try {
-      setLoading(true);
-      await defenseService.deleteSchedule(schedule.id);
-      setSelectedScheduleDetail(null);
-      setNotification({ type: 'success', message: 'Đã xóa ca lịch bảo vệ thành công!' });
-      await loadSchedulesForRound(selectedRoundId);
-    } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Không thể xóa ca lịch bảo vệ' });
-    } finally {
-      setLoading(false);
-    }
+    toast.confirm({
+      title: 'Xóa ca lịch bảo vệ',
+      message: `Xác nhận xóa ca bảo vệ tại phòng ${schedule.room} (${schedule.defenseDate})?`,
+      type: 'error',
+      confirmText: 'Xóa ca bảo vệ',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await defenseService.deleteSchedule(schedule.id);
+          setSelectedScheduleDetail(null);
+          const msg = 'Đã xóa ca lịch bảo vệ thành công!';
+          setNotification({ type: 'success', message: msg });
+          toast.success(msg);
+          await loadSchedulesForRound(selectedRoundId);
+        } catch (err: any) {
+          const errMsg = err?.message || 'Lỗi khi xóa ca bảo vệ';
+          setNotification({ type: 'error', message: errMsg });
+          toast.error(errMsg);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   const formatGradeLabel = (grade?: string) => {

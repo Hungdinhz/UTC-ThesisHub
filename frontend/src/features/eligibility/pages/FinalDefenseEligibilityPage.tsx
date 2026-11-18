@@ -305,28 +305,32 @@ export const FinalDefenseEligibilityPage: React.FC = () => {
   // 4. Quick 1-click clear debt for Stage 5 Academic Staff workflow
   const handleClearDebt = async (studentId: number, studentCode?: string, studentName?: string) => {
     if (!selectedRoundId) return;
-    const ok = window.confirm(
-      `Xác nhận sinh viên ${studentCode || studentId}${studentName ? ` (${studentName})` : ''} đã hoàn thành trả hết nợ tín chỉ (về 0 TC) trước khi bảo vệ đồ án?`
-    );
-    if (!ok) return;
-
-    try {
-      setClearingStudentId(studentId);
-      await apiService.clearStudentDebt(selectedRoundId, studentId);
-      const msg = `Đã xác nhận sinh viên ${studentCode || studentId} hoàn thành trả hết nợ tín chỉ (0 TC).`;
-      setNotification({ type: 'success', message: msg });
-      toast.success(msg);
-      await loadRoundData(selectedRoundId);
-      if (result && result.studentId === studentId) {
-        await handleCheck(undefined, result.studentId, result.thesisId, result.studentCode);
-      }
-    } catch (err: any) {
-      const errMsg = err?.response?.data?.message || err?.message || 'Không thể xác nhận trả nợ tín chỉ';
-      setNotification({ type: 'error', message: errMsg });
-      toast.error(errMsg);
-    } finally {
-      setClearingStudentId(null);
-    }
+    toast.confirm({
+      title: 'Xác nhận xóa nợ tín chỉ',
+      message: `Xác nhận sinh viên ${studentCode || studentId}${studentName ? ` (${studentName})` : ''} đã hoàn thành trả hết nợ tín chỉ (về 0 TC) trước khi bảo vệ đồ án?`,
+      type: 'info',
+      confirmText: 'Xác nhận đã trả nợ',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setClearingStudentId(studentId);
+          await apiService.clearStudentDebt(selectedRoundId, studentId);
+          const msg = `Đã xác nhận sinh viên ${studentCode || studentId} hoàn thành trả hết nợ tín chỉ (0 TC).`;
+          setNotification({ type: 'success', message: msg });
+          toast.success(msg);
+          await loadRoundData(selectedRoundId);
+          if (result && result.studentId === studentId) {
+            await handleCheck(undefined, result.studentId, result.thesisId, result.studentCode);
+          }
+        } catch (err: any) {
+          const errMsg = err?.response?.data?.message || err?.message || 'Không thể xác nhận trả nợ tín chỉ';
+          setNotification({ type: 'error', message: errMsg });
+          toast.error(errMsg);
+        } finally {
+          setClearingStudentId(null);
+        }
+      },
+    });
   };
 
   // Handle Review reservation (Approve/Reject)

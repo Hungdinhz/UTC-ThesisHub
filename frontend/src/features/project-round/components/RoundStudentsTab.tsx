@@ -12,6 +12,7 @@ import type {
 import { downloadBlob, extractErrorMessage } from '../../academic-staff/utils/download';
 import '../../eligibility/pages/EligibilityPages.css';
 import '../../academic-staff/pages/AcademicStaffPages.css';
+import { toast } from '../../../components/Toast';
 
 interface RoundStudentsTabProps {
   roundId: number;
@@ -879,51 +880,71 @@ export const RoundStudentsTab: React.FC<RoundStudentsTabProps> = ({
   // Khóa hoặc mở khóa tài khoản sinh viên
   const handleToggleAccountLock = async (st: StudentProjectRoundItem) => {
     if (isRoundClosed) {
-      setError('Đợt đồ án đã đóng. Không thể thay đổi trạng thái tài khoản.');
+      toast.warning('Đợt đồ án đã đóng. Không thể thay đổi trạng thái tài khoản.');
       return;
     }
     const isCurrentlyLocked = st.accountActive === false;
     const willLock = !isCurrentlyLocked;
     const actionText = willLock ? 'khóa tài khoản' : 'mở khóa tài khoản';
-    if (!window.confirm(`Bạn có chắc chắn muốn ${actionText} sinh viên ${st.studentCode} (${st.fullName})?\n${willLock ? '• Sinh viên sẽ bị cấm đăng nhập vào hệ thống.' : '• Sinh viên sẽ có thể đăng nhập bình thường.'}`)) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      await apiService.toggleStudentAccountLock(roundId, st.studentId, willLock);
-      setSuccessMsg(`Đã ${actionText} sinh viên ${st.studentCode} thành công.`);
-      loadStudents();
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : `Lỗi khi ${actionText}`;
-      setError(errMsg);
-    } finally {
-      setLoading(false);
-    }
+    
+    toast.confirm({
+      title: willLock ? 'Xác nhận khóa tài khoản sinh viên' : 'Xác nhận mở khóa tài khoản',
+      message: `Bạn có chắc chắn muốn ${actionText} sinh viên ${st.studentCode} (${st.fullName})?\n${willLock ? '• Sinh viên sẽ bị cấm đăng nhập vào hệ thống.' : '• Sinh viên sẽ có thể đăng nhập bình thường.'}`,
+      type: willLock ? 'warning' : 'info',
+      confirmText: willLock ? 'Khóa tài khoản' : 'Mở khóa',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          await apiService.toggleStudentAccountLock(roundId, st.studentId, willLock);
+          const msg = `Đã ${actionText} sinh viên ${st.studentCode} thành công.`;
+          setSuccessMsg(msg);
+          toast.success(msg);
+          loadStudents();
+          setTimeout(() => setSuccessMsg(null), 3000);
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : `Lỗi khi ${actionText}`;
+          setError(errMsg);
+          toast.error(errMsg);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   // Remove student from round
   const handleRemoveStudent = async (studentId: number, code: string) => {
     if (isRoundClosed) {
-      setError('Đợt đồ án đã đóng. Không thể xóa sinh viên khỏi đợt.');
+      toast.warning('Đợt đồ án đã đóng. Không thể xóa sinh viên khỏi đợt.');
       return;
     }
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa sinh viên ${code} khỏi đợt đồ án này?`)) return;
-
-    try {
-      setLoading(true);
-      await apiService.removeStudentFromRound(roundId, studentId);
-      setSuccessMsg(`Đã xóa sinh viên ${code} khỏi đợt đồ án.`);
-      loadStudents();
-      fetchKpis();
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi xóa sinh viên khỏi đợt');
-    } finally {
-      setLoading(false);
-    }
+    toast.confirm({
+      title: 'Xác nhận xóa sinh viên',
+      message: `Bạn có chắc chắn muốn xóa sinh viên ${code} khỏi đợt đồ án này?`,
+      type: 'error',
+      confirmText: 'Xóa sinh viên',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await apiService.removeStudentFromRound(roundId, studentId);
+          const msg = `Đã xóa sinh viên ${code} khỏi đợt đồ án.`;
+          setSuccessMsg(msg);
+          toast.success(msg);
+          loadStudents();
+          fetchKpis();
+          setTimeout(() => setSuccessMsg(null), 3000);
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : 'Lỗi khi xóa sinh viên khỏi đợt';
+          setError(errMsg);
+          toast.error(errMsg);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   const getStatusBadge = (status: string, note?: string) => {

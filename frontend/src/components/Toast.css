@@ -308,6 +308,52 @@
   transform: translateY(0);
 }
 
+/* ─── CONFIRM DIALOG BUTTONS ─────────────────────────────────────── */
+.utc-modal-btn-cancel {
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  background: #ffffff;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+
+.utc-modal-btn-cancel:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.utc-modal-btn-confirm {
+  padding: 10px 28px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #0a3273 0%, #1e40af 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(10, 50, 115, 0.22);
+  transition: all 0.2s ease;
+}
+
+.utc-modal-btn-confirm.confirm-danger {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+.utc-modal-btn-confirm:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.utc-modal-btn-confirm:active,
+.utc-modal-btn-cancel:active {
+  transform: translateY(0);
+}
+
 /* ─── KEYFRAME ANIMATIONS ────────────────────────────────────────── */
 @keyframes toastSlideIn {
   from {

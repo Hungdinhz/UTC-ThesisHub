@@ -330,13 +330,16 @@ export const ProposalManagementPage: React.FC = () => {
       );
       if (myExisting) {
         if (myExisting.status === 'REVISE_REQUIRED') {
-          if (
-            window.confirm(
-              `Bạn đã có đề cương ở trạng thái [Yêu Cầu Chỉnh Sửa (REVISE_REQUIRED)].\n\nTheo quy chế, mỗi sinh viên chỉ thực hiện 1 đề tài trong một đợt đồ án.\nBạn có muốn mở để CHỈNH SỬA & NỘP LẠI đề cương này không?`
-            )
-          ) {
-            handleOpenEditModal(myExisting);
-          }
+          toast.confirm({
+            title: 'Chỉnh sửa đề cương yêu cầu sửa đổi',
+            message: `Bạn đã có đề cương ở trạng thái [Yêu Cầu Chỉnh Sửa (REVISE_REQUIRED)].\n\nTheo quy chế, mỗi sinh viên chỉ thực hiện 1 đề tài trong một đợt đồ án.\nBạn có muốn mở để CHỈNH SỬA & NỘP LẠI đề cương này không?`,
+            type: 'info',
+            confirmText: 'Chỉnh sửa ngay',
+            cancelText: 'Đóng',
+            onConfirm: () => {
+              handleOpenEditModal(myExisting);
+            },
+          });
           return;
         } else {
           toast.modal(
@@ -439,16 +442,23 @@ export const ProposalManagementPage: React.FC = () => {
       ? `Xác nhận NỘP LẠI đề cương "${proposal.titleVn}" sau khi đã hoàn thiện chỉnh sửa?`
       : `Xác nhận NỘP đề cương "${proposal.titleVn}" để Giảng viên hướng dẫn kiểm tra & phê duyệt?`;
 
-    if (!window.confirm(confirmMsg)) return;
-
-    try {
-      await thesisService.submitProposal(proposal.id);
-      setBannerMsg(`Đã nộp đề cương "${proposal.titleVn}" thành công! Trạng thái chuyển sang SUBMITTED (Chờ GVHD xác nhận).`);
-      toast.success(`Đã nộp đề cương "${proposal.titleVn}" lên GVHD thành công! Trạng thái chuyển sang SUBMITTED.`);
-      await loadProposals();
-    } catch (err: any) {
-      toast.error('Lỗi nộp đề cương: ' + (err?.response?.data?.message || err?.message));
-    }
+    toast.confirm({
+      title: isRevise ? 'Nộp lại đề cương' : 'Nộp đề cương đồ án',
+      message: confirmMsg,
+      type: 'info',
+      confirmText: 'Xác nhận nộp',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          await thesisService.submitProposal(proposal.id);
+          setBannerMsg(`Đã nộp đề cương "${proposal.titleVn}" thành công! Trạng thái chuyển sang SUBMITTED (Chờ GVHD xác nhận).`);
+          toast.success(`Đã nộp đề cương "${proposal.titleVn}" lên GVHD thành công! Trạng thái chuyển sang SUBMITTED.`);
+          await loadProposals();
+        } catch (err: any) {
+          toast.error('Lỗi nộp đề cương: ' + (err?.response?.data?.message || err?.message));
+        }
+      },
+    });
   };
 
   const handleSupervisorConfirm = async (proposal: Proposal) => {

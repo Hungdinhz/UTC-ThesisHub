@@ -9,6 +9,7 @@ import type {
   SecurityPolicyItem,
   SecuritySessionItem,
 } from '../types';
+import { toast } from '../../../components/Toast';
 import './SecurityPages.css';
 
 export const SecurityCenterPage: React.FC = () => {
@@ -63,18 +64,26 @@ export const SecurityCenterPage: React.FC = () => {
   };
 
   const handleRevokeSession = async (session: SecuritySessionItem) => {
-    const confirmed = window.confirm(
-      `Xác nhận thu hồi phiên đăng nhập của tài khoản "${session.username}" (IP: ${session.ipAddress || '—'})? Người dùng sẽ bị đăng xuất ngay lập tức.`
-    );
-    if (!confirmed) return;
-
-    try {
-      await securityService.revokeSession(session.id, 'Quản trị viên thu hồi phiên từ Trung tâm bảo mật');
-      setNotification({ type: 'success', message: `Đã thu hồi phiên đăng nhập #${session.id} của ${session.username}` });
-      await loadAllData();
-    } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Không thể thu hồi phiên' });
-    }
+    toast.confirm({
+      title: 'Thu hồi phiên đăng nhập',
+      message: `Xác nhận thu hồi phiên đăng nhập của tài khoản "${session.username}" (IP: ${session.ipAddress || '—'})? Người dùng sẽ bị đăng xuất ngay lập tức.`,
+      type: 'warning',
+      confirmText: 'Thu hồi phiên',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          await securityService.revokeSession(session.id, 'Quản trị viên thu hồi phiên từ Trung tâm bảo mật');
+          const msg = `Đã thu hồi phiên đăng nhập #${session.id} của ${session.username}`;
+          setNotification({ type: 'success', message: msg });
+          toast.success(msg);
+          await loadAllData();
+        } catch (err: any) {
+          const errMsg = err?.message || 'Không thể thu hồi phiên';
+          setNotification({ type: 'error', message: errMsg });
+          toast.error(errMsg);
+        }
+      },
+    });
   };
 
   const handleUnlockAccount = async (account: LockedAccountItem) => {

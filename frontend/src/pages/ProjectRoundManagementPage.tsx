@@ -7,6 +7,7 @@ import { RoundLecturersTab } from '../features/project-round/components/RoundLec
 import { UTCAppLayout } from '../components/UTCAppLayout';
 import { getRoundStageNumber, STAGES } from '../utils/phaseTracking';
 import { VnDateTimePicker, parseVnDateTime } from '../components/VnDateTimePicker';
+import { toast } from '../components/Toast';
 import './ProjectRoundManagementPage.css';
 
 const ProjectRoundManagementPage: React.FC = () => {
@@ -299,19 +300,30 @@ const ProjectRoundManagementPage: React.FC = () => {
   };
 
   const handleDeleteMilestone = async (milestoneId: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa mốc thời gian này?')) return;
-    try {
-      setLoading(true);
-      await apiService.deleteMilestone(milestoneId);
-      setSuccessMsg('Đã xóa mốc thời gian');
-      if (selectedRound) {
-        loadRoundDetail(selectedRound.roundId);
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi xóa mốc');
-    } finally {
-      setLoading(false);
-    }
+    toast.confirm({
+      title: 'Xóa mốc thời gian',
+      message: 'Bạn có chắc chắn muốn xóa mốc thời gian này khỏi đợt đồ án?',
+      type: 'error',
+      confirmText: 'Xóa mốc',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await apiService.deleteMilestone(milestoneId);
+          setSuccessMsg('Đã xóa mốc thời gian');
+          toast.success('Đã xóa mốc thời gian thành công!');
+          if (selectedRound) {
+            loadRoundDetail(selectedRound.roundId);
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Lỗi khi xóa mốc';
+          setError(msg);
+          toast.error(msg);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   // Modal Delete Round (Double Click on Finished Round)

@@ -253,23 +253,28 @@
 }
 
 .sec-alert {
-  padding: 11px 16px;
-  border-radius: 8px;
-  margin-bottom: 14px;
-  font-size: 0.88rem;
+  padding: 13px 18px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  animation: utcFadeSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sec-alert-success {
-  background: #dcfce7;
-  color: #166534;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  color: #065f46;
   border: 1px solid #bbf7d0;
+  border-left: 4px solid #10b981;
 }
 
 .sec-alert-error {
-  background: #fee2e2;
+  background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
   color: #991b1b;
   border: 1px solid #fecaca;
+  border-left: 4px solid #ef4444;
 }

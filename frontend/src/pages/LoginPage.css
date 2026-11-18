@@ -668,14 +668,28 @@
 }
 
 .utc-error-box {
-  background: #fef2f2;
+  background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
   border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  margin-bottom: 16px;
-  text-align: center;
+  border-left: 4px solid #ef4444;
+  color: #991b1b;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.5;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
+  animation: utcFadeSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.utc-error-box::before {
+  content: '⚠️';
+  font-size: 1.15rem;
+  flex-shrink: 0;
 }
 
 .utc-btn-submit {

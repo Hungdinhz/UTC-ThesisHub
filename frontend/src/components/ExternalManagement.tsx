@@ -113,15 +113,22 @@ const ExternalManagement: React.FC = () => {
   };
 
   const handleDeleteGroup = async (groupId: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa nhóm cán bộ ngoài này?')) return;
-    
-    try {
-      await apiService.deleteExternalGroup(groupId);
-      toast.success('Đã xóa nhóm thành công!');
-      loadData();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Không thể xóa nhóm');
-    }
+    toast.confirm({
+      title: 'Xóa nhóm cán bộ ngoài',
+      message: 'Bạn có chắc chắn muốn xóa nhóm cán bộ chấm ngoài này?',
+      type: 'error',
+      confirmText: 'Xóa nhóm',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          await apiService.deleteExternalGroup(groupId);
+          toast.success('Đã xóa nhóm thành công!');
+          loadData();
+        } catch (error: any) {
+          toast.error(error.response?.data?.message || 'Không thể xóa nhóm');
+        }
+      },
+    });
   };
 
   return (
