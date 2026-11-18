@@ -47,6 +47,7 @@ export const StudentAssignmentPage: React.FC<Props> = ({
     note?: string;
     isDropped?: boolean;
   } | null>(null);
+  const [showLockedForm, setShowLockedForm] = useState<boolean>(false);
 
   // 1. Load project rounds & synchronize strictly with the student's enrolled round
   useEffect(() => {
@@ -533,23 +534,204 @@ export const StudentAssignmentPage: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Preference Form */}
-      <StudentPreferenceForm
-        directions={directions}
-        capacities={capacities}
-        onSubmit={handleSubmit}
-        studentProgram={activeProgram}
-        loading={loading}
-        projectRoundName={currentRound?.name}
-        projectRoundCode={currentRound?.roundCode}
-        academicYear={currentRound?.academicYear}
-        semester={currentRound?.semester}
-        isRoundClosed={isRoundClosed}
-        hasSubmitted={hasSubmitted}
-        canEdit={canEdit}
-        isAssignmentFinalized={isRoundFinalized}
-        initialValues={initialFormValues}
-      />
+      {(() => {
+        const sortedPreferences = [...myPreferences].sort((a, b) => a.priority - b.priority);
+        const matchedDirection = directions.find(
+          (d) => d.id === (currentRegistration?.directionId ?? myAssignment?.directionId)
+        );
+        const dirCode = currentRegistration?.directionCode || matchedDirection?.code || myAssignment?.directionCode || '—';
+        const dirName = currentRegistration?.directionName || matchedDirection?.name || myAssignment?.directionName || 'Chưa xác định';
+        const dirDesc = matchedDirection?.description;
+        const rawTime = currentRegistration?.registeredAt || sortedPreferences[0]?.createdAt;
+        const submittedAtLabel = rawTime ? new Date(rawTime).toLocaleString('vi-VN') : null;
+        const isLockedAndSubmitted = !canEdit && hasSubmitted;
+
+        const renderSummaryCard = () => {
+          if (!hasSubmitted) return null;
+          return (
+            <div className="student-registration-summary-card">
+              <div className="reg-summary-header">
+                <div className="reg-summary-title-group">
+                  <h3>📋 Phiếu Tổng hợp Hồ sơ Đăng ký Hướng &amp; Nguyện vọng Đã nộp</h3>
+                  <div className="reg-summary-subtitle">
+                    Đợt đồ án: <strong>{currentRound?.name || `Đợt #${effectiveRoundId}`}</strong>
+                    {submittedAtLabel && (
+                      <>
+                        {' '}• Thời gian ghi nhận: <strong>{submittedAtLabel}</strong>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <span
+                  className={`reg-summary-status-badge ${
+                    isRoundFinalized ? 'status-finalized' : isRoundClosed ? 'status-closed' : 'status-pending'
+                  }`}
+                >
+                  {isRoundFinalized
+                    ? '🔒 Đã chốt kết quả phân công'
+                    : isRoundClosed
+                    ? '🔒 Đợt đã đóng'
+                    : '⏳ Đã nộp — Đang chờ phân công'}
+                </span>
+              </div>
+
+              {/* 1. Hướng đồ án đã đăng ký */}
+              <div className="reg-summary-section">
+                <div className="reg-summary-section-label">1. Hướng đồ án đã đăng ký</div>
+                <div className="reg-direction-box">
+                  <div className="reg-direction-top">
+                    <span className="reg-direction-code">{dirCode}</span>
+                    <span className="reg-direction-name">{dirName}</span>
+                  </div>
+                  {dirDesc && <div className="reg-direction-desc">{dirDesc}</div>}
+                </div>
+              </div>
+
+              {/* 2. Danh sách Nguyện vọng GVHD */}
+              <div className="reg-summary-section">
+                <div className="reg-summary-section-label">
+                  2. Nguyện vọng Giảng viên hướng dẫn ({sortedPreferences.length} nguyện vọng)
+                </div>
+                {sortedPreferences.length > 0 ? (
+                  <div className="reg-pref-table-wrap">
+                    <table className="reg-pref-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '150px' }}>Thứ tự ưu tiên</th>
+                          <th>Giảng viên hướng dẫn</th>
+                          <th>Học vị &amp; Bộ môn</th>
+                          <th style={{ width: '160px' }}>Kết quả đối chiếu</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedPreferences.map((pref) => {
+                          const capInfo = capacities.find((c) => c.lecturerId === pref.lecturerId);
+                          const isMatched = Boolean(myAssignment && myAssignment.lecturerId === pref.lecturerId);
+                          const nvLabel =
+                            pref.priority === 1
+                              ? 'NV1 (Ưu tiên 1)'
+                              : pref.priority === 2
+                              ? 'NV2 (Dự phòng 1)'
+                              : `NV${pref.priority} (Dự phòng ${pref.priority - 1})`;
+                          return (
+                            <tr key={pref.id || `${pref.priority}-${pref.lecturerId}`} className={isMatched ? 'is-matched-row' : ''}>
+                              <td>
+                                <span className={`reg-nv-badge nv-${pref.priority}`}>{nvLabel}</span>
+                              </td>
+                              <td>
+                                <div style={{ fontWeight: 700, color: '#0f172a' }}>
+                                  {pref.lecturerName || capInfo?.fullName || `GV #${pref.lecturerId}`}
+                                </div>
+                                {(pref.lecturerCode || capInfo?.lecturerCode) && (
+                                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                    Mã CB: {pref.lecturerCode || capInfo?.lecturerCode}
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <span style={{ fontWeight: 600, color: '#0284c7' }}>
+                                  {pref.academicDegree || capInfo?.academicDegree || '—'}
+                                </span>
+                                {capInfo?.departmentName && (
+                                  <span style={{ color: '#475569' }}> • {capInfo.departmentName}</span>
+                                )}
+                              </td>
+                              <td>
+                                {myAssignment ? (
+                                  isMatched ? (
+                                    <span className="reg-match-pill matched">✅ Trúng tuyển</span>
+                                  ) : (
+                                    <span className="reg-match-pill unmatched">Không chọn</span>
+                                  )
+                                ) : (
+                                  <span className="reg-match-pill waiting">⏳ Chờ phân công</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="reg-notes-box reg-notes-empty">
+                    Chưa có nguyện vọng giảng viên nào được ghi nhận.
+                  </div>
+                )}
+              </div>
+
+              {/* 3. GPA & Tiêu chí phụ */}
+              <div className="reg-summary-section">
+                <div className="reg-summary-section-label">3. Hồ sơ năng lực &amp; Tiêu chí phụ đã khai báo</div>
+                <div className="reg-criteria-grid">
+                  <div className="reg-gpa-box">
+                    <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                      Điểm GPA tích lũy (Hệ 4.0)
+                    </span>
+                    <span className="reg-gpa-value">
+                      {initialFormValues.gpa != null ? Number(initialFormValues.gpa).toFixed(2) : '—'}
+                    </span>
+                  </div>
+                  <div className="reg-notes-box">
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600, marginBottom: '4px' }}>
+                      Định hướng nghiên cứu / Kỹ năng nổi bật:
+                    </div>
+                    {initialFormValues.prioritizationCriteria && initialFormValues.prioritizationCriteria.trim() ? (
+                      <span>{initialFormValues.prioritizationCriteria}</span>
+                    ) : (
+                      <span className="reg-notes-empty">Không có khai báo bổ sung.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const renderPreferenceForm = () => (
+          <StudentPreferenceForm
+            directions={directions}
+            capacities={capacities}
+            onSubmit={handleSubmit}
+            studentProgram={activeProgram}
+            loading={loading}
+            projectRoundName={currentRound?.name}
+            projectRoundCode={currentRound?.roundCode}
+            academicYear={currentRound?.academicYear}
+            semester={currentRound?.semester}
+            isRoundClosed={isRoundClosed}
+            hasSubmitted={hasSubmitted}
+            canEdit={canEdit}
+            isAssignmentFinalized={isRoundFinalized}
+            initialValues={initialFormValues}
+          />
+        );
+
+        if (isLockedAndSubmitted) {
+          return (
+            <>
+              {renderSummaryCard()}
+              <div className="reg-form-toggle-bar">
+                <button
+                  type="button"
+                  className="btn-toggle-locked-form"
+                  onClick={() => setShowLockedForm((prev) => !prev)}
+                >
+                  {showLockedForm ? '▲ Thu gọn biểu mẫu chi tiết' : '👁️ Xem lại biểu mẫu chọn chi tiết & danh sách GV'}
+                </button>
+              </div>
+              {showLockedForm && renderPreferenceForm()}
+            </>
+          );
+        }
+
+        return (
+          <>
+            {renderPreferenceForm()}
+            {renderSummaryCard()}
+          </>
+        );
+      })()}
     </div>
   );
 };

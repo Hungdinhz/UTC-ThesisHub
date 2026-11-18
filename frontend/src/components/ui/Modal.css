@@ -76,6 +76,22 @@
   gap: 10px;
 }
 
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-actions-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
 @keyframes ui-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
