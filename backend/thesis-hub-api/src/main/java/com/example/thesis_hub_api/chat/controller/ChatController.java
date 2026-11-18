@@ -31,14 +31,14 @@ public class ChatController {
     }
 
     @GetMapping("/rooms")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE')")
     public ResponseEntity<ApiResponse<List<ChatRoomResponseDTO>>> getMyRooms() {
         List<ChatRoomResponseDTO> rooms = chatService.getMyRooms(currentUserId());
         return ResponseEntity.ok(ApiResponse.success(rooms));
     }
 
     @GetMapping("/rooms/{roundId}/{lecturerId}/messages")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE')")
     public ResponseEntity<ApiResponse<List<ChatMessageResponseDTO>>> getRoomMessages(
             @PathVariable Long roundId,
             @PathVariable Long lecturerId) {
@@ -47,7 +47,7 @@ public class ChatController {
     }
 
     @PostMapping("/rooms/{roundId}/{lecturerId}/messages")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE')")
     public ResponseEntity<ApiResponse<ChatMessageResponseDTO>> sendMessage(
             @PathVariable Long roundId,
             @PathVariable Long lecturerId,
@@ -57,12 +57,19 @@ public class ChatController {
     }
 
     @DeleteMapping("/rooms/{roundId}/{lecturerId}/messages/{messageId}")
-    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'COMMITTEE')")
     public ResponseEntity<ApiResponse<Void>> deleteMessage(
             @PathVariable Long roundId,
             @PathVariable Long lecturerId,
             @PathVariable Long messageId) {
         chatService.deleteMessage(roundId, lecturerId, messageId, currentUserId());
         return ResponseEntity.ok(ApiResponse.success("Đã thu hồi tin nhắn", null));
+    }
+
+    @PostMapping("/rounds/{roundId}/init-groups")
+    @PreAuthorize("hasAnyRole('ADMIN', 'FACULTY_ADMIN')")
+    public ResponseEntity<ApiResponse<Integer>> initGuidanceChatRooms(@PathVariable Long roundId) {
+        int count = chatService.initializeGuidanceChatRooms(roundId);
+        return ResponseEntity.ok(ApiResponse.success("Đã kích hoạt nhóm chat hướng dẫn thành công", count));
     }
 }

@@ -61,6 +61,9 @@ public class AssignmentServiceImpl implements AssignmentService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.example.thesis_hub_api.projectround.repository.AcademicRecordRepository academicRecordRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.thesis_hub_api.chat.service.ChatService chatService;
+
     private ProjectRound getAndValidateActiveRound(Long projectRoundId) {
         ProjectRound round = projectRoundRepository.findById(projectRoundId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đợt đồ án với ID: " + projectRoundId));
@@ -1197,6 +1200,15 @@ public class AssignmentServiceImpl implements AssignmentService {
             log.info("Chốt phân công đợt {}: Đã ghi nhận {} sinh viên chưa đăng ký hướng", roundId, droppedCount);
         }
 
+        // Tự động khởi tạo nhóm chat hướng dẫn cho từng GVHD và SV trong đợt đồ án
+        if (chatService != null) {
+            try {
+                chatService.initializeGuidanceChatRooms(roundId);
+            } catch (Exception e) {
+                log.warn("Không thể tự động khởi tạo nhóm chat hướng dẫn cho đợt {}: {}", roundId, e.getMessage());
+            }
+        }
+
         log.info("Finalized {} supervisor assignments for project round {}", assignments.size(), roundId);
         return getAssignmentStats(roundId);
     }
@@ -1477,6 +1489,14 @@ public class AssignmentServiceImpl implements AssignmentService {
             }
             log.info("Kết thúc đợt đăng ký bổ sung đợt {}: Đã xóa vĩnh viễn {} sinh viên không đăng ký khỏi đợt đồ án",
                     round.getRoundCode(), removedCount);
+        }
+
+        if (chatService != null) {
+            try {
+                chatService.initializeGuidanceChatRooms(projectRoundId);
+            } catch (Exception e) {
+                log.warn("Không thể cập nhật nhóm chat hướng dẫn đợt bổ sung {}: {}", projectRoundId, e.getMessage());
+            }
         }
 
         return getAssignmentStats(projectRoundId);

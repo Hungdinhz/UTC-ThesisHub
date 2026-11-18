@@ -197,6 +197,7 @@ const STUDENT_PROMPTS = [
 export const ChatGroupPage: React.FC = () => {
   const { user, userType } = useAuth();
   const isStudent = userType === 'student';
+  const isAdmin = userType === 'admin';
 
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [selectedRoomKey, setSelectedRoomKey] = useState<string>('');
@@ -576,6 +577,21 @@ export const ChatGroupPage: React.FC = () => {
     );
   }
 
+  if (isAdmin) {
+    return (
+      <div className="utc-chat-empty-state">
+        <div style={{ fontSize: '46px', marginBottom: '12px' }}>🔒</div>
+        <h2 style={{ margin: '0 0 10px 0', color: '#0a3273', fontSize: '20px', fontWeight: 800 }}>
+          Không Gian Trao Đổi Học Thuật Riêng Tư
+        </h2>
+        <p style={{ margin: '0 auto', color: '#64748b', fontSize: '14px', lineHeight: 1.65, maxWidth: '600px' }}>
+          Nhóm chat hướng dẫn đồ án tốt nghiệp là không gian trao đổi học thuật riêng giữa Giảng viên hướng dẫn và các Sinh viên được phân công theo từng đợt đồ án.
+          Theo quy định bảo mật chuyên môn, tài khoản Quản trị viên không tham gia vào nhóm chat này.
+        </p>
+      </div>
+    );
+  }
+
   if (rooms.length === 0) {
     return (
       <div className="utc-chat-empty-state">
@@ -942,6 +958,37 @@ export const ChatGroupPage: React.FC = () => {
                   const isImg = Boolean(
                     msg.attachmentUrl && isImageAttachment(msg.attachmentName || msg.attachmentUrl)
                   );
+
+                  const isSystem = msg.senderRole === 'SYSTEM';
+                  if (isSystem) {
+                    return (
+                      <React.Fragment key={msg.id}>
+                        {showDateDivider && (
+                          <div className="utc-chat-date-divider">
+                            <span>{formatDateDivider(msg.createdAt)}</span>
+                          </div>
+                        )}
+                        <div style={{ textAlign: 'center', margin: '14px 0' }}>
+                          <div
+                            style={{
+                              display: 'inline-block',
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              color: '#1e40af',
+                              borderRadius: '20px',
+                              padding: '8px 18px',
+                              fontSize: '12.5px',
+                              lineHeight: 1.5,
+                              maxWidth: '85%',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                            }}
+                          >
+                            {msg.content}
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  }
 
                   return (
                     <React.Fragment key={msg.id}>

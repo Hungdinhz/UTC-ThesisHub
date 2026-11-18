@@ -52,6 +52,7 @@ public class ChatService {
     private final StudentProjectRoundRepository studentProjectRoundRepository;
     private final ProjectDirectionRepository projectDirectionRepository;
     private final DepartmentRepository departmentRepository;
+    private final com.example.thesis_hub_api.notification.service.NotificationService notificationService;
 
     @Getter
     @Setter
@@ -545,6 +546,108 @@ public class ChatService {
         ChatMessage saved = chatMessageRepository.save(entity);
         SenderMeta senderMeta = resolveSenderMetaForMessage(saved, new HashMap<>());
         return toMessageDTO(saved, currentUserId, senderMeta);
+    }
+
+    /**
+     * Tự động khởi tạo nhóm chat hướng dẫn cho từng GVHD và các sinh viên của GVHD đó trong đợt đồ án
+     * ngay khi chốt kết quả phân công GĐ2.
+     * Tái sử dụng bảng chat_messages và supervisor_assignments hiện có, KHÔNG tạo thêm bảng database.
+     * Nhóm chat hoàn toàn riêng tư: Admin không có quyền xem/truy cập.
+     */
+    @Transactional
+    public int initializeGuidanceChatRooms(Long roundId) {
+        if (roundId == null || projectRoundRepository == null || supervisorAssignmentRepository == null) {
+            return 0;
+        }
+
+        ProjectRound round = projectRoundRepository.findById(roundId).orElse(null);
+        if (round == null) {
+            return 0;
+        }
+
+        List<SupervisorAssignment> assignments = supervisorAssignmentRepository.findByProjectRoundId(roundId);
+        if (assignments == null || assignments.isEmpty()) {
+            return 0;
+        }
+
+        // Gom nhóm phân công theo từng Giảng viên hướng dẫn trong đợt
+        Map<Long, List<SupervisorAssignment>> lecturerGroupMap = assignments.stream()
+                .filter(sa -> sa.getLecturerId() != null && sa.getStudentId() != null && isFinalizedAssignmentStatus(sa.getStatus()))
+                .collect(Collectors.groupingBy(SupervisorAssignment::getLecturerId));
+
+        if (lecturerGroupMap.isEmpty()) {
+            return 0;
+        }
+
+        int initializedRooms = 0;
+        for (Map.Entry<Long, List<SupervisorAssignment>> entry : lecturerGroupMap.entrySet()) {
+            Long lecturerId = entry.getKey();
+            List<SupervisorAssignment> assignedList = entry.getValue();
+            if (assignedList.isEmpty()) {
+                continue;
+            }
+
+            Lecturer lecturer = lecturerRepository.findById(lecturerId).orElse(null);
+            if (lecturer == null) {
+                continue;
+            }
+
+            User lecUser = lecturer.getUser();
+            String lecName = lecUser != null && StringUtils.hasText(lecUser.getFullName())
+                    ? lecUser.getFullName()
+                    : ("GV #" + lecturer.getId());
+
+            // 1. Kiểm tra xem phòng chat của GVHD này trong đợt đã có tin nhắn chào mừng chưa
+            long msgCount = chatMessageRepository.countByProjectRoundIdAndLecturerId(roundId, lecturerId);
+            if (msgCount == 0) {
+                ChatMessage welcomeMessage = ChatMessage.builder()
+                        .projectRoundId(roundId)
+                        .lecturerId(lecturerId)
+                        .senderUserId(lecUser != null ? lecUser.getId() : 0L)
+                        .senderName("Hệ thống Smart FYP UTC")
+                        .senderRole("SYSTEM")
+                        .content("🎉 Chào mừng Thầy/Cô " + lecName + " và các bạn sinh viên đến với Nhóm chat hướng dẫn đồ án tốt nghiệp ["
+                                + round.getName() + "]. Đây là không gian trao đổi học thuật riêng, thảo luận đề tài, duyệt đề cương và cập nhật tiến độ đồ án.")
+                        .createdAt(Instant.now())
+                        .build();
+                chatMessageRepository.save(welcomeMessage);
+                initializedRooms++;
+            }
+
+            // 2. Gửi thông báo đến Giảng viên hướng dẫn
+            if (notificationService != null && lecUser != null && lecUser.getId() != null) {
+                try {
+                    notificationService.createNotification(
+                            lecUser.getId(),
+                            "Nhóm chat hướng dẫn đã sẵn sàng",
+                            "Nhóm chat hướng dẫn đồ án đợt [" + round.getName() + "] với " + assignedList.size() + " sinh viên đã được kích hoạt.",
+                            "CHAT",
+                            "/chat"
+                    );
+                } catch (Exception ignored) {}
+            }
+
+            // 3. Gửi thông báo đến từng Sinh viên được phân công
+            if (notificationService != null) {
+                for (SupervisorAssignment sa : assignedList) {
+                    studentRepository.findById(sa.getStudentId()).ifPresent(st -> {
+                        if (st.getUser() != null && st.getUser().getId() != null) {
+                            try {
+                                notificationService.createNotification(
+                                        st.getUser().getId(),
+                                        "Nhóm chat hướng dẫn đã sẵn sàng",
+                                        "Bạn đã được thêm vào Nhóm chat hướng dẫn của GVHD " + lecName + " trong đợt [" + round.getName() + "]. Bấm vào để bắt đầu trao đổi đề tài!",
+                                        "CHAT",
+                                        "/chat"
+                                );
+                            } catch (Exception ignored) {}
+                        }
+                    });
+                }
+            }
+        }
+
+        return initializedRooms;
     }
 
     @Transactional

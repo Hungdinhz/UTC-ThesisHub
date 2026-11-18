@@ -287,7 +287,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
 
       setAlert({
         type: 'success',
-        message: `Khoa đã CHỐT thành công kết quả phân công Giảng viên hướng dẫn cho đợt ${currentRound?.name || effectiveRoundId}!${droppedText}`,
+        message: `Khoa đã CHỐT thành công kết quả phân công Giảng viên hướng dẫn cho đợt ${currentRound?.name || effectiveRoundId}! Đã tự động kích hoạt Nhóm chat hướng dẫn cho các cặp GVHD & Sinh viên.${droppedText}`,
       });
     } catch {
       setAlert({
@@ -943,6 +943,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
               >
                 <ul style={{ margin: 0, paddingLeft: '18px' }}>
                   <li>Sinh viên chưa đăng ký nguyện vọng sẽ chuyển sang trạng thái <strong>DROPPED</strong>.</li>
+                  <li>Hệ thống <strong>tự động kích hoạt Nhóm chat hướng dẫn</strong> riêng giữa từng Giảng viên hướng dẫn và các sinh viên của mình trong đợt.</li>
                   <li>Sau khi chốt, vẫn có thể sửa phân công thủ công từng sinh viên nếu cần.</li>
                 </ul>
               </div>
