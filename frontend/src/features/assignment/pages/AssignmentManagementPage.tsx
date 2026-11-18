@@ -750,32 +750,36 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
         <button
           className={`nav-tab-btn ${activeTab === 'proposals' ? 'active' : ''}`}
           onClick={() => setActiveTab('proposals')}
+          title="Kết quả phân công & Override"
         >
-          <span>📋 Kết quả phân công & Override</span>
+          <span>📋 Kết quả &amp; Override</span>
           <span className="tab-badge">{proposals.length}</span>
         </button>
 
         <button
           className={`nav-tab-btn ${activeTab === 'capacities' ? 'active' : ''}`}
           onClick={() => setActiveTab('capacities')}
+          title="Năng lực & Chỉ tiêu Giảng viên"
         >
-          <span>📊 Năng lực & Chỉ tiêu GV</span>
+          <span>📊 Năng lực &amp; Chỉ tiêu GV</span>
           <span className="tab-badge">{capacities.length}</span>
         </button>
 
         <button
           className={`nav-tab-btn ${activeTab === 'registrations' ? 'active' : ''}`}
           onClick={() => setActiveTab('registrations')}
+          title="Sinh viên đăng ký hướng đồ án"
         >
-          <span>👥 Sinh viên đăng ký hướng</span>
+          <span>👥 SV đăng ký hướng</span>
           <span className="tab-badge">{registrations.length}</span>
         </button>
 
         <button
           className={`nav-tab-btn ${activeTab === 'preferences' ? 'active' : ''}`}
           onClick={() => setActiveTab('preferences')}
+          title="Danh sách nguyện vọng NV1–NV3"
         >
-          <span>⭐ Danh sách nguyện vọng NV1-NV3</span>
+          <span>⭐ Nguyện vọng NV1–NV3</span>
           <span className="tab-badge">{preferences.length}</span>
         </button>
       </div>
