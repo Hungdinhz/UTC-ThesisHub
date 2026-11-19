@@ -244,8 +244,3 @@ student-capstone-system/
 
 ---
 
-## 👨‍💻 Thông tin đồ án & Đơn vị phát triển
-
-* **Học phần:** Phát triển phần mềm mã nguồn mở
-* **Đơn vị:** Khoa Công nghệ Thông tin – Trường Đại học Giao thông Vận tải (UTC)
-* **Kho lưu trữ chính thức:** [kkhoautc/student-capstone-system](https://github.com/kkhoautc/student-capstone-system)

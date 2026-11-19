@@ -123,6 +123,7 @@ export const AssignmentProposalTable: React.FC<Props> = ({
               <th>#</th>
               <th>Mã SV</th>
               <th>Sinh viên</th>
+              <th>Lớp</th>
               <th>Hệ ĐT</th>
               <th>Hướng đồ án</th>
               <th>Giảng viên hướng dẫn</th>
@@ -135,9 +136,9 @@ export const AssignmentProposalTable: React.FC<Props> = ({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="empty-row">
-                  Chưa có kết quả phân công nào phù hợp với bộ lọc
-                </td>
+                  <td colSpan={11} className="empty-row">
+                    Chưa có kết quả phân công nào phù hợp với bộ lọc
+                  </td>
               </tr>
             ) : (
               filtered.map((item, index) => (
@@ -145,16 +146,17 @@ export const AssignmentProposalTable: React.FC<Props> = ({
                   <td>{index + 1}</td>
                   <td className="font-semibold text-primary">{item.studentCode}</td>
                   <td>
-                    <div className="student-name-block">
-                      <strong>{item.studentName}</strong>
-                      <span className="text-xs text-muted">{item.studentClass || '—'}</span>
-                    </div>
+                    <strong>{item.studentName}</strong>
+                  </td>
+                  <td>
+                    <span style={{ color: '#475569', fontWeight: 500, fontSize: '0.85rem' }}>
+                      {item.studentClass || '—'}
+                    </span>
                   </td>
                   <td>
                     <span
-                      className={`program-badge ${
-                        item.trainingProgramCode === 'KY_SU' ? 'badge-kysu' : 'badge-cunhan'
-                      }`}
+                      className={`program-badge ${item.trainingProgramCode === 'KY_SU' ? 'badge-kysu' : 'badge-cunhan'
+                        }`}
                     >
                       {item.trainingProgramCode === 'KY_SU' ? 'Kỹ sư' : 'Cử nhân'}
                     </span>
@@ -199,19 +201,18 @@ export const AssignmentProposalTable: React.FC<Props> = ({
                   </td>
                   <td>
                     <span
-                      className={`status-badge ${
-                        item.status === 'FINALIZED'
+                      className={`status-badge ${item.status === 'FINALIZED'
                           ? 'badge-finalized'
                           : item.status === 'OVERRIDDEN'
-                          ? 'badge-amber'
-                          : 'badge-proposed'
-                      }`}
+                            ? 'badge-amber'
+                            : 'badge-proposed'
+                        }`}
                     >
                       {item.status === 'FINALIZED'
                         ? 'Đã chốt'
                         : item.status === 'OVERRIDDEN'
-                        ? 'Đã Override'
-                        : 'Hệ thống đề xuất'}
+                          ? 'Đã Override'
+                          : 'Hệ thống đề xuất'}
                     </span>
                   </td>
                   <td>

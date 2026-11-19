@@ -253,31 +253,43 @@ const StudentDashboard: React.FC = () => {
   };
 
   const handleCancelGroupRequest = async (groupId: number) => {
-    const confirmed = window.confirm('Bạn có chắc chắn muốn hủy yêu cầu nhóm này?');
-    if (!confirmed) return;
-
-    try {
-      await apiService.updateGroupRequest(groupId, { status: 'canceled' });
-      await loadGroupRequests(); // Reload group requests
-      toast.success('Đã hủy yêu cầu ghép nhóm thành công.');
-    } catch (error) {
-      console.error('Failed to cancel group request:', error);
-      toast.error('Không thể hủy yêu cầu ghép nhóm. Vui lòng thử lại!');
-    }
+    toast.confirm({
+      title: 'Hủy yêu cầu ghép nhóm',
+      message: 'Bạn có chắc chắn muốn hủy yêu cầu ghép nhóm này?',
+      type: 'warning',
+      confirmText: 'Hủy yêu cầu',
+      cancelText: 'Giữ lại',
+      onConfirm: async () => {
+        try {
+          await apiService.updateGroupRequest(groupId, { status: 'canceled' });
+          await loadGroupRequests(); // Reload group requests
+          toast.success('Đã hủy yêu cầu ghép nhóm thành công.');
+        } catch (error) {
+          console.error('Failed to cancel group request:', error);
+          toast.error('Không thể hủy yêu cầu ghép nhóm. Vui lòng thử lại!');
+        }
+      },
+    });
   };
 
   const handleCancelSupervisorRequest = async (requestId: number) => {
-    const confirmed = window.confirm('Bạn có chắc chắn muốn hủy yêu cầu giảng viên này?');
-    if (!confirmed) return;
-
-    try {
-      await apiService.updateSupervisorRequest(requestId, { status: 'canceled' });
-      await loadSupervisorRequests(); // Reload supervisor requests
-      toast.success('Đã hủy yêu cầu giảng viên hướng dẫn thành công.');
-    } catch (error) {
-      console.error('Failed to cancel supervisor request:', error);
-      toast.error('Không thể hủy yêu cầu giảng viên hướng dẫn. Vui lòng thử lại!');
-    }
+    toast.confirm({
+      title: 'Hủy yêu cầu giảng viên hướng dẫn',
+      message: 'Bạn có chắc chắn muốn hủy yêu cầu gửi đến giảng viên này?',
+      type: 'warning',
+      confirmText: 'Hủy yêu cầu',
+      cancelText: 'Giữ lại',
+      onConfirm: async () => {
+        try {
+          await apiService.updateSupervisorRequest(requestId, { status: 'canceled' });
+          await loadSupervisorRequests(); // Reload supervisor requests
+          toast.success('Đã hủy yêu cầu giảng viên hướng dẫn thành công.');
+        } catch (error) {
+          console.error('Failed to cancel supervisor request:', error);
+          toast.error('Không thể hủy yêu cầu giảng viên hướng dẫn. Vui lòng thử lại!');
+        }
+      },
+    });
   };
 
   if (loading && !profile) {

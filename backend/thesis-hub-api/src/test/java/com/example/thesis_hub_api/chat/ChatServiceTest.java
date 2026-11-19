@@ -58,6 +58,7 @@ class ChatServiceTest {
     @Mock private StudentProjectRoundRepository studentProjectRoundRepository;
     @Mock private ProjectDirectionRepository projectDirectionRepository;
     @Mock private DepartmentRepository departmentRepository;
+    @Mock private com.example.thesis_hub_api.notification.service.NotificationService notificationService;
 
     @InjectMocks
     private ChatService chatService;
@@ -368,5 +369,70 @@ class ChatServiceTest {
         when(lecturerRepository.findByUserId(101L)).thenReturn(Optional.of(lec1));
         chatService.deleteMessage(1L, 10L, 500L, 101L);
         verify(chatMessageRepository, times(2)).delete(savedMsg);
+    }
+
+    @Test
+    @DisplayName("Auto-initialize guidance chat rooms on GĐ2 finalize creates welcome message and notifies members")
+    void testInitializeGuidanceChatRooms_CreatesWelcomeMessageAndNotifications() {
+        when(projectRoundRepository.findById(1L)).thenReturn(Optional.of(round));
+        when(supervisorAssignmentRepository.findByProjectRoundId(1L)).thenReturn(List.of(
+                SupervisorAssignment.builder().id(1L).projectRoundId(1L).lecturerId(10L).studentId(1L).status("FINALIZED").build(),
+                SupervisorAssignment.builder().id(2L).projectRoundId(1L).lecturerId(10L).studentId(2L).status("FINALIZED").build()
+        ));
+        when(lecturerRepository.findById(10L)).thenReturn(Optional.of(lec1));
+        when(chatMessageRepository.countByProjectRoundIdAndLecturerId(1L, 10L)).thenReturn(0L);
+        when(studentRepository.findById(1L)).thenReturn(Optional.of(stu1));
+        when(studentRepository.findById(2L)).thenReturn(Optional.of(stu2));
+
+        int initialized = chatService.initializeGuidanceChatRooms(1L);
+        assertEquals(1, initialized);
+
+        // Verify welcome message saved
+        verify(chatMessageRepository, times(1)).save(org.mockito.ArgumentMatchers.argThat(msg ->
+                msg.getProjectRoundId().equals(1L)
+                        && msg.getLecturerId().equals(10L)
+                        && "SYSTEM".equals(msg.getSenderRole())
+                        && msg.getContent().contains("Chào mừng Thầy/Cô")
+        ));
+
+        // Verify notifications sent to lecturer and 2 students
+        verify(notificationService, times(1)).createNotification(
+                org.mockito.ArgumentMatchers.eq(101L),
+                org.mockito.ArgumentMatchers.contains("Nhóm chat hướng dẫn"),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq("CHAT"),
+                org.mockito.ArgumentMatchers.eq("/chat")
+        );
+        verify(notificationService, times(1)).createNotification(
+                org.mockito.ArgumentMatchers.eq(201L),
+                org.mockito.ArgumentMatchers.contains("Nhóm chat hướng dẫn"),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq("CHAT"),
+                org.mockito.ArgumentMatchers.eq("/chat")
+        );
+        verify(notificationService, times(1)).createNotification(
+                org.mockito.ArgumentMatchers.eq(202L),
+                org.mockito.ArgumentMatchers.contains("Nhóm chat hướng dẫn"),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq("CHAT"),
+                org.mockito.ArgumentMatchers.eq("/chat")
+        );
+    }
+
+    @Test
+    @DisplayName("Admin accounts cannot view or enter guidance chat rooms")
+    void testAdminAccessDenied_CannotViewOrParticipateInGuidanceChat() {
+        Long adminUserId = 999L;
+        when(lecturerRepository.findByUserId(adminUserId)).thenReturn(Optional.empty());
+        when(studentRepository.findByUserId(adminUserId)).thenReturn(Optional.empty());
+
+        // Admin gets empty room list
+        List<ChatRoomResponseDTO> rooms = chatService.getMyRooms(adminUserId);
+        assertTrue(rooms.isEmpty());
+
+        // Admin cannot read room messages
+        AppException ex = assertThrows(AppException.class,
+                () -> chatService.getRoomMessages(1L, 10L, adminUserId));
+        assertEquals(ErrorCode.UNAUTHORIZED, ex.getErrorCode());
     }
 }

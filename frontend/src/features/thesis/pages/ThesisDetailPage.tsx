@@ -163,20 +163,28 @@ export const ThesisDetailPage: React.FC = () => {
     const confirmMsg = newStatus
       ? 'Xác nhận sinh viên ĐỦ điều kiện bảo vệ đồ án tốt nghiệp?'
       : 'Xác nhận chuyển trạng thái sang CHƯA ĐỦ điều kiện bảo vệ đồ án?';
-    if (!window.confirm(confirmMsg)) return;
 
-    try {
-      const updated = await thesisService.setDefenseEligible(thesis.id, newStatus);
-      setThesis(updated);
-      setSupervisedTheses((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      if (newStatus) {
-        toast.success('Đã xác nhận sinh viên ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!');
-      } else {
-        toast.warning('Đã cập nhật sang trạng thái CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ.');
-      }
-    } catch (err: any) {
-      toast.error('Không thể cập nhật trạng thái điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message));
-    }
+    toast.confirm({
+      title: 'Điều kiện bảo vệ đồ án',
+      message: confirmMsg,
+      type: newStatus ? 'success' : 'warning',
+      confirmText: newStatus ? 'Xác nhận ĐỦ ĐK' : 'Chưa đủ điều kiện',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          const updated = await thesisService.setDefenseEligible(thesis.id, newStatus);
+          setThesis(updated);
+          setSupervisedTheses((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+          if (newStatus) {
+            toast.success('Đã xác nhận sinh viên ĐỦ ĐIỀU KIỆN BẢO VỆ thành công!');
+          } else {
+            toast.warning('Đã cập nhật sang trạng thái CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ.');
+          }
+        } catch (err: any) {
+          toast.error('Không thể cập nhật trạng thái điều kiện bảo vệ: ' + (err?.response?.data?.message || err?.message));
+        }
+      },
+    });
   };
 
   if (loading) {

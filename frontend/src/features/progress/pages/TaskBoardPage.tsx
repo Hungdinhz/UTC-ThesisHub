@@ -499,68 +499,80 @@ export const TaskBoardPage: React.FC = () => {
     feedback: string
   ) => {
     if (!selectedTask) return;
+
+    const executeReview = async () => {
+      try {
+        setReviewLoading(true);
+        await progressService.reviewSubmission(submissionId, status, feedback);
+
+        // Update submissions list
+        setSubmissions(prev => prev.map(s => s.id === submissionId ? {
+          ...s,
+          status,
+          reviewFeedback: feedback,
+          reviewedAt: new Date().toISOString()
+        } : s));
+
+        if (status === 'ACCEPTED') {
+          setRevisedTaskIds(prev => {
+            const next = { ...prev, [selectedTask.id]: false };
+            try {
+              localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+            } catch {}
+            return next;
+          });
+          setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'COMPLETED', latestSubmissionStatus: 'ACCEPTED' } : t));
+          setSelectedTask(prev => prev ? { ...prev, status: 'COMPLETED', latestSubmissionStatus: 'ACCEPTED' } : null);
+
+          // Recalculate progress rate
+          const updatedTasks = tasks.map(t => t.id === selectedTask.id ? { ...t, status: 'COMPLETED' as const } : t);
+          const completedCount = updatedTasks.filter(t => t.status === 'COMPLETED').length;
+          const newRate = updatedTasks.length > 0 ? Math.round((completedCount / updatedTasks.length) * 100) : 100;
+
+          try {
+            await thesisService.updateThesisCompletionRate(selectedThesisId, newRate);
+            if (currentThesis) {
+              setCurrentThesis({ ...currentThesis, completionRate: newRate });
+            }
+            setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, completionRate: newRate } : t));
+          } catch {}
+
+          toast.success(`Đã nghiệm thu ĐẠT! Task đã chuyển sang HOÀN THÀNH. Tiến độ đề tài tăng lên ${newRate}%.`);
+        } else {
+          setRevisedTaskIds(prev => {
+            const next = { ...prev, [selectedTask.id]: false };
+            try {
+              localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
+            } catch {}
+            return next;
+          });
+          setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'REVISE', latestSubmissionStatus: 'REVISE_REQUIRED' } : t));
+          setSelectedTask(prev => prev ? { ...prev, status: 'REVISE', latestSubmissionStatus: 'REVISE_REQUIRED' } : null);
+          toast.warning('Đã gửi yêu cầu sửa lại (REVISE_REQUIRED). Task đã chuyển về cột CẦN SỬA để sinh viên làm lại.');
+        }
+      } catch (err: any) {
+        console.error('Lỗi khi đánh giá bài nộp:', err);
+        toast.error('Không thể lưu kết quả đánh giá bài nộp: ' + (err?.response?.data?.message || err?.message || 'Lỗi máy chủ'));
+      } finally {
+        setReviewLoading(false);
+        setReviewModalSubmission(null);
+        setReviewFeedbackInput('');
+      }
+    };
+
     if (status === 'ACCEPTED') {
-      if (!window.confirm('Xác nhận NGHIỆM THU ĐẠT bài nộp này? Công việc sẽ chuyển sang trạng thái HOÀN THÀNH (COMPLETED).')) {
-        return;
-      }
+      toast.confirm({
+        title: 'Nghiệm thu đạt bài nộp',
+        message: 'Xác nhận NGHIỆM THU ĐẠT bài nộp này? Công việc sẽ chuyển sang trạng thái HOÀN THÀNH (COMPLETED).',
+        type: 'success',
+        confirmText: 'Nghiệm thu đạt',
+        cancelText: 'Hủy bỏ',
+        onConfirm: executeReview,
+      });
+      return;
     }
-    try {
-      setReviewLoading(true);
-      await progressService.reviewSubmission(submissionId, status, feedback);
 
-      // Update submissions list
-      setSubmissions(prev => prev.map(s => s.id === submissionId ? {
-        ...s,
-        status,
-        reviewFeedback: feedback,
-        reviewedAt: new Date().toISOString()
-      } : s));
-
-      if (status === 'ACCEPTED') {
-        setRevisedTaskIds(prev => {
-          const next = { ...prev, [selectedTask.id]: false };
-          try {
-            localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
-          } catch {}
-          return next;
-        });
-        setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'COMPLETED', latestSubmissionStatus: 'ACCEPTED' } : t));
-        setSelectedTask(prev => prev ? { ...prev, status: 'COMPLETED', latestSubmissionStatus: 'ACCEPTED' } : null);
-
-        // Recalculate progress rate
-        const updatedTasks = tasks.map(t => t.id === selectedTask.id ? { ...t, status: 'COMPLETED' as const } : t);
-        const completedCount = updatedTasks.filter(t => t.status === 'COMPLETED').length;
-        const newRate = updatedTasks.length > 0 ? Math.round((completedCount / updatedTasks.length) * 100) : 100;
-
-        try {
-          await thesisService.updateThesisCompletionRate(selectedThesisId, newRate);
-          if (currentThesis) {
-            setCurrentThesis({ ...currentThesis, completionRate: newRate });
-          }
-          setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, completionRate: newRate } : t));
-        } catch {}
-
-        toast.success(`Đã nghiệm thu ĐẠT! Task đã chuyển sang HOÀN THÀNH. Tiến độ đề tài tăng lên ${newRate}%.`);
-      } else {
-        setRevisedTaskIds(prev => {
-          const next = { ...prev, [selectedTask.id]: false };
-          try {
-            localStorage.setItem('utc_revised_tasks_v1', JSON.stringify(next));
-          } catch {}
-          return next;
-        });
-        setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'REVISE', latestSubmissionStatus: 'REVISE_REQUIRED' } : t));
-        setSelectedTask(prev => prev ? { ...prev, status: 'REVISE', latestSubmissionStatus: 'REVISE_REQUIRED' } : null);
-        toast.warning('Đã gửi yêu cầu sửa lại (REVISE_REQUIRED). Task đã chuyển về cột CẦN SỬA để sinh viên làm lại.');
-      }
-    } catch (err: any) {
-      console.error('Lỗi khi đánh giá bài nộp:', err);
-      toast.error('Không thể lưu kết quả đánh giá bài nộp: ' + (err?.response?.data?.message || err?.message || 'Lỗi máy chủ'));
-    } finally {
-      setReviewLoading(false);
-      setReviewModalSubmission(null);
-      setReviewFeedbackInput('');
-    }
+    await executeReview();
   };
 
   // Fetch supervisor score whenever selectedThesisId changes
@@ -590,24 +602,29 @@ export const TaskBoardPage: React.FC = () => {
   // Lecturer confirm NOT eligible for defense
   const handleConfirmNotDefenseEligible = async () => {
     if (!currentThesis) return;
-    const ok = window.confirm(
-      `Xác nhận đánh dấu sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp?`
-    );
-    if (!ok) return;
-    try {
-      setDefenseReadyLoading(true);
-      const updated = await thesisService.setDefenseEligible(selectedThesisId, false);
-      setCurrentThesis({ ...updated, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' });
-      setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' } : t));
-      toast.warning(`Đã xác nhận sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp.`);
-    } catch (err: any) {
-      console.error('Lỗi khi cập nhật trạng thái không đủ điều kiện bảo vệ:', err);
-      setCurrentThesis({ ...currentThesis, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' });
-      setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' } : t));
-      toast.warning(`Đã cập nhật trạng thái: CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ cho sinh viên ${currentThesis.studentFullName}.`);
-    } finally {
-      setDefenseReadyLoading(false);
-    }
+    toast.confirm({
+      title: 'Xác nhận chưa đủ điều kiện bảo vệ',
+      message: `Xác nhận đánh dấu sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp?`,
+      type: 'error',
+      confirmText: 'Chưa đủ điều kiện',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setDefenseReadyLoading(true);
+          const updated = await thesisService.setDefenseEligible(selectedThesisId, false);
+          setCurrentThesis({ ...updated, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' });
+          setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' } : t));
+          toast.warning(`Đã xác nhận sinh viên ${currentThesis.studentFullName} (${currentThesis.studentCode}) CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ đồ án tốt nghiệp.`);
+        } catch (err: any) {
+          console.error('Lỗi khi cập nhật trạng thái không đủ điều kiện bảo vệ:', err);
+          setCurrentThesis({ ...currentThesis, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' });
+          setTheses(prev => prev.map(t => t.id === selectedThesisId ? { ...t, defenseEligible: false, status: 'DEFENSE_NOT_ELIGIBLE' } : t));
+          toast.warning(`Đã cập nhật trạng thái: CHƯA ĐỦ ĐIỀU KIỆN BẢO VỆ cho sinh viên ${currentThesis.studentFullName}.`);
+        } finally {
+          setDefenseReadyLoading(false);
+        }
+      },
+    });
   };
 
   const handleResetToInProgress = async () => {

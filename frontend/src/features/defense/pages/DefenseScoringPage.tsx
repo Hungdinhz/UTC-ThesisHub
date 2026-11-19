@@ -7,6 +7,7 @@ import { ResultSynthesisModal } from '../components/ResultSynthesisModal';
 import { defenseService } from '../services/defenseService';
 import { apiService } from '../../../services/api';
 import { getCouncilRoleLabel } from '../types';
+import { toast } from '../../../components/Toast';
 import type {
   ScoreItem,
   ScoreType,
@@ -260,26 +261,37 @@ export const DefenseScoringPage: React.FC = () => {
 
   const handleFinalizeAndPublishRound = async () => {
     if (!selectedRoundId) {
+      toast.error('Vui lòng chọn Đợt đồ án cần công bố kết quả và hoàn tất!');
       setNotification({ type: 'error', message: 'Vui lòng chọn Đợt đồ án cần công bố kết quả và hoàn tất!' });
       return;
     }
-    if (!window.confirm('Xác nhận hoàn tất và đóng Đợt đồ án này, đồng thời công bố kết quả chính thức về tài khoản của toàn bộ Sinh viên?')) {
-      return;
-    }
-    try {
-      setPublishingRound(true);
-      await defenseService.finalizeAndPublishRound(selectedRoundId);
-      setShowFinalizeModal(false);
-      setNotification({
-        type: 'success',
-        message: '🎓 Đã công bố kết quả bảo vệ chính thức tới toàn bộ Sinh viên và hoàn tất đóng Đợt đồ án!',
-      });
-      await initPage();
-    } catch (err: any) {
-      setNotification({ type: 'error', message: err?.message || 'Không thể hoàn tất và công bố kết quả đợt đồ án' });
-    } finally {
-      setPublishingRound(false);
-    }
+    toast.confirm({
+      title: 'Công bố kết quả & Chốt đợt đồ án',
+      message: 'Xác nhận hoàn tất và đóng Đợt đồ án này, đồng thời công bố kết quả chính thức về tài khoản của toàn bộ Sinh viên?',
+      type: 'warning',
+      confirmText: 'Công bố & Đóng đợt',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setPublishingRound(true);
+          await defenseService.finalizeAndPublishRound(selectedRoundId);
+          setShowFinalizeModal(false);
+          const msg = '🎓 Đã công bố kết quả bảo vệ chính thức tới toàn bộ Sinh viên và hoàn tất đóng Đợt đồ án!';
+          setNotification({
+            type: 'success',
+            message: msg,
+          });
+          toast.success(msg);
+          await initPage();
+        } catch (err: any) {
+          const errMsg = err?.message || 'Không thể hoàn tất và công bố kết quả đợt đồ án';
+          setNotification({ type: 'error', message: errMsg });
+          toast.error(errMsg);
+        } finally {
+          setPublishingRound(false);
+        }
+      },
+    });
   };
 
   const selectedThesis = useMemo(

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
 import type { DocumentRequirement, DocumentTypeValue } from '../types';
+import { toast } from './Toast';
 import './DocumentRequirementsManager.css';
 
 const DOCUMENT_TYPES: { value: DocumentTypeValue; label: string }[] = [
@@ -105,20 +106,31 @@ const DocumentRequirementsManager: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Delete this document requirement?')) return;
-    try {
-      setSubmitting(true);
-      setError(null);
-      await apiService.deleteDocumentRequirement(id);
-      await load();
-    } catch (err: any) {
-      const data = err.response?.data;
-      const message = data?.message || data?.detail || err.message || 'Failed to delete.';
-      const detail = typeof data?.detail === 'string' && data?.message ? data.detail : null;
-      setError(detail ? `${message}: ${detail}` : message);
-    } finally {
-      setSubmitting(false);
-    }
+    toast.confirm({
+      title: 'Xóa yêu cầu tài liệu',
+      message: 'Bạn có chắc chắn muốn xóa yêu cầu nộp tài liệu này?',
+      type: 'error',
+      confirmText: 'Xóa yêu cầu',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setSubmitting(true);
+          setError(null);
+          await apiService.deleteDocumentRequirement(id);
+          toast.success('Đã xóa yêu cầu tài liệu thành công!');
+          await load();
+        } catch (err: any) {
+          const data = err.response?.data;
+          const message = data?.message || data?.detail || err.message || 'Lỗi khi xóa yêu cầu.';
+          const detail = typeof data?.detail === 'string' && data?.message ? data.detail : null;
+          const finalMsg = detail ? `${message}: ${detail}` : message;
+          setError(finalMsg);
+          toast.error(finalMsg);
+        } finally {
+          setSubmitting(false);
+        }
+      },
+    });
   };
 
   const formatDeadline = (s: string) => {

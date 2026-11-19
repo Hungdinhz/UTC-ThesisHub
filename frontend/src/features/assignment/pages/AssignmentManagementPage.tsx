@@ -17,6 +17,7 @@ import { LecturerCapacityManager } from '../components/LecturerCapacityManager';
 import { DirectionRegistrationList } from '../components/DirectionRegistrationList';
 import { PreferenceList } from '../components/PreferenceList';
 import { AssignmentNotifyModal } from '../components/AssignmentNotifyModal';
+import { toast } from '../../../components/Toast';
 import '../assignment.css';
 import { getRoundStageNumber } from '../../../utils/phaseTracking';
 import type { AssignmentNotifyRequest } from '../types';
@@ -159,35 +160,49 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
       return;
     }
 
-    if (isFinalized) {
-      if (!window.confirm('Đợt đồ án này đã được chốt phân công. Bạn có chắc muốn chạy lại thuật toán phân công đề xuất?')) {
-        return;
+    const runGeneration = async () => {
+      try {
+        setActionLoading(true);
+        setAlert(null);
+        const generated = await assignmentService.generateAssignments(effectiveRoundId, true);
+        setProposals(generated);
+        const updatedStats = await assignmentService.getStats(effectiveRoundId);
+        setStats(updatedStats);
+        const updatedCapacities = await assignmentService.getCapacities(effectiveRoundId);
+        setCapacities(updatedCapacities);
+
+        const msg = `Thuật toán phân công đã thực thi thành công! Đã sinh phương án cho ${generated.length} sinh viên trong đợt ${currentRound?.name || effectiveRoundId}.`;
+        setAlert({
+          type: 'success',
+          message: msg,
+        });
+        toast.success(msg);
+        setActiveTab('proposals');
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi thực thi thuật toán phân công.';
+        setAlert({
+          type: 'danger',
+          message: errMsg,
+        });
+        toast.error(errMsg);
+      } finally {
+        setActionLoading(false);
       }
+    };
+
+    if (isFinalized) {
+      toast.confirm({
+        title: 'Chạy lại phân công đề xuất',
+        message: 'Đợt đồ án này đã được chốt phân công. Bạn có chắc muốn chạy lại thuật toán phân công đề xuất?',
+        type: 'warning',
+        confirmText: 'Chạy lại phân công',
+        cancelText: 'Hủy bỏ',
+        onConfirm: runGeneration,
+      });
+      return;
     }
 
-    try {
-      setActionLoading(true);
-      setAlert(null);
-      const generated = await assignmentService.generateAssignments(effectiveRoundId, true);
-      setProposals(generated);
-      const updatedStats = await assignmentService.getStats(effectiveRoundId);
-      setStats(updatedStats);
-      const updatedCapacities = await assignmentService.getCapacities(effectiveRoundId);
-      setCapacities(updatedCapacities);
-
-      setAlert({
-        type: 'success',
-        message: `Thuật toán phân công đã thực thi thành công! Đã sinh phương án cho ${generated.length} sinh viên trong đợt ${currentRound?.name || effectiveRoundId}.`,
-      });
-      setActiveTab('proposals');
-    } catch {
-      setAlert({
-        type: 'danger',
-        message: 'Có lỗi xảy ra khi thực thi thuật toán phân công.',
-      });
-    } finally {
-      setActionLoading(false);
-    }
+    await runGeneration();
   };
 
   // Manual Override: PUT /assignments/{id}/override
@@ -272,7 +287,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
 
       setAlert({
         type: 'success',
-        message: `Khoa đã CHỐT thành công kết quả phân công Giảng viên hướng dẫn cho đợt ${currentRound?.name || effectiveRoundId}!${droppedText}`,
+        message: `Khoa đã CHỐT thành công kết quả phân công Giảng viên hướng dẫn cho đợt ${currentRound?.name || effectiveRoundId}! Đã tự động kích hoạt Nhóm chat hướng dẫn cho các cặp GVHD & Sinh viên.${droppedText}`,
       });
     } catch {
       setAlert({
@@ -311,81 +326,98 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
   // Mở đợt đăng ký bổ sung cho các sinh viên chưa đăng ký
   const handleOpenSupplementary = async () => {
     if (isRoundClosed || !isAdmin) return;
-    if (!window.confirm('Bạn có chắc chắn muốn mở ĐỢT ĐĂNG KÝ BỔ SUNG cho các sinh viên chưa đăng ký nguyện vọng trong đợt đồ án này?')) {
-      return;
-    }
-    try {
-      setActionLoading(true);
-      setAlert(null);
-      const updatedStats = await assignmentService.openSupplementaryRegistration(effectiveRoundId);
-      setStats({ ...updatedStats, supplementaryOpen: true });
-      const refreshedRounds = await apiService.getProjectRounds();
-      setRounds(refreshedRounds || []);
-      const countInfo = updatedStats?.supplementaryCount !== undefined
-        ? ` (Đã mở lại và gửi thông báo cho ${updatedStats.supplementaryCount} sinh viên chưa đăng ký)`
-        : '';
-      setAlert({
-        type: 'success',
-        message: `🔔 THÔNG BÁO: Đã mở Đợt đăng ký bổ sung thành công!${countInfo}. Lưu ý: Trong thời gian mở đăng ký bổ sung, không thể bấm chốt/kết thúc đợt cho tới khi bấm "Kết thúc ĐK bổ sung".`,
-      });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {
-      setAlert({
-        type: 'danger',
-        message: 'Có lỗi xảy ra khi mở đợt đăng ký bổ sung.',
-      });
-    } finally {
-      setActionLoading(false);
-    }
+    toast.confirm({
+      title: 'Mở đợt đăng ký bổ sung',
+      message: 'Bạn có chắc chắn muốn mở ĐỢT ĐĂNG KÝ BỔ SUNG cho các sinh viên chưa đăng ký nguyện vọng trong đợt đồ án này?',
+      type: 'warning',
+      confirmText: 'Mở đăng ký bổ sung',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          setAlert(null);
+          const updatedStats = await assignmentService.openSupplementaryRegistration(effectiveRoundId);
+          setStats({ ...updatedStats, supplementaryOpen: true });
+          const refreshedRounds = await apiService.getProjectRounds();
+          setRounds(refreshedRounds || []);
+          const countInfo = updatedStats?.supplementaryCount !== undefined
+            ? ` (Đã mở lại và gửi thông báo cho ${updatedStats.supplementaryCount} sinh viên chưa đăng ký)`
+            : '';
+          const msg = `🔔 THÔNG BÁO: Đã mở Đợt đăng ký bổ sung thành công!${countInfo}. Lưu ý: Trong thời gian mở đăng ký bổ sung, không thể bấm chốt/kết thúc đợt cho tới khi bấm "Kết thúc ĐK bổ sung".`;
+          setAlert({
+            type: 'success',
+            message: msg,
+          });
+          toast.success(msg);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch {
+          const errMsg = 'Có lỗi xảy ra khi mở đợt đăng ký bổ sung.';
+          setAlert({
+            type: 'danger',
+            message: errMsg,
+          });
+          toast.error(errMsg);
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Chốt đợt đăng ký bổ sung & Xóa hẳn sinh viên không đăng ký khỏi đợt
   const handleFinalizeSupplementary = async () => {
     if (isRoundClosed || !isAdmin) return;
     if (!isSupplementaryOpen) {
+      toast.warning('Hiện tại đợt đồ án chưa mở đăng ký bổ sung nên không thể bấm Kết thúc ĐK bổ sung.');
       setAlert({
         type: 'warning',
         message: 'Hiện tại đợt đồ án chưa mở đăng ký bổ sung nên không thể bấm Kết thúc ĐK bổ sung.',
       });
       return;
     }
-    if (
-      !window.confirm(
-        'XÁC NHẬN CHỐT ĐỢT ĐĂNG KÝ BỔ SUNG:\n\n- Các sinh viên đã đăng ký bổ sung sẽ được phân công GVHD.\n- Các sinh viên VẪN CHƯA ĐĂNG KÝ sẽ bị XÓA HOÀN TOÀN khỏi đợt đồ án (không còn trong danh sách đợt nữa).\n\nBạn có chắc chắn muốn thực hiện?'
-      )
-    ) {
-      return;
-    }
-    try {
-      setActionLoading(true);
-      setAlert(null);
-      const updatedStats = await assignmentService.finalizeSupplementaryRegistration(effectiveRoundId);
-      setStats({ ...updatedStats, supplementaryOpen: false });
-      const [updatedProps, updatedCaps, updatedRegs, updatedPrefs, refreshedRounds] = await Promise.all([
-        assignmentService.getProposals(effectiveRoundId),
-        assignmentService.getCapacities(effectiveRoundId),
-        assignmentService.getRegistrations(effectiveRoundId),
-        assignmentService.getPreferences(effectiveRoundId),
-        apiService.getProjectRounds(),
-      ]);
-      setProposals(updatedProps);
-      setCapacities(updatedCaps);
-      setRegistrations(updatedRegs);
-      setPreferences(updatedPrefs);
-      setRounds(refreshedRounds || []);
-      setAlert({
-        type: 'success',
-        message: '✅ Đã kết thúc Đợt đăng ký bổ sung thành công! Các sinh viên đăng ký bổ sung đã được gán GVHD và các sinh viên không đăng ký đã bị xóa khỏi đợt đồ án.',
-      });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {
-      setAlert({
-        type: 'danger',
-        message: 'Có lỗi xảy ra khi chốt đợt đăng ký bổ sung.',
-      });
-    } finally {
-      setActionLoading(false);
-    }
+    toast.confirm({
+      title: 'Xác nhận chốt đợt đăng ký bổ sung',
+      message: 'Các sinh viên đã đăng ký bổ sung sẽ được phân công GVHD.\nCác sinh viên VẪN CHƯA ĐĂNG KÝ sẽ bị XÓA HOÀN TOÀN khỏi đợt đồ án (không còn trong danh sách đợt nữa).\n\nBạn có chắc chắn muốn thực hiện?',
+      type: 'error',
+      confirmText: 'Chốt & Xóa SV chưa ĐK',
+      cancelText: 'Hủy bỏ',
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          setAlert(null);
+          const updatedStats = await assignmentService.finalizeSupplementaryRegistration(effectiveRoundId);
+          setStats({ ...updatedStats, supplementaryOpen: false });
+          const [updatedProps, updatedCaps, updatedRegs, updatedPrefs, refreshedRounds] = await Promise.all([
+            assignmentService.getProposals(effectiveRoundId),
+            assignmentService.getCapacities(effectiveRoundId),
+            assignmentService.getRegistrations(effectiveRoundId),
+            assignmentService.getPreferences(effectiveRoundId),
+            apiService.getProjectRounds(),
+          ]);
+          setProposals(updatedProps);
+          setCapacities(updatedCaps);
+          setRegistrations(updatedRegs);
+          setPreferences(updatedPrefs);
+          setRounds(refreshedRounds || []);
+          const msg = 'Đã chốt đợt đăng ký bổ sung thành công! Các sinh viên không đăng ký đã được loại khỏi đợt.';
+          setAlert({
+            type: 'success',
+            message: msg,
+          });
+          toast.success(msg);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch {
+          const errMsg = 'Có lỗi xảy ra khi chốt đợt đăng ký bổ sung.';
+          setAlert({
+            type: 'danger',
+            message: errMsg,
+          });
+          toast.error(errMsg);
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Update Lecturer Capacity
@@ -750,32 +782,36 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
         <button
           className={`nav-tab-btn ${activeTab === 'proposals' ? 'active' : ''}`}
           onClick={() => setActiveTab('proposals')}
+          title="Kết quả phân công & Override"
         >
-          <span>📋 Kết quả phân công & Override</span>
+          <span>📋 Kết quả &amp; Override</span>
           <span className="tab-badge">{proposals.length}</span>
         </button>
 
         <button
           className={`nav-tab-btn ${activeTab === 'capacities' ? 'active' : ''}`}
           onClick={() => setActiveTab('capacities')}
+          title="Năng lực & Chỉ tiêu Giảng viên"
         >
-          <span>📊 Năng lực & Chỉ tiêu GV</span>
+          <span>📊 Năng lực &amp; Chỉ tiêu GV</span>
           <span className="tab-badge">{capacities.length}</span>
         </button>
 
         <button
           className={`nav-tab-btn ${activeTab === 'registrations' ? 'active' : ''}`}
           onClick={() => setActiveTab('registrations')}
+          title="Sinh viên đăng ký hướng đồ án"
         >
-          <span>👥 Sinh viên đăng ký hướng</span>
+          <span>👥 SV đăng ký hướng</span>
           <span className="tab-badge">{registrations.length}</span>
         </button>
 
         <button
           className={`nav-tab-btn ${activeTab === 'preferences' ? 'active' : ''}`}
           onClick={() => setActiveTab('preferences')}
+          title="Danh sách nguyện vọng NV1–NV3"
         >
-          <span>⭐ Danh sách nguyện vọng NV1-NV3</span>
+          <span>⭐ Nguyện vọng NV1–NV3</span>
           <span className="tab-badge">{preferences.length}</span>
         </button>
       </div>
@@ -907,6 +943,7 @@ export const AssignmentManagementPage: React.FC<Props> = ({ projectRoundId: prop
               >
                 <ul style={{ margin: 0, paddingLeft: '18px' }}>
                   <li>Sinh viên chưa đăng ký nguyện vọng sẽ chuyển sang trạng thái <strong>DROPPED</strong>.</li>
+                  <li>Hệ thống <strong>tự động kích hoạt Nhóm chat hướng dẫn</strong> riêng giữa từng Giảng viên hướng dẫn và các sinh viên của mình trong đợt.</li>
                   <li>Sau khi chốt, vẫn có thể sửa phân công thủ công từng sinh viên nếu cần.</li>
                 </ul>
               </div>

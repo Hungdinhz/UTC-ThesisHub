@@ -973,6 +973,7 @@ const OrganizationManagementPage: React.FC<OrganizationManagementPageProps> = ({
                 <option value="TIEN_SI">Tiến sĩ</option>
                 <option value="PGS">Phó Giáo sư</option>
                 <option value="GS">Giáo sư</option>
+                <option value="KS">Kỹ sư</option>
               </select>
               <select
                 value={lecturerDeptId || ''}
@@ -1048,8 +1049,8 @@ const OrganizationManagementPage: React.FC<OrganizationManagementPageProps> = ({
                           borderRadius: '4px',
                           fontSize: '0.8rem',
                           fontWeight: 600,
-                          backgroundColor: l.academicDegree === 'TIEN_SI' || l.academicDegree === 'PGS' || l.academicDegree === 'GS' ? '#fef3c7' : '#e0e7ff',
-                          color: l.academicDegree === 'TIEN_SI' || l.academicDegree === 'PGS' || l.academicDegree === 'GS' ? '#92400e' : '#3730a3',
+                          backgroundColor: l.academicDegree === 'KS' ? '#ecfdf5' : (l.academicDegree === 'TIEN_SI' || l.academicDegree === 'PGS' || l.academicDegree === 'GS' ? '#fef3c7' : '#e0e7ff'),
+                          color: l.academicDegree === 'KS' ? '#047857' : (l.academicDegree === 'TIEN_SI' || l.academicDegree === 'PGS' || l.academicDegree === 'GS' ? '#92400e' : '#3730a3'),
                         }}
                       >
                         {l.academicDegree || 'THAC_SI'}
@@ -1081,7 +1082,40 @@ const OrganizationManagementPage: React.FC<OrganizationManagementPageProps> = ({
                         <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic' }}>Chưa tham gia đợt</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 10px', color: '#047857', fontSize: '0.85rem' }}>{l.researchInterests || '—'}</td>
+                    <td style={{ padding: '12px 10px', minWidth: '220px' }}>
+                      {l.researchInterests ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {l.researchInterests.split(',').map((item, idx) => {
+                            const trimmed = item.trim();
+                            if (!trimmed) return null;
+                            const matched = FACULTY_RESEARCH_DIRECTIONS.find(
+                              (d) => d.code === trimmed || d.name.toLowerCase() === trimmed.toLowerCase()
+                            );
+                            const label = matched ? matched.name : trimmed;
+                            return (
+                              <span
+                                key={idx}
+                                style={{
+                                  backgroundColor: '#ecfdf5',
+                                  color: '#047857',
+                                  border: '1px solid #a7f3d0',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 500,
+                                  lineHeight: '1.3',
+                                }}
+                                title={label}
+                              >
+                                {label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic' }}>—</span>
+                      )}
+                    </td>
                     <td style={{ padding: '12px 10px', fontWeight: 600 }}>{l.maxThesisQuota || 5} SV</td>
                     <td style={{ padding: '12px 10px' }}>
                       <span style={{ color: l.isActive ? '#16a34a' : '#dc2626', fontWeight: 600, fontSize: '0.85rem' }}>
@@ -1556,6 +1590,7 @@ const OrganizationManagementPage: React.FC<OrganizationManagementPageProps> = ({
                     <option value="TIEN_SI">Tiến sĩ (TIEN_SI)</option>
                     <option value="PGS">Phó Giáo sư (PGS)</option>
                     <option value="GS">Giáo sư (GS)</option>
+                    <option value="KS">Kỹ sư (KS)</option>
                   </select>
                   {lecturerTouched.academicDegree && lecturerErrors.academicDegree && (
                     <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '4px', fontWeight: 500 }}>
