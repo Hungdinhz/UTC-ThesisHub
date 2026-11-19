@@ -216,6 +216,8 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
         return { label: 'Phó Giáo sư', bg: '#fce7f3', color: '#9d174d' };
       case 'GS':
         return { label: 'Giáo sư', bg: '#fae8ff', color: '#86198f' };
+      case 'KS':
+        return { label: 'Kỹ sư', bg: '#ecfdf5', color: '#047857' };
       case 'THAC_SI':
       default:
         return { label: 'Thạc sĩ', bg: '#e0e7ff', color: '#3730a3' };
@@ -487,6 +489,7 @@ export const RoundLecturersTab: React.FC<RoundLecturersTabProps> = ({
           <option value="TIEN_SI">Tiến sĩ</option>
           <option value="PGS">Phó Giáo sư</option>
           <option value="GS">Giáo sư</option>
+          <option value="KS">Kỹ sư</option>
         </select>
 
         <select

@@ -385,8 +385,28 @@ export const ProposalManagementPage: React.FC = () => {
 
   const handleSaveProposal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!titleVn.trim()) {
+      toast.error('Vui lòng nhập Tên đề tài (Tiếng Việt).');
+      return;
+    }
+    if (!description.trim()) {
+      toast.error('Vui lòng nhập Mô tả tóm tắt.');
+      return;
+    }
+    if (!objectives.trim()) {
+      toast.error('Vui lòng nhập Mục tiêu nghiên cứu.');
+      return;
+    }
+    if (!expectedResults.trim()) {
+      toast.error('Vui lòng nhập Kết quả dự kiến đạt được.');
+      return;
+    }
+    const cleanFileUrl = hasValidUploadedFile(fileUrl) ? fileUrl.trim() : '';
+    if (!cleanFileUrl) {
+      toast.error('Vui lòng tải lên hoặc đính kèm Tập tin đề cương đồ án.');
+      return;
+    }
     try {
-      const cleanFileUrl = hasValidUploadedFile(fileUrl) ? fileUrl.trim() : '';
       if (editingProposal) {
         await thesisService.updateProposal(editingProposal.id, {
           titleVn,
@@ -2083,44 +2103,57 @@ export const ProposalManagementPage: React.FC = () => {
               )}
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Tên đề tài (Tiếng Việt) *</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                  Tên đề tài (Tiếng Việt) <span style={{ color: '#dc2626' }}>*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={titleVn}
                   onChange={(e) => setTitleVn(e.target.value)}
+                  placeholder="Nhập tên đề tài tiếng Việt..."
                   style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
                 />
               </div>
 
-
-
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Mô tả tóm tắt</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                  Mô tả tóm tắt <span style={{ color: '#dc2626' }}>*</span>
+                </label>
                 <textarea
                   rows={2}
+                  required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Nhập mô tả tóm tắt đề tài..."
                   style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Mục tiêu nghiên cứu</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                  Mục tiêu nghiên cứu <span style={{ color: '#dc2626' }}>*</span>
+                </label>
                 <textarea
                   rows={2}
+                  required
                   value={objectives}
                   onChange={(e) => setObjectives(e.target.value)}
+                  placeholder="Nhập mục tiêu nghiên cứu..."
                   style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
                 />
               </div>
 
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>Kết quả dự kiến đạt được</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+                  Kết quả dự kiến đạt được <span style={{ color: '#dc2626' }}>*</span>
+                </label>
                 <textarea
                   rows={2}
+                  required
                   value={expectedResults}
                   onChange={(e) => setExpectedResults(e.target.value)}
+                  placeholder="Nhập kết quả dự kiến đạt được..."
                   style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
                 />
               </div>
@@ -2147,6 +2180,7 @@ export const ProposalManagementPage: React.FC = () => {
 
               <FileUploadInput
                 label="Tập tin đề cương đồ án"
+                required={true}
                 value={fileUrl}
                 onChange={(url) => setFileUrl(url)}
                 accept=".pdf,.doc,.docx"

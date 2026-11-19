@@ -30,10 +30,18 @@ public class CreateProposalRequest {
     @Size(max = 500, message = "Tên đề tài tiếng Anh tối đa 500 ký tự")
     private String titleEn;
 
+    @NotBlank(message = "Mô tả tóm tắt không được để trống")
     private String description;
+
+    @NotBlank(message = "Mục tiêu nghiên cứu không được để trống")
     private String objectives;
+
+    @NotBlank(message = "Kết quả dự kiến đạt được không được để trống")
     private String expectedResults;
+
     private String researchContent;
+
+    @NotBlank(message = "Tập tin đề cương đồ án không được để trống")
     private String fileUrl;
     private String rebuttalNotes;
 }
