@@ -7,6 +7,7 @@ export interface VnDateTimePickerProps {
   disabled?: boolean;
   placeholder?: string;
   id?: string;
+  hasError?: boolean;
 }
 
 /**
@@ -67,6 +68,7 @@ export const VnDateTimePicker: React.FC<VnDateTimePickerProps> = ({
   disabled,
   placeholder = 'dd/mm/yyyy hh:mm',
   id,
+  hasError = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -226,11 +228,13 @@ export const VnDateTimePicker: React.FC<VnDateTimePickerProps> = ({
             width: '100%',
             padding: '8px 36px 8px 12px',
             borderRadius: '6px',
-            border: '1px solid #cbd5e1',
+            border: hasError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
             fontSize: '0.9rem',
-            color: '#1e293b',
-            backgroundColor: disabled ? '#f1f5f9' : '#fff',
+            color: hasError ? '#b91c1c' : '#1e293b',
+            backgroundColor: disabled ? '#f1f5f9' : hasError ? '#fef2f2' : '#fff',
             outline: 'none',
+            boxShadow: hasError ? '0 0 0 2px rgba(239, 68, 68, 0.12)' : 'none',
+            transition: 'border-color 0.15s, background-color 0.15s',
           }}
         />
         <button

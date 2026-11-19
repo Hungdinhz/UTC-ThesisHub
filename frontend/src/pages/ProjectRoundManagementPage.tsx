@@ -54,6 +54,7 @@ const ProjectRoundManagementPage: React.FC = () => {
 
   // Modal Add Milestone
   const [showAddMilestoneModal, setShowAddMilestoneModal] = useState(false);
+  const [milestoneError, setMilestoneError] = useState<string | null>(null);
   const [newMilestone, setNewMilestone] = useState<CreateMilestonePayload>({
     name: '',
     phaseType: 'REGISTRATION',
@@ -246,6 +247,7 @@ const ProjectRoundManagementPage: React.FC = () => {
     const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0);
     const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59);
 
+    setMilestoneError(null);
     setNewMilestone({
       name: 'Đăng ký nguyện vọng & Hướng đề tài',
       phaseType: 'REGISTRATION',
@@ -263,18 +265,23 @@ const ProjectRoundManagementPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      setMilestoneError(null);
 
       const parsedStart = parseVnDateTime(newMilestone.startDate) || new Date(newMilestone.startDate);
       const parsedEnd = parseVnDateTime(newMilestone.endDate) || new Date(newMilestone.endDate);
 
       if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
-        setError('Định dạng ngày không hợp lệ. Vui lòng nhập theo định dạng ngày/tháng/năm (VD: 16/11/2026 08:00)');
+        const msg = 'Định dạng ngày không hợp lệ. Vui lòng nhập theo định dạng ngày/tháng/năm (VD: 16/11/2026 08:00)';
+        setMilestoneError(msg);
+        toast.error(msg);
         setLoading(false);
         return;
       }
 
       if (parsedStart > parsedEnd) {
-        setError('Ngày kết thúc phải diễn ra sau ngày bắt đầu!');
+        const msg = 'Ngày kết thúc phải diễn ra sau ngày bắt đầu! Vui lòng chọn lại thời gian mốc.';
+        setMilestoneError(msg);
+        toast.error(msg);
         setLoading(false);
         return;
       }
@@ -290,10 +297,15 @@ const ProjectRoundManagementPage: React.FC = () => {
       });
 
       setSuccessMsg('Thêm mốc thời gian thành công!');
+      toast.success('Thêm mốc thời gian thành công!');
       setShowAddMilestoneModal(false);
+      setMilestoneError(null);
       loadRoundDetail(selectedRound.roundId);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi thêm mốc thời gian');
+      const msg = err instanceof Error ? err.message : 'Lỗi khi thêm mốc thời gian';
+      setMilestoneError(msg);
+      toast.error(msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -1750,97 +1762,181 @@ const ProjectRoundManagementPage: React.FC = () => {
         )}
 
         {/* Modal Add Milestone */}
-        {showAddMilestoneModal && (
-          <div style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
-            <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px 32px', width: '100%', maxWidth: '500px' }}>
-              <h3 style={{ margin: '0 0 16px 0', color: '#0a3273' }}>Thêm Mốc Thời Gian (Timeline)</h3>
-              <form onSubmit={handleAddMilestone}>
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Tên mốc giai đoạn *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: Đăng ký nguyện vọng & Hướng đề tài"
-                    value={newMilestone.name}
-                    onChange={(e) => setNewMilestone({ ...newMilestone, name: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  />
-                </div>
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Loại giai đoạn (Phase Type) *</label>
-                  <select
-                    value={newMilestone.phaseType}
-                    onChange={(e) => {
-                      const selectedPhase = e.target.value;
-                      const phaseTitles: Record<string, string> = {
-                        REGISTRATION: 'Đăng ký nguyện vọng & Hướng đề tài',
-                        PROPOSAL_SUBMISSION: 'Nộp đề cương đồ án tốt nghiệp',
-                        WEEKLY_REPORT: 'Thực hiện đồ án & Báo cáo tiến độ tuần',
-                        ELIGIBILITY_REVIEW: 'Xét điều kiện bảo vệ đồ án tốt nghiệp',
-                        COMMITTEE_ASSIGNMENT: 'Thành lập và phân công Hội đồng chấm bảo vệ',
-                        DEFENSE: 'Bảo vệ đồ án tốt nghiệp trước Hội đồng',
-                      };
-                      setNewMilestone((prev) => ({
-                        ...prev,
-                        phaseType: selectedPhase,
-                        name: phaseTitles[selectedPhase] || prev.name,
-                      }));
-                    }}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  >
-                    <option value="REGISTRATION">Đăng ký nguyện vọng & Hướng đề tài (REGISTRATION)</option>
-                    <option value="PROPOSAL_SUBMISSION">Nộp đề cương đồ án tốt nghiệp (PROPOSAL_SUBMISSION)</option>
-                    <option value="WEEKLY_REPORT">Thực hiện đồ án & Báo cáo tiến độ tuần (WEEKLY_REPORT)</option>
-                    <option value="ELIGIBILITY_REVIEW">Xét điều kiện bảo vệ đồ án tốt nghiệp (ELIGIBILITY_REVIEW)</option>
-                    <option value="COMMITTEE_ASSIGNMENT">Thành lập và phân công Hội đồng chấm bảo vệ (COMMITTEE_ASSIGNMENT)</option>
-                    <option value="DEFENSE">Bảo vệ đồ án tốt nghiệp trước Hội đồng (DEFENSE)</option>
-                  </select>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Ngày bắt đầu *</label>
-                    <VnDateTimePicker
+        {showAddMilestoneModal && (() => {
+          const parsedStart = parseVnDateTime(newMilestone.startDate) || (newMilestone.startDate ? new Date(newMilestone.startDate) : null);
+          const parsedEnd = parseVnDateTime(newMilestone.endDate) || (newMilestone.endDate ? new Date(newMilestone.endDate) : null);
+          const isDateInvalid = Boolean(
+            parsedStart &&
+            parsedEnd &&
+            !isNaN(parsedStart.getTime()) &&
+            !isNaN(parsedEnd.getTime()) &&
+            parsedEnd < parsedStart
+          );
+
+          return (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '24px 32px', width: '100%', maxWidth: '520px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+                <h3 style={{ margin: '0 0 16px 0', color: '#0a3273' }}>Thêm Mốc Thời Gian (Timeline)</h3>
+                <form onSubmit={handleAddMilestone}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Tên mốc giai đoạn *</label>
+                    <input
+                      type="text"
                       required
-                      value={newMilestone.startDate}
-                      onChange={(val) => setNewMilestone((prev) => ({ ...prev, startDate: val }))}
+                      placeholder="VD: Đăng ký nguyện vọng & Hướng đề tài"
+                      value={newMilestone.name}
+                      onChange={(e) => {
+                        setNewMilestone({ ...newMilestone, name: e.target.value });
+                        setMilestoneError(null);
+                      }}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                     />
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Ngày kết thúc *</label>
-                    <VnDateTimePicker
-                      required
-                      value={newMilestone.endDate}
-                      onChange={(val) => setNewMilestone((prev) => ({ ...prev, endDate: val }))}
-                    />
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Loại giai đoạn (Phase Type) *</label>
+                    <select
+                      value={newMilestone.phaseType}
+                      onChange={(e) => {
+                        const selectedPhase = e.target.value;
+                        const phaseTitles: Record<string, string> = {
+                          REGISTRATION: 'Đăng ký nguyện vọng & Hướng đề tài',
+                          PROPOSAL_SUBMISSION: 'Nộp đề cương đồ án tốt nghiệp',
+                          WEEKLY_REPORT: 'Thực hiện đồ án & Báo cáo tiến độ tuần',
+                          ELIGIBILITY_REVIEW: 'Xét điều kiện bảo vệ đồ án tốt nghiệp',
+                          COMMITTEE_ASSIGNMENT: 'Thành lập và phân công Hội đồng chấm bảo vệ',
+                          DEFENSE: 'Bảo vệ đồ án tốt nghiệp trước Hội đồng',
+                        };
+                        setNewMilestone((prev) => ({
+                          ...prev,
+                          phaseType: selectedPhase,
+                          name: phaseTitles[selectedPhase] || prev.name,
+                        }));
+                        setMilestoneError(null);
+                      }}
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    >
+                      <option value="REGISTRATION">Đăng ký nguyện vọng & Hướng đề tài (REGISTRATION)</option>
+                      <option value="PROPOSAL_SUBMISSION">Nộp đề cương đồ án tốt nghiệp (PROPOSAL_SUBMISSION)</option>
+                      <option value="WEEKLY_REPORT">Thực hiện đồ án & Báo cáo tiến độ tuần (WEEKLY_REPORT)</option>
+                      <option value="ELIGIBILITY_REVIEW">Xét điều kiện bảo vệ đồ án tốt nghiệp (ELIGIBILITY_REVIEW)</option>
+                      <option value="COMMITTEE_ASSIGNMENT">Thành lập và phân công Hội đồng chấm bảo vệ (COMMITTEE_ASSIGNMENT)</option>
+                      <option value="DEFENSE">Bảo vệ đồ án tốt nghiệp trước Hội đồng (DEFENSE)</option>
+                    </select>
                   </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddMilestoneModal(false)}
-                    style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#0a3273', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    Thêm mốc
-                  </button>
-                </div>
-              </form>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '8px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Ngày bắt đầu *</label>
+                      <VnDateTimePicker
+                        required
+                        value={newMilestone.startDate}
+                        onChange={(val) => {
+                          setNewMilestone((prev) => ({ ...prev, startDate: val }));
+                          setMilestoneError(null);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
+                        Ngày kết thúc *
+                      </label>
+                      <VnDateTimePicker
+                        required
+                        value={newMilestone.endDate}
+                        hasError={isDateInvalid}
+                        onChange={(val) => {
+                          setNewMilestone((prev) => ({ ...prev, endDate: val }));
+                          setMilestoneError(null);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Thông báo lỗi khi Ngày kết thúc nhỏ hơn Ngày bắt đầu */}
+                  {isDateInvalid && (
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fca5a5',
+                        borderRadius: '8px',
+                        color: '#b91c1c',
+                        fontSize: '0.84rem',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '8px',
+                        margin: '10px 0 14px',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>⚠️</span>
+                      <div>
+                        <strong>Thời gian không hợp lệ:</strong> Ngày kết thúc không thể nhỏ hơn ngày bắt đầu! Vui lòng chọn lại ngày kết thúc diễn ra sau ngày bắt đầu.
+                      </div>
+                    </div>
+                  )}
+
+                  {milestoneError && !isDateInvalid && (
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fca5a5',
+                        borderRadius: '8px',
+                        color: '#b91c1c',
+                        fontSize: '0.84rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        margin: '10px 0 14px',
+                      }}
+                    >
+                      <span>⚠️</span>
+                      <div>{milestoneError}</div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '18px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddMilestoneModal(false);
+                        setMilestoneError(null);
+                      }}
+                      style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isDateInvalid || loading}
+                      style={{
+                        padding: '8px 20px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: isDateInvalid ? '#94a3b8' : '#0a3273',
+                        color: '#fff',
+                        fontWeight: 600,
+                        cursor: isDateInvalid ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      title={isDateInvalid ? 'Ngày kết thúc phải lớn hơn ngày bắt đầu' : undefined}
+                    >
+                      {loading ? 'Đang thêm...' : 'Thêm mốc'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Modal Xác nhận Chuyển Trạng Thái Đợt Đồ Án (Pages 4 & 5) */}
         {transitionTargetStatus && selectedRound && (
